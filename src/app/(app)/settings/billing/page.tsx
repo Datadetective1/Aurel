@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import { PLANS, formatPrice, type MeterKind } from '@/lib/billing/plans'
+import { FOUNDING_OFFER, PLANS, formatPrice, type MeterKind } from '@/lib/billing/plans'
+import { foundingPlacesRemaining } from './actions'
+import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
 import { features } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
@@ -18,10 +20,16 @@ const METER_LABEL: Partial<Record<MeterKind, string>> = {
   message_adaptation: 'Messages adapted',
 }
 
-export default async function BillingSettingsPage() {
+export default async function BillingSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>
+}) {
   await requireOnboardedUser()
+  const { checkout } = await searchParams
   const entitlements = await getEntitlements()
   const plan = PLANS[entitlements.plan]
+  const founding = await foundingPlacesRemaining()
 
   // Only meters with an actual numeric quota are worth showing a bar for.
   const metered = (Object.keys(METER_LABEL) as MeterKind[]).filter((kind) => {
@@ -40,6 +48,23 @@ export default async function BillingSettingsPage() {
   return (
     <div>
       <Eyebrow>Plan</Eyebrow>
+
+      {checkout === 'success' ? (
+        <p
+          role="status"
+          className="mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border border-positive/25 bg-positive-wash px-3.5 py-3 text-xs leading-relaxed text-positive"
+        >
+          <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+          Payment received. Your plan updates the moment Stripe confirms it — usually within
+          seconds. Reload if this page still shows the old plan.
+        </p>
+      ) : null}
+
+      {checkout === 'cancelled' ? (
+        <p className="mt-4 max-w-lg text-xs leading-relaxed text-ink-muted">
+          Checkout was cancelled and nothing was charged.
+        </p>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <span className="font-display text-2xl text-ink">{plan.name}</span>
@@ -102,11 +127,35 @@ export default async function BillingSettingsPage() {
         </section>
       ) : null}
 
-      <div className="mt-10 flex flex-wrap gap-2">
+      <div className="mt-10 flex flex-wrap items-start gap-2">
+        {features.billing && entitlements.plan === 'free' ? (
+          <UpgradeButton
+            label={
+              founding !== null && founding > 0
+                ? `Upgrade at the founding price — ${formatPrice(FOUNDING_OFFER.monthlyPriceCents)}`
+                : 'Upgrade to Pro'
+            }
+          />
+        ) : null}
+        {features.billing && entitlements.plan !== 'free' ? <ManageBillingButton /> : null}
         <Button asChild variant="secondary" size="sm">
           <Link href="/pricing">Compare plans</Link>
         </Button>
       </div>
+
+      {/* Only where someone could actually take a place. Advertising scarcity on
+          a deployment that cannot sell is a claim with nothing behind it. */}
+      {features.billing && founding !== null && founding > 0 && entitlements.plan === 'free' ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          {founding} founding {founding === 1 ? 'place' : 'places'} left. {FOUNDING_OFFER.blurb}
+        </p>
+      ) : null}
+
+      {entitlements.isFounding ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          You joined as a founding customer. {FOUNDING_OFFER.blurb}
+        </p>
+      ) : null}
 
       {!features.billing ? (
         <p className="mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border border-line bg-bg-sunken px-3.5 py-3 text-xs leading-relaxed text-ink-muted">
