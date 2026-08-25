@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { meetingBriefPrompt, readsAsImperative } from './meeting-brief'
-import type { MeetingContext, PersonContext, UserContext } from '../types'
+import type {
+  MeetingContext,
+  PersonContext,
+  ProfessionalFactContext,
+  UserContext,
+} from '../types'
 
 /**
  * Copy-quality tests for the composed brief.
@@ -39,11 +44,14 @@ function person(overrides: Partial<PersonContext> = {}): PersonContext {
     observations: { confirmed: [], observed: [], inferred: [] },
     recentInteractions: [],
     openCommitments: [],
+    professionalFacts: [],
+    publicSources: [],
+    lastResearchedAt: null,
     ...overrides,
   }
 }
 
-function brief(objective: string | null, participants: PersonContext[] = [person()]) {
+function input(objective: string | null, participants: PersonContext[] = [person()]) {
   const meeting: MeetingContext = {
     id: 'm1',
     title: 'Q3 capacity review',
@@ -56,7 +64,11 @@ function brief(objective: string | null, participants: PersonContext[] = [person
     importance: 4,
     participants,
   }
-  return meetingBriefPrompt.compose({ meeting, user })
+  return { meeting, user }
+}
+
+function brief(objective: string | null, participants: PersonContext[] = [person()]) {
+  return meetingBriefPrompt.compose(input(objective, participants))
 }
 
 /** Catches the doubled-stop and run-on patterns the composer used to produce. */
@@ -235,5 +247,130 @@ describe('meeting brief copy quality', () => {
     const citations = meetingBriefPrompt.cite(input)
     expect(citations.some((c) => c.observationId === 'o1')).toBe(true)
     expect(citations.every((c) => c.label.length > 0)).toBe(true)
+  })
+})
+
+/**
+ * FIRST-MEETING INTELLIGENCE
+ * =============================================================================
+ * The V1→V2 difference: before any private interaction exists, a brief must
+ * still be useful from public evidence — and must say plainly that it is public
+ * evidence, not a read on the person.
+ * =============================================================================
+ */
+
+function fact(overrides: Partial<ProfessionalFactContext> = {}): ProfessionalFactContext {
+  return {
+    id: 'f1',
+    kind: 'current_role',
+    value: 'VP Engineering',
+    detail: 'Meridian Systems',
+    evidenceLevel: 'observed',
+    asOf: '2026-06-01',
+    hasConflict: false,
+    sourceTitles: ['Meridian leadership page'],
+    ...overrides,
+  }
+}
+
+describe('first-meeting intelligence', () => {
+  const stranger = (facts: ProfessionalFactContext[]) =>
+    person({
+      fullName: 'Jordan Avery',
+      preferredName: 'Jordan',
+      displayName: 'Jordan Avery',
+      interactionCount: 0,
+      observations: { confirmed: [], observed: [], inferred: [] },
+      recentInteractions: [],
+      professionalFacts: facts,
+      publicSources: [
+        {
+          id: 's1',
+          title: 'Meridian leadership page',
+          url: 'https://meridian.example.com/team',
+          publisher: 'Meridian Systems',
+          sourceType: 'company_bio',
+          retrievedAt: '2026-08-20T00:00:00Z',
+          publishedAt: '2026-06-01T00:00:00Z',
+          identityStatus: 'confirmed',
+        },
+      ],
+    })
+
+  it('uses public evidence when there is no relationship history at all', () => {
+    const result = brief('Agreement on the platform investment.', [stranger([fact()])])
+    const participant = result.participants[0]!
+
+    expect(participant.publicContext.length).toBeGreaterThan(0)
+    expect(participant.publicContext[0]!.statement).toContain('VP Engineering')
+    // The claim must carry where it came from.
+    expect(participant.publicContext[0]!.sourceLabel).toBe('Meridian leadership page')
+  })
+
+  it('says relationship history is none yet, in those words', () => {
+    const result = brief('Agreement on scope.', [stranger([fact()])])
+    expect(result.participants[0]!.relationshipNote).toMatch(/relationship history: none yet/i)
+  })
+
+  it('marks guidance preliminary rather than presenting it as a read', () => {
+    const result = brief('Agreement on scope.', [stranger([fact()])])
+    expect(result.participants[0]!.publicOnly).toBe(true)
+    expect(result.participants[0]!.relationshipNote).toMatch(/preliminary/i)
+  })
+
+  it('keeps public context out of the relationship fields', () => {
+    const result = brief('Agreement on scope.', [stranger([fact()])])
+    const p = result.participants[0]!
+    // A company bio must never surface as "how to approach them".
+    expect(p.guidance.join(' ')).not.toContain('VP Engineering')
+    expect(p.whatMatters.join(' ')).not.toContain('VP Engineering')
+  })
+
+  it('states that what is known is public, not behavioural', () => {
+    const result = brief('Agreement on scope.', [stranger([fact()])])
+    expect(result.uncertainties.join(' ')).toMatch(
+      /comes from public sources.*not from working with them/i,
+    )
+  })
+
+  it('warns when a public detail is old rather than presenting it as current', () => {
+    const old = fact({ asOf: '2019-01-01' })
+    const result = brief('Agreement on scope.', [stranger([old])])
+    expect(result.uncertainties.join(' ')).toMatch(/over a year old/i)
+  })
+
+  it('warns when the source stated no date at all', () => {
+    const undated = fact({ asOf: null })
+    const result = brief('Agreement on scope.', [stranger([undated])])
+    expect(result.uncertainties.join(' ')).toMatch(/did not state when they were written/i)
+    // And the line itself must not imply currency.
+    const statement = result.participants[0]!.publicContext[0]!.statement
+    expect(statement).toContain('date not stated')
+  })
+
+  it('surfaces a disagreement between sources instead of picking one', () => {
+    const conflicted = fact({ hasConflict: true })
+    const result = brief('Agreement on scope.', [stranger([conflicted])])
+    expect(result.uncertainties.join(' ')).toMatch(/sources disagree/i)
+    expect(result.participants[0]!.publicContext[0]!.statement).toContain('sources disagree')
+  })
+
+  it('flags a single-mention fact as inferred', () => {
+    const thin = fact({ evidenceLevel: 'inferred', kind: 'theme', value: 'platform migration' })
+    const result = brief('Agreement on scope.', [stranger([thin])])
+    expect(result.participants[0]!.publicContext[0]!.statement).toContain('inferred from one mention')
+  })
+
+  it('cites the public sources so the user can open them', () => {
+    const citations = meetingBriefPrompt.cite?.(input('Agreement on scope.', [stranger([fact()])]))
+    expect(citations?.some((c) => c.sourceUrl === 'https://meridian.example.com/team')).toBe(true)
+  })
+
+  it('does not claim public knowledge for someone with no research at all', () => {
+    const result = brief('Agreement on scope.', [stranger([])])
+    const p = result.participants[0]!
+    expect(p.publicContext).toEqual([])
+    expect(p.publicOnly).toBe(false)
+    expect(result.uncertainties.join(' ')).toMatch(/no interaction history/i)
   })
 })

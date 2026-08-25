@@ -97,7 +97,8 @@ export function renderPerson(person: PersonContext): string {
       `Importance to the user: ${person.relevance}/5. ` +
       `Recorded interactions: ${person.interactionCount}.`,
   )
-  if (person.meetingRole) lines.push(`Role in this meeting: ${person.meetingRole.replace(/_/g, ' ')}.`)
+  if (person.meetingRole)
+    lines.push(`Role in this meeting: ${person.meetingRole.replace(/_/g, ' ')}.`)
 
   const group = (label: string, items: typeof person.observations.confirmed) => {
     if (items.length === 0) return
@@ -136,12 +137,54 @@ export function renderPerson(person: PersonContext): string {
   if (person.topics.length > 0) lines.push(`Topics: ${person.topics.join(', ')}.`)
   if (person.notes) lines.push(`User's notes: ${person.notes}`)
 
-  if (
-    person.observations.confirmed.length === 0 &&
-    person.observations.observed.length === 0 &&
-    person.recentInteractions.length === 0
-  ) {
+  // Public material is rendered in its own block, after everything earned
+  // through contact, and labelled so the model cannot present a company bio as
+  // a read on how someone behaves.
+  if (person.professionalFacts.length > 0) {
+    lines.push(
+      'PUBLIC PROFESSIONAL CONTEXT (from public sources — describes who they are, ' +
+        'NOT how they work with the user; never cite it as relationship knowledge):',
+    )
+    for (const f of person.professionalFacts) {
+      const freshness = f.asOf ? ` [as of ${f.asOf.slice(0, 10)}]` : ' [date not stated]'
+      const conflict = f.hasConflict ? ' [SOURCES DISAGREE]' : ''
+      const level = f.evidenceLevel === 'inferred' ? ' [inferred from one mention]' : ''
+      const cite = f.sourceTitles[0] ? ` (source: ${f.sourceTitles[0]})` : ''
+      lines.push(
+        `- ${f.kind.replace(/_/g, ' ')}: ${f.value}${f.detail ? ` — ${f.detail}` : ''}${freshness}${conflict}${level}${cite}`,
+      )
+    }
+  }
+
+  if (person.publicSources.length > 0) {
+    lines.push(
+      `Public sources read (${person.publicSources.length}): ` +
+        person.publicSources
+          .slice(0, 6)
+          .map((src) => src.title ?? src.publisher ?? src.url ?? 'untitled')
+          .join('; '),
+    )
+  }
+
+  const hasRelationshipRecord =
+    person.observations.confirmed.length > 0 ||
+    person.observations.observed.length > 0 ||
+    person.recentInteractions.length > 0
+
+  if (!hasRelationshipRecord && person.professionalFacts.length > 0) {
+    lines.push(
+      'NOTE: there is NO relationship history with this person — only public professional ' +
+        'context. Say "Relationship history: none yet" plainly. You may use the public context ' +
+        'for who they are and what they work on. Do NOT state how they communicate, decide or ' +
+        'react as if it were known; at most raise it as something to find out.',
+    )
+  } else if (!hasRelationshipRecord) {
     lines.push('NOTE: there is almost no record for this person. Say so rather than inventing one.')
+  } else if (person.professionalFacts.length > 0) {
+    lines.push(
+      'NOTE: where public context and recorded interactions disagree, the recorded ' +
+        'interactions win. They are first-hand and current; public material may be years old.',
+    )
   }
 
   return lines.join('\n')
@@ -165,7 +208,9 @@ export function renderUser(user: UserContext): string {
       'Where the user and the other person differ, name the gap and tell the user what to adjust.',
     )
   } else {
-    lines.push('The user has not completed an Interaction Profile, so do not reference their style.')
+    lines.push(
+      'The user has not completed an Interaction Profile, so do not reference their style.',
+    )
   }
   return lines.join('\n')
 }

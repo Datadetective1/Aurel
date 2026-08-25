@@ -72,8 +72,47 @@ export interface PersonContext {
   }
   recentInteractions: InteractionContext[]
   openCommitments: CommitmentContext[]
+  /**
+   * Source-backed public professional facts, from research.
+   *
+   * Kept separate from `observations` on purpose. An observation is what it is
+   * like to WORK with someone, earned through interaction. A fact is who they
+   * are professionally, taken from public material. They age differently, they
+   * are sourced differently, and one must never be presented as the other.
+   */
+  professionalFacts: ProfessionalFactContext[]
+  /** Public sources analysed for this person, newest first. */
+  publicSources: PublicSourceContext[]
+  /** When research last ran. Null means never. */
+  lastResearchedAt: string | null
   /** Role in the specific meeting being prepared for, when applicable. */
   meetingRole?: AttendeeRole
+}
+
+export interface ProfessionalFactContext {
+  id: string
+  kind: string
+  value: string
+  detail: string | null
+  evidenceLevel: EvidenceLevel
+  /** Publication or confirmation date, when the source stated one. */
+  asOf: string | null
+  /** True when sources disagreed and it could not be resolved. */
+  hasConflict: boolean
+  /** Titles of the sources supporting it, for citation. */
+  sourceTitles: string[]
+}
+
+export interface PublicSourceContext {
+  id: string
+  title: string | null
+  url: string | null
+  publisher: string | null
+  sourceType: string
+  retrievedAt: string | null
+  publishedAt: string | null
+  /** How confident we are that this source is about THIS person. */
+  identityStatus: string | null
 }
 
 export interface UserContext {
@@ -117,6 +156,9 @@ export interface Citation {
   interactionId?: string
   commitmentId?: string
   personId?: string
+  /** A public source this claim rests on, so the user can open it. */
+  sourceId?: string
+  sourceUrl?: string
 }
 
 export interface Provenance {

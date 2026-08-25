@@ -42,7 +42,9 @@ export interface SearchQuery {
 export interface SearchProvider {
   readonly id: string
   readonly configured: boolean
-  search(query: SearchQuery): Promise<
+  search(
+    query: SearchQuery,
+  ): Promise<
     | { ok: true; results: SearchResultItem[]; costUnits: number }
     | { ok: false; reason: 'not_configured' | 'rate_limited' | 'error'; detail?: string }
   >
@@ -60,7 +62,9 @@ export interface EnrichmentCandidate {
 export interface EnrichmentProvider {
   readonly id: string
   readonly configured: boolean
-  resolvePerson(query: SearchQuery): Promise<
+  resolvePerson(
+    query: SearchQuery,
+  ): Promise<
     | { ok: true; candidates: EnrichmentCandidate[]; costUnits: number }
     | { ok: false; reason: 'not_configured' | 'no_match' | 'error'; detail?: string }
   >
@@ -131,6 +135,54 @@ function braveSearch(apiKey: string): SearchProvider {
   }
 }
 
+/**
+ * Deterministic provider for automated tests.
+ *
+ * Returns fixed candidate URLs derived from the query, so the discovery →
+ * ingest → fact pipeline can be exercised without a paid key and without a
+ * network call whose results change week to week.
+ *
+ * Refuses to run outside development. A "search provider" that invents results
+ * would be a lie in production, and the whole point of this product is that its
+ * evidence is real. Enabled with SEARCH_PROVIDER=mock.
+ */
+function mockSearch(): SearchProvider {
+  if (process.env.NODE_ENV === 'production') {
+    logger.warn('research.mock_provider_refused_in_production')
+    return unconfiguredSearch
+  }
+
+  return {
+    id: 'mock',
+    configured: true,
+    async search(query) {
+      const slug = query.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+      const org = (query.organization ?? 'example').toLowerCase().replace(/[^a-z0-9]+/g, '')
+      return {
+        ok: true,
+        costUnits: 0,
+        results: [
+          {
+            url: `https://${org}.example.com/team/${slug}`,
+            title: `${query.name} — ${query.organization ?? 'Team'}`,
+            snippet: `${query.name}${query.jobTitle ? `, ${query.jobTitle}` : ''}.`,
+            rank: 0,
+          },
+          {
+            url: `https://conference.example.com/speakers/${slug}`,
+            title: `${query.name} · Speaker`,
+            snippet: `Conference profile for ${query.name}.`,
+            rank: 1,
+          },
+        ],
+      }
+    },
+  }
+}
+
 /** Serper (Google SERP proxy). Second implementation, proving the seam works. */
 function serperSearch(apiKey: string): SearchProvider {
   return {
@@ -141,7 +193,10 @@ function serperSearch(apiKey: string): SearchProvider {
         const response = await fetch('https://google.serper.dev/search', {
           method: 'POST',
           headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ q: buildQueryString(query), num: Math.min(query.limit ?? 10, 20) }),
+          body: JSON.stringify({
+            q: buildQueryString(query),
+            num: Math.min(query.limit ?? 10, 20),
+          }),
           signal: AbortSignal.timeout(10_000),
         })
 
@@ -188,6 +243,7 @@ function buildQueryString(query: SearchQuery): string {
 
 export function resolveSearchProvider(): SearchProvider {
   const provider = serverEnv.SEARCH_PROVIDER
+  if (provider === 'mock') return mockSearch()
   if (provider === 'brave' && serverEnv.BRAVE_SEARCH_API_KEY) {
     return braveSearch(serverEnv.BRAVE_SEARCH_API_KEY)
   }

@@ -32,6 +32,20 @@ export const participantBriefSchema = z.object({
   knownConcerns: z.array(z.string()).max(4),
   /** One line on the state of this relationship. */
   relationshipNote: z.string(),
+  /**
+   * Source-backed public professional context.
+   *
+   * A SEPARATE field from `whatMatters` and `guidance` on purpose. Public
+   * material tells you who someone is; it does not tell you what it is like to
+   * work with them. Merging the two would let a conference bio masquerade as
+   * relationship knowledge, which is the failure this product exists to avoid.
+   */
+  publicContext: z
+    .array(z.object({ statement: z.string(), sourceLabel: z.string().nullable() }))
+    .max(6)
+    .default([]),
+  /** True when the ONLY thing known is public. Drives the preliminary framing. */
+  publicOnly: z.boolean().default(false),
 })
 
 export const meetingBriefSchema = z.object({
@@ -75,6 +89,13 @@ export interface MeetingBriefInput {
 
 const sentence = (s: string) => (s.trim().endsWith('.') ? s.trim() : `${s.trim()}.`)
 
+/** Whole months between a date and now. Used only for freshness warnings. */
+function monthsSince(iso: string): number {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return 0
+  return (Date.now() - then) / (1000 * 60 * 60 * 24 * 30.44)
+}
+
 function firstName(p: PersonContext) {
   return p.preferredName ?? p.displayName.split(' ')[0] ?? p.displayName
 }
@@ -90,6 +111,56 @@ function frictionSignals(p: PersonContext) {
   return [...p.observations.confirmed, ...p.observations.observed].filter((o) =>
     ['friction', 'trust'].includes(o.category),
   )
+}
+
+const FACT_PREFIX: Record<string, string> = {
+  current_role: 'Currently',
+  current_organization: 'At',
+  prior_role: 'Previously',
+  education: 'Studied',
+  expertise: 'Works on',
+  theme: 'Publicly focused on',
+  publication: 'Published',
+  appearance: 'Spoke at',
+  location: 'Based in',
+  communication_signal: 'Publicly',
+}
+
+/**
+ * Turn stored facts into readable lines, each carrying its source.
+ *
+ * Undated facts are marked rather than dropped. "VP Engineering" from a page of
+ * unknown age is still useful — presented as unquestionably current, it is a
+ * liability.
+ */
+function composePublicContext(p: PersonContext) {
+  return p.professionalFacts.slice(0, 6).map((fact) => {
+    const prefix = FACT_PREFIX[fact.kind]
+    const body = fact.detail ? `${fact.value} — ${fact.detail}` : fact.value
+    const stated = prefix ? `${prefix} ${lowerFirstWord(body)}` : body
+
+    const qualifier = fact.hasConflict
+      ? ' (sources disagree)'
+      : fact.evidenceLevel === 'inferred'
+        ? ' (inferred from one mention)'
+        : fact.asOf
+          ? ` (as of ${fact.asOf.slice(0, 10)})`
+          : ' (date not stated in the source)'
+
+    return {
+      statement: sentence(stated) + qualifier,
+      sourceLabel: fact.sourceTitles[0] ?? null,
+    }
+  })
+}
+
+function lowerFirstWord(value: string): string {
+  const t = value.trim()
+  if (!t) return t
+  // Leave acronyms and proper nouns alone: "CEO" must not become "cEO".
+  const first = t.split(/\s/)[0] ?? ''
+  if (first.length > 1 && first === first.toUpperCase()) return t
+  return t[0]!.toLowerCase() + t.slice(1)
 }
 
 function composeParticipant(p: PersonContext) {
@@ -118,8 +189,17 @@ function composeParticipant(p: PersonContext) {
     )
   }
 
+  const publicContext = composePublicContext(p)
+  // Public-only means: we know who they are, not what they are like to work
+  // with. That distinction changes how firmly everything below should be read.
+  const publicOnly = p.interactionCount === 0 && publicContext.length > 0
+
   let relationshipNote: string
-  if (p.interactionCount === 0) {
+  if (p.interactionCount === 0 && publicContext.length > 0) {
+    relationshipNote =
+      `Relationship history: none yet. What follows about them is public professional ` +
+      `context, not a read on how they work with you — treat communication guidance as preliminary.`
+  } else if (p.interactionCount === 0) {
     relationshipNote = `No recorded interactions yet. Treat everything below as a starting point, not a read.`
   } else {
     const last = p.lastInteractionAt ? p.lastInteractionAt.slice(0, 10) : 'an unrecorded date'
@@ -139,6 +219,8 @@ function composeParticipant(p: PersonContext) {
     guidance: guidance.slice(0, 4),
     knownConcerns: friction.slice(0, 4).map((o) => o.content),
     relationshipNote,
+    publicContext,
+    publicOnly,
   }
 }
 
@@ -147,9 +229,7 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   const people = meeting.participants
   const kindLabel = MEETING_KIND_LABEL[meeting.kind] ?? 'meeting'
 
-  const allCommitments = people.flatMap((p) =>
-    p.openCommitments.map((c) => ({ ...c, person: p })),
-  )
+  const allCommitments = people.flatMap((p) => p.openCommitments.map((c) => ({ ...c, person: p })))
   const overdue = allCommitments.filter((c) => c.isOverdue)
   const knownPeople = people.filter((p) => p.interactionCount > 0)
   const unknownPeople = people.filter((p) => p.interactionCount === 0)
@@ -186,10 +266,14 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   // --- recommended approach ---
   const approach: string[] = []
   if (overdue.length > 0) {
-    approach.push(`Open by closing the loop on ${overdue[0]!.description}, before you ask for anything.`)
+    approach.push(
+      `Open by closing the loop on ${overdue[0]!.description}, before you ask for anything.`,
+    )
   }
   const detailFirst = people.find((p) =>
-    communicationSignals(p).some((o) => /data|evidence|number|detail|proof|utilisation|utilization/i.test(o.content)),
+    communicationSignals(p).some((o) =>
+      /data|evidence|number|detail|proof|utilisation|utilization/i.test(o.content),
+    ),
   )
   if (detailFirst) {
     approach.push(
@@ -201,7 +285,9 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   }
   const decisionOwner = people.find((p) => p.meetingRole === 'decision_maker')
   if (decisionOwner) {
-    approach.push(`Close with ${firstName(decisionOwner)}, who owns the decision, and confirm the next step.`)
+    approach.push(
+      `Close with ${firstName(decisionOwner)}, who owns the decision, and confirm the next step.`,
+    )
   } else {
     approach.push('Confirm who owns the next step and by when, before the meeting ends.')
   }
@@ -226,7 +312,11 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
             )
             .slice(0, 5),
           knownDisagreements: people
-            .flatMap((p) => frictionSignals(p).slice(0, 1).map((o) => `${firstName(p)}: ${o.content}`))
+            .flatMap((p) =>
+              frictionSignals(p)
+                .slice(0, 1)
+                .map((o) => `${firstName(p)}: ${o.content}`),
+            )
             .slice(0, 5),
           unresolvedIssues: allCommitments
             .slice(0, 5)
@@ -248,11 +338,11 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
         // "I need sign-off", "Agreement on scope"). Any frame that splices the
         // objective into a verb phrase will be ungrammatical for some of them,
         // so the objective is quoted as a goal rather than conjugated.
-        (readsAsImperative(meeting.objective)
-          ? // An imperative objective is already a sentence. Announcing it as
-            // one beats forcing it into "...is <command>".
-            `Name the outcome in the first thirty seconds: "Here is what I want us to do today: ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
-          : `Name the outcome in the first thirty seconds: "What I'd like us to settle today is ${lowerFirst(stripLeadingVerb(meeting.objective))}"`)
+        readsAsImperative(meeting.objective)
+        ? // An imperative objective is already a sentence. Announcing it as
+          // one beats forcing it into "...is <command>".
+          `Name the outcome in the first thirty seconds: "Here is what I want us to do today: ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
+        : `Name the outcome in the first thirty seconds: "What I'd like us to settle today is ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
       : `Open by stating what you want the meeting to produce, so the room is working toward the same thing.`
 
   // --- emphasise / avoid ---
@@ -283,22 +373,26 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   // --- objections drawn only from recorded friction ---
   const likelyObjections = people
     .flatMap((p) =>
-      frictionSignals(p).slice(0, 2).map((o) => ({
-        objection: `${firstName(p)} may return to: ${o.content}`,
-        response:
-          'Acknowledge it directly, then show what has changed since they raised it. Do not re-argue the original point.',
-        basis:
-          o.evidenceLevel === 'confirmed'
-            ? 'They raised this themselves.'
-            : `Observed across ${o.reinforcementCount} recorded interaction${o.reinforcementCount === 1 ? '' : 's'}.`,
-      })),
+      frictionSignals(p)
+        .slice(0, 2)
+        .map((o) => ({
+          objection: `${firstName(p)} may return to: ${o.content}`,
+          response:
+            'Acknowledge it directly, then show what has changed since they raised it. Do not re-argue the original point.',
+          basis:
+            o.evidenceLevel === 'confirmed'
+              ? 'They raised this themselves.'
+              : `Observed across ${o.reinforcementCount} recorded interaction${o.reinforcementCount === 1 ? '' : 's'}.`,
+        })),
     )
     .slice(0, 5)
 
   // --- questions to ask ---
   const questionsToAsk: string[] = []
   if (decisionOwner) {
-    questionsToAsk.push(`"${firstName(decisionOwner)}, what would you need to see to decide today?"`)
+    questionsToAsk.push(
+      `"${firstName(decisionOwner)}, what would you need to see to decide today?"`,
+    )
   }
   for (const p of unknownPeople.slice(0, 2)) {
     questionsToAsk.push(`"${firstName(p)}, how do you like to receive this kind of update?"`)
@@ -327,9 +421,42 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
 
   // --- uncertainties: what Atturel genuinely does not know ---
   const uncertainties: string[] = []
-  if (unknownPeople.length > 0) {
+
+  // Someone researched but never met is a different state from someone we know
+  // nothing about, and the difference is worth stating precisely.
+  const publicOnlyPeople = unknownPeople.filter((p) => p.professionalFacts.length > 0)
+  const trulyUnknown = unknownPeople.filter((p) => p.professionalFacts.length === 0)
+
+  if (publicOnlyPeople.length > 0) {
     uncertainties.push(
-      `No interaction history with ${unknownPeople.map((p) => p.displayName).join(', ')}. Nothing here is a read on them.`,
+      `What is known about ${publicOnlyPeople.map((p) => p.displayName).join(', ')} comes from public sources, not from working with them. It describes who they are, not how they behave with you.`,
+    )
+  }
+  if (trulyUnknown.length > 0) {
+    uncertainties.push(
+      `No interaction history with ${trulyUnknown.map((p) => p.displayName).join(', ')}. Nothing here is a read on them.`,
+    )
+  }
+
+  // Stale public facts must not be read as current.
+  const stale = people.flatMap((p) =>
+    p.professionalFacts.filter((f) => f.asOf && monthsSince(f.asOf) >= 18),
+  )
+  if (stale.length > 0) {
+    uncertainties.push(
+      `Some public details above are over a year old and may no longer hold. Confirm the current role rather than assuming it.`,
+    )
+  }
+  const undated = people.flatMap((p) => p.professionalFacts.filter((f) => !f.asOf))
+  if (undated.length > 0 && stale.length === 0) {
+    uncertainties.push(
+      `The public sources did not state when they were written, so the details above cannot be confirmed as current.`,
+    )
+  }
+  const conflicted = people.flatMap((p) => p.professionalFacts.filter((f) => f.hasConflict))
+  if (conflicted.length > 0) {
+    uncertainties.push(
+      `Sources disagree on ${conflicted.length === 1 ? 'one public detail' : `${conflicted.length} public details`}. ${brand.name} has not picked a winner.`,
     )
   }
   if (!meeting.objective) {
@@ -370,7 +497,10 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   }
 }
 
-function buildSequencing(people: PersonContext[], decisionOwner: PersonContext | undefined): string[] {
+function buildSequencing(
+  people: PersonContext[],
+  decisionOwner: PersonContext | undefined,
+): string[] {
   const steps: string[] = ['Open with the decision you need, in one sentence.']
   const byRole = (role: string) => people.filter((p) => p.meetingRole === role)
 
@@ -396,14 +526,16 @@ function buildAnticipatedQuestions(people: PersonContext[]) {
       if (/data|number|evidence|proof|detail/i.test(o.content)) {
         out.push({
           question: `"What is this based on?" — likely from ${firstName(p)}`,
-          response: 'Have the source ready in one line, with the fuller working available if asked.',
+          response:
+            'Have the source ready in one line, with the fuller working available if asked.',
         })
       }
     }
     for (const c of p.openCommitments.slice(0, 1)) {
       out.push({
         question: `"Where did we land on ${stripTrailingStop(lowerFirst(c.description))}?" — likely from ${firstName(p)}`,
-        response: 'Give the current status and a date, even if the answer is that it has not moved.',
+        response:
+          'Give the current status and a date, even if the answer is that it has not moved.',
       })
     }
   }
@@ -491,6 +623,20 @@ function citeMeeting(input: MeetingBriefInput): Citation[] {
         label: `Open commitment: ${c.description}${c.isOverdue ? ' (overdue)' : ''}`,
         evidenceLevel: 'confirmed',
         commitmentId: c.id,
+        personId: p.id,
+      })
+    }
+    // Public sources are cited last, after everything earned through contact.
+    // Order here is what the evidence panel renders, and relationship evidence
+    // outranking public material is the whole argument of the product.
+    for (const source of p.publicSources) {
+      citations.push({
+        label: `Public source: ${source.title ?? source.url ?? 'untitled'}${
+          source.publisher ? ` — ${source.publisher}` : ''
+        }`,
+        evidenceLevel: 'observed',
+        sourceId: source.id,
+        sourceUrl: source.url ?? undefined,
         personId: p.id,
       })
     }

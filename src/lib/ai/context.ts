@@ -9,6 +9,8 @@ import type {
   MeetingContext,
   ObservationContext,
   PersonContext,
+  ProfessionalFactContext,
+  PublicSourceContext,
   UserContext,
 } from './types'
 
@@ -33,6 +35,47 @@ type Client = SupabaseClient<Database>
 /** How much history a prompt sees. Enough to be useful, bounded enough to stay cheap. */
 const RECENT_INTERACTION_LIMIT = 6
 const OBSERVATION_LIMIT = 40
+const PROFESSIONAL_FACT_LIMIT = 24
+
+/**
+ * Order facts so identity comes first and speculation last.
+ *
+ * Within the same evidence level, a fact with a stated date beats one without:
+ * "VP Engineering, as of March" is worth more than an undated title scraped
+ * from a page that could be five years old.
+ */
+const FACT_KIND_ORDER = [
+  'current_role',
+  'current_organization',
+  'location',
+  'expertise',
+  'education',
+  'prior_role',
+  'publication',
+  'appearance',
+  'theme',
+  'communication_signal',
+  'other',
+]
+
+const EVIDENCE_ORDER: Record<string, number> = {
+  confirmed: 0,
+  observed: 1,
+  inferred: 2,
+  unknown: 3,
+}
+
+function sortFacts(facts: ProfessionalFactContext[]): ProfessionalFactContext[] {
+  return [...facts].sort((a, b) => {
+    const byEvidence =
+      (EVIDENCE_ORDER[a.evidenceLevel] ?? 9) - (EVIDENCE_ORDER[b.evidenceLevel] ?? 9)
+    if (byEvidence !== 0) return byEvidence
+    const byKind =
+      (FACT_KIND_ORDER.indexOf(a.kind) + 1 || 99) - (FACT_KIND_ORDER.indexOf(b.kind) + 1 || 99)
+    if (byKind !== 0) return byKind
+    return (b.asOf ?? '').localeCompare(a.asOf ?? '')
+  })
+}
 
 function displayNameOf(fullName: string, preferred: string | null) {
   return preferred?.trim() || fullName
@@ -87,7 +130,12 @@ export async function getUserContext(supabase: Client, userId: string): Promise<
           lean,
           distinctiveness: Math.abs(delta) / 50,
         })
-        return { label: described.label, pole: described.pole, blurb: described.blurb, delta: Math.abs(delta) }
+        return {
+          label: described.label,
+          pole: described.pole,
+          blurb: described.blurb,
+          delta: Math.abs(delta),
+        }
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
       .sort((a, b) => b.delta - a.delta)
@@ -133,46 +181,79 @@ export async function getPeopleContext(
   const result = new Map<string, PersonContext>()
   if (personIds.length === 0) return result
 
-  const [people, observations, sources, participations, commitments, personTopics] =
-    await Promise.all([
-      supabase
-        .from('people')
-        .select(
-          'id, full_name, preferred_name, job_title, email, relationship_type, relevance, notes, first_interaction_at, last_interaction_at, organization_id, organizations(name)',
-        )
-        .eq('user_id', userId)
-        .in('id', personIds),
-      supabase
-        .from('observations')
-        .select('id, person_id, content, category, evidence_level, reinforcement_count, last_reinforced_at')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .in('person_id', personIds)
-        .order('reinforcement_count', { ascending: false })
-        .limit(OBSERVATION_LIMIT * personIds.length),
-      supabase
-        .from('observation_sources')
-        .select('observation_id, interaction_id, excerpt')
-        .eq('user_id', userId),
-      supabase
-        .from('interaction_participants')
-        .select('person_id, interactions(id, title, occurred_at, kind, summary, outcome, went_well)')
-        .eq('user_id', userId)
-        .in('person_id', personIds),
-      supabase
-        .from('commitments')
-        .select('id, person_id, description, owner, owner_person_id, due_on')
-        .eq('user_id', userId)
-        .eq('status', 'open')
-        .in('person_id', personIds),
-      supabase
-        .from('person_topics')
-        .select('person_id, topics(label)')
-        .eq('user_id', userId)
-        .in('person_id', personIds),
-    ])
+  const [
+    people,
+    observations,
+    sources,
+    participations,
+    commitments,
+    personTopics,
+    professionalFacts,
+    factSources,
+    publicSources,
+  ] = await Promise.all([
+    supabase
+      .from('people')
+      .select(
+        'id, full_name, preferred_name, job_title, email, relationship_type, relevance, notes, first_interaction_at, last_interaction_at, last_researched_at, organization_id, organizations(name)',
+      )
+      .eq('user_id', userId)
+      .in('id', personIds),
+    supabase
+      .from('observations')
+      .select(
+        'id, person_id, content, category, evidence_level, reinforcement_count, last_reinforced_at',
+      )
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .in('person_id', personIds)
+      .order('reinforcement_count', { ascending: false })
+      .limit(OBSERVATION_LIMIT * personIds.length),
+    supabase
+      .from('observation_sources')
+      .select('observation_id, interaction_id, excerpt')
+      .eq('user_id', userId),
+    supabase
+      .from('interaction_participants')
+      .select('person_id, interactions(id, title, occurred_at, kind, summary, outcome, went_well)')
+      .eq('user_id', userId)
+      .in('person_id', personIds),
+    supabase
+      .from('commitments')
+      .select('id, person_id, description, owner, owner_person_id, due_on')
+      .eq('user_id', userId)
+      .eq('status', 'open')
+      .in('person_id', personIds),
+    supabase
+      .from('person_topics')
+      .select('person_id, topics(label)')
+      .eq('user_id', userId)
+      .in('person_id', personIds),
+    // Only current facts. A superseded title is history, not context.
+    supabase
+      .from('professional_facts')
+      .select('id, person_id, kind, value, detail, evidence_level, as_of, has_conflict')
+      .eq('user_id', userId)
+      .eq('is_current', true)
+      .in('person_id', personIds)
+      .limit(PROFESSIONAL_FACT_LIMIT * personIds.length),
+    supabase
+      .from('fact_sources')
+      .select('fact_id, sources(source_title, publisher)')
+      .eq('user_id', userId),
+    supabase
+      .from('source_person_links')
+      .select(
+        'person_id, identity_match_status, sources(id, source_title, source_url, publisher, source_type, retrieved_at, published_at, access_status)',
+      )
+      .eq('user_id', userId)
+      .in('person_id', personIds),
+  ])
 
-  const sourcesByObservation = new Map<string, { interactionId: string | null; excerpt: string | null }[]>()
+  const sourcesByObservation = new Map<
+    string,
+    { interactionId: string | null; excerpt: string | null }[]
+  >()
   for (const s of sources.data ?? []) {
     const list = sourcesByObservation.get(s.observation_id) ?? []
     list.push({ interactionId: s.interaction_id, excerpt: s.excerpt })
@@ -211,7 +292,9 @@ export async function getPeopleContext(
     interactionsByPerson.set(row.person_id, list)
   }
 
-  const nameById = new Map((people.data ?? []).map((p) => [p.id, displayNameOf(p.full_name, p.preferred_name)]))
+  const nameById = new Map(
+    (people.data ?? []).map((p) => [p.id, displayNameOf(p.full_name, p.preferred_name)]),
+  )
 
   const commitmentsByPerson = new Map<string, CommitmentContext[]>()
   for (const c of commitments.data ?? []) {
@@ -226,6 +309,52 @@ export async function getPeopleContext(
       isOverdue: isOverdue(c.due_on),
     })
     commitmentsByPerson.set(c.person_id, list)
+  }
+
+  // A fact cites the sources that support it. A fact with none can never be
+  // presented above 'inferred', which the ingest pipeline already enforces.
+  const titlesByFact = new Map<string, string[]>()
+  for (const row of factSources.data ?? []) {
+    const title = row.sources?.source_title ?? row.sources?.publisher
+    if (!title) continue
+    const list = titlesByFact.get(row.fact_id) ?? []
+    list.push(title)
+    titlesByFact.set(row.fact_id, list)
+  }
+
+  const factsByPerson = new Map<string, ProfessionalFactContext[]>()
+  for (const f of professionalFacts.data ?? []) {
+    const list = factsByPerson.get(f.person_id) ?? []
+    list.push({
+      id: f.id,
+      kind: f.kind,
+      value: f.value,
+      detail: f.detail,
+      evidenceLevel: f.evidence_level,
+      asOf: f.as_of,
+      hasConflict: f.has_conflict,
+      sourceTitles: titlesByFact.get(f.id) ?? [],
+    })
+    factsByPerson.set(f.person_id, list)
+  }
+
+  const publicSourcesByPerson = new Map<string, PublicSourceContext[]>()
+  for (const row of publicSources.data ?? []) {
+    const src = row.sources
+    // A source we could not actually read is not evidence.
+    if (!src || src.access_status !== 'analyzed') continue
+    const list = publicSourcesByPerson.get(row.person_id) ?? []
+    list.push({
+      id: src.id,
+      title: src.source_title,
+      url: src.source_url,
+      publisher: src.publisher,
+      sourceType: src.source_type,
+      retrievedAt: src.retrieved_at,
+      publishedAt: src.published_at,
+      identityStatus: row.identity_match_status,
+    })
+    publicSourcesByPerson.set(row.person_id, list)
   }
 
   const topicsByPerson = new Map<string, string[]>()
@@ -264,6 +393,11 @@ export async function getPeopleContext(
       },
       recentInteractions: interactions.slice(0, RECENT_INTERACTION_LIMIT),
       openCommitments: commitmentsByPerson.get(p.id) ?? [],
+      professionalFacts: sortFacts(factsByPerson.get(p.id) ?? []),
+      publicSources: (publicSourcesByPerson.get(p.id) ?? []).sort((a, b) =>
+        (b.retrievedAt ?? '').localeCompare(a.retrievedAt ?? ''),
+      ),
+      lastResearchedAt: p.last_researched_at,
     })
   }
 
@@ -290,7 +424,9 @@ export async function getMeetingContext(
 ): Promise<MeetingContext | null> {
   const { data: meeting } = await supabase
     .from('meetings')
-    .select('id, title, kind, scheduled_at, duration_minutes, objective, stakes, extra_context, importance')
+    .select(
+      'id, title, kind, scheduled_at, duration_minutes, objective, stakes, extra_context, importance',
+    )
     .eq('user_id', userId)
     .eq('id', meetingId)
     .maybeSingle()
@@ -376,7 +512,9 @@ export async function getQuietRelationships(supabase: Client, userId: string, th
 export async function getOpenCommitments(supabase: Client, userId: string) {
   const { data } = await supabase
     .from('commitments')
-    .select('id, description, owner, due_on, person_id, people!commitments_person_id_fkey(full_name, preferred_name)')
+    .select(
+      'id, description, owner, due_on, person_id, people!commitments_person_id_fkey(full_name, preferred_name)',
+    )
     .eq('user_id', userId)
     .eq('status', 'open')
     .order('due_on', { ascending: true, nullsFirst: false })

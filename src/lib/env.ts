@@ -15,16 +15,21 @@ import { z } from 'zod'
  * bare `.optional()` would reject every commented-out integration key. Empty and
  * whitespace-only values are normalised to undefined before validation.
  */
-const blankToUndefined = (v: unknown) =>
-  typeof v === 'string' && v.trim() === '' ? undefined : v
+const blankToUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v)
 
 const optional = z.preprocess(blankToUndefined, z.string().trim().min(1).optional())
 
 const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optional,
-  AI_PROVIDER: z.preprocess(blankToUndefined, z.enum(['anthropic', 'openai', 'grounded']).catch('grounded')),
+  AI_PROVIDER: z.preprocess(
+    blankToUndefined,
+    z.enum(['anthropic', 'openai', 'grounded']).catch('grounded'),
+  ),
   AI_MODEL: z.preprocess(blankToUndefined, z.string().trim().min(1).catch('claude-opus-5')),
-  AI_EMBEDDING_PROVIDER: z.preprocess(blankToUndefined, z.enum(['anthropic', 'openai', 'none']).catch('none')),
+  AI_EMBEDDING_PROVIDER: z.preprocess(
+    blankToUndefined,
+    z.enum(['anthropic', 'openai', 'none']).catch('none'),
+  ),
   AI_EMBEDDING_MODEL: optional,
   ANTHROPIC_API_KEY: optional,
   OPENAI_API_KEY: optional,
@@ -45,7 +50,12 @@ const serverSchema = z.object({
   // --- research providers ---
   // Discovery (name -> candidate URLs) needs a paid key. Analysing a URL the
   // user supplies does not, which is why research still works without these.
-  SEARCH_PROVIDER: z.preprocess(blankToUndefined, z.enum(['brave', 'serper', 'none']).catch('none')),
+  // 'mock' is a deterministic development provider for tests; it refuses to
+  // run in production, so it can never fabricate evidence for a real user.
+  SEARCH_PROVIDER: z.preprocess(
+    blankToUndefined,
+    z.enum(['brave', 'serper', 'mock', 'none']).catch('none'),
+  ),
   BRAVE_SEARCH_API_KEY: optional,
   SERPER_API_KEY: optional,
 })

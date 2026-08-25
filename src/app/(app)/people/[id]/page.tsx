@@ -13,7 +13,8 @@ import { AddContext } from '@/components/app/add-context'
 import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
-import { ResearchPanel, SourceLink } from '@/components/app/research-panel'
+import { ResearchPanel } from '@/components/app/research-panel'
+import { SourceRow, type SourceRowData } from '@/components/app/source-controls'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
@@ -80,11 +81,7 @@ const FACT_GROUPS: { kinds: string[]; label: string }[] = [
   { kinds: ['communication_signal'], label: 'Public communication signals' },
 ]
 
-export default async function PersonPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { user } = await requireOnboardedUser()
   const supabase = await createClient()
@@ -106,7 +103,7 @@ export default async function PersonPage({
   const [
     { data: observations },
     { data: facts },
-    { data: sources },
+    { data: sourceLinks },
     { data: commitments },
     { data: participations },
     { data: notes },
@@ -114,7 +111,9 @@ export default async function PersonPage({
   ] = await Promise.all([
     supabase
       .from('observations')
-      .select('id, content, category, evidence_level, status, reinforcement_count, source_kind, created_at')
+      .select(
+        'id, content, category, evidence_level, status, reinforcement_count, source_kind, created_at',
+      )
       .eq('user_id', user.id)
       .eq('person_id', id)
       .neq('status', 'dismissed')
@@ -125,24 +124,16 @@ export default async function PersonPage({
       .eq('user_id', user.id)
       .eq('person_id', id)
       .order('is_current', { ascending: false }),
+    // Includes sources the user marked as someone else. Hiding them would make
+    // that correction irreversible from the interface, which is the opposite of
+    // giving the user control over their own record.
     supabase
-      .from('sources')
+      .from('source_person_links')
       .select(
-        'id, source_title, source_url, publisher, source_type, access_status, retrieved_at, published_at',
+        'identity_match_status, sources(id, source_title, source_url, publisher, author, source_type, access_status, retrieved_at, published_at)',
       )
       .eq('user_id', user.id)
-      .in(
-        'id',
-        (
-          await supabase
-            .from('source_person_links')
-            .select('source_id')
-            .eq('user_id', user.id)
-            .eq('person_id', id)
-            .neq('identity_match_status', 'no_match')
-        ).data?.map((l) => l.source_id) ?? ['00000000-0000-0000-0000-000000000000'],
-      )
-      .order('retrieved_at', { ascending: false }),
+      .eq('person_id', id),
     supabase
       .from('commitments')
       .select('id, description, owner, due_on, status')
@@ -165,6 +156,58 @@ export default async function PersonPage({
     supabase.rpc('relationship_pulse', { target_person: id }).maybeSingle(),
   ])
 
+  // --- sources, with what each one is actually holding up --------------------
+  const sourceRows = (sourceLinks ?? [])
+    .flatMap((link) =>
+      link.sources ? [{ status: link.identity_match_status, src: link.sources }] : [],
+    )
+    .sort((a, b) => (b.src.retrieved_at ?? '').localeCompare(a.src.retrieved_at ?? ''))
+
+  const sourceIds = sourceRows.map((r) => r.src.id)
+
+  // Counts let the delete confirmation say exactly what will be withdrawn,
+  // rather than a generic "this cannot be undone".
+  const [{ data: factLinks }, { data: obsLinks }] = sourceIds.length
+    ? await Promise.all([
+        supabase
+          .from('fact_sources')
+          .select('source_id, fact_id')
+          .eq('user_id', user.id)
+          .in('source_id', sourceIds),
+        supabase
+          .from('observation_sources')
+          .select('source_id, observation_id')
+          .eq('user_id', user.id)
+          .in('source_id', sourceIds),
+      ])
+    : [{ data: [] }, { data: [] }]
+
+  const countBySource = (rows: { source_id: string | null }[] | null) => {
+    const map = new Map<string, number>()
+    for (const r of rows ?? []) {
+      if (!r.source_id) continue
+      map.set(r.source_id, (map.get(r.source_id) ?? 0) + 1)
+    }
+    return map
+  }
+  const factCounts = countBySource(factLinks)
+  const observationCounts = countBySource(obsLinks)
+
+  const sources: SourceRowData[] = sourceRows.map(({ status, src }) => ({
+    id: src.id,
+    title: src.source_title,
+    url: src.source_url,
+    publisher: src.publisher,
+    author: src.author,
+    sourceType: src.source_type,
+    retrievedAt: src.retrieved_at,
+    publishedAt: src.published_at,
+    accessStatus: src.access_status,
+    identityStatus: status,
+    factCount: factCounts.get(src.id) ?? 0,
+    observationCount: observationCounts.get(src.id) ?? 0,
+  }))
+
   // Excerpts backing each proposal, so the review gate can show its basis.
   const proposedIds = (observations ?? []).filter((o) => o.status === 'proposed').map((o) => o.id)
   const { data: proposalSources } = proposedIds.length
@@ -173,7 +216,13 @@ export default async function PersonPage({
         .select('observation_id, excerpt, sources(source_title, publisher)')
         .eq('user_id', user.id)
         .in('observation_id', proposedIds)
-    : { data: [] as { observation_id: string; excerpt: string | null; sources: { source_title: string | null; publisher: string | null } | null }[] }
+    : {
+        data: [] as {
+          observation_id: string
+          excerpt: string | null
+          sources: { source_title: string | null; publisher: string | null } | null
+        }[],
+      }
 
   const basisByObservation = new Map<string, { basis: string | null; excerpt: string | null }>()
   for (const row of proposalSources ?? []) {
@@ -218,11 +267,11 @@ export default async function PersonPage({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-3xl text-ink sm:text-4xl">{name}</h1>
+            <h1 className="font-display text-ink text-3xl sm:text-4xl">{name}</h1>
             {person.is_demo ? <Badge tone="outline">Demo</Badge> : null}
           </div>
 
-          <p className="mt-1.5 text-sm text-ink-secondary">
+          <p className="text-ink-secondary mt-1.5 text-sm">
             {[person.job_title, person.organizations?.name].filter(Boolean).join(' · ') ||
               'No role recorded'}
           </p>
@@ -287,7 +336,7 @@ export default async function PersonPage({
 
       <section>
         <Eyebrow>Your relationship</Eyebrow>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mt-3 max-w-2xl text-sm leading-relaxed">
           {interactions.length === 0 ? (
             <>
               No interactions recorded yet. {brand.name} has nothing to tell you about working with{' '}
@@ -316,7 +365,7 @@ export default async function PersonPage({
             <div className="mt-5 grid gap-8">
               {[...byCategory.entries()].map(([category, items]) => (
                 <div key={category}>
-                  <h3 className="text-sm font-medium text-ink">
+                  <h3 className="text-ink text-sm font-medium">
                     {CATEGORY_LABEL[category] ?? category}
                   </h3>
                   <ul className="mt-3 grid gap-3.5">
@@ -347,7 +396,7 @@ export default async function PersonPage({
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
         lastResearchedAt={person.last_researched_at}
-        sourceCount={(sources ?? []).length}
+        sourceCount={sources.length}
       />
 
       {hasFootprint ? (
@@ -358,13 +407,16 @@ export default async function PersonPage({
 
             return (
               <div key={group.label}>
-                <h3 className="text-sm font-medium text-ink">{group.label}</h3>
+                <h3 className="text-ink text-sm font-medium">{group.label}</h3>
                 <ul className="mt-3 grid gap-3.5">
                   {groupFacts.map((fact) => (
                     <li key={fact.id} className="flex gap-3">
-                      <span aria-hidden="true" className="mt-2.5 h-px w-3 shrink-0 bg-line-strong" />
+                      <span
+                        aria-hidden="true"
+                        className="bg-line-strong mt-2.5 h-px w-3 shrink-0"
+                      />
                       <div className="min-w-0">
-                        <p className="text-sm leading-relaxed text-ink">
+                        <p className="text-ink text-sm leading-relaxed">
                           {fact.value}
                           {fact.detail ? (
                             <span className="text-ink-muted"> — {fact.detail}</span>
@@ -373,11 +425,13 @@ export default async function PersonPage({
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                           <EvidenceBadge level={fact.evidence_level} />
                           <ProvenanceLabel
-                            provenance={fact.evidence_level === 'inferred' ? 'inference' : 'public_research'}
+                            provenance={
+                              fact.evidence_level === 'inferred' ? 'inference' : 'public_research'
+                            }
                           />
                           {/* Freshness: a five-year-old title must not read as current. */}
                           {fact.as_of ? (
-                            <span className="text-[0.6875rem] text-ink-faint">
+                            <span className="text-ink-faint text-[0.6875rem]">
                               as of {formatDate(fact.as_of)}
                             </span>
                           ) : null}
@@ -396,37 +450,23 @@ export default async function PersonPage({
       ) : null}
 
       {/* --- sources ----------------------------------------------------------- */}
-      {(sources ?? []).length > 0 ? (
+      {sources.length > 0 ? (
         <section className="mt-8">
           <Eyebrow>Sources</Eyebrow>
+          <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
+            Everything above that came from public material rests on these. Correct any of them —
+            what they alone supported is withdrawn with them.
+          </p>
           <ul className="mt-3 grid gap-2">
-            {(sources ?? []).map((source) => (
-              <li
-                key={source.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-2.5"
-              >
-                <SourceLink
-                  title={source.source_title}
-                  url={source.source_url}
-                  publisher={source.publisher}
-                />
-                <div className="flex items-center gap-2">
-                  <Badge tone="outline">{source.source_type.replace(/_/g, ' ')}</Badge>
-                  {source.access_status === 'identity_uncertain' ? (
-                    <Badge tone="caution">Unconfirmed match</Badge>
-                  ) : null}
-                  <span className="text-[0.6875rem] text-ink-faint">
-                    {source.retrieved_at ? formatDate(source.retrieved_at) : ''}
-                  </span>
-                </div>
-              </li>
+            {sources.map((source) => (
+              <SourceRow key={source.id} source={source} personId={id} />
             ))}
           </ul>
         </section>
       ) : null}
 
       {/* --- add context -------------------------------------------------------- */}
-      <div className="mt-8 rounded-[var(--radius-lg)] border border-line bg-bg-sunken p-5 sm:p-6">
+      <div className="border-line bg-bg-sunken mt-8 rounded-[var(--radius-lg)] border p-5 sm:p-6">
         <AddContext personId={id} personName={person.full_name} />
       </div>
 
@@ -439,11 +479,13 @@ export default async function PersonPage({
             <ul className="mt-4 grid gap-2">
               {(commitments ?? []).map((c) => {
                 const overdue =
-                  c.status === 'open' && c.due_on && c.due_on < new Date().toISOString().slice(0, 10)
+                  c.status === 'open' &&
+                  c.due_on &&
+                  c.due_on < new Date().toISOString().slice(0, 10)
                 return (
                   <li
                     key={c.id}
-                    className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3"
+                    className="border-line bg-surface flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border px-4 py-3"
                   >
                     <Handshake
                       className={`size-4 shrink-0 ${overdue ? 'text-critical' : 'text-ink-faint'}`}
@@ -455,7 +497,11 @@ export default async function PersonPage({
                       {c.description}
                     </span>
                     <Badge tone="outline">
-                      {c.owner === 'user' ? 'You owe' : c.owner === 'person' ? 'They owe' : 'Shared'}
+                      {c.owner === 'user'
+                        ? 'You owe'
+                        : c.owner === 'person'
+                          ? 'They owe'
+                          : 'Shared'}
                     </Badge>
                     {c.due_on ? (
                       <Badge tone={overdue ? 'critical' : 'neutral'}>{relativeDay(c.due_on)}</Badge>
@@ -474,24 +520,24 @@ export default async function PersonPage({
           <Rule />
           <section>
             <Eyebrow>Interaction timeline</Eyebrow>
-            <ol className="mt-5 grid gap-6 border-l border-line pl-5">
+            <ol className="border-line mt-5 grid gap-6 border-l pl-5">
               {interactions.map((interaction) => (
                 <li key={interaction.id} className="relative">
                   <span
                     aria-hidden="true"
-                    className="absolute -left-[1.4375rem] top-2 size-1.5 rounded-full bg-accent-graphic ring-4 ring-bg"
+                    className="bg-accent-graphic ring-bg absolute top-2 -left-[1.4375rem] size-1.5 rounded-full ring-4"
                   />
-                  <p className="text-xs text-ink-muted">
+                  <p className="text-ink-muted text-xs">
                     {formatDate(interaction.occurred_at)} · {interaction.kind}
                   </p>
-                  <p className="mt-1 text-sm font-medium text-ink">{interaction.title}</p>
+                  <p className="text-ink mt-1 text-sm font-medium">{interaction.title}</p>
                   {interaction.summary ? (
-                    <p className="mt-1.5 text-sm leading-relaxed text-ink-secondary">
+                    <p className="text-ink-secondary mt-1.5 text-sm leading-relaxed">
                       {interaction.summary}
                     </p>
                   ) : null}
                   {interaction.outcome ? (
-                    <p className="mt-1.5 text-sm leading-relaxed text-ink-secondary">
+                    <p className="text-ink-secondary mt-1.5 text-sm leading-relaxed">
                       <span className="text-ink-muted">Outcome — </span>
                       {interaction.outcome}
                     </p>
@@ -511,9 +557,14 @@ export default async function PersonPage({
             <Eyebrow>Notes</Eyebrow>
             <ul className="mt-4 grid gap-3">
               {(notes ?? []).map((note) => (
-                <li key={note.id} className="rounded-[var(--radius-md)] border border-line bg-surface p-4">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink">{note.body}</p>
-                  <p className="mt-2 text-xs text-ink-faint">{formatDate(note.created_at)}</p>
+                <li
+                  key={note.id}
+                  className="border-line bg-surface rounded-[var(--radius-md)] border p-4"
+                >
+                  <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
+                    {note.body}
+                  </p>
+                  <p className="text-ink-faint mt-2 text-xs">{formatDate(note.created_at)}</p>
                 </li>
               ))}
             </ul>
@@ -522,7 +573,7 @@ export default async function PersonPage({
       ) : null}
 
       {openCommitments.length === 0 && interactions.length === 0 && active.length === 0 ? (
-        <p className="mt-10 max-w-xl text-xs leading-relaxed text-ink-muted">
+        <p className="text-ink-muted mt-10 max-w-xl text-xs leading-relaxed">
           This page fills in as you use it. Research their public footprint, paste a link or a note
           above, or log your next conversation — after a few interactions {brand.name} will be
           briefing you on your actual relationship rather than on general principles.
@@ -553,12 +604,12 @@ function RelationshipPulse({
   const tone = pulse.score >= 70 ? 'positive' : pulse.score >= 40 ? 'caution' : 'critical'
 
   return (
-    <div className="mt-6 rounded-[var(--radius-md)] border border-line bg-surface p-4">
+    <div className="border-line bg-surface mt-6 rounded-[var(--radius-md)] border p-4">
       <div className="flex flex-wrap items-center gap-3">
         <Eyebrow>Relationship pulse</Eyebrow>
         <Badge tone={tone}>{pulse.score}/100</Badge>
       </div>
-      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-ink-secondary">
+      <ul className="text-ink-secondary mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
         <li>
           {pulse.days_since_contact >= 0
             ? `${pulse.days_since_contact} days since contact`
@@ -571,7 +622,7 @@ function RelationshipPulse({
         ) : null}
         <li>{pulse.has_upcoming ? 'Meeting scheduled' : 'Nothing scheduled'}</li>
       </ul>
-      <p className="mt-3 text-[0.6875rem] leading-relaxed text-ink-faint">
+      <p className="text-ink-faint mt-3 text-[0.6875rem] leading-relaxed">
         This reflects your contact cadence and follow-through — not how the other person feels.
       </p>
     </div>
