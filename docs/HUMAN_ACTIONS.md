@@ -13,14 +13,14 @@ are off.
 
 | # | Capability | Blocked by | Free tier? | Code status |
 | --- | --- | --- | --- | --- |
-| 1 | **AI reasoning** | API key | Trial credit only | Complete |
+| 1 | **AI reasoning** | — | — | **Live — OpenAI** |
 | 2 | **Automatic research** | API key | **Yes — 2,000/mo free** | Complete |
 | 3 | Document ingestion | — | — | **Live** |
 | 4 | Calendar | OAuth client **+ code** | Yes | **Not built** |
 | 5 | Billing | Stripe account | Yes (test mode) | Complete |
 | 6 | Email | API key + domain | **Yes — 3,000/mo free** | Complete |
 
-Items 1, 2, 5 and 6 are credential-only: paste the variables, redeploy, done.
+Items 2, 5 and 6 are credential-only: paste the variables, redeploy, done.
 Item 4 needs implementation as well — see §4 for why I have not written it
 blind.
 
@@ -29,42 +29,60 @@ Set every variable in **Vercel → Project → Settings → Environment Variable
 
 ---
 
-## 1. AI reasoning
+## 1. AI reasoning — **live, nothing needed**
 
-Every AI capability currently runs on the deterministic evidence composer. That
-path is real and cited, and the UI says *"Composed directly from your records"*
-rather than implying reasoning that did not happen. Nothing is broken — but no
-model is active.
+Running on **OpenAI `gpt-4.1-mini`** via the Responses API, from `OPENAI_API_KEY`
+alone. Settings → Capabilities names the provider and model actually in use.
+
+**A key is the whole configuration.** `AI_PROVIDER` and `AI_MODEL` are optional
+and should normally stay unset — the provider is inferred from whichever key is
+present, and the model default follows from the provider.
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+> **Do not leave `AI_PROVIDER=grounded` set.** It is the off switch, and it wins
+> over any key. The old `.env.example` shipped it as a default, which is exactly
+> why adding the key the first time appeared to do nothing.
+
+**Why `gpt-4.1-mini`.** The prompts are structured extraction at low temperature
+over evidence we supply, not open-ended reasoning — a fast, cheap,
+temperature-respecting model fits, and keeps a brief quick enough to read before
+the meeting starts. To change it, set `AI_MODEL`. To move to Anthropic, set
+`ANTHROPIC_API_KEY` instead; with both set, Anthropic wins unless `AI_PROVIDER`
+says otherwise.
 
 | | |
 | --- | --- |
-| **Service** | Anthropic (recommended) or OpenAI |
-| **Sign-up** | https://console.anthropic.com → **API Keys** → *Create key*<br>or https://platform.openai.com/api-keys |
-| **Billing page** | https://console.anthropic.com/settings/billing |
-| **Free tier** | No ongoing free tier. New accounts usually get a small trial credit; after that it is pay-as-you-go with a prepaid balance. |
-| **Cost** | Billed per token. A meeting brief is roughly 4–8k input and 1–2k output tokens. At Claude Sonnet pricing that is well under a cent per brief; Opus is several times that. **Set a monthly spend cap in the billing page before going live.** |
+| **Console** | https://platform.openai.com/api-keys |
+| **Spend cap** | https://platform.openai.com/settings/organization/limits |
+| **Free tier** | None ongoing. New accounts may get a small trial credit; after that it is pay-as-you-go against a prepaid balance. |
+| **Cost** | Per token. A meeting brief is roughly 4–8k input and 1–2k output tokens — well under a cent each on `gpt-4.1-mini`. **Set a monthly cap before real use.** |
+
+**The one thing still worth doing:** set that spend cap. Nothing in the product
+can do it, and nothing in the product limits your bill — the plan quotas limit
+*users*, not spend.
+
+**Verify**
 
 ```
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-AI_MODEL=claude-sonnet-5
+npx tsx scripts/ai-check.ts
 ```
 
-`AI_MODEL` defaults to `claude-opus-5`. Sonnet is the sensible default for this
-workload — the prompts are structured extraction, not open-ended reasoning.
+Prints the resolved provider and model, then round-trips the three real
+production schemas — meeting brief, debrief, source extraction — against the
+live model. It prints no key material. In the product:
 
-**Verify after configuring**
+1. Settings → Capabilities: **AI reasoning** → **Connected**, naming the model.
+2. Any meeting brief → **Rebuild**. The evidence footer stops saying *"Composed
+   directly from the records below. No language model was involved."*
+3. Settings → Plan → *This month*: the meters accrue.
 
-1. Settings → Capabilities: **AI reasoning** shows **Connected** and names the
-   provider and model.
-2. Open any meeting brief → **Rebuild**.
-3. The evidence panel footer changes from *"Composed directly from the records
-   below. No language model was involved."* to the generated wording.
-4. Settings → Plan → *This month* — the meters now accrue against the AI path.
-
-If the provider errors or times out, the brief silently falls back to the
-composer and logs `ai.fell_back_to_grounded`. That is by design; the user still
-gets a brief.
+If the provider errors or times out, the brief falls back to the composer and
+logs `ai.fell_back_to_grounded`. The user still gets a brief — but a run of that
+line in the logs means AI is effectively off, not that it is degrading
+gracefully. It is the line to watch.
 
 ---
 
@@ -267,9 +285,11 @@ build SEO authority on it until a search comes back clean.
 
 ### 7.3 What you are promising about AI
 
-Configuring §1 sends user relationship data to that provider. Confirm their
-retention terms and whether they train on API traffic, and make sure the privacy
-policy describes it correctly.
+This is now live, not hypothetical: relationship data — including notes about
+third parties who never agreed to anything — is being sent to OpenAI's API on
+every brief, debrief and coach question. Confirm OpenAI's retention terms and
+their position on training from API traffic, and make sure the privacy policy
+names them. Right now it does not name any provider.
 
 ---
 

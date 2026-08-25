@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
-import { features, serverEnv } from '@/lib/env'
+import { aiModel, aiProvider, features, serverEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { getUserContext } from './context'
 import {
@@ -601,13 +601,16 @@ async function askWithModel(
     const userContext = await getUserContext(supabase, userId)
     const collected: Citation[] = []
 
+    // createOpenAI()(id) routes to the OpenAI Responses API by default in
+    // AI SDK 5+, which is the current path; there is no deprecated
+    // chat-completions call here.
     const model =
-      serverEnv.AI_PROVIDER === 'anthropic'
+      aiProvider === 'anthropic'
         ? (await import('@ai-sdk/anthropic')).createAnthropic({
             apiKey: serverEnv.ANTHROPIC_API_KEY,
-          })(serverEnv.AI_MODEL)
+          })(aiModel)
         : (await import('@ai-sdk/openai')).createOpenAI({ apiKey: serverEnv.OPENAI_API_KEY })(
-            serverEnv.AI_MODEL,
+            aiModel,
           )
 
     const result = await generateText({
@@ -697,8 +700,8 @@ async function askWithModel(
       grounded: false,
       actions: [],
       usage: {
-        provider: serverEnv.AI_PROVIDER,
-        model: serverEnv.AI_MODEL,
+        provider: aiProvider,
+        model: aiModel,
         inputTokens: result.usage?.inputTokens ?? 0,
         outputTokens: result.usage?.outputTokens ?? 0,
       },

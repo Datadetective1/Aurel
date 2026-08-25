@@ -132,14 +132,17 @@ export function MeetingBriefView({
                   <BriefList label="Concerns they have raised" items={participant.knownConcerns} />
                 ) : null}
 
-                {participant.publicContext.length > 0 ? (
+                {/* Stored artifacts are cast, not re-parsed, so a brief
+                    generated before these fields existed has neither. Guard
+                    rather than crash on an old record. */}
+                {(participant.publicContext ?? []).length > 0 ? (
                   <div className="border-line bg-bg-sunken mt-4 rounded-[var(--radius-md)] border px-4 py-3.5">
                     <div className="flex items-center gap-1.5">
                       <Globe className="text-ink-faint size-3 shrink-0" aria-hidden="true" />
                       <p className="label">From public sources</p>
                     </div>
                     <ul className="mt-2.5 grid gap-2">
-                      {participant.publicContext.map((item, index) => (
+                      {(participant.publicContext ?? []).map((item, index) => (
                         <li key={index} className="flex gap-2.5">
                           <span
                             aria-hidden="true"

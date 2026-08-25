@@ -1,6 +1,6 @@
 import 'server-only'
 import { generateObject, type LanguageModel } from 'ai'
-import { serverEnv, features } from '@/lib/env'
+import { aiModel, aiProvider, features, serverEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import type { Generation, PromptModule } from './types'
 
@@ -39,7 +39,7 @@ export interface GenerateOptions {
 }
 
 async function resolveModel(modelId: string): Promise<LanguageModel> {
-  switch (serverEnv.AI_PROVIDER) {
+  switch (aiProvider) {
     case 'anthropic': {
       const { createAnthropic } = await import('@ai-sdk/anthropic')
       return createAnthropic({ apiKey: serverEnv.ANTHROPIC_API_KEY })(modelId)
@@ -103,7 +103,7 @@ export async function runPrompt<TInput, TOutput>(
     return composed()
   }
 
-  const modelId = options.model ?? serverEnv.AI_MODEL
+  const modelId = options.model ?? aiModel
   let lastError: unknown = null
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -129,7 +129,7 @@ export async function runPrompt<TInput, TOutput>(
         output: result.object,
         citations,
         provenance: {
-          provider: serverEnv.AI_PROVIDER,
+          provider: aiProvider,
           model: modelId,
           promptVersion: module.version,
           latencyMs: Date.now() - started,
@@ -147,7 +147,7 @@ export async function runPrompt<TInput, TOutput>(
       logger.warn('ai.generation_failed', {
         capability: module.id,
         promptVersion: module.version,
-        provider: serverEnv.AI_PROVIDER,
+        provider: aiProvider,
         model: modelId,
         attempt,
         retryable: isRetryable(error),
@@ -177,8 +177,8 @@ export async function runPrompt<TInput, TOutput>(
 export function aiStatus() {
   return {
     generative: features.generativeAI,
-    provider: features.generativeAI ? serverEnv.AI_PROVIDER : 'grounded',
-    model: features.generativeAI ? serverEnv.AI_MODEL : 'evidence-composer',
+    provider: aiProvider,
+    model: aiModel,
     label: features.generativeAI
       ? 'Generated from your relationship record'
       : 'Composed directly from your relationship record',

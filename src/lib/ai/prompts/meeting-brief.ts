@@ -40,12 +40,17 @@ export const participantBriefSchema = z.object({
    * work with them. Merging the two would let a conference bio masquerade as
    * relationship knowledge, which is the failure this product exists to avoid.
    */
+  //
+  // Required, not defaulted. OpenAI's strict structured outputs reject optional
+  // properties — a Zod `.default()` marks the field not-required in the emitted
+  // JSON Schema, which would make every generated brief fail validation and
+  // fall silently back to the composer. The composer always supplies both, so
+  // requiring them costs nothing.
   publicContext: z
     .array(z.object({ statement: z.string(), sourceLabel: z.string().nullable() }))
-    .max(6)
-    .default([]),
+    .max(6),
   /** True when the ONLY thing known is public. Drives the preliminary framing. */
-  publicOnly: z.boolean().default(false),
+  publicOnly: z.boolean(),
 })
 
 export const meetingBriefSchema = z.object({

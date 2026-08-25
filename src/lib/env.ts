@@ -21,11 +21,18 @@ const optional = z.preprocess(blankToUndefined, z.string().trim().min(1).optiona
 
 const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optional,
+  // Left unset on purpose in most deployments: the provider is inferred from
+  // whichever key is present (see `aiProvider` below). Set it explicitly only
+  // to force a choice when more than one key exists, or to 'grounded' to turn
+  // generation off while leaving the keys in place.
   AI_PROVIDER: z.preprocess(
     blankToUndefined,
-    z.enum(['anthropic', 'openai', 'grounded']).catch('grounded'),
+    z.enum(['anthropic', 'openai', 'grounded']).optional(),
   ),
-  AI_MODEL: z.preprocess(blankToUndefined, z.string().trim().min(1).catch('claude-opus-5')),
+  // No default here. A single default cannot be right for both providers —
+  // 'claude-opus-5' sent to OpenAI is simply a 404 — so the fallback is chosen
+  // per provider once the provider is known.
+  AI_MODEL: z.preprocess(blankToUndefined, z.string().trim().min(1).optional()),
   AI_EMBEDDING_PROVIDER: z.preprocess(
     blankToUndefined,
     z.enum(['anthropic', 'openai', 'none']).catch('none'),
@@ -91,12 +98,68 @@ export const publicEnv = (() => {
 /** Server-only config. Accessing this from a client component is a build error. */
 export const serverEnv = serverSchema.parse(process.env)
 
+/** The model used when a provider is active but AI_MODEL was not set. */
+const DEFAULT_MODEL = {
+  // Structured extraction at low temperature over evidence we supply — not
+  // open-ended reasoning. A fast, inexpensive, temperature-respecting model
+  // suits this better than a reasoning model, and keeps a brief quick enough
+  // to read before a meeting. Override with AI_MODEL to change it.
+  openai: 'gpt-4.1-mini',
+  anthropic: 'claude-opus-5',
+} as const
+
+/**
+ * Which generative provider is actually active, and on which model.
+ *
+ * Pure and exported so the resolution can be tested without reloading the
+ * module under a mutated environment.
+ *
+ * The provider is inferred from the keys rather than requiring AI_PROVIDER to
+ * agree with them. Requiring both was a foot-gun: setting only OPENAI_API_KEY
+ * left the product silently running the deterministic composer, with nothing
+ * to indicate the key was doing nothing.
+ *
+ * An explicit AI_PROVIDER still wins, so 'grounded' remains the way to switch
+ * generation off without removing credentials — and naming a provider whose
+ * key is absent falls back rather than booting into certain failure.
+ */
+export function resolveAI(input: {
+  provider?: 'anthropic' | 'openai' | 'grounded'
+  model?: string
+  anthropicKey?: string
+  openaiKey?: string
+}): { provider: 'anthropic' | 'openai' | 'grounded'; model: string } {
+  const provider = ((): 'anthropic' | 'openai' | 'grounded' => {
+    if (input.provider === 'grounded') return 'grounded'
+    if (input.provider === 'anthropic') return input.anthropicKey ? 'anthropic' : 'grounded'
+    if (input.provider === 'openai') return input.openaiKey ? 'openai' : 'grounded'
+
+    if (input.anthropicKey) return 'anthropic'
+    if (input.openaiKey) return 'openai'
+    return 'grounded'
+  })()
+
+  return {
+    provider,
+    // Never a Claude id on OpenAI, or the reverse.
+    model: provider === 'grounded' ? 'evidence-composer' : (input.model ?? DEFAULT_MODEL[provider]),
+  }
+}
+
+const resolvedAI = resolveAI({
+  provider: serverEnv.AI_PROVIDER,
+  model: serverEnv.AI_MODEL,
+  anthropicKey: serverEnv.ANTHROPIC_API_KEY,
+  openaiKey: serverEnv.OPENAI_API_KEY,
+})
+
+export const aiProvider = resolvedAI.provider
+export const aiModel = resolvedAI.model
+
 /** Capability flags — the UI uses these to degrade honestly instead of erroring. */
 export const features = {
   /** True when a real model is reachable; false means the grounded fallback. */
-  generativeAI:
-    (serverEnv.AI_PROVIDER === 'anthropic' && Boolean(serverEnv.ANTHROPIC_API_KEY)) ||
-    (serverEnv.AI_PROVIDER === 'openai' && Boolean(serverEnv.OPENAI_API_KEY)),
+  generativeAI: aiProvider !== 'grounded',
   emailDelivery: Boolean(serverEnv.RESEND_API_KEY),
   billing: Boolean(serverEnv.STRIPE_SECRET_KEY),
   billingWebhooks: Boolean(serverEnv.STRIPE_SECRET_KEY && serverEnv.STRIPE_WEBHOOK_SECRET),
