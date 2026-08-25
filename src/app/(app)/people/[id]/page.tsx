@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { AddContext } from '@/components/app/add-context'
+import { AddDocument } from '@/components/app/add-document'
 import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
@@ -474,6 +475,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       {/* --- add context -------------------------------------------------------- */}
       <div className="border-line bg-bg-sunken mt-8 rounded-[var(--radius-lg)] border p-5 sm:p-6">
         <AddContext personId={id} personName={person.full_name} />
+        <AddDocument personId={id} />
       </div>
 
       {/* --- commitments --------------------------------------------------------- */}

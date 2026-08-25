@@ -46,6 +46,20 @@ export interface CoachAnswer {
   grounded: boolean
   /** Links the UI can offer alongside the answer. */
   actions: { label: string; href: string }[]
+  /**
+   * What the answer cost, when a model produced it.
+   *
+   * Null on the deterministic path — which is the honest record, because
+   * nothing was spent with a provider. Without this the coach meter counts
+   * questions but not consumption, and unit economics stay unknowable the
+   * moment a provider is configured.
+   */
+  usage?: {
+    provider: string
+    model: string
+    inputTokens: number
+    outputTokens: number
+  } | null
 }
 
 type Intent =
@@ -682,6 +696,12 @@ async function askWithModel(
       followUps: [],
       grounded: false,
       actions: [],
+      usage: {
+        provider: serverEnv.AI_PROVIDER,
+        model: serverEnv.AI_MODEL,
+        inputTokens: result.usage?.inputTokens ?? 0,
+        outputTokens: result.usage?.outputTokens ?? 0,
+      },
     }
   } catch (error) {
     logger.warn('coach.model_failed', {

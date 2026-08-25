@@ -101,6 +101,12 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       aiCoach: true,
       messageAdaptation: true,
       dataExport: true,
+      // The quota below already granted 2 document analyses a month, but the
+      // capability was off, so the quota was unreachable. A document is just
+      // text in a file — allowing a pasted transcript while refusing the same
+      // words as an attachment is a distinction a user would experience as
+      // arbitrary.
+      documentAnalysis: true,
     },
     quotas: {
       person_research: 3,

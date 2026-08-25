@@ -38,6 +38,7 @@ export type AnalyticsEvent =
   | 'coach_used'
   | 'demo_data_seeded'
   | 'people_merged'
+  | 'document_added'
   | 'demo_data_cleared'
   | 'upgrade_viewed'
   | 'checkout_started'

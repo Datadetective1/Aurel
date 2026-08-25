@@ -8,6 +8,7 @@ import { requireUser } from '@/lib/auth'
 import { getWorkspace } from '@/lib/workspace'
 import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
 import { ingestText, ingestUrl } from '@/lib/research/ingest'
+import { extractDocument } from '@/lib/sources/document'
 import { resolveSearchProvider, researchCapability } from '@/lib/research/providers'
 import { detectInputKind } from '@/lib/sources/url'
 import { track } from '@/lib/analytics'
@@ -37,12 +38,99 @@ export interface ResearchState {
   needsReview?: boolean
 }
 
-
 const addContextSchema = z.object({
   personId: z.string().uuid(),
   input: z.string().trim().min(3, 'Paste a link, a note or a transcript.').max(200_000),
   title: z.string().trim().max(200).optional(),
 })
+
+/**
+ * Add a document.
+ *
+ * The file is turned into text and then goes down exactly the same path as a
+ * pasted transcript — identity resolution, fact extraction, citation, user
+ * confirmation. Nothing about a document is special once it is text, which is
+ * why this is a thin wrapper rather than a second pipeline.
+ *
+ * Metered as a document analysis, and refused before any work happens if the
+ * user has no quota left.
+ */
+export async function addDocument(
+  _prev: ResearchState,
+  formData: FormData,
+): Promise<ResearchState> {
+  const personId = formData.get('personId')
+  const file = formData.get('file')
+
+  if (typeof personId !== 'string' || !personId) return { error: 'No person selected.' }
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose a file first.' }
+
+  const capability = await checkCapability('documentAnalysis', 'document_analysis')
+  if (!capability.allowed) return { error: capability.message }
+
+  const user = await requireUser()
+  const { workspaceId } = await getWorkspace()
+  const supabase = await createClient()
+
+  const { data: person } = await supabase
+    .from('people')
+    .select('id')
+    .eq('id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!person) return { error: 'That person could not be found.' }
+
+  const extraction = await extractDocument(file)
+  if (!extraction.ok) return { error: extraction.message }
+
+  try {
+    const result = await ingestText(extraction.text, {
+      supabase,
+      workspaceId,
+      userId: user.id,
+      personId,
+      title: extraction.title,
+      sourceType: 'document',
+    })
+
+    await recordUsage({
+      meter: 'document_analysis',
+      subjectKind: 'person',
+      subjectId: personId,
+      provider: result.usage?.provider,
+      model: result.usage?.model,
+      inputTokens: result.usage?.inputTokens,
+      outputTokens: result.usage?.outputTokens,
+    })
+
+    await track('document_added', { kind: extraction.kind, truncated: extraction.truncated })
+    revalidatePath(`/people/${personId}`)
+
+    if (result.message) return { error: result.message }
+
+    const truncationNote = extraction.truncated
+      ? ' Only the first part was read — it is a long document.'
+      : ''
+
+    return {
+      ok: true,
+      message:
+        result.observationsProposed > 0
+          ? `Read ${extraction.title}. ${result.observationsProposed} suggestion${
+              result.observationsProposed === 1 ? '' : 's'
+            } to review.${truncationNote}`
+          : `Read ${extraction.title} and saved it as a source.${truncationNote}`,
+      factsCreated: result.factsCreated,
+      observationsProposed: result.observationsProposed,
+    }
+  } catch (error) {
+    logger.error('research.document_failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    })
+    return { error: 'That document could not be processed. Nothing was saved.' }
+  }
+}
 
 /**
  * Universal Add Context. Accepts a URL, pasted text or a transcript and routes
@@ -56,7 +144,9 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
   })
 
   if (!parsed.success) {
-    return { error: z.flattenError(parsed.error).fieldErrors.input?.[0] ?? 'That could not be read.' }
+    return {
+      error: z.flattenError(parsed.error).fieldErrors.input?.[0] ?? 'That could not be read.',
+    }
   }
 
   const kind = detectInputKind(parsed.data.input)
@@ -91,7 +181,17 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
           })
 
     if (kind === 'transcript') {
-      await recordUsage({ meter: 'transcript_analysis', subjectKind: 'person', subjectId: parsed.data.personId })
+      await recordUsage({
+        meter: 'transcript_analysis',
+        subjectKind: 'person',
+        subjectId: parsed.data.personId,
+        // Null when the deterministic composer ran, which is the honest
+        // record: nothing was spent with a provider.
+        provider: result.usage?.provider,
+        model: result.usage?.model,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+      })
     }
 
     await track('observation_added', { source: kind })
@@ -172,6 +272,10 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
   let accepted = 0
   let facts = 0
   let proposals = 0
+  let inputTokens = 0
+  let outputTokens = 0
+  let usedProvider: string | undefined
+  let usedModel: string | undefined
   const candidateUrls: string[] = []
 
   try {
@@ -211,7 +315,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
         ok: false,
         error: capabilities.canDiscover
           ? `I could not find enough reliable professional information about ${person.full_name}.`
-          : capabilities.discoveryHint ?? 'Add a link to research from.',
+          : (capabilities.discoveryHint ?? 'Add a link to research from.'),
       }
     }
 
@@ -231,6 +335,15 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
         // Only the profile URL the user themselves supplied gets that trust.
         userSupplied: url === person.profile_url,
       })
+
+      if (result.usage) {
+        // One research run reads several pages, so cost accrues across the
+        // whole job rather than per page.
+        inputTokens += result.usage.inputTokens
+        outputTokens += result.usage.outputTokens
+        usedProvider = result.usage.provider
+        usedModel = result.usage.model
+      }
 
       if (result.sourceId && result.accessStatus === 'analyzed') {
         accepted++
@@ -258,7 +371,15 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       .eq('id', personId)
       .eq('user_id', user.id)
 
-    await recordUsage({ meter: 'person_research', subjectKind: 'person', subjectId: personId })
+    await recordUsage({
+      meter: 'person_research',
+      subjectKind: 'person',
+      subjectId: personId,
+      provider: usedProvider,
+      model: usedModel,
+      inputTokens,
+      outputTokens,
+    })
     await track('person_added', { researched: true, sourcesAccepted: accepted })
 
     revalidatePath(`/people/${personId}`)
@@ -393,7 +514,11 @@ export async function confirmSourceMatch(sourceId: string, personId: string) {
     .eq('person_id', personId)
     .eq('user_id', user.id)
 
-  await supabase.from('sources').update({ access_status: 'analyzed' }).eq('id', sourceId).eq('user_id', user.id)
+  await supabase
+    .from('sources')
+    .update({ access_status: 'analyzed' })
+    .eq('id', sourceId)
+    .eq('user_id', user.id)
 
   revalidatePath(`/people/${personId}`)
   return { ok: true as const }

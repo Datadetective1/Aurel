@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   isCleanProse,
   matchCurrentRole,
+  matchExpertise,
   matchRoleAtKnownOrg,
   sourceExtractionPrompt,
 } from './source-extraction'
@@ -21,7 +22,11 @@ import { extractFromHtml } from '@/lib/sources/extract'
  * person — the worst output this product can generate.
  */
 
-function extract(text: string, fullName = 'Satya Nadella', organization: string | null = 'Microsoft') {
+function extract(
+  text: string,
+  fullName = 'Satya Nadella',
+  organization: string | null = 'Microsoft',
+) {
   return sourceExtractionPrompt.compose({
     person: { fullName, organization, jobTitle: 'Chairman and CEO' },
     source: {
@@ -90,13 +95,13 @@ describe('matchCurrentRole', () => {
   })
 
   it('does not accept "for" as an employment connector', () => {
-    expect(
-      matchCurrentRole('Maya Chen is Director For Love', 'Maya Chen'),
-    ).toBeNull()
+    expect(matchCurrentRole('Maya Chen is Director For Love', 'Maya Chen')).toBeNull()
   })
 
   it('accepts "at" and "of"', () => {
-    expect(matchCurrentRole('Maya Chen is VP Engineering at Acme Corp.', 'Maya Chen')).not.toBeNull()
+    expect(
+      matchCurrentRole('Maya Chen is VP Engineering at Acme Corp.', 'Maya Chen'),
+    ).not.toBeNull()
     expect(matchCurrentRole('Maya Chen is Head of Platform at Acme.', 'Maya Chen')).not.toBeNull()
   })
 
@@ -278,5 +283,58 @@ describe('matchRoleAtKnownOrg', () => {
   it('still requires the phrase to look like a title', () => {
     expect(matchRoleAtKnownOrg('a fan of Microsoft', 'Microsoft')).toBeNull()
     expect(matchRoleAtKnownOrg('the history of Microsoft', 'Microsoft')).toBeNull()
+  })
+})
+
+/**
+ * Bounded capture.
+ *
+ * Both of these shipped to a rendered page: an organisation that ran past a
+ * comma and got cut off mid-word, and an "expertise" that was really a whole
+ * sentence about someone's job title.
+ */
+describe('bounded capture', () => {
+  const bio =
+    'Jordan Avery is VP Engineering at Meridian Systems, where she leads the platform ' +
+    'and infrastructure organisation. Her public work focuses on migration strategy ' +
+    'and on reducing operational risk during large infrastructure changes.'
+
+  it('stops the organisation at the clause boundary', () => {
+    const result = matchCurrentRole(bio, 'Jordan Avery')
+    expect(result).not.toBeNull()
+    expect(result!.title).toBe('VP Engineering')
+    expect(result!.organization).toBe('Meridian Systems')
+    // Previously captured ", where she leads the platform and infrastruc".
+    expect(result!.organization).not.toMatch(/where|infrastruc/)
+  })
+
+  it('keeps a corporate suffix that genuinely contains a comma', () => {
+    const result = matchCurrentRole(
+      'Dana Reed is Chief Counsel at Wikimedia Foundation, Inc. and joined in 2021.',
+      'Dana Reed',
+    )
+    // The trailing stop is stripped by cleanValue, deliberately: leaving it
+    // produced "Inc.." wherever the value was used mid-sentence.
+    expect(result?.organization).toBe('Wikimedia Foundation, Inc')
+  })
+
+  it('extracts the subject of an expertise phrase, not the sentence', () => {
+    const subject = matchExpertise(
+      'Her public work focuses on migration strategy and on reducing operational risk.',
+    )
+    expect(subject).toBe('migration strategy and on reducing operational risk')
+    expect(subject).not.toMatch(/^Her public work/)
+  })
+
+  it('stops an expertise phrase at a relative clause', () => {
+    const subject = matchExpertise(
+      'She leads the platform organisation, which spans four teams across two regions.',
+    )
+    expect(subject).toBe('platform organisation')
+    expect(subject).not.toMatch(/which|regions/)
+  })
+
+  it('returns nothing when the sentence declares no expertise', () => {
+    expect(matchExpertise('Jordan holds a degree in Computer Science.')).toBeNull()
   })
 })

@@ -41,6 +41,22 @@ export interface IngestOptions {
   userSupplied?: boolean
 }
 
+/** Provenance -> the shape the usage meter wants. Null when nothing generated. */
+function usageFrom(provenance: {
+  provider: string
+  model: string
+  groundedFallback: boolean
+  tokenUsage: { input: number; output: number } | null
+}): IngestResult['usage'] {
+  return {
+    provider: provenance.provider,
+    model: provenance.model,
+    inputTokens: provenance.tokenUsage?.input ?? 0,
+    outputTokens: provenance.tokenUsage?.output ?? 0,
+    grounded: provenance.groundedFallback,
+  }
+}
+
 export interface IngestResult {
   sourceId: string | null
   accessStatus: AccessStatus
@@ -54,6 +70,20 @@ export interface IngestResult {
   } | null
   factsCreated: number
   observationsProposed: number
+  /**
+   * What the extraction cost, when a model ran.
+   *
+   * Surfaced so the caller can meter it. Without this the research meter
+   * records that research happened but not what it consumed, which makes unit
+   * economics unknowable the moment a provider is configured.
+   */
+  usage: {
+    provider: string
+    model: string
+    inputTokens: number
+    outputTokens: number
+    grounded: boolean
+  } | null
   /** User-facing explanation when nothing usable came back. */
   message: string | null
 }
@@ -139,6 +169,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity: linked,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: null,
     }
   }
@@ -194,7 +225,11 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
   }
 
   // Unchanged content: keep the existing extraction and skip the model call.
-  if (existing?.content_hash && existing.content_hash === extracted.contentHash && !options.refresh) {
+  if (
+    existing?.content_hash &&
+    existing.content_hash === extracted.contentHash &&
+    !options.refresh
+  ) {
     return {
       sourceId: existing.id,
       accessStatus: existing.access_status,
@@ -204,6 +239,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity: null,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: null,
     }
   }
@@ -246,6 +282,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity: null,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: null,
     }
   }
@@ -267,6 +304,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity: null,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: null,
     }
   }
@@ -322,6 +360,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: needsReview(assessment)
         ? `${assessment.explanation} Confirm whether this is the right person before ${brand.name} uses it.`
         : assessment.explanation,
@@ -353,7 +392,10 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
   }
 
   if (!generation.output.mentionsTarget) {
-    await supabase.from('sources').update({ access_status: 'identity_uncertain' }).eq('id', sourceId)
+    await supabase
+      .from('sources')
+      .update({ access_status: 'identity_uncertain' })
+      .eq('id', sourceId)
     await supabase
       .from('source_person_links')
       .update({ identity_match_status: 'no_match' })
@@ -369,6 +411,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       identity: { ...identity, status: 'no_match' },
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: `On reading it, this source does not appear to be about ${person.full_name}.`,
     }
   }
@@ -391,6 +434,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
   })
 
   return {
+    usage: usageFrom(generation.provenance),
     sourceId,
     accessStatus: 'analyzed',
     title: extracted.title,
@@ -441,6 +485,7 @@ export async function ingestText(
       identity: null,
       factsCreated: 0,
       observationsProposed: 0,
+      usage: null,
       message: null,
     }
   }
@@ -504,6 +549,7 @@ export async function ingestText(
   })
 
   return {
+    usage: usageFrom(generation.provenance),
     sourceId,
     accessStatus: 'analyzed',
     title: options.title ?? null,
@@ -615,7 +661,9 @@ async function ensurePersonLink(
   })
 
   return {
-    status: (input.userSupplied ? 'confirmed' : 'unreviewed') as Database['public']['Enums']['identity_match_status'],
+    status: (input.userSupplied
+      ? 'confirmed'
+      : 'unreviewed') as Database['public']['Enums']['identity_match_status'],
     confidence: input.userSupplied ? 1 : 0,
     explanation: input.userSupplied ? 'You provided this link.' : 'Not yet reviewed.',
   }
@@ -628,7 +676,14 @@ async function persistFacts(
     userId: string
     personId: string
     sourceId: string
-    facts: { kind: string; value: string; detail: string | null; excerpt: string | null; evidenceLevel: string; isCurrent: boolean }[]
+    facts: {
+      kind: string
+      value: string
+      detail: string | null
+      excerpt: string | null
+      evidenceLevel: string
+      isCurrent: boolean
+    }[]
     asOf: string | null
   },
 ): Promise<number> {
@@ -767,6 +822,7 @@ async function proposeObservations(
 
 function emptyResult(accessStatus: AccessStatus, message: string): IngestResult {
   return {
+    usage: null,
     sourceId: null,
     accessStatus,
     title: null,

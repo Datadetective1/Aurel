@@ -16,6 +16,7 @@ const METER_LABEL: Partial<Record<MeterKind, string>> = {
   person_research: 'People researched',
   meeting_brief: 'Meeting briefs',
   transcript_analysis: 'Transcripts analysed',
+  document_analysis: 'Documents read',
   ai_coach_message: 'Coach questions',
   message_adaptation: 'Messages adapted',
 }

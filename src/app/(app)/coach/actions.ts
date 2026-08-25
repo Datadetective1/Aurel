@@ -38,7 +38,13 @@ export async function ask(_prev: CoachState, formData: FormData): Promise<CoachS
   try {
     const answer = await askCoach(supabase, user.id, parsed.data)
 
-    await recordUsage({ meter: 'ai_coach_message' })
+    await recordUsage({
+      meter: 'ai_coach_message',
+      provider: answer.usage?.provider,
+      model: answer.usage?.model,
+      inputTokens: answer.usage?.inputTokens,
+      outputTokens: answer.usage?.outputTokens,
+    })
     await track('coach_used', { grounded: answer.grounded, citations: answer.citations.length })
 
     return { answer, question: parsed.data }
@@ -119,6 +125,10 @@ export async function adaptMessage(_prev: AdaptState, formData: FormData): Promi
       meter: 'message_adaptation',
       subjectKind: recipient ? 'person' : undefined,
       subjectId: recipient?.id,
+      provider: generation.provenance.provider,
+      model: generation.provenance.model,
+      inputTokens: generation.provenance.tokenUsage?.input,
+      outputTokens: generation.provenance.tokenUsage?.output,
     })
     await track('message_adapted', {
       mode: parsed.data.mode,

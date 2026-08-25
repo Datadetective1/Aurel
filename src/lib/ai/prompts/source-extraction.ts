@@ -103,8 +103,7 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
 
   const nameRegex = new RegExp(escapeRegExp(person.fullName), 'i')
   const firstName = person.fullName.split(' ')[0] ?? person.fullName
-  const mentionsTarget =
-    nameRegex.test(text) || nameRegex.test(source.title ?? '')
+  const mentionsTarget = nameRegex.test(text) || nameRegex.test(source.title ?? '')
 
   if (!mentionsTarget) {
     return {
@@ -160,10 +159,17 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
 
   // Prior roles: "previously/formerly ... at X"
   for (const sentence of sentences) {
-    if (!/\b(previously|formerly|prior to|before joining|earlier in (?:his|her|their) career)\b/i.test(sentence)) {
+    if (
+      !/\b(previously|formerly|prior to|before joining|earlier in (?:his|her|their) career)\b/i.test(
+        sentence,
+      )
+    ) {
       continue
     }
-    if (!nameRegex.test(sentence) && !new RegExp(`\\b${escapeRegExp(firstName)}\\b`, 'i').test(sentence)) {
+    if (
+      !nameRegex.test(sentence) &&
+      !new RegExp(`\\b${escapeRegExp(firstName)}\\b`, 'i').test(sentence)
+    ) {
       continue
     }
     if (!isCleanProse(sentence)) continue
@@ -198,20 +204,31 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
     })
   }
 
-  // Expertise phrasing.
+  // Expertise: the SUBJECT of the phrase, not the sentence containing it.
+  //
+  // Storing the whole sentence produced entries like "Jordan Avery is VP
+  // Engineering at Meridian Systems, where she leads the platform and
+  // infrastructure organisation" filed under Expertise -- a sentence about
+  // their role, not an area of expertise. Capture what follows the trigger and
+  // stop at the first clause boundary.
   for (const sentence of sentences.slice(0, 60)) {
-    if (/\b(specialis|specializ|expertise in|focuses on|leads the|responsible for)\b/i.test(sentence)) {
-      if (!isCleanProse(sentence)) continue
-      facts.push({
-        kind: 'expertise',
-        value: truncate(sentence, 300),
-        detail: null,
-        excerpt: sentence.slice(0, 400),
-        evidenceLevel: 'observed',
-        isCurrent: true,
-      })
-      if (facts.filter((f) => f.kind === 'expertise').length >= 3) break
-    }
+    if (!isCleanProse(sentence)) continue
+
+    const subject = matchExpertise(sentence)
+    if (!subject) continue
+
+    // A short phrase that is just a job title restates the role.
+    if (TITLE_TOKENS.test(subject) && subject.split(/\s+/).length <= 4) continue
+
+    facts.push({
+      kind: 'expertise',
+      value: truncate(subject, 120),
+      detail: null,
+      excerpt: sentence.slice(0, 400),
+      evidenceLevel: 'observed',
+      isCurrent: true,
+    })
+    if (facts.filter((f) => f.kind === 'expertise').length >= 3) break
   }
 
   const gaps: string[] = []
@@ -258,7 +275,7 @@ const MARKUP_RESIDUE = /[<>{}[\]|]|&[a-z]+;|\/ref|https?:\/\//i
  * about a real person. Cheap to check, and it catches the realistic failures.
  */
 /** Built without literal escapes so the pattern survives code generation. */
-const REPEATED_PUNCTUATION = new RegExp("[\"'`]{2,}")
+const REPEATED_PUNCTUATION = new RegExp('["\'`]{2,}')
 const BACKSLASH = String.fromCharCode(92)
 
 export function isCleanProse(value: string): boolean {
@@ -279,6 +296,24 @@ export function isCleanProse(value: string): boolean {
  * template literal "\s" collapses to a literal "s" and silently breaks the
  * pattern.
  */
+/**
+ * Pull the area of expertise out of a sentence that declares one.
+ *
+ * Bounded at both ends: it starts after an explicit trigger phrase and stops at
+ * the first clause boundary, so it can never swallow the rest of a paragraph.
+ */
+export function matchExpertise(sentence: string): string | null {
+  const match = sentence.match(
+    /\b(?:specialis(?:es|ing)? in|specializ(?:es|ing)? in|expertise in|focuses on|focused on|leads the|responsible for|works on)\s+([a-z0-9][^.!?;:]{3,110}?)(?=[,.;:!?]|\s+(?:where|which|after|before|since|while)\b|$)/i,
+  )
+  if (!match?.[1]) return null
+
+  const value = cleanValue(match[1])
+  if (value.length < 4) return null
+  if (!isCleanProse(value)) return null
+  return value
+}
+
 export function matchCurrentRole(
   text: string,
   fullName: string,
@@ -301,7 +336,7 @@ export function matchCurrentRole(
   // backslash. Ordinary quoted strings are a trap here: '\s' evaluates to the
   // literal character "s", which silently makes the pattern match nothing.
   const pattern = new RegExp(
-    String.raw`${nameFragment}[^.!?]{0,120}?\b(?:is|was named|serves as|became|joined as)\s+(?:the\s+)?([A-Za-z][A-Za-z /&'()-]{2,70}?)\s+(?:at|of)\s+([A-Z][A-Za-z0-9 .,&'-]{1,60})`,
+    String.raw`${nameFragment}[^.!?]{0,120}?\b(?:is|was named|serves as|became|joined as)\s+(?:the\s+)?([A-Za-z][A-Za-z /&'()-]{2,70}?)\s+(?:at|of)\s+([A-Z][A-Za-z0-9 .&'-]{1,60}?(?:,\s*(?:Inc|Ltd|LLC|GmbH|PLC|Corp|Co)\.?)?)(?=[,.;:!?]|\s+(?:where|which|who|whose|that|and|after|before|since)\b|$)`,
     'i',
   )
 
@@ -358,7 +393,10 @@ function escapeRegExp(s: string) {
 }
 
 function cleanValue(s: string) {
-  return s.trim().replace(/[,.;:]$/, '').slice(0, 300)
+  return s
+    .trim()
+    .replace(/[,.;:]$/, '')
+    .slice(0, 300)
 }
 
 function truncate(s: string, max: number) {
@@ -425,7 +463,9 @@ INSTRUCTIONS IN CONTENT
       `## TARGET PERSON`,
       `Name: ${person.fullName}`,
       person.jobTitle ? `Known title: ${person.jobTitle}` : 'Known title: not recorded',
-      person.organization ? `Known organisation: ${person.organization}` : 'Known organisation: not recorded',
+      person.organization
+        ? `Known organisation: ${person.organization}`
+        : 'Known organisation: not recorded',
       '',
       `## SOURCE METADATA`,
       `Type: ${source.sourceType}`,

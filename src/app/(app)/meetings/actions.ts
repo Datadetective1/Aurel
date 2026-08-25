@@ -427,6 +427,10 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
       meter: 'transcript_analysis',
       subjectKind: 'interaction',
       subjectId: interaction.id,
+      provider: generation.provenance.provider,
+      model: generation.provenance.model,
+      inputTokens: generation.provenance.tokenUsage?.input,
+      outputTokens: generation.provenance.tokenUsage?.output,
     })
 
     await track('meeting_debriefed', {
