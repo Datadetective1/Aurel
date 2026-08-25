@@ -98,8 +98,11 @@ function splitSentences(source: string): string[] {
 
 const CUES = {
   decision: /\b(decided|agreed|approved|signed off|we will go with|chose|settled on|green ?lit)\b/i,
+  // No bare "deadline": "citing the compliance deadline" is a reason someone
+  // gave, not a promise anyone made. Due-date phrasing is covered by the
+  // "by <day>" branch, which needs the preposition to match.
   commitment:
-    /\b(will|going to|i'll|we'll|owes?|owe|to send|to share|follow up|by (monday|tuesday|wednesday|thursday|friday|next week|end of|eod|eow)|deadline)\b/i,
+    /\b(will|going to|i'll|we'll|owes?|owe|to send|to share|follow up|by (monday|tuesday|wednesday|thursday|friday|next week|end of|eod|eow))\b/i,
   objection: /\b(concerned|concern|pushed back|objected|worried|disagreed|hesitant|reservation|not convinced|challenged)\b/i,
   question: /\?$|\b(asked|wanted to know|unclear|open question|unresolved|tbd|to be determined)\b/i,
   preference:
@@ -134,16 +137,18 @@ function composeDebrief(input: DebriefInput): Debrief {
   const openQuestions = sentences.filter((s) => CUES.question.test(s)).slice(0, 5)
 
   const commitments = sentences
-    .filter((s) => CUES.commitment.test(s) && !CUES.decision.test(s))
+    // An objection is not a commitment. "He pushed back, citing the deadline"
+    // matched both and was filed as a promise nobody made.
+    .filter((s) => CUES.commitment.test(s) && !CUES.decision.test(s) && !CUES.objection.test(s))
     .slice(0, 8)
     .map((s) => {
       const who = attribute(s, participants)
-      const userOwns = /\b(i'?ll|i will|i am going to|i'm going to|my )\b/i.test(s)
+      const userOwns = /\b(i'?ll|i will|i owe|i need to|i have to|i said i would|i promised|i am going to|i'm going to|my )\b/i.test(s)
       return {
         description: s.replace(/\s+/g, ' ').trim(),
         owner: userOwns ? ('user' as const) : who ? ('person' as const) : ('shared' as const),
         ownerPersonId: userOwns ? null : (who?.id ?? null),
-        dueOn: extractDate(s),
+        dueOn: extractDate(s, input.interaction.occurredAt),
       }
     })
 
@@ -207,9 +212,65 @@ function composeDebrief(input: DebriefInput): Debrief {
 }
 
 /** Very conservative ISO-date extraction; returns null unless unambiguous. */
-function extractDate(s: string): string | null {
-  const iso = s.match(/\b(\d{4}-\d{2}-\d{2})\b/)
-  return iso ? iso[1]! : null
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+/**
+ * Resolve a due date out of a sentence, relative to when the meeting happened.
+ *
+ * Only ISO dates were recognised before, so "I owe him the revised timeline by
+ * Friday" produced no date at all - the commitment could never come due and
+ * never surfaced as overdue, which is most of what a commitment is for. Real
+ * meeting notes almost never contain an ISO date.
+ *
+ * Computed in UTC against the interaction date so the same notes always resolve
+ * the same way, and only unambiguous phrasing is accepted. A wrong due date is
+ * worse than none: it invents a broken promise.
+ */
+function extractDate(sentence: string, referenceIso: string): string | null {
+  const iso = sentence.match(/\b(\d{4}-\d{2}-\d{2})\b/)
+  if (iso) return iso[1]!
+
+  const reference = new Date(referenceIso)
+  if (Number.isNaN(reference.getTime())) return null
+
+  const day = (offset: number) => {
+    const d = new Date(reference)
+    d.setUTCDate(d.getUTCDate() + offset)
+    return d.toISOString().slice(0, 10)
+  }
+
+  const s = sentence.toLowerCase()
+
+  if (/\btomorrow\b/.test(s)) return day(1)
+  if (/\b(today|eod|end of day)\b/.test(s)) return day(0)
+
+  const weekday = s.match(
+    /\bby (?:next )?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/,
+  )
+  if (weekday?.[1]) {
+    const target = WEEKDAYS.indexOf(weekday[1])
+    const current = reference.getUTCDay()
+    let delta = (target - current + 7) % 7
+    if (delta === 0) delta = 7
+    if (/\bby next\b/.test(s)) delta += 7
+    return day(delta)
+  }
+
+  if (/\bnext week\b/.test(s)) return day(7)
+  if (/\b(end of (the )?week|eow)\b/.test(s)) {
+    const current = reference.getUTCDay()
+    const delta = (5 - current + 7) % 7
+    return day(delta)
+  }
+  if (/\b(end of (the )?month|eom)\b/.test(s)) {
+    return new Date(
+      Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 0),
+    )
+      .toISOString()
+      .slice(0, 10)
+  }
+
+  return null
 }
 
 function extractTopics(sentences: string[]): string[] {
