@@ -1,0 +1,491 @@
+import { z } from 'zod'
+import type { Citation, MeetingContext, PersonContext, PromptModule, UserContext } from '../types'
+import {
+  AUREL_VOICE,
+  MEETING_KIND_LABEL,
+  RELATIONSHIP_LABEL,
+  dateBlock,
+  renderPerson,
+  renderUser,
+  styleBlock,
+} from './shared'
+
+/**
+ * MEETING BRIEF
+ * =============================================================================
+ * The paid-value centrepiece: turn a room, an objective and a relationship
+ * record into something the user can act on in the next hour.
+ * =============================================================================
+ */
+
+export const participantBriefSchema = z.object({
+  personId: z.string(),
+  name: z.string(),
+  /** Their professional role and why they matter to this objective. */
+  relevance: z.string(),
+  /** What matters to them, grounded in the record. */
+  whatMatters: z.array(z.string()).max(4),
+  /** How to communicate with them specifically. */
+  guidance: z.array(z.string()).max(4),
+  /** Concerns they have actually raised before. Empty when none are recorded. */
+  knownConcerns: z.array(z.string()).max(4),
+  /** One line on the state of this relationship. */
+  relationshipNote: z.string(),
+})
+
+export const meetingBriefSchema = z.object({
+  /** The whole brief compressed to what you could read walking down a corridor. */
+  sixtySecond: z.string(),
+  objective: z.string(),
+  recommendedApproach: z.array(z.string()).min(2).max(6),
+  participants: z.array(participantBriefSchema),
+  roomDynamics: z
+    .object({
+      decisionOwner: z.string().nullable(),
+      informationNeeds: z.array(z.string()).max(5),
+      knownDisagreements: z.array(z.string()).max(5),
+      unresolvedIssues: z.array(z.string()).max(5),
+      /** Suggested order to work the room, each step tied to a person. */
+      sequencing: z.array(z.string()).max(6),
+    })
+    .nullable(),
+  howToOpen: z.string(),
+  emphasize: z.array(z.string()).max(5),
+  avoid: z.array(z.string()).max(5),
+  questionsYouMayGet: z.array(z.object({ question: z.string(), response: z.string() })).max(5),
+  likelyObjections: z
+    .array(z.object({ objection: z.string(), response: z.string(), basis: z.string() }))
+    .max(5),
+  questionsToAsk: z.array(z.string()).max(5),
+  outcomeToLeaveWith: z.string(),
+  checklist: z.array(z.string()).max(6),
+  /** What Aurel does NOT know. Rendered prominently — this is a trust feature. */
+  uncertainties: z.array(z.string()).max(5),
+})
+
+export type MeetingBrief = z.infer<typeof meetingBriefSchema>
+
+export interface MeetingBriefInput {
+  meeting: MeetingContext
+  user: UserContext
+}
+
+// --- deterministic composition ------------------------------------------------
+
+const sentence = (s: string) => (s.trim().endsWith('.') ? s.trim() : `${s.trim()}.`)
+
+function firstName(p: PersonContext) {
+  return p.preferredName ?? p.displayName.split(' ')[0] ?? p.displayName
+}
+
+/** Observations that speak to how to communicate, most-supported first. */
+function communicationSignals(p: PersonContext) {
+  return [...p.observations.confirmed, ...p.observations.observed]
+    .filter((o) => ['communication', 'preference', 'decision'].includes(o.category))
+    .sort((a, b) => b.reinforcementCount - a.reinforcementCount)
+}
+
+function frictionSignals(p: PersonContext) {
+  return [...p.observations.confirmed, ...p.observations.observed].filter((o) =>
+    ['friction', 'trust'].includes(o.category),
+  )
+}
+
+function composeParticipant(p: PersonContext) {
+  const comms = communicationSignals(p)
+  const friction = frictionSignals(p)
+  const priorities = [...p.observations.confirmed, ...p.observations.observed].filter((o) =>
+    ['priority', 'context'].includes(o.category),
+  )
+
+  const whatMatters = priorities.slice(0, 3).map((o) => o.content)
+  if (whatMatters.length === 0 && p.topics.length > 0) {
+    whatMatters.push(`Recurring topics with them: ${p.topics.slice(0, 4).join(', ')}.`)
+  }
+
+  const guidance = comms.slice(0, 3).map((o) => {
+    // Attribute observed patterns; state confirmed ones plainly.
+    return o.evidenceLevel === 'confirmed'
+      ? sentence(o.content)
+      : `Across ${o.reinforcementCount > 1 ? `${o.reinforcementCount} recorded interactions` : 'a recorded interaction'}: ${o.content.replace(/\.$/, '')}.`
+  })
+
+  const overdue = p.openCommitments.filter((c) => c.isOverdue)
+  if (overdue.length > 0) {
+    guidance.unshift(
+      `Address the overdue commitment before anything else: ${overdue[0]!.description}`,
+    )
+  }
+
+  let relationshipNote: string
+  if (p.interactionCount === 0) {
+    relationshipNote = `No recorded interactions yet. Treat everything below as a starting point, not a read.`
+  } else {
+    const last = p.lastInteractionAt ? p.lastInteractionAt.slice(0, 10) : 'an unrecorded date'
+    const open = p.openCommitments.length
+    relationshipNote =
+      `${p.interactionCount} recorded interaction${p.interactionCount === 1 ? '' : 's'}, most recently ${last}.` +
+      (open > 0 ? ` ${open} open commitment${open === 1 ? '' : 's'}.` : ' No open commitments.')
+  }
+
+  return {
+    personId: p.id,
+    name: p.displayName,
+    relevance:
+      (p.jobTitle ? `${p.jobTitle}. ` : '') +
+      `${RELATIONSHIP_LABEL[p.relationshipType] ?? 'A colleague'}, marked ${p.relevance}/5 for importance.`,
+    whatMatters: whatMatters.slice(0, 4),
+    guidance: guidance.slice(0, 4),
+    knownConcerns: friction.slice(0, 4).map((o) => o.content),
+    relationshipNote,
+  }
+}
+
+function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
+  const { meeting, user } = input
+  const people = meeting.participants
+  const kindLabel = MEETING_KIND_LABEL[meeting.kind] ?? 'meeting'
+
+  const allCommitments = people.flatMap((p) =>
+    p.openCommitments.map((c) => ({ ...c, person: p })),
+  )
+  const overdue = allCommitments.filter((c) => c.isOverdue)
+  const knownPeople = people.filter((p) => p.interactionCount > 0)
+  const unknownPeople = people.filter((p) => p.interactionCount === 0)
+
+  const objective = meeting.objective?.trim() || 'No objective recorded for this meeting yet.'
+
+  // --- sixty second brief ---
+  const sixty: string[] = []
+  sixty.push(
+    `${kindLabel[0]!.toUpperCase()}${kindLabel.slice(1)} with ${
+      people.length === 0
+        ? 'no participants recorded'
+        : people.length === 1
+          ? firstName(people[0]!)
+          : `${people.slice(0, -1).map(firstName).join(', ')} and ${firstName(people[people.length - 1]!)}`
+    }.`,
+  )
+  if (meeting.objective) sixty.push(`You want to ${lowerFirst(meeting.objective)}`)
+  if (overdue.length > 0) {
+    sixty.push(
+      `Clear the overdue commitment first — ${overdue[0]!.description} (${firstName(overdue[0]!.person)}).`,
+    )
+  }
+  const topSignal = knownPeople.flatMap(communicationSignals)[0]
+  if (topSignal) {
+    const owner = knownPeople.find((p) => communicationSignals(p).includes(topSignal))
+    sixty.push(`${owner ? `${firstName(owner)}: ` : ''}${sentence(topSignal.content)}`)
+  }
+  if (meeting.stakes) sixty.push(`At stake: ${lowerFirst(meeting.stakes)}`)
+  if (knownPeople.length === 0) {
+    sixty.push('You have no recorded history with anyone in this room, so this brief is thin.')
+  }
+
+  // --- recommended approach ---
+  const approach: string[] = []
+  if (overdue.length > 0) {
+    approach.push(`Open by closing the loop on ${overdue[0]!.description}, before you ask for anything.`)
+  }
+  const detailFirst = people.find((p) =>
+    communicationSignals(p).some((o) => /data|evidence|number|detail|proof|utilisation|utilization/i.test(o.content)),
+  )
+  if (detailFirst) {
+    approach.push(
+      `Bring supporting evidence to the front — ${firstName(detailFirst)} has asked for it before.`,
+    )
+  }
+  if (meeting.objective) {
+    approach.push(`State the decision you need clearly and early: ${lowerFirst(meeting.objective)}`)
+  }
+  const decisionOwner = people.find((p) => p.meetingRole === 'decision_maker')
+  if (decisionOwner) {
+    approach.push(`Close with ${firstName(decisionOwner)}, who owns the decision, and confirm the next step.`)
+  } else {
+    approach.push('Confirm who owns the next step and by when, before the meeting ends.')
+  }
+  if (unknownPeople.length > 0) {
+    approach.push(
+      `Use this meeting to learn how ${unknownPeople.map(firstName).join(' and ')} prefer${unknownPeople.length === 1 ? 's' : ''} to work. Add what you notice afterwards.`,
+    )
+  }
+  while (approach.length < 2) approach.push('Confirm the outcome and the owner before you leave.')
+
+  // --- room dynamics: only when there is genuinely a room ---
+  const roomDynamics =
+    people.length < 2
+      ? null
+      : {
+          decisionOwner: decisionOwner ? decisionOwner.displayName : null,
+          informationNeeds: people
+            .flatMap((p) =>
+              communicationSignals(p)
+                .slice(0, 1)
+                .map((o) => `${firstName(p)}: ${o.content}`),
+            )
+            .slice(0, 5),
+          knownDisagreements: people
+            .flatMap((p) => frictionSignals(p).slice(0, 1).map((o) => `${firstName(p)}: ${o.content}`))
+            .slice(0, 5),
+          unresolvedIssues: allCommitments
+            .slice(0, 5)
+            .map(
+              (c) =>
+                `${c.description} (${c.owner === 'user' ? 'you owe' : `${firstName(c.person)} owes`}${c.dueOn ? `, due ${c.dueOn}` : ''})`,
+            ),
+          sequencing: buildSequencing(people, decisionOwner),
+        }
+
+  // --- opening ---
+  const howToOpen = overdue.length
+    ? `"Before we get into it — I owe you ${lowerFirst(overdue[0]!.description)}. Here's where that stands." Then move to the ask.`
+    : meeting.objective
+      ? `Name the outcome you want in the first thirty seconds: "I'd like us to leave today having ${lowerFirst(stripLeadingVerb(meeting.objective))}."`
+      : `Open by stating what you want the meeting to produce, so the room is working toward the same thing.`
+
+  // --- emphasise / avoid ---
+  const emphasize: string[] = []
+  const avoid: string[] = []
+  for (const p of knownPeople) {
+    for (const o of communicationSignals(p).slice(0, 2)) {
+      if (/first|before|up front|lead with|headline|recommendation/i.test(o.content)) {
+        emphasize.push(`${firstName(p)}: ${o.content}`)
+      }
+    }
+    for (const o of frictionSignals(p).slice(0, 2)) {
+      avoid.push(`${firstName(p)}: ${o.content}`)
+    }
+  }
+  if (emphasize.length === 0 && meeting.objective) {
+    emphasize.push('The specific decision you need, stated once, plainly.')
+  }
+  if (avoid.length === 0) {
+    avoid.push('Opening with methodology before anyone has heard the recommendation.')
+  }
+  if (unknownPeople.length > 0) {
+    avoid.push(
+      `Assuming you know how ${unknownPeople.map(firstName).join(' or ')} prefer${unknownPeople.length === 1 ? 's' : ''} to be approached — you have no record yet.`,
+    )
+  }
+
+  // --- objections drawn only from recorded friction ---
+  const likelyObjections = people
+    .flatMap((p) =>
+      frictionSignals(p).slice(0, 2).map((o) => ({
+        objection: `${firstName(p)} may return to: ${o.content}`,
+        response:
+          'Acknowledge it directly, then show what has changed since they raised it. Do not re-argue the original point.',
+        basis:
+          o.evidenceLevel === 'confirmed'
+            ? 'They raised this themselves.'
+            : `Observed across ${o.reinforcementCount} recorded interaction${o.reinforcementCount === 1 ? '' : 's'}.`,
+      })),
+    )
+    .slice(0, 5)
+
+  // --- questions to ask ---
+  const questionsToAsk: string[] = []
+  if (decisionOwner) {
+    questionsToAsk.push(`"${firstName(decisionOwner)}, what would you need to see to decide today?"`)
+  }
+  for (const p of unknownPeople.slice(0, 2)) {
+    questionsToAsk.push(`"${firstName(p)}, how do you like to receive this kind of update?"`)
+  }
+  questionsToAsk.push('"What have I not asked about that would change this?"')
+  if (allCommitments.length > 0) {
+    questionsToAsk.push('"Is there anything still open from last time that I have missed?"')
+  }
+
+  // --- outcome + checklist ---
+  const outcomeToLeaveWith = meeting.objective
+    ? `A clear answer on: ${lowerFirst(meeting.objective)} — plus a named owner and a date.`
+    : 'A named owner and a date for the next step, even if the decision itself is deferred.'
+
+  const checklist: string[] = []
+  if (detailFirst) checklist.push(`Supporting evidence ready for ${firstName(detailFirst)}`)
+  if (overdue.length > 0) checklist.push(`Status on: ${overdue[0]!.description}`)
+  checklist.push('One-sentence version of your ask')
+  checklist.push('The decision you want, written down')
+  if (people.length > 1) checklist.push('Who you need in agreement, and in what order')
+  checklist.push('Where you will capture what you learn afterwards')
+
+  // --- uncertainties: what Aurel genuinely does not know ---
+  const uncertainties: string[] = []
+  if (unknownPeople.length > 0) {
+    uncertainties.push(
+      `No interaction history with ${unknownPeople.map((p) => p.displayName).join(', ')}. Nothing here is a read on them.`,
+    )
+  }
+  if (!meeting.objective) {
+    uncertainties.push('No objective recorded, so this brief cannot tell you what to optimise for.')
+  }
+  const inferredCount = people.reduce((n, p) => n + p.observations.inferred.length, 0)
+  if (inferredCount > 0) {
+    uncertainties.push(
+      `${inferredCount} of the points above are inferred from limited evidence rather than confirmed. Treat them as questions to test, not facts.`,
+    )
+  }
+  if (people.every((p) => p.interactionCount < 2)) {
+    uncertainties.push(
+      'This relationship record is still thin. Aurel gets materially more useful after a few logged interactions.',
+    )
+  }
+  if (!user.interactionProfile) {
+    uncertainties.push(
+      'You have not completed an Interaction Profile, so this brief does not account for your own defaults.',
+    )
+  }
+
+  return {
+    sixtySecond: sixty.join(' '),
+    objective,
+    recommendedApproach: approach.slice(0, 6),
+    participants: people.map(composeParticipant),
+    roomDynamics,
+    howToOpen,
+    emphasize: emphasize.slice(0, 5),
+    avoid: avoid.slice(0, 5),
+    questionsYouMayGet: buildAnticipatedQuestions(people).slice(0, 5),
+    likelyObjections,
+    questionsToAsk: questionsToAsk.slice(0, 5),
+    outcomeToLeaveWith,
+    checklist: checklist.slice(0, 6),
+    uncertainties: uncertainties.slice(0, 5),
+  }
+}
+
+function buildSequencing(people: PersonContext[], decisionOwner: PersonContext | undefined): string[] {
+  const steps: string[] = ['Open with the decision you need, in one sentence.']
+  const byRole = (role: string) => people.filter((p) => p.meetingRole === role)
+
+  for (const p of byRole('influencer').slice(0, 2)) {
+    const signal = communicationSignals(p)[0]
+    steps.push(
+      `Address ${firstName(p)}${signal ? ` — ${lowerFirst(signal.content)}` : ' and their area of the decision'}`,
+    )
+  }
+  for (const p of byRole('contributor').slice(0, 2)) {
+    const concern = frictionSignals(p)[0]
+    if (concern) steps.push(`Handle ${firstName(p)}'s previous concern: ${concern.content}`)
+  }
+  if (decisionOwner) steps.push(`Return to ${firstName(decisionOwner)} for the decision.`)
+  steps.push('Confirm the owner and the date before closing.')
+  return steps.slice(0, 6)
+}
+
+function buildAnticipatedQuestions(people: PersonContext[]) {
+  const out: { question: string; response: string }[] = []
+  for (const p of people) {
+    for (const o of communicationSignals(p).slice(0, 1)) {
+      if (/data|number|evidence|proof|detail/i.test(o.content)) {
+        out.push({
+          question: `"What is this based on?" — likely from ${firstName(p)}`,
+          response: 'Have the source ready in one line, with the fuller working available if asked.',
+        })
+      }
+    }
+    for (const c of p.openCommitments.slice(0, 1)) {
+      out.push({
+        question: `"Where did we land on ${lowerFirst(c.description)}" — likely from ${firstName(p)}`,
+        response: 'Give the current status and a date, even if the answer is that it has not moved.',
+      })
+    }
+  }
+  return out
+}
+
+function lowerFirst(s: string) {
+  const t = s.trim()
+  if (!t) return t
+  const out = t[0]!.toLowerCase() + t.slice(1)
+  return out.endsWith('.') ? out : `${out}.`
+}
+
+function stripLeadingVerb(s: string) {
+  return s.trim().replace(/^(I want to|I need to|We need to|To)\s+/i, '')
+}
+
+// --- citations ----------------------------------------------------------------
+
+function citeMeeting(input: MeetingBriefInput): Citation[] {
+  const citations: Citation[] = []
+  for (const p of input.meeting.participants) {
+    for (const group of [
+      p.observations.confirmed,
+      p.observations.observed,
+      p.observations.inferred,
+    ]) {
+      for (const o of group) {
+        citations.push({
+          label: o.content,
+          evidenceLevel: o.evidenceLevel,
+          observationId: o.id,
+          personId: p.id,
+        })
+      }
+    }
+    for (const i of p.recentInteractions) {
+      citations.push({
+        label: `Interaction: "${i.title}" on ${i.occurredAt.slice(0, 10)}`,
+        evidenceLevel: 'observed',
+        interactionId: i.id,
+        personId: p.id,
+      })
+    }
+    for (const c of p.openCommitments) {
+      citations.push({
+        label: `Open commitment: ${c.description}${c.isOverdue ? ' (overdue)' : ''}`,
+        evidenceLevel: 'confirmed',
+        commitmentId: c.id,
+        personId: p.id,
+      })
+    }
+  }
+  return citations
+}
+
+// --- module -------------------------------------------------------------------
+
+export const meetingBriefPrompt: PromptModule<MeetingBriefInput, MeetingBrief> = {
+  id: 'meeting-brief',
+  kind: 'meeting_brief',
+  version: 'meeting-brief@1.0.0',
+  schema: meetingBriefSchema,
+
+  system: (input) =>
+    [
+      AUREL_VOICE,
+      styleBlock(input.user.coachingStyle),
+      dateBlock(),
+      `TASK: produce a preparation brief for one specific upcoming ${MEETING_KIND_LABEL[input.meeting.kind]}.`,
+      `Every participant section must be traceable to the record you are given. Where the record is empty, say it is empty.`,
+      `The "uncertainties" field is required and must be honest. List what you do not know. Do not leave it empty just because the rest of the brief reads well.`,
+      `Set roomDynamics to null if there are fewer than two participants.`,
+    ].join('\n\n'),
+
+  user: (input) => {
+    const { meeting, user } = input
+    const parts = [
+      renderUser(user),
+      '',
+      `## THE MEETING`,
+      `Title: ${meeting.title}`,
+      `Type: ${MEETING_KIND_LABEL[meeting.kind]}`,
+      meeting.scheduledAt ? `Scheduled: ${meeting.scheduledAt}` : 'Not yet scheduled.',
+      meeting.durationMinutes ? `Duration: ${meeting.durationMinutes} minutes` : '',
+      `Importance to the user: ${meeting.importance}/5`,
+      meeting.objective ? `\nUSER'S OBJECTIVE: ${meeting.objective}` : '\nNo objective recorded.',
+      meeting.stakes ? `WHAT IS AT STAKE: ${meeting.stakes}` : '',
+      meeting.extraContext ? `ADDITIONAL CONTEXT: ${meeting.extraContext}` : '',
+      '',
+      `## THE ROOM (${meeting.participants.length} participant${meeting.participants.length === 1 ? '' : 's'})`,
+      meeting.participants.length === 0
+        ? 'No participants have been added. Say so and keep the brief minimal.'
+        : meeting.participants.map(renderPerson).join('\n\n'),
+    ]
+    return parts.filter(Boolean).join('\n')
+  },
+
+  compose: composeMeetingBrief,
+  cite: citeMeeting,
+}

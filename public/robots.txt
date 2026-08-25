@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /today
+Disallow: /people
+Disallow: /prepare
+Disallow: /meetings
+Disallow: /coach
+Disallow: /atlas
+Disallow: /settings
+Disallow: /onboarding
+Disallow: /api
+
+Sitemap: https://aurel.app/sitemap.xml

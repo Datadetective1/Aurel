@@ -1,0 +1,285 @@
+@import 'tailwindcss';
+
+/* Dark mode is class-driven so the Pearl/Obsidian/System switch can override the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =============================================================================
+   AUREL DESIGN TOKENS
+   Two committed themes: PEARL (warm ivory, editorial) and OBSIDIAN (graphite).
+   One accent family only — BRASS — used as a marker, never as a flood fill.
+   Primary actions use high-contrast ink, which is what makes the brass read as
+   precious rather than decorative.
+   ========================================================================== */
+
+:root {
+  /* --- Pearl: surfaces ---------------------------------------------------- */
+  --bg: #fbf9f6;
+  --bg-sunken: #f3f0ea;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inverse: #16161a;
+
+  /* --- Pearl: type -------------------------------------------------------- */
+  --ink: #1a1815;
+  --ink-secondary: #4a4741; /* ~8.2:1 on --bg */
+  --ink-muted: #6b6862;   /* ~5.4:1 on --bg */
+  --ink-faint: #8a867e;   /* ~3.5:1 on --bg: decorative and large text only */
+  --ink-inverse: #f7f4ee;
+
+  /* --- Pearl: structure --------------------------------------------------- */
+  --line: #e7e2d9;
+  --line-strong: #c6bfb1;  /* ~1.9:1: visible control borders */
+
+  /* --- Pearl: brass ------------------------------------------------------- */
+  --accent: #856427; /* passes AA on --bg for text and icons */
+  --accent-strong: #674d1b;
+  --accent-graphic: #b5893f; /* non-text: motif strokes, rules, indicators */
+  --accent-wash: rgb(181 137 63 / 0.1);
+  --accent-contrast: #fffdf8; /* text on a filled brass surface */
+
+  /* --- Pearl: status (paired with an icon; never colour alone) ------------ */
+  --positive: #2f6b45;
+  --caution: #8a5a12;
+  --critical: #9b2c25;
+  --info: #2b5673;
+  --positive-wash: rgb(47 107 69 / 0.1);
+  --caution-wash: rgb(138 90 18 / 0.1);
+  --critical-wash: rgb(155 44 37 / 0.1);
+  --info-wash: rgb(43 86 115 / 0.1);
+
+  --focus-ring: #b5893f;
+
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0d0d0f;
+  --bg-sunken: #08080a;
+  --surface: #141417;
+  --surface-raised: #1b1b20;
+  --surface-inverse: #f7f4ee;
+
+  --ink: #f2efe9;
+  --ink-secondary: #b4b0a8;
+  --ink-muted: #9b978f;   /* ~7.1:1 on --bg */
+  --ink-faint: #75716a;   /* ~4.1:1 on --bg */
+  --ink-inverse: #16161a;
+
+  --line: #26262b;
+  --line-strong: #44444c;
+
+  --accent: #d9b074;
+  --accent-strong: #eac795;
+  --accent-graphic: #d9b074;
+  --accent-wash: rgb(217 176 116 / 0.12);
+  --accent-contrast: #17150f;
+
+  --positive: #7fc79a;
+  --caution: #e0b062;
+  --critical: #e58a80;
+  --info: #8fbcdc;
+  --positive-wash: rgb(127 199 154 / 0.12);
+  --caution-wash: rgb(224 176 98 / 0.12);
+  --critical-wash: rgb(229 138 128 / 0.12);
+  --info-wash: rgb(143 188 220 / 0.12);
+
+  --focus-ring: #d9b074;
+
+  color-scheme: dark;
+}
+
+/* =============================================================================
+   TAILWIND THEME BRIDGE
+   ========================================================================== */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inverse: var(--surface-inverse);
+
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-graphic: var(--accent-graphic);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-positive: var(--positive);
+  --color-caution: var(--caution);
+  --color-critical: var(--critical);
+  --color-info: var(--info);
+  --color-positive-wash: var(--positive-wash);
+  --color-caution-wash: var(--caution-wash);
+  --color-critical-wash: var(--critical-wash);
+  --color-info-wash: var(--info-wash);
+
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+
+  /* Motion: controlled, never bouncy. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --animate-rise: rise 0.5s var(--ease-out-quint) both;
+  --animate-settle: settle 0.7s var(--ease-out-quint) both;
+  --animate-sheen: sheen 2.4s var(--ease-in-out-quart) infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes sheen {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* =============================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv05' 1, 'ss01' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A visible, brand-coloured focus ring on keyboard navigation only. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-wash);
+    color: var(--ink);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Editorial display type: tighter tracking, optical sizing at large sizes. */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    font-weight: 400;
+  }
+
+  /* Small-caps label style used for section eyebrows and evidence tags.
+     Replaces the need for a separate monospace family. */
+  .label {
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--ink-muted);
+  }
+
+  /* Hairline rule — the primary separator in this system, in place of shadows. */
+  .rule {
+    height: 1px;
+    background: var(--line);
+    border: 0;
+  }
+}
+
+@layer utilities {
+  /* A single, very restrained elevation. Luxury reads as hairlines, not shadows. */
+  .elevate {
+    box-shadow:
+      0 1px 2px rgb(26 24 21 / 0.04),
+      0 8px 24px -12px rgb(26 24 21 / 0.08);
+  }
+
+  .dark .elevate {
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 8px 24px -12px rgb(0 0 0 / 0.6);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* =============================================================================
+   REDUCED MOTION — honour the OS preference everywhere, including our keyframes.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
