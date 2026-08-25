@@ -1,270 +1,284 @@
 # Human actions
 
-Everything in this file needs a person. Not because the work is hard, but
-because it requires a credential, a payment, a legal judgement, or a signature —
-things that cannot and should not be automated on someone's behalf.
+Everything here needs you. Not because the work is unfinished, but because it
+needs a credential, a payment, a legal judgement, or a signature.
 
-Nothing here blocks the product from running. Atturel works today without a
-single item on this list: it degrades honestly instead, and the
-**Settings → Capabilities** screen tells the user exactly which parts are off.
-
-Ordered by what actually gates a launch.
+**The product runs today without a single item on this list.** It degrades
+honestly instead, and Settings → Capabilities tells the user exactly which parts
+are off.
 
 ---
 
-## 1. Before anyone else uses this
+## Activation at a glance
 
-### 1.1 Legal review of Terms and Privacy — **required**
+| # | Capability | Blocked by | Free tier? | Code status |
+| --- | --- | --- | --- | --- |
+| 1 | **AI reasoning** | API key | Trial credit only | Complete |
+| 2 | **Automatic research** | API key | **Yes — 2,000/mo free** | Complete |
+| 3 | Document ingestion | — | — | **Live** |
+| 4 | Calendar | OAuth client **+ code** | Yes | **Not built** |
+| 5 | Billing | Stripe account | Yes (test mode) | Complete |
+| 6 | Email | API key + domain | **Yes — 3,000/mo free** | Complete |
 
-`src/lib/brand/index.ts` carries `legal.policiesLegallyReviewed: false`, and the
-policy pages say plainly that they are awaiting review. They were written as
-accurate descriptions of real behaviour, which is the right starting point for a
-lawyer — but they are not legal advice and were not written by a lawyer.
+Items 1, 2, 5 and 6 are credential-only: paste the variables, redeploy, done.
+Item 4 needs implementation as well — see §4 for why I have not written it
+blind.
 
-A reviewer needs to look at, at minimum:
-
-- The claim that Atturel never infers protected characteristics. It is enforced
-  in prompts and in the data model; it still needs signing off as a public
-  commitment.
-- Data-processing basis for storing information about **third parties** — the
-  colleagues a user records — who never agreed to anything. This is the sharpest
-  question in the product and deserves the most attention.
-- Retention and deletion. `delete_my_data()` removes every row the user owns;
-  confirm that satisfies your obligations, including backups.
-- Whether you need a DPA, and in which jurisdictions.
-
-Then set `policiesLegallyReviewed: true` and fill in `legal.entityAddress` and
-`legal.jurisdiction`.
-
-### 1.2 Register the entity and settle the name
-
-`brand.legalEntity` is currently `Atturel Labs` and `brand.domain` is
-`atturel.app`. Both are placeholders until:
-
-- a trademark search clears **ATTUREL** in your classes and markets
-- the domain is actually registered
-- the company exists
-
-The brand registry exists precisely so this stays a one-file change. Do not
-commission a logo, order stationery, or start building SEO authority on the name
-before the search comes back.
-
-### 1.3 Decide what you are promising about AI
-
-If you configure a model provider (§2.1), user relationship data is sent to that
-provider. Confirm their data-retention terms, whether they train on API traffic,
-and that your privacy policy describes it correctly.
+Set every variable in **Vercel → Project → Settings → Environment Variables**
+(Production), never in `.env.production`, which is committed.
 
 ---
 
-## 2. Credentials
+## 1. AI reasoning
 
-Each of these turns on one capability. All are optional. Set them in your host's
-environment settings — **never** in `.env.production`, which is committed.
+Every AI capability currently runs on the deterministic evidence composer. That
+path is real and cited, and the UI says *"Composed directly from your records"*
+rather than implying reasoning that did not happen. Nothing is broken — but no
+model is active.
 
-### 2.1 AI provider — turns on generated guidance
-
-**Blocked in production today: no model is configured, so every AI feature is
-running on the deterministic composer.** That path is real and evidence-backed,
-and the UI says "Composed directly from your records" rather than implying
-reasoning that did not happen — but nothing here should be described as an
-active AI feature until this key is set.
+| | |
+| --- | --- |
+| **Service** | Anthropic (recommended) or OpenAI |
+| **Sign-up** | https://console.anthropic.com → **API Keys** → *Create key*<br>or https://platform.openai.com/api-keys |
+| **Billing page** | https://console.anthropic.com/settings/billing |
+| **Free tier** | No ongoing free tier. New accounts usually get a small trial credit; after that it is pay-as-you-go with a prepaid balance. |
+| **Cost** | Billed per token. A meeting brief is roughly 4–8k input and 1–2k output tokens. At Claude Sonnet pricing that is well under a cent per brief; Opus is several times that. **Set a monthly spend cap in the billing page before going live.** |
 
 ```
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
-AI_MODEL=claude-opus-5
+AI_MODEL=claude-sonnet-5
 ```
 
-Without this the product uses its deterministic evidence composer. Briefs are
-still real and still cited; they reason less. The UI says
-"Composed directly from your relationship record" rather than pretending.
+`AI_MODEL` defaults to `claude-opus-5`. Sonnet is the sensible default for this
+workload — the prompts are structured extraction, not open-ended reasoning.
 
-### 2.2 Search provider — turns on automatic source discovery
+**Verify after configuring**
 
-**This is the one genuinely blocked production capability.** Everything around
-it is built and tested; only the credential is missing.
+1. Settings → Capabilities: **AI reasoning** shows **Connected** and names the
+   provider and model.
+2. Open any meeting brief → **Rebuild**.
+3. The evidence panel footer changes from *"Composed directly from the records
+   below. No language model was involved."* to the generated wording.
+4. Settings → Plan → *This month* — the meters now accrue against the AI path.
+
+If the provider errors or times out, the brief silently falls back to the
+composer and logs `ai.fell_back_to_grounded`. That is by design; the user still
+gets a brief.
+
+---
+
+## 2. Automatic professional research
+
+Pasting a link already works and needs no credential. What is gated is turning
+a *name* into candidate URLs, which needs a web index. There is no legitimate
+way to do that without a search API — the alternative is scraping a search
+engine, which violates its terms.
 
 | | |
 | --- | --- |
-| **Service** | Brave Search API (reference implementation) or Serper |
-| **Why required** | Turning a *name* into candidate URLs needs a web index. There is no legitimate way to do that without a search API — the alternative is scraping a search engine, which violates its terms. |
-| **Sign-up** | https://brave.com/search/api/ — or https://serper.dev |
-| **Credential** | An API subscription token from the dashboard |
-| **Env** | `SEARCH_PROVIDER=brave` and `BRAVE_SEARCH_API_KEY=…`<br>(or `SEARCH_PROVIDER=serper` and `SERPER_API_KEY=…`) |
-
-**Already implemented** — nothing here is left for you:
-
-- Provider abstraction with two real implementations (Brave, Serper), resolved
-  from env at call time
-- The full discovery → rank → fetch → extract → identity-resolve → fact →
-  memory-proposal pipeline
-- `research_jobs` rows recording stage, sources considered/accepted, facts
-  created and cost units
-- Entitlements and usage metering on `person_research`
-- Loading, empty, error and rate-limited states in the UI
-- A deterministic `SEARCH_PROVIDER=mock` provider for automated tests, which
-  **refuses to run when NODE_ENV is production** so it can never fabricate
-  evidence for a real user
-
-**How to verify afterwards:**
-
-1. Set the two variables and redeploy.
-2. Settings → Capabilities: "Finding sources automatically" flips from
-   *Configuration required* to **Connected**, naming the provider.
-3. Add a person with a name and company but **no** profile URL.
-4. Press **Research public footprint**. Without the key this returns "paste a
-   link instead"; with it, sources are discovered, fetched and cited.
-
-Until then the product does not pretend: the capability screen says
-configuration is required, and the research panel tells the user to paste a
-link — which genuinely works and produces the same source-backed footprint.
-
-**Pasting a link needs no credential and is fully working today.** Only
-discovery from a name alone is gated.
-
-### 2.3 Email delivery
+| **Service** | Brave Search API (recommended) or Serper |
+| **Sign-up** | https://api-dashboard.search.brave.com/register → **Subscriptions** → choose *Data for Search*<br>or https://serper.dev → *API Key* |
+| **Free tier** | **Brave: yes** — 2,000 queries/month free, one query per second. A card is required to activate even the free plan.<br>**Serper:** 2,500 one-off trial credits, no card. |
+| **Cost** | Beyond Brave's free tier, roughly \$3–5 per 1,000 queries depending on plan. One *Research person* run costs **one** query. |
 
 ```
-RESEND_API_KEY=re_...
-EMAIL_FROM_ADDRESS=hello@yourdomain
+SEARCH_PROVIDER=brave
+BRAVE_SEARCH_API_KEY=BSA...
 ```
 
-You must verify the sending domain with the provider before mail leaves. Until
-the key is set, messages are written to the server log with subject and
-recipient only — never the body, which contains private relationship content.
-
-Preview every template at `/dev/emails` (development only).
-
-### 2.4 Stripe
+or
 
 ```
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_PRO_MONTHLY=price_...
-STRIPE_PRICE_PRO_YEARLY=price_...
+SEARCH_PROVIDER=serper
+SERPER_API_KEY=...
 ```
 
-Steps that need a person:
+**Already built — nothing engineering-side is left:** provider abstraction with
+two implementations, the discovery → rank → fetch → extract → identity-resolve
+→ fact → memory-proposal pipeline, research jobs recording stages and cost,
+entitlements and metering, and every loading, empty, error and rate-limited
+state.
 
-1. Create the Pro product and its monthly/yearly prices in the Stripe dashboard.
-   Prices in `src/lib/billing/plans.ts` are display copy — Stripe is the source
-   of truth for what is charged. **Keep them in agreement.**
-2. Add a webhook endpoint pointing at `/api/stripe/webhook`, subscribed to:
-   `checkout.session.completed`, `customer.subscription.created`,
-   `customer.subscription.updated`, `customer.subscription.deleted`,
-   `invoice.payment_failed`.
-3. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-4. Set `SUPABASE_SERVICE_ROLE_KEY` — the webhook writes subscription state with
-   it, and without it a successful payment will not grant a plan.
-5. Decide whether the founding offer runs. `FOUNDING_OFFER` in
-   `src/lib/billing/plans.ts` controls the cap and the price-protection window.
-   The blurb promises **12 months**, not lifetime; if you change one, change the
-   other.
+**Verify after configuring**
 
-Test with `stripe listen --forward-to localhost:3000/api/stripe/webhook` before
-going live.
+1. Settings → Capabilities: **Finding sources automatically** shows
+   **Connected** and names the provider.
+2. Add a person with a name and company but **no profile URL**.
+3. Press **Research public footprint**.
+   - Before: *"paste a link instead"*.
+   - After: sources are discovered, fetched, identity-checked and cited.
+4. Settings → Plan: *People researched* increments.
 
-### 2.5 Calendar integration
+---
 
-Register an OAuth client with Google and/or Microsoft, request **read-only**
-calendar scope, and complete each provider's verification process. Expect this
-to take longer than the code did.
+## 3. Document ingestion — **live, nothing needed**
+
+PDF, Word `.docx` and plain text, up to 10 MB, on the free plan (2/month).
+Person page → **Attach a document**. A scanned PDF with no text layer is
+refused by name rather than saved as an empty source.
+
+---
+
+## 4. Calendar — needs code as well as credentials
+
+**I have not built this, and I want to be straight about why.**
+
+The database tables exist (`integration_accounts`, `external_calendar_events`)
+and the capability screen reports it honestly as *Unavailable*. But there is no
+OAuth flow, no token encryption, no sync, and no attendee-to-person matching.
+
+Writing an OAuth integration I cannot execute even once would mean shipping
+several hundred lines of unverifiable code into the security-sensitive part of
+the product — token storage and refresh. I would rather tell you it is missing
+than have you discover it is subtly wrong.
+
+If you want it, the credential half is:
+
+| | |
+| --- | --- |
+| **Service** | Google Cloud (Calendar API) and/or Microsoft Entra ID |
+| **Setup** | https://console.cloud.google.com/apis/credentials → *Create OAuth client ID* → Web application<br>Enable **Google Calendar API** under *APIs & Services → Library* |
+| **Scope** | `https://www.googleapis.com/auth/calendar.readonly` — read-only, nothing else |
+| **Free tier** | Yes. Calendar API has no charge at this volume. |
+| **Cost** | None directly. Google **verification** is required before outside users can connect, and takes weeks. |
+| **Redirect URI** | `https://<your-domain>/auth/google/callback` |
 
 ```
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 ```
 
-### 2.6 Supabase service role
+Say the word and I will build it — but it needs the credentials in place first
+so it can be tested against a real account rather than guessed at.
+
+---
+
+## 5. Billing
+
+Checkout, the billing portal, the webhook, entitlements, metering and the
+founding-customer offer are all implemented. Only the account is missing.
+
+| | |
+| --- | --- |
+| **Service** | Stripe |
+| **Sign-up** | https://dashboard.stripe.com/register |
+| **Keys** | https://dashboard.stripe.com/apikeys |
+| **Webhook** | https://dashboard.stripe.com/webhooks → *Add endpoint* |
+| **Free tier** | Test mode is free and unlimited. Live mode has no monthly fee. |
+| **Cost** | Per transaction, around 2.9% + 30¢ in the US; varies by country. |
 
 ```
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_PRO_MONTHLY=price_...
+STRIPE_PRICE_PRO_YEARLY=price_...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-Needed for exactly two things: the Stripe webhook, and deleting the auth record
-during account deletion. Without it, account deletion still removes **all** of a
-user's data — only the empty login shell remains, and the UI says so.
+Steps in order:
 
-This key bypasses row level security. It must never appear in
-`NEXT_PUBLIC_*`, in the browser bundle, or in a committed file.
+1. Create the **Pro** product and its monthly and yearly prices. Prices in
+   `src/lib/billing/plans.ts` are display copy — **Stripe is the source of
+   truth for what is charged. Keep them in agreement.**
+2. Add a webhook endpoint at `https://<your-domain>/api/stripe/webhook`
+   subscribed to exactly: `checkout.session.completed`,
+   `customer.subscription.created`, `customer.subscription.updated`,
+   `customer.subscription.deleted`, `invoice.payment_failed`.
+3. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+4. **`SUPABASE_SERVICE_ROLE_KEY` is required.** The webhook is the only thing
+   allowed to grant a plan, and it writes with the service role. Without it a
+   payment succeeds and nothing happens. Get it from
+   Supabase → Project Settings → API → `service_role`.
+5. Decide whether the founding offer runs. `FOUNDING_OFFER` in
+   `src/lib/billing/plans.ts` sets the cap and the protection window. The copy
+   promises **12 months**, not lifetime — if you change one, change the other.
+
+**Verify after configuring**
+
+1. Settings → Capabilities: **Payments** shows **Connected**.
+2. Settings → Plan shows **Upgrade**. In test mode use card `4242 4242 4242 4242`.
+3. After checkout the plan flips to **Pro** — driven by the webhook, not the
+   redirect. If it does not, the webhook secret or the service role key is wrong.
+4. `stripe listen --forward-to localhost:3000/api/stripe/webhook` to test locally.
 
 ---
 
-## 3. Deployment
+## 6. Email
 
-### 3.1 Database
+Templates, the transport, and the send call sites are all implemented. A
+welcome email fires on signup and a security notice on password change. With no
+key configured they are written to the server log — subject and a redacted
+recipient only, never the body.
 
-Apply `supabase/migrations/*.sql` in filename order to a fresh project. They are
-ordered and dependent.
-
-Then verify the boundary actually holds:
+| | |
+| --- | --- |
+| **Service** | Resend |
+| **Sign-up** | https://resend.com/signup |
+| **API key** | https://resend.com/api-keys |
+| **Domain** | https://resend.com/domains → *Add domain*, then add the DNS records it gives you |
+| **Free tier** | **Yes** — 3,000 emails/month, 100/day, one custom domain. |
+| **Cost** | \$20/month beyond the free tier. |
 
 ```
-psql "$DATABASE_URL" -f supabase/tests/rls-isolation.sql
+RESEND_API_KEY=re_...
+EMAIL_FROM_ADDRESS=hello@yourdomain.com
 ```
 
-It creates two users, checks isolation in both directions, and rolls back. It is
-safe against any environment. If it fails, do not launch — row level security is
-the security model here, not a convenience.
+**The sending domain must be verified before any mail leaves.** DNS propagation
+takes minutes to hours. `EMAIL_FROM_ADDRESS` must be on the verified domain.
 
-### 3.2 Environment
+**Verify after configuring**
 
-`.env.production` contains only values that are public by design: the Supabase
-URL and publishable key, both of which already ship in the JavaScript every
-visitor downloads. Host environment settings override it.
-
-Everything secret goes in the host's environment settings.
-
-### 3.3 Domain and DNS
-
-Point the domain at the deployment, then set `NEXT_PUBLIC_SITE_URL`. Several
-things read it: OAuth redirect URLs, Stripe return URLs, email links, canonical
-metadata. A wrong value here produces working pages with broken links out.
-
-Also add the Supabase Auth redirect URL for the production domain, or sign-in
-emails will send users to localhost.
+1. Settings → Capabilities: **Email** shows **Connected** and names the sender.
+2. Sign up a fresh account — the welcome email arrives.
+3. Preview every template locally at `/dev/emails` (development only; it 404s
+   in production).
 
 ---
 
-## 4. Judgement calls left open
+## 7. Before anyone else uses this
 
-These are deliberately unresolved. Each is a decision about what the product
-*is*, and an agent should not make them for you.
+### 7.1 Legal review of Terms and Privacy — **the real launch blocker**
 
-**Pricing.** `$29` founding, `$49` Pro, Teams unpriced. These are placeholders
-chosen to be plausible, not researched. Teams needs a per-seat number before it
-can be sold.
+`brand.legal.policiesLegallyReviewed` is `false`, and both pages say plainly
+that they await review. They accurately describe real behaviour, which is the
+right starting point for a lawyer — but they are not legal advice.
 
-**The founding cap.** 250 places. Real scarcity is fine; invented scarcity is
-not. The billing page only shows remaining places where payments are actually
-connected — keep it that way.
+A reviewer needs to consider at minimum:
 
-**Whether to ship Teams at all.** The private/shared boundary is in the schema
-and enforced by policy, so a member's private notes stay private from an admin.
-The product surface for it is not built.
+- The commitment never to infer protected characteristics. It is enforced in
+  prompts and in the data model; it still needs signing off as a public promise.
+- **The basis for storing information about third parties** — the colleagues a
+  user records, who never agreed to anything. This is the sharpest question in
+  the product.
+- Retention and deletion, including backups. `delete_my_data()` removes every
+  row a user owns.
+- Whether you need a DPA, and where.
 
-**Data retention.** Nothing expires today. A relationship record that never
-forgets is the point of the product; it is also a growing liability. Decide
-whether inactive accounts should age out.
+Then set `policiesLegallyReviewed: true` and fill in `legal.entityAddress` and
+`legal.jurisdiction`.
 
-**Whether the assessment should be published.** The Interaction Profile is an
-original 96-item ipsative instrument, balanced by construction. It has **not**
-been validated against a population, and nothing in the product claims it has.
-Do not let marketing copy start calling it validated.
+### 7.2 The name
+
+`ATTUREL` has not been trademark-cleared and `atturel.app` is not registered.
+The brand registry keeps a rename to one file — do not commission a logo or
+build SEO authority on it until a search comes back clean.
+
+### 7.3 What you are promising about AI
+
+Configuring §1 sends user relationship data to that provider. Confirm their
+retention terms and whether they train on API traffic, and make sure the privacy
+policy describes it correctly.
 
 ---
 
-## What is deliberately *not* here
+## What is deliberately not here
 
-Some things were considered and rejected rather than deferred:
+Considered and rejected, not deferred:
 
-- **LinkedIn scraping.** Not built, and not a gap to be filled later. Automating
-  login, circumventing rate limits, or replicating their dataset would violate
-  their terms and put users at risk of account bans.
-- **Bypassing paywalls, CAPTCHAs, or robots directives.** The source fetcher
-  respects access controls and records "paywall" or "login required" as an
-  honest outcome instead of working around it.
-- **Any hiring, firing, promotion or compensation scoring.** Not a missing
-  feature. Building it would create employment-discrimination exposure and is
-  outside what this product is for.
+- **LinkedIn scraping.** Automating login, circumventing rate limits or
+  replicating their dataset would violate their terms and risk user bans.
+- **Bypassing paywalls, CAPTCHAs or robots directives.** The fetcher records
+  "paywall" or "login required" as an honest outcome instead.
+- **Hiring, firing, promotion or compensation scoring.** Not a missing feature.

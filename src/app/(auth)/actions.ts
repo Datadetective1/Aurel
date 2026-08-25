@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/server'
 import { safeRedirectPath } from '@/lib/auth'
 import { absoluteUrl } from '@/lib/brand'
 import { logger } from '@/lib/logger'
+import { sendEmail } from '@/lib/email/send'
+import { passwordChangedEmail, welcomeEmail } from '@/lib/email/templates'
 
 /**
  * Auth server actions.
@@ -75,6 +77,18 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: 'We could not create that account. Try a different email address.' }
   }
 
+  // Welcome mail is best-effort and deliberately not awaited for its result
+  // beyond delivery: sendEmail never throws, and a mail outage must not fail a
+  // signup that already succeeded. Without a provider configured this writes a
+  // log line instead, which is the supported unconfigured state.
+  const welcome = welcomeEmail({ firstName: firstNameOf(parsed.data.fullName) })
+  await sendEmail({
+    to: parsed.data.email,
+    subject: welcome.subject,
+    html: welcome.html,
+    kind: 'welcome',
+  })
+
   // No session means Supabase is holding the account for email confirmation.
   if (!data.session) {
     redirect(`/check-email?email=${encodeURIComponent(parsed.data.email)}`)
@@ -82,6 +96,11 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
 
   revalidatePath('/', 'layout')
   redirect('/onboarding')
+}
+
+/** First name for a greeting. Falls back to the whole string. */
+function firstNameOf(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] ?? fullName
 }
 
 export async function signIn(_prev: AuthState, formData: FormData): Promise<AuthState> {
@@ -188,6 +207,22 @@ export async function updatePassword(_prev: AuthState, formData: FormData): Prom
     kind: 'password_changed',
     ip_hash: forwarded ? await hashValue(forwarded) : null,
   })
+
+  // Tell them their password changed. This is the one email with no
+  // unsubscribe: a security notice a user can switch off is not a security
+  // notice, and an unexpected one here is how someone learns their account was
+  // taken over.
+  if (user.email) {
+    const notice = passwordChangedEmail({
+      firstName: firstNameOf((user.user_metadata?.full_name as string | undefined) ?? ''),
+    })
+    await sendEmail({
+      to: user.email,
+      subject: notice.subject,
+      html: notice.html,
+      kind: 'password_changed',
+    })
+  }
 
   revalidatePath('/', 'layout')
   redirect('/today')

@@ -14,6 +14,16 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    /**
+     * Minimum public config so modules that validate env at import time can be
+     * unit-tested. These are placeholders, never reached: no test makes a
+     * network call, and every optional credential is deliberately left unset so
+     * the suite exercises the unconfigured paths production is running.
+     */
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
     include: ['src/**/*.test.{ts,tsx}', 'tests/unit/**/*.test.{ts,tsx}'],
     exclude: ['tests/e2e/**', 'node_modules/**'],
     globals: false,
