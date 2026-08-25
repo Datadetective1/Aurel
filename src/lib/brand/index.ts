@@ -1,5 +1,5 @@
 /**
- * AUREL — CENTRAL BRAND REGISTRY
+ * ATTUREL — CENTRAL BRAND REGISTRY
  * =============================================================================
  * Single source of truth for every user-visible brand string in the product:
  * app UI, marketing site, transactional email, PDF exports, metadata, legal.

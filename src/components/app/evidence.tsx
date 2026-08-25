@@ -1,6 +1,7 @@
 import { CircleCheck, CircleHelp, Eye, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/types'
+import { ProvenanceLabel, type Provenance } from './provenance'
 
 type EvidenceLevel = Database['public']['Enums']['evidence_level']
 
@@ -78,6 +79,7 @@ export function EvidenceBadge({
 export function EvidenceLine({
   content,
   level,
+  provenance,
   sourceCount,
   reinforcementCount,
   action,
@@ -85,6 +87,8 @@ export function EvidenceLine({
 }: {
   content: string
   level: EvidenceLevel
+  /** Where the claim came from. Orthogonal to how strongly it is believed. */
+  provenance?: Provenance
   sourceCount?: number
   reinforcementCount?: number
   action?: React.ReactNode
@@ -105,6 +109,7 @@ export function EvidenceLine({
         <p className="text-sm leading-relaxed text-ink">{content}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <EvidenceBadge level={level} />
+          {provenance ? <ProvenanceLabel provenance={provenance} /> : null}
           {support.length > 0 ? (
             <span className="text-[0.6875rem] text-ink-faint">{support.join(' · ')}</span>
           ) : null}

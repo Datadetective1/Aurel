@@ -7,7 +7,7 @@ import { type StepState } from '@/lib/onboarding'
 import { FormField, Input, Select } from '@/components/ui/field'
 import { StepShell } from './step-shell'
 import { Avatar } from '@/components/ui/avatar'
-import { useHasMounted } from '@/lib/use-has-mounted'
+import { TimezoneField } from '@/components/app/timezone-field'
 import { brand } from '@/lib/brand'
 
 const FUNCTIONS = [
@@ -55,20 +55,6 @@ export function AboutForm({
   const [state, formAction] = useActionState<StepState, FormData>(saveAbout, {})
   const [name, setName] = React.useState(defaults.fullName)
   const [preferred, setPreferred] = React.useState(defaults.preferredName)
-
-  // The browser timezone is only knowable after hydration, so it is DERIVED
-  // from the mount state rather than written back through an effect. `override`
-  // holds an explicit user choice, which always wins.
-  const mounted = useHasMounted()
-  const [override, setOverride] = React.useState<string | null>(null)
-  const browserTimezone = mounted ? Intl.DateTimeFormat().resolvedOptions().timeZone : ''
-  const timezone = override ?? defaults.timezone ?? browserTimezone ?? 'UTC'
-
-  const timezones = React.useMemo(() => {
-    const supported =
-      typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC']
-    return supported
-  }, [])
 
   return (
     <form action={formAction} noValidate>
@@ -187,27 +173,13 @@ export function AboutForm({
             )}
           </FormField>
 
-          <FormField
+          <TimezoneField
             id="timezone"
-            label="Timezone"
+            name="timezone"
+            defaultValue={defaults.timezone}
             description="Used to order your day correctly."
             className="sm:col-span-2"
-          >
-            {(props) => (
-              <Select
-                {...props}
-                name="timezone"
-                value={timezone}
-                onChange={(e) => setOverride(e.currentTarget.value)}
-              >
-                {timezones.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
+          />
         </div>
       </StepShell>
     </form>

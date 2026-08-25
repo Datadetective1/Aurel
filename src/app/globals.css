@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =============================================================================
-   AUREL DESIGN TOKENS
+   ATTUREL DESIGN TOKENS
    Two committed themes: PEARL (warm ivory, editorial) and OBSIDIAN (graphite).
    One accent family only — BRASS — used as a marker, never as a flood fill.
    Primary actions use high-contrast ink, which is what makes the brass read as

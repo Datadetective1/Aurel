@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { isValidTimezone } from '@/lib/timezones'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
@@ -66,7 +67,15 @@ const aboutSchema = z.object({
   jobFunction: z.string().trim().max(80).optional().or(z.literal('')),
   seniority: z.string().trim().max(80).optional().or(z.literal('')),
   pronouns: z.string().trim().max(40).optional().or(z.literal('')),
-  timezone: z.string().trim().max(64).optional().or(z.literal('')),
+  // Validated against the runtime's zone database, not just a length: an
+  // unrecognised identifier would silently misorder someone's entire day.
+  timezone: z
+    .string()
+    .trim()
+    .max(64)
+    .refine((v) => v === '' || isValidTimezone(v), 'That is not a timezone we recognise.')
+    .optional()
+    .or(z.literal('')),
 })
 
 export async function saveAbout(_prev: StepState, formData: FormData): Promise<StepState> {

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { AddContext } from '@/components/app/add-context'
 import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
+import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
 import { ResearchPanel, SourceLink } from '@/components/app/research-panel'
 import { Avatar } from '@/components/ui/avatar'
@@ -113,7 +114,7 @@ export default async function PersonPage({
   ] = await Promise.all([
     supabase
       .from('observations')
-      .select('id, content, category, evidence_level, status, reinforcement_count, created_at')
+      .select('id, content, category, evidence_level, status, reinforcement_count, source_kind, created_at')
       .eq('user_id', user.id)
       .eq('person_id', id)
       .neq('status', 'dismissed')
@@ -324,6 +325,7 @@ export default async function PersonPage({
                         key={o.id}
                         content={o.content}
                         level={o.evidence_level}
+                        provenance={provenanceFor(o.source_kind, o.evidence_level)}
                         reinforcementCount={o.reinforcement_count}
                       />
                     ))}
@@ -370,6 +372,9 @@ export default async function PersonPage({
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                           <EvidenceBadge level={fact.evidence_level} />
+                          <ProvenanceLabel
+                            provenance={fact.evidence_level === 'inferred' ? 'inference' : 'public_research'}
+                          />
                           {/* Freshness: a five-year-old title must not read as current. */}
                           {fact.as_of ? (
                             <span className="text-[0.6875rem] text-ink-faint">

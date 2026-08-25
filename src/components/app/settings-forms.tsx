@@ -13,38 +13,11 @@ import { Button } from '@/components/ui/button'
 import { FormField, Input, OptionCard } from '@/components/ui/field'
 import { Eyebrow } from '@/components/ui/primitives'
 import { ThemePicker } from '@/components/theme-provider'
+import { TimezoneField } from '@/components/app/timezone-field'
 import { COACHING_STYLES } from '@/lib/onboarding'
 import { brand } from '@/lib/brand'
 
-export function SettingsForms({
-  profile,
-  preferences,
-  email,
-}: {
-  profile: {
-    fullName: string
-    preferredName: string
-    jobTitle: string
-    company: string
-    pronouns: string
-    timezone: string
-  }
-  preferences: {
-    theme: string
-    coachingStyle: string
-    emailNotifications: boolean
-  }
-  email: string
-}) {
-  return (
-    <div className="grid gap-10">
-      <ProfileForm profile={profile} email={email} />
-      <PreferencesForm preferences={preferences} />
-    </div>
-  )
-}
-
-function ProfileForm({
+export function ProfileSettingsForm({
   profile,
   email,
 }: {
@@ -90,9 +63,7 @@ function ProfileForm({
           {(props) => <Input {...props} name="pronouns" defaultValue={profile.pronouns} maxLength={40} />}
         </FormField>
 
-        <FormField id="settings-timezone" label="Timezone">
-          {(props) => <Input {...props} name="timezone" defaultValue={profile.timezone} maxLength={64} />}
-        </FormField>
+        <TimezoneField id="settings-timezone" name="timezone" defaultValue={profile.timezone} />
 
         <div className="sm:col-span-2">
           <p className="text-[0.8125rem] font-medium text-ink-secondary">Email</p>
@@ -108,7 +79,7 @@ function ProfileForm({
   )
 }
 
-function PreferencesForm({
+export function PreferencesSettingsForm({
   preferences,
 }: {
   preferences: { theme: string; coachingStyle: string; emailNotifications: boolean }

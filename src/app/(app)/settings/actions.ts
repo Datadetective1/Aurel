@@ -6,6 +6,9 @@ import { z } from 'zod'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { features } from '@/lib/env'
+import { getWorkspace } from '@/lib/workspace'
+import { seedDemoData } from '@/lib/demo/seed'
+import { isValidTimezone } from '@/lib/timezones'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -21,7 +24,15 @@ const profileSchema = z.object({
   jobTitle: z.string().trim().max(120).optional(),
   company: z.string().trim().max(160).optional(),
   pronouns: z.string().trim().max(40).optional(),
-  timezone: z.string().trim().max(64).optional(),
+  // Validated against the runtime's own zone database rather than a length
+  // check: an unrecognised identifier would silently break every scheduled
+  // briefing, and the failure would surface days later as "wrong time".
+  timezone: z
+    .string()
+    .trim()
+    .max(64)
+    .refine(isValidTimezone, 'That is not a timezone we recognise.')
+    .optional(),
 })
 
 export async function updateProfile(
@@ -239,4 +250,25 @@ export async function deleteAccount(
 
   await supabase.auth.signOut()
   redirect('/?deleted=1')
+}
+
+/**
+ * Load the fictional demonstration record.
+ * A server action rather than a GET route, so it cannot be triggered by a
+ * prefetch or a stray link visit. Idempotent: running it twice is a no-op.
+ */
+export async function loadDemoData(): Promise<SettingsState> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { workspaceId } = await getWorkspace()
+
+  const result = await seedDemoData(supabase, user.id, workspaceId)
+  if (!result.ok) return { error: 'Demo data could not be loaded.' }
+
+  if (result.peopleCreated > 0) {
+    await track('demo_data_seeded', { people: result.peopleCreated })
+  }
+
+  revalidatePath('/', 'layout')
+  return { message: 'Demo data loaded.' }
 }

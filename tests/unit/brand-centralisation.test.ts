@@ -24,7 +24,10 @@ const ALLOWED_FILES = [join('lib', 'brand', 'index.ts')]
 
 /** Declared as constants so no escape sequence has to survive code generation. */
 const NEWLINE = String.fromCharCode(10)
-const FORMER_CODENAME = new RegExp('\bAurel', 'i')
+// String.raw, because in a normal string literal '\b' is the backspace
+// character rather than a word boundary — which would silently disarm this
+// entire guard while still appearing to pass.
+const FORMER_CODENAME = new RegExp(String.raw`\bAurel`, 'i')
 const TECHNICAL_IDENTIFIER = /aurel-demo|supabase|migration/i
 
 /**

@@ -9,7 +9,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
-import { Badge, Eyebrow, Panel } from '@/components/ui/primitives'
+import { Eyebrow, Panel } from '@/components/ui/primitives'
 import { EvidenceBadge } from './evidence'
 import { ApertureRule } from '@/components/brand/aperture'
 import type { MeetingBrief } from '@/lib/ai/prompts/meeting-brief'

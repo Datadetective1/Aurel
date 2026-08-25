@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 
 /**
- * THE AUREL APERTURE
+ * THE ATTUREL APERTURE
  * =============================================================================
  * Atturel's visual motif is a *threshold*: nested arches receding toward a single
  * vanishing line. It encodes the product promise — walking into a room prepared —
@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils'
 /** Arch path on a 0 0 24 24 grid, parameterised by half-width. */
 function arch(halfWidth: number, baseline = 21, springLine = 12): string {
   const left = 12 - halfWidth
-  const right = 12 + halfWidth
   return `M${left} ${baseline} V${springLine} a${halfWidth} ${halfWidth} 0 0 1 ${halfWidth * 2} 0 V${baseline}`
 }
 

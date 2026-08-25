@@ -91,7 +91,10 @@ export function FormField({
   const describedBy = [descriptionId, errorId].filter(Boolean).join(' ') || undefined
 
   return (
-    <div className={cn('grid gap-1.5', className)}>
+    // content-start keeps label and control packed at the top. Without it a
+    // field sharing a grid row with a taller neighbour stretches, and its input
+    // drifts away from its own label.
+    <div className={cn('grid content-start gap-1.5', className)}>
       <Label htmlFor={id}>
         {label}
         {required ? (
