@@ -114,16 +114,16 @@ function frictionSignals(p: PersonContext) {
 }
 
 const FACT_PREFIX: Record<string, string> = {
-  current_role: 'Currently',
-  current_organization: 'At',
-  prior_role: 'Previously',
-  education: 'Studied',
-  expertise: 'Works on',
-  theme: 'Publicly focused on',
-  publication: 'Published',
-  appearance: 'Spoke at',
-  location: 'Based in',
-  communication_signal: 'Publicly',
+  current_role: 'Role:',
+  current_organization: 'Organisation:',
+  prior_role: 'Previously:',
+  education: 'Education:',
+  expertise: 'Works on:',
+  theme: 'Recurring public theme:',
+  publication: 'Published:',
+  appearance: 'Public appearance:',
+  location: 'Based in:',
+  communication_signal: 'Publicly observed:',
 }
 
 /**
@@ -134,18 +134,34 @@ const FACT_PREFIX: Record<string, string> = {
  * liability.
  */
 function composePublicContext(p: PersonContext) {
-  return p.professionalFacts.slice(0, 6).map((fact) => {
+  // A current_role fact already carries the organisation in its detail, so
+  // listing current_organization as well reads as the same thing said twice
+  // ("Currently CEO — Microsoft." / "At Microsoft.").
+  const role = p.professionalFacts.find((f) => f.kind === 'current_role')
+  const roleOrg = role?.detail?.trim().toLowerCase()
+  const facts = p.professionalFacts.filter(
+    (f) => !(f.kind === 'current_organization' && f.value.trim().toLowerCase() === roleOrg),
+  )
+
+  return facts.slice(0, 6).map((fact) => {
     const prefix = FACT_PREFIX[fact.kind]
+    // Values are proper nouns as often as not — "Microsoft", "Artificial
+    // Intelligence". Lower-casing the first word to fit a sentence frame
+    // produced "At microsoft" and "artificial Intelligence", so the frames are
+    // written to accept the value as it stands instead.
     const body = fact.detail ? `${fact.value} — ${fact.detail}` : fact.value
-    const stated = prefix ? `${prefix} ${lowerFirstWord(body)}` : body
+    const stated = prefix ? `${prefix} ${body}` : body
 
     const qualifier = fact.hasConflict
       ? ' (sources disagree)'
       : fact.evidenceLevel === 'inferred'
-        ? ' (inferred from one mention)'
+        ? ' (inferred from a single mention)'
         : fact.asOf
-          ? ` (as of ${fact.asOf.slice(0, 10)})`
-          : ' (date not stated in the source)'
+          ? // NOT "as of": the date belongs to the source, not to the fact.
+            // Wikipedia's page for a chief executive is dated years before they
+            // held the job, and "CEO as of 2013" would simply be wrong.
+            ` (from a source published ${formatFactDate(fact.asOf)})`
+          : ' (the source gave no date)'
 
     return {
       statement: sentence(stated) + qualifier,
@@ -154,13 +170,16 @@ function composePublicContext(p: PersonContext) {
   })
 }
 
-function lowerFirstWord(value: string): string {
-  const t = value.trim()
-  if (!t) return t
-  // Leave acronyms and proper nouns alone: "CEO" must not become "cEO".
-  const first = t.split(/\s/)[0] ?? ''
-  if (first.length > 1 && first === first.toUpperCase()) return t
-  return t[0]!.toLowerCase() + t.slice(1)
+/** "23 January 2013" — readable, unambiguous, and not an ISO timestamp. */
+function formatFactDate(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10)
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date)
 }
 
 function composeParticipant(p: PersonContext) {
@@ -247,7 +266,15 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
           : `${people.slice(0, -1).map(firstName).join(', ')} and ${firstName(people[people.length - 1]!)}`
     }.`,
   )
-  if (meeting.objective) sixty.push(`You want to ${lowerFirst(meeting.objective)}`)
+  if (meeting.objective) {
+    // "You want to agreement on scope" is not a sentence. Same frame-selection
+    // rule as howToOpen and outcomeToLeaveWith: match the grammar the user wrote.
+    sixty.push(
+      readsAsImperative(meeting.objective)
+        ? `You want to ${lowerFirst(stripLeadingVerb(meeting.objective))}`
+        : `What you want out of it: ${lowerFirst(meeting.objective)}`,
+    )
+  }
   if (overdue.length > 0) {
     sixty.push(
       `Clear the overdue commitment first — ${overdue[0]!.description} (${firstName(overdue[0]!.person)}).`,
@@ -260,7 +287,14 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   }
   if (meeting.stakes) sixty.push(`At stake: ${lowerFirst(meeting.stakes)}`)
   if (knownPeople.length === 0) {
-    sixty.push('You have no recorded history with anyone in this room, so this brief is thin.')
+    const researched = people.filter((p) => p.professionalFacts.length > 0)
+    sixty.push(
+      researched.length > 0
+        ? `You have not worked with ${
+            researched.length === people.length ? 'anyone in this room' : 'them'
+          } before — what follows is public professional context, not a read on them.`
+        : 'You have no recorded history with anyone in this room, so this brief is thin.',
+    )
   }
 
   // --- recommended approach ---

@@ -429,12 +429,18 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                               fact.evidence_level === 'inferred' ? 'inference' : 'public_research'
                             }
                           />
-                          {/* Freshness: a five-year-old title must not read as current. */}
+                          {/* Freshness. Phrased as the SOURCE's date, not the
+                              fact's: a page can predate the thing it describes,
+                              and "CEO as of 2013" would simply be false. */}
                           {fact.as_of ? (
                             <span className="text-ink-faint text-[0.6875rem]">
-                              as of {formatDate(fact.as_of)}
+                              source published {formatDate(fact.as_of)}
                             </span>
-                          ) : null}
+                          ) : (
+                            <span className="text-ink-faint text-[0.6875rem]">
+                              source gave no date
+                            </span>
+                          )}
                           {fact.has_conflict ? (
                             <Badge tone="caution">Sources disagree</Badge>
                           ) : null}

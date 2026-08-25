@@ -5,6 +5,7 @@ import { ArrowLeft, Smartphone } from 'lucide-react'
 import { MeetingBriefView, type BriefCitation } from '@/components/app/meeting-brief'
 import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
+import { RegenerateBrief } from '@/components/app/regenerate-brief'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
@@ -49,7 +50,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
     .eq('meeting_id', id)
 
   const citations: BriefCitation[] = artifact
-    ? (
+    ? ((
         await supabase
           .from('artifact_sources')
           .select('label, evidence_level, person_id')
@@ -60,8 +61,48 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
         label: c.label,
         evidenceLevel: c.evidence_level,
         personId: c.person_id,
-      })) ?? []
+      })) ?? [])
     : []
+
+  // --- has the evidence moved since this brief was made? --------------------
+  // Checked against the things a brief actually rests on. A brief that goes on
+  // citing a source the user has since deleted is the failure worth catching.
+  const attendeeIds = (attendees ?? []).map((a) => a.person_id)
+  let staleReason: string | null = null
+
+  if (artifact && attendeeIds.length > 0) {
+    const since = artifact.created_at
+    const [{ count: newFacts }, { count: newObservations }, { count: newSources }] =
+      await Promise.all([
+        supabase
+          .from('professional_facts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('person_id', attendeeIds)
+          .gt('updated_at', since),
+        supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('person_id', attendeeIds)
+          .eq('status', 'active')
+          .gt('updated_at', since),
+        supabase
+          .from('source_person_links')
+          .select('source_id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .in('person_id', attendeeIds)
+          .gt('updated_at', since),
+      ])
+
+    const changes: string[] = []
+    if ((newFacts ?? 0) > 0) changes.push('public professional facts')
+    if ((newObservations ?? 0) > 0) changes.push('what you have learned about them')
+    if ((newSources ?? 0) > 0) changes.push('the sources behind it')
+    if (changes.length > 0) {
+      staleReason = `Since then, ${changes.join(' and ')} changed.`
+    }
+  }
 
   const brief = artifact ? (artifact.content as unknown as MeetingBrief) : null
 
@@ -86,10 +127,10 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
           ) : null}
         </div>
 
-        <h1 className="mt-3 font-display text-3xl text-ink sm:text-4xl">{meeting.title}</h1>
+        <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">{meeting.title}</h1>
 
         {(attendees ?? []).length > 0 ? (
-          <p className="mt-2 text-sm text-ink-secondary">
+          <p className="text-ink-secondary mt-2 text-sm">
             With{' '}
             {(attendees ?? [])
               .map((a) => a.people?.preferred_name || a.people?.full_name)
@@ -111,10 +152,13 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
             <Button asChild variant="secondary" size="sm">
               <Link href={`/meetings/${id}/debrief`}>Debrief this meeting</Link>
             </Button>
-            <span className="text-xs text-ink-faint">
+            <span className="text-ink-faint text-xs">
               Prepared {formatDate(artifact!.created_at)}
             </span>
+            <RegenerateBrief meetingId={id} stale={false} reason={null} />
           </div>
+
+          {staleReason ? <RegenerateBrief meetingId={id} stale reason={staleReason} /> : null}
 
           <div className="mt-10">
             <MeetingBriefView
@@ -125,7 +169,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
             />
           </div>
 
-          <div className="mt-12 border-t border-line pt-6">
+          <div className="border-line mt-12 border-t pt-6">
             <ArtifactFeedback artifactId={artifact!.id} />
           </div>
         </>

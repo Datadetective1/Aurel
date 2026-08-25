@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { meetingBriefPrompt, readsAsImperative } from './meeting-brief'
-import type {
-  MeetingContext,
-  PersonContext,
-  ProfessionalFactContext,
-  UserContext,
-} from '../types'
+import type { MeetingContext, PersonContext, ProfessionalFactContext, UserContext } from '../types'
 
 /**
  * Copy-quality tests for the composed brief.
@@ -345,7 +340,7 @@ describe('first-meeting intelligence', () => {
     expect(result.uncertainties.join(' ')).toMatch(/did not state when they were written/i)
     // And the line itself must not imply currency.
     const statement = result.participants[0]!.publicContext[0]!.statement
-    expect(statement).toContain('date not stated')
+    expect(statement).toContain('the source gave no date')
   })
 
   it('surfaces a disagreement between sources instead of picking one', () => {
@@ -358,7 +353,9 @@ describe('first-meeting intelligence', () => {
   it('flags a single-mention fact as inferred', () => {
     const thin = fact({ evidenceLevel: 'inferred', kind: 'theme', value: 'platform migration' })
     const result = brief('Agreement on scope.', [stranger([thin])])
-    expect(result.participants[0]!.publicContext[0]!.statement).toContain('inferred from one mention')
+    expect(result.participants[0]!.publicContext[0]!.statement).toContain(
+      'inferred from a single mention',
+    )
   })
 
   it('cites the public sources so the user can open them', () => {
@@ -372,5 +369,91 @@ describe('first-meeting intelligence', () => {
     expect(p.publicContext).toEqual([])
     expect(p.publicOnly).toBe(false)
     expect(result.uncertainties.join(' ')).toMatch(/no interaction history/i)
+  })
+})
+
+/**
+ * Copy defects found by walking the real product, each pinned so it cannot
+ * return. Every one of these shipped to a rendered page before being caught.
+ */
+describe('public context copy quality', () => {
+  const withFacts = (facts: ProfessionalFactContext[]) =>
+    person({
+      fullName: 'Satya Nadella',
+      preferredName: 'Satya',
+      displayName: 'Satya Nadella',
+      interactionCount: 0,
+      observations: { confirmed: [], observed: [], inferred: [] },
+      recentInteractions: [],
+      professionalFacts: facts,
+    })
+
+  it('never lower-cases a proper noun to fit a sentence frame', () => {
+    const result = brief('Agreement on scope.', [
+      withFacts([
+        fact({ kind: 'current_organization', value: 'Microsoft', detail: null }),
+        fact({
+          id: 'f2',
+          kind: 'theme',
+          value: 'Artificial Intelligence',
+          detail: null,
+          evidenceLevel: 'inferred',
+        }),
+      ]),
+    ])
+    const text = result.participants[0]!.publicContext.map((c) => c.statement).join(' ')
+    expect(text).toContain('Microsoft')
+    expect(text).not.toContain('microsoft')
+    expect(text).toContain('Artificial Intelligence')
+    expect(text).not.toContain('artificial Intelligence')
+  })
+
+  it('does not repeat the organisation the role already names', () => {
+    const result = brief('Agreement on scope.', [
+      withFacts([
+        fact({ kind: 'current_role', value: 'CEO', detail: 'Microsoft' }),
+        fact({ id: 'f2', kind: 'current_organization', value: 'Microsoft', detail: null }),
+      ]),
+    ])
+    expect(result.participants[0]!.publicContext).toHaveLength(1)
+  })
+
+  it('attributes a date to the source, not to the fact', () => {
+    // Wikipedia's page predates the job. "CEO as of 2013" would be false.
+    const result = brief('Agreement on scope.', [
+      withFacts([
+        fact({ kind: 'current_role', value: 'CEO', detail: 'Microsoft', asOf: '2013-01-23' }),
+      ]),
+    ])
+    const statement = result.participants[0]!.publicContext[0]!.statement
+    expect(statement).toContain('from a source published')
+    expect(statement).not.toMatch(/\bas of\b/)
+    // Human date, not an ISO timestamp.
+    expect(statement).toContain('23 January 2013')
+    expect(statement).not.toContain('2013-01-23')
+  })
+
+  it('does not claim there is no history when public research exists', () => {
+    const result = brief('Agreement on scope.', [
+      withFacts([fact({ kind: 'current_role', value: 'CEO', detail: 'Microsoft' })]),
+    ])
+    expect(result.sixtySecond).not.toContain('no recorded history')
+    expect(result.sixtySecond).toContain('public professional context')
+  })
+
+  it('still says there is nothing when there genuinely is nothing', () => {
+    const result = brief('Agreement on scope.', [withFacts([])])
+    expect(result.sixtySecond).toContain('no recorded history')
+  })
+
+  it('frames a noun-phrase objective grammatically in the summary', () => {
+    const result = brief('Agreement on a follow-up technical session', [withFacts([])])
+    expect(result.sixtySecond).not.toContain('You want to agreement')
+    expect(result.sixtySecond).toContain('What you want out of it')
+  })
+
+  it('keeps the verb frame for an imperative objective', () => {
+    const result = brief('Get approval for the extra headcount', [withFacts([])])
+    expect(result.sixtySecond).toContain('You want to')
   })
 })
