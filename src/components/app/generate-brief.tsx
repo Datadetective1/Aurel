@@ -1,0 +1,139 @@
+'use client'
+
+import * as React from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { CircleAlert, Loader2, Sparkles } from 'lucide-react'
+import { generateBrief } from '@/app/(app)/meetings/actions'
+import { Button } from '@/components/ui/button'
+import { Eyebrow, Panel } from '@/components/ui/primitives'
+import { brand } from '@/lib/brand'
+
+/**
+ * Brief generation with truthful progress.
+ *
+ * Each stage names a step that genuinely runs server-side: assembling the room,
+ * reading the relationship record, checking commitments, composing. The stages
+ * advance on a timer because a single server action cannot stream progress, but
+ * they never claim completion — the panel only resolves when the server returns.
+ */
+const STAGES = [
+  'Reading the meeting…',
+  'Gathering everyone in the room…',
+  'Reviewing your relationship record…',
+  'Checking open commitments…',
+  'Building your brief…',
+] as const
+
+export function GenerateBriefPanel({
+  meetingId,
+  hasObjective,
+  attendeeCount,
+}: {
+  meetingId: string
+  hasObjective: boolean
+  attendeeCount: number
+}) {
+  const router = useRouter()
+  const [running, setRunning] = React.useState(false)
+  const [stage, setStage] = React.useState(0)
+  const [error, setError] = React.useState<string | null>(null)
+  const [upgrade, setUpgrade] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!running) return
+    const timer = window.setInterval(
+      () => setStage((s) => Math.min(s + 1, STAGES.length - 1)),
+      1600,
+    )
+    return () => window.clearInterval(timer)
+  }, [running])
+
+  const run = async () => {
+    setRunning(true)
+    setStage(0)
+    setError(null)
+    setUpgrade(false)
+
+    const result = await generateBrief(meetingId)
+    if (result.ok) {
+      router.refresh()
+    } else {
+      setRunning(false)
+      setError(result.error ?? 'Something went wrong.')
+      setUpgrade('upgrade' in result && Boolean(result.upgrade))
+    }
+  }
+
+  return (
+    <Panel className="mt-8 p-6 sm:p-8">
+      {running ? (
+        <div role="status" aria-live="polite">
+          <div className="flex items-center gap-2.5 text-sm text-ink">
+            <Loader2 className="size-4 animate-spin text-accent" aria-hidden="true" />
+            {STAGES[stage]}
+          </div>
+          <div className="mt-4 h-px w-full overflow-hidden bg-line">
+            <div
+              className="h-full bg-accent-graphic transition-[width] duration-700 ease-[var(--ease-out-quint)]"
+              style={{ width: `${((stage + 1) / STAGES.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <Eyebrow className="flex items-center gap-1.5">
+            <Sparkles className="size-3 text-accent" aria-hidden="true" />
+            Prepare
+          </Eyebrow>
+          <h2 className="mt-3 font-display text-2xl text-ink">Build your brief</h2>
+          <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
+            {brand.name} will pull together everyone in the room, what you have recorded about
+            working with them, what is still open between you, and turn it into how to approach this
+            conversation.
+          </p>
+
+          {(!hasObjective || attendeeCount === 0) && (
+            <ul className="mt-5 grid gap-2">
+              {!hasObjective ? (
+                <li className="flex gap-2 text-xs text-ink-muted">
+                  <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
+                  No objective recorded. The brief will be much sharper with one —{' '}
+                  <Link href={`/meetings/${meetingId}`} className="text-accent hover:underline">
+                    add it
+                  </Link>
+                  .
+                </li>
+              ) : null}
+              {attendeeCount === 0 ? (
+                <li className="flex gap-2 text-xs text-ink-muted">
+                  <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
+                  Nobody is added to this meeting yet.{' '}
+                  <Link href={`/meetings/${meetingId}`} className="text-accent hover:underline">
+                    Add participants
+                  </Link>
+                  .
+                </li>
+              ) : null}
+            </ul>
+          )}
+
+          <Button size="lg" onClick={run} className="mt-7">
+            Generate brief
+          </Button>
+
+          {error ? (
+            <div className="mt-5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3">
+              <p className="text-sm leading-relaxed text-ink-secondary">{error}</p>
+              {upgrade ? (
+                <Button asChild size="sm" className="mt-3">
+                  <Link href="/settings/billing">See plans</Link>
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </>
+      )}
+    </Panel>
+  )
+}

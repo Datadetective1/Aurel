@@ -7,7 +7,7 @@ import type { Generation, PromptModule } from './types'
 /**
  * PROVIDER ABSTRACTION
  * =============================================================================
- * Aurel is not coupled to a single model vendor. A capability declares what it
+ * Atturel is not coupled to a single model vendor. A capability declares what it
  * needs (a schema, a prompt, a deterministic composer) and this module decides
  * how to satisfy it:
  *
@@ -49,7 +49,7 @@ async function resolveModel(modelId: string): Promise<LanguageModel> {
       return createOpenAI({ apiKey: serverEnv.OPENAI_API_KEY })(modelId)
     }
     default:
-      throw new Error(`[aurel] no generative provider configured`)
+      throw new Error(`[atturel] no generative provider configured`)
   }
 }
 

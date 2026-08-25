@@ -354,7 +354,7 @@ function buildBlocks(): Block[] {
       const pool = n % 2 === 0 ? pools[dim].pos : pools[dim].neg
       const item = pool[Math.floor(n / 2)]
       /* istanbul ignore next -- guarded by the balance unit tests */
-      if (!item) throw new Error(`[aurel] instrument exhausted pool for ${dim} at slot ${n}`)
+      if (!item) throw new Error(`[atturel] instrument exhausted pool for ${dim} at slot ${n}`)
       items.push(item)
       used[dim] = n + 1
     }

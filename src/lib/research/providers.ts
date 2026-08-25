@@ -238,9 +238,9 @@ export function researchCapability() {
   const search = resolveSearchProvider()
   const enrichment = resolveEnrichmentProvider()
   return {
-    /** Can Aurel discover sources from just a name? */
+    /** Can Atturel discover sources from just a name? */
     canDiscover: search.configured,
-    /** Can Aurel analyse a URL the user provides? Always yes. */
+    /** Can Atturel analyse a URL the user provides? Always yes. */
     canAnalyseUrls: true,
     searchProvider: search.id,
     enrichmentProvider: enrichment.id,

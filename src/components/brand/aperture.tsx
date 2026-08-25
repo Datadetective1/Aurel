@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 /**
  * THE AUREL APERTURE
  * =============================================================================
- * Aurel's visual motif is a *threshold*: nested arches receding toward a single
+ * Atturel's visual motif is a *threshold*: nested arches receding toward a single
  * vanishing line. It encodes the product promise — walking into a room prepared —
  * without resorting to brains, networks or sparkles.
  *

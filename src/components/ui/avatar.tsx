@@ -3,7 +3,7 @@ import { cn, hashToBucket, initials } from '@/lib/utils'
 /**
  * Avatar with a generated fallback.
  *
- * No photos are required anywhere in Aurel — most people you add will never
+ * No photos are required anywhere in Atturel — most people you add will never
  * have one. The fallback has to look deliberate rather than like a missing
  * image, so it uses initials on a tint deterministically derived from the name.
  * The same person always gets the same tint, which makes lists scannable.

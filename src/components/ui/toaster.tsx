@@ -3,7 +3,7 @@
 import { useTheme } from 'next-themes'
 import { Toaster as Sonner } from 'sonner'
 
-/** Toasts, themed to Aurel surfaces rather than Sonner defaults. */
+/** Toasts, themed to Atturel surfaces rather than Sonner defaults. */
 export function Toaster() {
   const { resolvedTheme } = useTheme()
   return (

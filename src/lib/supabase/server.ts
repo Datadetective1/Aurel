@@ -48,7 +48,7 @@ export function createServiceRoleClient() {
   const key = serverEnv.SUPABASE_SERVICE_ROLE_KEY
   if (!key) {
     throw new Error(
-      '[aurel] SUPABASE_SERVICE_ROLE_KEY is not configured; this privileged operation is unavailable.',
+      '[atturel] SUPABASE_SERVICE_ROLE_KEY is not configured; this privileged operation is unavailable.',
     )
   }
 

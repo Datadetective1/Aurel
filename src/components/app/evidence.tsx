@@ -7,7 +7,7 @@ type EvidenceLevel = Database['public']['Enums']['evidence_level']
 /**
  * EVIDENCE BADGE
  * =============================================================================
- * The most important small component in the product. Every claim Aurel makes
+ * The most important small component in the product. Every claim Atturel makes
  * about a person carries one of these, so a user can always tell the difference
  * between something that was said, something that was seen, and something the
  * system guessed.

@@ -71,7 +71,7 @@ export const publicEnv = (() => {
   if (!parsed.success) {
     const missing = parsed.error.issues.map((i) => i.path.join('.')).join(', ')
     throw new Error(
-      `[aurel] Missing or invalid public environment variables: ${missing}. ` +
+      `[atturel] Missing or invalid public environment variables: ${missing}. ` +
         `Copy .env.example to .env.local and fill in the [CORE] values.`,
     )
   }

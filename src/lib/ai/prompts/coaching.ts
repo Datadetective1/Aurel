@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Citation, CommitmentContext, PersonContext, PromptModule, UserContext } from '../types'
-import { AUREL_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
+import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
 import { brand } from '@/lib/brand'
 
 /**
@@ -138,7 +138,7 @@ export const dailyFocusPrompt: PromptModule<DailyFocusInput, DailyFocus> = {
   schema: dailyFocusSchema,
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       `TASK: tell the user what actually deserves their attention today, based only on the data below.
 
@@ -208,7 +208,7 @@ export const relationshipSummarySchema = z.object({
   potentialFriction: z.array(z.string()).max(4),
   yourRelationship: z.string(),
   nextInteraction: z.array(z.string()).max(4),
-  /** Explicit gaps. Rendered as "what Aurel doesn't know yet". */
+  /** Explicit gaps. Rendered as "what Atturel doesn't know yet". */
   gaps: z.array(z.string()).max(4),
 })
 
@@ -288,7 +288,7 @@ export const relationshipSummaryPrompt: PromptModule<RelationshipSummaryInput, R
   schema: relationshipSummarySchema,
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       dateBlock(),
       `TASK: summarise what the user has actually learned about working with this one person.
@@ -505,7 +505,7 @@ export const profileNarrativePrompt: PromptModule<ProfileNarrativeInput, Profile
   schema: profileNarrativeSchema,
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       `TASK: write the reveal for the user's own Interaction Profile.
 

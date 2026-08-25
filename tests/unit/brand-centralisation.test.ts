@@ -6,9 +6,10 @@ import { brand } from '@/lib/brand'
 /**
  * BRAND CENTRALISATION GUARD
  * =============================================================================
- * "Aurel" is a working codename. This test fails the build if the product name
- * is hard-coded anywhere outside the brand registry, so a rename stays a
- * one-file change instead of a scavenger hunt.
+ * Fails the build if the product name is hard-coded anywhere outside the brand
+ * registry, so a rename stays a one-file change instead of a scavenger hunt.
+ * This is not hypothetical: the product was renamed from the codename "Aurel"
+ * to "Atturel" and the change was a single edit to the registry.
  *
  * Comments, internal identifiers and namespaced strings (bot user-agent,
  * placeholder domains, log prefixes) are exempt — none of those are copy a user
@@ -21,18 +22,22 @@ const ROOT = join(__dirname, '..', '..', 'src')
 /** The registry itself is where the name is allowed to live. */
 const ALLOWED_FILES = [join('lib', 'brand', 'index.ts')]
 
+/** Declared as constants so no escape sequence has to survive code generation. */
+const NEWLINE = String.fromCharCode(10)
+const FORMER_CODENAME = new RegExp('\bAurel', 'i')
+const TECHNICAL_IDENTIFIER = /aurel-demo|supabase|migration/i
+
 /**
  * Patterns that legitimately contain the codename but are not user-facing copy:
  * log event prefixes, the outbound bot identifier, placeholder addresses, and
  * exported constant names.
  */
 const EXEMPT_PATTERNS = [
-  /\[aurel\]/i, // log/error prefix
-  /AurelBot/, // outbound user-agent
-  /aurel\.app/i, // placeholder domain, lives in the registry's defaults
-  /@aurel/i, // placeholder email addresses
-  /aurel-demo/i, // test fixture accounts
-  /AUREL_VOICE/, // exported constant identifier
+  /\[atturel\]/i, // internal log/error prefix
+  /atturel\.app/i, // placeholder domain; its canonical value is in the registry
+  /@atturel/i, // placeholder email addresses
+  /atturel-demo/i, // development fixture accounts
+  /brand\.slug/, // the user-agent is composed from the registry
 ]
 
 function walk(dir: string): string[] {
@@ -101,6 +106,24 @@ describe('brand centralisation', () => {
 
   it('keeps the slug machine-safe so a rename cannot break storage keys', () => {
     expect(brand.slug).toMatch(/^[a-z0-9-]+$/)
+  })
+
+  it('has no user-visible trace of the former codename', () => {
+    // The rename must be complete in the copy, not merely centralised.
+    const offenders: string[] = []
+    for (const file of files) {
+      const code = stripComments(readFileSync(file, 'utf8'))
+      for (const [index, line] of code.split(NEWLINE).entries()) {
+        if (!FORMER_CODENAME.test(line)) continue
+        // Stable technical identifiers are deliberately left alone.
+        if (TECHNICAL_IDENTIFIER.test(line)) continue
+        offenders.push(`${relative(ROOT, file).split(sep).join('/')}:${index + 1} - ${line.trim()}`)
+      }
+    }
+    expect(
+      offenders,
+      `Former codename still visible:${NEWLINE}${offenders.join(NEWLINE)}`,
+    ).toEqual([])
   })
 
   it('flags that the policies still need human legal review', () => {

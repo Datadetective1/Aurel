@@ -120,7 +120,7 @@ export async function saveFrameworks(_prev: StepState, formData: FormData): Prom
     .map(String)
     .filter((v) => (frameworkValues as readonly string[]).includes(v))
 
-  // Stored as user-supplied context only. Aurel does not implement, validate or
+  // Stored as user-supplied context only. Atturel does not implement, validate or
   // claim any of these instruments — it just remembers what the user told us.
   const known: Record<string, { selected: true; result?: string }> = {}
   for (const value of selected) {

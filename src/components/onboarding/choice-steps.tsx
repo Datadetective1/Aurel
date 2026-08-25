@@ -70,7 +70,7 @@ export function IntentStep({ defaults }: { defaults: string[] }) {
 
 /**
  * Prior frameworks.
- * Captured strictly as user-supplied context. Aurel does not implement, score
+ * Captured strictly as user-supplied context. Atturel does not implement, score
  * or validate any of these instruments, and the copy says so plainly.
  */
 export function FrameworksStep({ defaults }: { defaults: Record<string, { result?: string }> }) {

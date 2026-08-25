@@ -21,7 +21,7 @@ type AccessStatus = Database['public']['Enums']['source_access_status']
  *   persist facts with provenance -> propose observations
  *
  * Every step records why it did what it did, so the Person page can answer
- * "why does Aurel think this" from stored rows rather than reconstruction.
+ * "why does Atturel think this" from stored rows rather than reconstruction.
  *
  * CACHING: a URL already ingested into this workspace is reused unless the
  * caller forces a refresh, and re-fetching an unchanged page (same content hash)

@@ -1,7 +1,7 @@
 /**
  * IDENTITY RESOLUTION
  * =============================================================================
- * The highest-stakes correctness problem in the product. If Aurel attributes
+ * The highest-stakes correctness problem in the product. If Atturel attributes
  * John Smith at Boeing's career to John Smith at Lockheed, every downstream
  * brief is confidently wrong about a real person.
  *

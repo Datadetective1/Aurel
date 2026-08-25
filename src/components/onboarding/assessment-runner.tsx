@@ -202,7 +202,7 @@ export function AssessmentRunner({
         </div>
       </div>
 
-      {/* The progress line terminates in the Aurel arch, so the motif does the
+      {/* The progress line terminates in the Atturel arch, so the motif does the
           work a percentage label would otherwise duplicate. */}
       <div className="mt-4 flex items-center gap-2">
         <div

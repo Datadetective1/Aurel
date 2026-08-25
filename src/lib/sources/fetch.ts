@@ -2,6 +2,7 @@ import 'server-only'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { logger } from '@/lib/logger'
+import { brand } from '@/lib/brand'
 import { parseUrl } from './url'
 
 // Re-exported so existing server callers keep a single import site.
@@ -45,7 +46,7 @@ const ALLOWED_CONTENT_TYPES = [
 
 /** Presented to the site being fetched. Honest about what this is. */
 const USER_AGENT =
-  'AurelBot/1.0 (+https://aurel.app/bot; professional context research; respects robots.txt)'
+  `${brand.slug}bot/1.0 (+${brand.domain}/bot; professional context research; respects robots.txt)`
 
 export type FetchFailure =
   | 'invalid_url'

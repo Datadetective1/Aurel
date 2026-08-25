@@ -50,7 +50,7 @@ export const getWorkspace = cache(async (): Promise<WorkspaceContext> => {
     .maybeSingle()
 
   if (!membership?.workspace_id) {
-    throw new Error('[aurel] no workspace for user; signup provisioning did not complete')
+    throw new Error('[atturel] no workspace for user; signup provisioning did not complete')
   }
 
   await supabase

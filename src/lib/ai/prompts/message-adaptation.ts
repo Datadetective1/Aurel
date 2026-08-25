@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Citation, PersonContext, PromptModule, UserContext } from '../types'
-import { AUREL_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
+import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
 
 /**
  * MESSAGE ADAPTATION
@@ -276,7 +276,7 @@ export const messageAdaptationPrompt: PromptModule<MessageAdaptationInput, Messa
 
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       dateBlock(),
       `TASK: rewrite the user's draft ${input.format} in the mode "${input.mode}" (${ADAPTATION_MODE_HINT[input.mode]}).

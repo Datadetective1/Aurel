@@ -108,7 +108,7 @@ export function ThemePicker({ className }: { className?: string }) {
   )
 }
 
-/** A miniature of a real Aurel surface, drawn with fixed colours per theme. */
+/** A miniature of a real Atturel surface, drawn with fixed colours per theme. */
 function ThemeMiniature({ variant }: { variant: ThemeValue }) {
   if (variant === 'system') {
     return (

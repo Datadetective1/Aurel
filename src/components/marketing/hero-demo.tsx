@@ -10,7 +10,7 @@ import { brand } from '@/lib/brand'
  * HERO DEMONSTRATION
  * =============================================================================
  * A staged reconstruction of the real product: a meeting, the room, the recorded
- * evidence, and the guidance Aurel composes from it.
+ * evidence, and the guidance Atturel composes from it.
  *
  * Deliberately NOT a video, a looping gradient or fake analytics. Every element
  * on screen is a shape the product actually renders, using the same evidence
@@ -145,7 +145,7 @@ export function HeroDemo({ className }: { className?: string }) {
         </ul>
       </div>
 
-      {/* What Aurel produces */}
+      {/* What Atturel produces */}
       <div className="bg-bg-sunken px-5 py-5 sm:px-7" style={stage(4)}>
         <span className="label">{brand.name}&rsquo;s brief</span>
 

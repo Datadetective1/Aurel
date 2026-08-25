@@ -45,7 +45,7 @@ export default async function PeoplePage() {
   const list = people ?? []
   const ids = list.map((p) => p.id)
 
-  // Counts that make the list scannable: what does Aurel actually know?
+  // Counts that make the list scannable: what does Atturel actually know?
   const [{ data: observations }, { data: commitments }] = await Promise.all([
     ids.length
       ? supabase

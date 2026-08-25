@@ -107,7 +107,7 @@ export interface MeetingContext {
 /**
  * EVIDENCE ACCOUNTING
  * Every generation returns the citations it actually used. This is what the
- * "why is Aurel recommending this" panel renders from — it is recorded at
+ * "why is Atturel recommending this" panel renders from — it is recorded at
  * generation time and never reconstructed afterwards.
  */
 export interface Citation {
@@ -139,7 +139,7 @@ export interface Generation<T> {
  * A capability. Each one ships BOTH a model prompt and a deterministic composer.
  *
  * The composer is not a stub: it is the honest floor of the product. With no API
- * key configured, or when a model call fails, Aurel still returns real guidance
+ * key configured, or when a model call fails, Atturel still returns real guidance
  * assembled from the user's own evidence — clearly labelled as composed rather
  * than generated. That keeps the app fully usable and the failure mode truthful
  * instead of an error page.

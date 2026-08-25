@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Citation, MeetingContext, PersonContext, PromptModule, UserContext } from '../types'
 import {
-  AUREL_VOICE,
+  BRAND_VOICE,
   MEETING_KIND_LABEL,
   RELATIONSHIP_LABEL,
   dateBlock,
@@ -60,7 +60,7 @@ export const meetingBriefSchema = z.object({
   questionsToAsk: z.array(z.string()).max(5),
   outcomeToLeaveWith: z.string(),
   checklist: z.array(z.string()).max(6),
-  /** What Aurel does NOT know. Rendered prominently — this is a trust feature. */
+  /** What Atturel does NOT know. Rendered prominently — this is a trust feature. */
   uncertainties: z.array(z.string()).max(5),
 })
 
@@ -310,7 +310,7 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   if (people.length > 1) checklist.push('Who you need in agreement, and in what order')
   checklist.push('Where you will capture what you learn afterwards')
 
-  // --- uncertainties: what Aurel genuinely does not know ---
+  // --- uncertainties: what Atturel genuinely does not know ---
   const uncertainties: string[] = []
   if (unknownPeople.length > 0) {
     uncertainties.push(
@@ -455,7 +455,7 @@ export const meetingBriefPrompt: PromptModule<MeetingBriefInput, MeetingBrief> =
 
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       dateBlock(),
       `TASK: produce a preparation brief for one specific upcoming ${MEETING_KIND_LABEL[input.meeting.kind]}.`,

@@ -4,8 +4,16 @@
  * Single source of truth for every user-visible brand string in the product:
  * app UI, marketing site, transactional email, PDF exports, metadata, legal.
  *
- * "Aurel" is a WORKING CODENAME. To rename the product, edit `name`,
- * `legalEntity`, `domain` and `email` below — nothing else should need to change.
+ * The product name is configuration, not a constant scattered through the code.
+ * To rename, edit `name`, `slug`, `legalEntity`, `domain` and `email` below —
+ * nothing else should need to change. A unit test
+ * (tests/unit/brand-centralisation.test.ts) fails the build if the name is
+ * hard-coded anywhere else.
+ *
+ * HISTORY: shipped internally as the codename "Aurel" before the name Atturel
+ * was chosen. A few stable technical identifiers still carry the old spelling
+ * (see the exemptions in that test); they are deliberately left alone because
+ * renaming them buys nothing and risks breaking stored data.
  *
  * RULE: never hard-code the product name, a URL, a support address or a sender
  * name anywhere else in the codebase. Import from here.
@@ -30,41 +38,44 @@ export function absoluteUrl(path = '/'): string {
 
 export const brand = {
   /** Product name as shown to users. */
-  name: 'Aurel',
+  name: 'Atturel',
   /** Lowercase machine-safe slug (cookies, analytics prefixes, storage keys). */
-  slug: 'aurel',
+  slug: 'atturel',
   /** Registered company name used in legal copy and email footers. */
-  legalEntity: 'Aurel Labs',
+  legalEntity: 'Atturel Labs',
   /** Primary marketing domain, display form (no protocol). */
-  domain: 'aurel.app',
+  domain: 'atturel.app',
 
-  /** One-line positioning statement. Used in metadata + email preheaders. */
+  /**
+   * One-line positioning statement. Used in metadata and email preheaders.
+   * The name reads AT-uh-rel: attune + relational.
+   */
   tagline: 'Walk into every room prepared.',
 
   /** Short description — meta description, OG, app store style blurbs. */
   description:
-    'Aurel turns the people, relationship history and context around a meeting into practical guidance for the conversations that matter.',
+    'Atturel turns the people, relationship history and context around a meeting into practical guidance for the conversations that matter.',
 
   /** Longer description for structured data and the about surface. */
   longDescription:
-    'Aurel is a professional relationship intelligence system. It records what you learn about the people you work with, keeps that memory honest by separating confirmed facts from inference, and turns it into preparation for your next important interaction.',
+    'Atturel is a professional relationship intelligence system. It records what you learn about the people you work with, keeps that memory honest by separating confirmed facts from inference, and turns it into preparation for your next important interaction.',
 
   /** What the product calls its own assessment instrument. */
   assessmentName: 'Interaction Profile',
 
   /** What the product calls its conversational assistant. */
-  assistantName: 'Ask Aurel',
+  assistantName: 'Ask Atturel',
 
   email: {
     /** Sender for transactional mail. Domain must be verified in Resend. */
-    fromName: 'Aurel',
-    fromAddress: 'hello@aurel.app',
+    fromName: 'Atturel',
+    fromAddress: 'hello@atturel.app',
     /** Where replies land. */
-    replyTo: 'support@aurel.app',
+    replyTo: 'support@atturel.app',
     /** Public support address shown in UI and legal pages. */
-    support: 'support@aurel.app',
+    support: 'support@atturel.app',
     /** Privacy / data-rights contact required by the privacy policy. */
-    privacy: 'privacy@aurel.app',
+    privacy: 'privacy@atturel.app',
   },
 
   legal: {

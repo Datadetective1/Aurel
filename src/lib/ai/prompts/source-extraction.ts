@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Citation, PromptModule } from '../types'
-import { AUREL_VOICE, dateBlock } from './shared'
+import { BRAND_VOICE, dateBlock } from './shared'
 import { fenceUntrusted, UNTRUSTED_CONTENT_RULES } from '../untrusted'
 
 /**
@@ -254,7 +254,7 @@ const MARKUP_RESIDUE = /[<>{}[\]|]|&[a-z]+;|\/ref|https?:\/\//i
  * template residue.
  *
  * Real pages embed JSON in attributes and wiki markup in body text; when any of
- * that reaches a "fact" it is displayed to the user as something Aurel believes
+ * that reaches a "fact" it is displayed to the user as something Atturel believes
  * about a real person. Cheap to check, and it catches the realistic failures.
  */
 /** Built without literal escapes so the pattern survives code generation. */
@@ -386,7 +386,7 @@ export const sourceExtractionPrompt: PromptModule<SourceExtractionInput, SourceE
 
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       UNTRUSTED_CONTENT_RULES,
       dateBlock(),
       `TASK: read ONE source and extract professional facts about ONE specific person: ${input.person.fullName}.

@@ -10,4 +10,4 @@ Disallow: /settings
 Disallow: /onboarding
 Disallow: /api
 
-Sitemap: https://aurel.app/sitemap.xml
+Sitemap: https://atturel.app/sitemap.xml

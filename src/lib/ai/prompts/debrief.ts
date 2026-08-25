@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import type { Citation, PersonContext, PromptModule, UserContext } from '../types'
-import { AUREL_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
+import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
 
 /**
  * DEBRIEF + MEMORY PROPOSAL
  * =============================================================================
- * After an interaction the user dumps notes or a transcript. Aurel extracts the
+ * After an interaction the user dumps notes or a transcript. Atturel extracts the
  * structured residue — decisions, commitments, objections, open questions — and
  * PROPOSES things worth remembering about each person.
  *
@@ -251,7 +251,7 @@ export const debriefPrompt: PromptModule<DebriefInput, Debrief> = {
 
   system: (input) =>
     [
-      AUREL_VOICE,
+      BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       dateBlock(),
       `TASK: extract structure from the user's notes about an interaction that has already happened, and propose what is worth remembering.`,
