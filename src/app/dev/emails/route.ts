@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation'
 import type { NextRequest } from 'next/server'
 import {
   meetingReminderEmail,
@@ -78,7 +77,13 @@ const TEMPLATES: Record<string, () => BuiltEmail> = {
 }
 
 export function GET(request: NextRequest) {
-  if (process.env.NODE_ENV === 'production') notFound()
+  // An explicit 404 response, not notFound(). In a Route Handler that helper
+  // does not reliably produce a 404 status — it returned 200 on a production
+  // build, which an end-to-end test caught. A preview endpoint reachable on a
+  // real domain is a phishing-template generator, so this must be unambiguous.
+  if (process.env.NODE_ENV === 'production') {
+    return new Response('Not found', { status: 404 })
+  }
 
   const params = request.nextUrl.searchParams
   const name = params.get('t')
