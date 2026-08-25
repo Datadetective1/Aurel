@@ -10,10 +10,10 @@ import { cn, hashToBucket, initials } from '@/lib/utils'
  */
 
 const TINTS = [
-  'bg-[color-mix(in_oklab,var(--accent-graphic)_14%,var(--bg-sunken))] text-accent',
-  'bg-[color-mix(in_oklab,var(--info)_14%,var(--bg-sunken))] text-info',
-  'bg-[color-mix(in_oklab,var(--positive)_14%,var(--bg-sunken))] text-positive',
-  'bg-[color-mix(in_oklab,var(--caution)_14%,var(--bg-sunken))] text-caution',
+  'bg-[color-mix(in_oklab,var(--accent-graphic)_14%,var(--bg-sunken))] text-accent-strong',
+  'bg-[color-mix(in_oklab,var(--info)_14%,var(--bg-sunken))] text-info-strong',
+  'bg-[color-mix(in_oklab,var(--positive)_14%,var(--bg-sunken))] text-positive-strong',
+  'bg-[color-mix(in_oklab,var(--caution)_14%,var(--bg-sunken))] text-caution-strong',
   'bg-bg-sunken text-ink-secondary',
 ]
 

@@ -93,7 +93,14 @@ was green.
 both themes and both viewports, at WCAG 2.1 A and AA, plus checks for a working
 skip link, a single `main` landmark, and a visible focus ring on first Tab.
 
-Adding it found real violations on **every page in both themes**, all fixed:
+`tests/e2e/accessibility-app.spec.ts` does the same for the twelve signed-in
+pages, which is where the interaction-dense screens live. It needs an account,
+so it runs only when `E2E_EMAIL` and `E2E_PASSWORD` are set and skips otherwise.
+Last run: all twelve pages clean in both themes, and the assessment — the most
+complex screen in the product — clean as well.
+
+Between them they found real violations on **every public page in both themes**
+plus two signed-in pages, all fixed:
 
 - **`--ink-faint` failed AA wherever it carried words** (3.19:1 in Pearl).
   Its own comment said "decorative and large text only" — and it was used for
@@ -102,6 +109,11 @@ Adding it found real violations on **every page in both themes**, all fixed:
   (≥4.5:1 worst case), and the scale gives up some separation to get there.
 - **Inline prose links were distinguished by colour alone**, with underline on
   hover only. They now carry a permanent underline.
+- **Avatar initials failed AA in Pearl.** A status colour that clears 4.5:1 on
+  the page background does not necessarily clear it once the background is
+  tinted toward that same hue — both sides move together. Accent initials
+  measured 4.24:1 on their own 14% tint. There are now `--*-strong` tokens for
+  text sitting on a tint of its own colour.
 - **Reduced motion cancelled `animation-duration` but not `animation-delay`.**
   With `fill-mode: both`, an un-cancelled delay holds the element at
   `opacity: 0` — so someone who asked for no motion still got staggered

@@ -53,6 +53,15 @@
   --critical-wash: rgb(155 44 37 / 0.1);
   --info-wash: rgb(43 86 115 / 0.1);
 
+  /* For text sitting on a tint of its OWN hue — avatar initials, chips on a
+     wash. A status colour that clears AA on the page background does not
+     necessarily clear it once the background is tinted toward that same colour,
+     because both sides move together. These are the darker step that does. */
+  --positive-strong: #255436;
+  --caution-strong: #6b4610;
+  --critical-strong: #7d231d;
+  --info-strong: #22455c;
+
   --focus-ring: #b5893f;
 
   color-scheme: light;
@@ -89,6 +98,13 @@
   --critical-wash: rgb(229 138 128 / 0.12);
   --info-wash: rgb(143 188 220 / 0.12);
 
+  /* Obsidian tints are dark, so the base tones already clear 8:1 on them.
+     Defined anyway so components can reference one token in both themes. */
+  --positive-strong: #7fc79a;
+  --caution-strong: #e0b062;
+  --critical-strong: #e58a80;
+  --info-strong: #8fbcdc;
+
   --focus-ring: #d9b074;
 
   color-scheme: dark;
@@ -124,6 +140,10 @@
   --color-caution: var(--caution);
   --color-critical: var(--critical);
   --color-info: var(--info);
+  --color-positive-strong: var(--positive-strong);
+  --color-caution-strong: var(--caution-strong);
+  --color-critical-strong: var(--critical-strong);
+  --color-info-strong: var(--info-strong);
   --color-positive-wash: var(--positive-wash);
   --color-caution-wash: var(--caution-wash);
   --color-critical-wash: var(--critical-wash);
