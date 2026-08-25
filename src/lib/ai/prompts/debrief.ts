@@ -364,3 +364,42 @@ MEMORY PROPOSAL RULES - THESE MATTER MOST
   compose: composeDebrief,
   cite: citeDebrief,
 }
+
+/**
+ * Normalise one extracted commitment before it is written.
+ *
+ * Separate from the action, and pure, because the failure this guards against
+ * was invisible in production: the model returned the user's display name as
+ * `ownerPersonId`, the column is a uuid, every insert failed the cast, and the
+ * unchecked result meant both commitments disappeared while the UI reported the
+ * debrief saved. A model asked for an id will sometimes answer with a name, so
+ * the id is checked against the people who were actually in the room rather
+ * than trusted.
+ *
+ * `dueOn` is validated to the same standard: a date the database will reject is
+ * a commitment that never gets written at all, so a malformed one is dropped
+ * while the commitment itself survives without a due date.
+ */
+export function normaliseCommitment(
+  commitment: Debrief['commitments'][number],
+  validPersonIds: ReadonlySet<string>,
+): { description: string; owner: 'user' | 'person' | 'shared'; ownerPersonId: string | null; dueOn: string | null } {
+  const ownerPersonId =
+    commitment.ownerPersonId && validPersonIds.has(commitment.ownerPersonId)
+      ? commitment.ownerPersonId
+      : null
+
+  const dueOn =
+    commitment.dueOn && /^\d{4}-\d{2}-\d{2}$/.test(commitment.dueOn.trim()) &&
+    !Number.isNaN(Date.parse(commitment.dueOn.trim()))
+      ? commitment.dueOn.trim()
+      : null
+
+  return {
+    description: commitment.description.slice(0, 500),
+    // An owner of 'person' with nobody to point at is not a usable record.
+    owner: commitment.owner === 'person' && !ownerPersonId ? 'shared' : commitment.owner,
+    ownerPersonId,
+    dueOn,
+  }
+}

@@ -255,9 +255,41 @@ takes minutes to hours. `EMAIL_FROM_ADDRESS` must be on the verified domain.
 
 ---
 
-## 7. Before anyone else uses this
+## 7. Supabase — two settings that need you
 
-### 7.1 Legal review of Terms and Privacy — **the real launch blocker**
+Both are dashboard settings on the Supabase project, not code.
+
+### 7.1 The confirmation link points at localhost — **this is live and broken**
+
+Auth → URL Configuration → **Site URL** is still `http://localhost:3000`. Every
+confirmation email sends a real user to a dead address on their own machine.
+The account is confirmed by following the link, so it half-works — the user
+lands on nothing and has no idea whether it worked.
+
+Set **Site URL** to `https://www.atturel.com`, and add these under
+**Redirect URLs**:
+
+```
+https://www.atturel.com/**
+https://atturel.com/**
+```
+
+Verified by signing up on production during the AI activation check: the link
+in the email carried `redirect_to=http://localhost:3000`.
+
+### 7.2 Email is going through Supabase's shared sender
+
+Confirmation mail currently comes from `noreply@mail.app.supabase.io`, which is
+rate-limited to a handful an hour and is not a sender you control. §6 configures
+Resend for transactional mail; the auth emails need pointing at it too, under
+Auth → SMTP Settings, or signups will start silently failing to arrive as soon
+as more than a few people try at once.
+
+---
+
+## 8. Before anyone else uses this
+
+### 8.1 Legal review of Terms and Privacy — **the real launch blocker**
 
 `brand.legal.policiesLegallyReviewed` is `false`, and both pages say plainly
 that they await review. They accurately describe real behaviour, which is the
@@ -277,13 +309,13 @@ A reviewer needs to consider at minimum:
 Then set `policiesLegallyReviewed: true` and fill in `legal.entityAddress` and
 `legal.jurisdiction`.
 
-### 7.2 The name
+### 8.2 The name
 
 `ATTUREL` has not been trademark-cleared and `atturel.app` is not registered.
 The brand registry keeps a rename to one file — do not commission a logo or
 build SEO authority on it until a search comes back clean.
 
-### 7.3 What you are promising about AI
+### 8.3 What you are promising about AI
 
 This is now live, not hypothetical: relationship data — including notes about
 third parties who never agreed to anything — is being sent to OpenAI's API on

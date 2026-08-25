@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { debriefPrompt } from './debrief'
+import { debriefPrompt, normaliseCommitment } from './debrief'
 import type { PersonContext, UserContext } from '../types'
 
 /**
@@ -136,5 +136,57 @@ describe('debrief prompt contract', () => {
     expect(system).toMatch(
       /Today is (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{4}-\d{2}-\d{2}\./,
     )
+  })
+})
+
+describe('normaliseCommitment', () => {
+  const room = new Set(['p1', 'p2'])
+  const base = { description: 'Send the utilisation breakdown', owner: 'user' as const, ownerPersonId: null, dueOn: null }
+
+  it('discards an ownerPersonId that is not a uuid in the room', () => {
+    // The exact production failure: the model answered with a display name.
+    // The column is a uuid, so the insert failed and the commitment was lost.
+    const result = normaliseCommitment({ ...base, ownerPersonId: 'AI Activation Check' }, room)
+    expect(result.ownerPersonId).toBeNull()
+  })
+
+  it('discards a real uuid belonging to someone who was not there', () => {
+    const result = normaliseCommitment(
+      { ...base, owner: 'person', ownerPersonId: '00000000-0000-4000-8000-000000000000' },
+      room,
+    )
+    expect(result.ownerPersonId).toBeNull()
+  })
+
+  it('keeps an id that is genuinely a participant', () => {
+    const result = normaliseCommitment({ ...base, owner: 'person', ownerPersonId: 'p2' }, room)
+    expect(result.ownerPersonId).toBe('p2')
+    expect(result.owner).toBe('person')
+  })
+
+  it("downgrades 'person' to 'shared' when there is nobody to point at", () => {
+    // A commitment owed by an unidentified person is not something the user can
+    // act on, and showing it as owed by someone else would be a claim about a
+    // person the record cannot name.
+    const result = normaliseCommitment({ ...base, owner: 'person', ownerPersonId: 'Dana' }, room)
+    expect(result.owner).toBe('shared')
+  })
+
+  it('never downgrades an owner the user actually holds', () => {
+    expect(normaliseCommitment({ ...base, owner: 'user' }, room).owner).toBe('user')
+    expect(normaliseCommitment({ ...base, owner: 'shared' }, room).owner).toBe('shared')
+  })
+
+  it('keeps a well-formed date and drops one the database would reject', () => {
+    expect(normaliseCommitment({ ...base, dueOn: '2026-08-28' }, room).dueOn).toBe('2026-08-28')
+    // Losing the date is survivable. Losing the whole commitment is not.
+    expect(normaliseCommitment({ ...base, dueOn: 'next Friday' }, room).dueOn).toBeNull()
+    expect(normaliseCommitment({ ...base, dueOn: '2026-13-45' }, room).dueOn).toBeNull()
+    expect(normaliseCommitment({ ...base, dueOn: '' }, room).dueOn).toBeNull()
+  })
+
+  it('truncates a description rather than letting the insert fail on length', () => {
+    const result = normaliseCommitment({ ...base, description: 'x'.repeat(900) }, room)
+    expect(result.description).toHaveLength(500)
   })
 })

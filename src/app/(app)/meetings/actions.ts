@@ -10,7 +10,7 @@ import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
 import { getMeetingContext, getUserContext } from '@/lib/ai/context'
 import { runPrompt } from '@/lib/ai/provider'
 import { meetingBriefPrompt } from '@/lib/ai/prompts/meeting-brief'
-import { debriefPrompt } from '@/lib/ai/prompts/debrief'
+import { debriefPrompt, normaliseCommitment } from '@/lib/ai/prompts/debrief'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -362,30 +362,20 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
 
     const validPersonIds = new Set(meeting.participants.map((p) => p.id))
 
-    // Commitments extracted from the notes.
-    //
-    // ownerPersonId is whatever the model returned, and a model asked for an id
-    // will sometimes hand back a name instead. That is not a hypothetical: the
-    // first production run returned the user's display name for both
-    // commitments, every insert failed the uuid cast, and because the result was
-    // never checked they vanished in silence while the UI reported success.
-    // Anything that is not a participant id is discarded rather than trusted.
+    // Commitments extracted from the notes. normaliseCommitment is what keeps a
+    // model's answer from reaching the database unchecked - see its comment.
     for (const commitment of output.commitments.slice(0, 8)) {
-      const ownerPersonId =
-        commitment.ownerPersonId && validPersonIds.has(commitment.ownerPersonId)
-          ? commitment.ownerPersonId
-          : null
+      const safe = normaliseCommitment(commitment, validPersonIds)
 
       const { error: commitmentError } = await supabase.from('commitments').insert({
         ...own,
-        description: commitment.description.slice(0, 500),
-        // An owner of 'person' with nobody to point at is not a usable record.
-        owner: commitment.owner === 'person' && !ownerPersonId ? 'shared' : commitment.owner,
-        owner_person_id: ownerPersonId,
-        person_id: ownerPersonId ?? meeting.participants[0]?.id ?? null,
+        description: safe.description,
+        owner: safe.owner,
+        owner_person_id: safe.ownerPersonId,
+        person_id: safe.ownerPersonId ?? meeting.participants[0]?.id ?? null,
         interaction_id: interaction.id,
         meeting_id: v.meetingId,
-        due_on: commitment.dueOn,
+        due_on: safe.dueOn,
       })
 
       if (commitmentError) {
