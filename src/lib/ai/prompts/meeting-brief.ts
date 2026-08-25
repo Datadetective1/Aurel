@@ -221,7 +221,7 @@ function composeParticipant(p: PersonContext) {
   } else if (p.interactionCount === 0) {
     relationshipNote = `No recorded interactions yet. Treat everything below as a starting point, not a read.`
   } else {
-    const last = p.lastInteractionAt ? p.lastInteractionAt.slice(0, 10) : 'an unrecorded date'
+    const last = p.lastInteractionAt ? formatFactDate(p.lastInteractionAt) : 'an unrecorded date'
     const open = p.openCommitments.length
     relationshipNote =
       `${p.interactionCount} recorded interaction${p.interactionCount === 1 ? '' : 's'}, most recently ${last}.` +

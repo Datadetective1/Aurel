@@ -103,7 +103,8 @@ const CUES = {
   // "by <day>" branch, which needs the preposition to match.
   commitment:
     /\b(will|going to|i'll|we'll|owes?|owe|to send|to share|follow up|by (monday|tuesday|wednesday|thursday|friday|next week|end of|eod|eow))\b/i,
-  objection: /\b(concerned|concern|pushed back|objected|worried|disagreed|hesitant|reservation|not convinced|challenged)\b/i,
+  objection:
+    /\b(concerned|concern|pushed back|objected|worried|disagreed|hesitant|reservation|not convinced|challenged)\b/i,
   question: /\?$|\b(asked|wanted to know|unclear|open question|unresolved|tbd|to be determined)\b/i,
   preference:
     /\b(prefers?|wants?|asked for|likes?|expects?|needs? to see|wants? the|first|before)\b/i,
@@ -143,7 +144,10 @@ function composeDebrief(input: DebriefInput): Debrief {
     .slice(0, 8)
     .map((s) => {
       const who = attribute(s, participants)
-      const userOwns = /\b(i'?ll|i will|i owe|i need to|i have to|i said i would|i promised|i am going to|i'm going to|my )\b/i.test(s)
+      const userOwns =
+        /\b(i'?ll|i will|i owe|i need to|i have to|i said i would|i promised|i am going to|i'm going to|my )\b/i.test(
+          s,
+        )
       return {
         description: s.replace(/\s+/g, ' ').trim(),
         owner: userOwns ? ('user' as const) : who ? ('person' as const) : ('shared' as const),
@@ -204,7 +208,10 @@ function composeDebrief(input: DebriefInput): Debrief {
     commitments,
     objections,
     openQuestions,
-    followUps: commitments.filter((c) => c.owner === 'user').map((c) => c.description).slice(0, 5),
+    followUps: commitments
+      .filter((c) => c.owner === 'user')
+      .map((c) => c.description)
+      .slice(0, 5),
     topics: extractTopics(sentences).slice(0, 6),
     proposedMemories,
     nextTime: nextTime.slice(0, 4),
@@ -263,9 +270,7 @@ function extractDate(sentence: string, referenceIso: string): string | null {
     return day(delta)
   }
   if (/\b(end of (the )?month|eom)\b/.test(s)) {
-    return new Date(
-      Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 0),
-    )
+    return new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 0))
       .toISOString()
       .slice(0, 10)
   }

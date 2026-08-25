@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CircleCheck,
   CreditCard,
+  FileText,
   Link2,
   Mail,
   Search,
@@ -28,11 +29,9 @@ export const metadata: Metadata = { title: 'Capabilities', robots: { index: fals
  * An inventory of what this deployment can actually do, and — where something
  * is off — what would turn it on and who can do that.
  *
- * Four states, deliberately distinct:
- *   RUNNING      configured and in use right now
- *   AVAILABLE    works today, nothing to set up
- *   NEEDS SETUP  possible here, with a concrete next step
- *   UNAVAILABLE  not offered on this deployment or plan
+ * Five states, defined below. The one that matters most is what "available"
+ * is NOT allowed to mean: anything needing a credential, or absent from this
+ * deployment entirely, must never be shown as available.
  *
  * "Needs setup" is split further by WHO can act. Most integrations here are
  * server credentials: showing an account holder a button they cannot use is
@@ -42,7 +41,7 @@ export const metadata: Metadata = { title: 'Capabilities', robots: { index: fals
  * =============================================================================
  */
 
-type Status = 'running' | 'available' | 'setup' | 'unavailable'
+type Status = 'configured' | 'available' | 'not_connected' | 'setup' | 'unavailable'
 
 interface Capability {
   id: string
@@ -57,10 +56,22 @@ interface Capability {
   deploymentAction?: { summary: string; env: string[] }
 }
 
-const STATUS_META: Record<Status, { label: string; tone: 'positive' | 'accent' | 'caution' | 'outline' }> = {
-  running: { label: 'Running', tone: 'positive' },
+/**
+ * Five states, deliberately distinct.
+ *
+ * "Available" is reserved for things that genuinely work right now with no
+ * setup. Anything requiring a credential is CONFIGURATION REQUIRED, and
+ * anything simply absent from this deployment is UNAVAILABLE — labelling either
+ * of those "available" would be the misleading state worth avoiding most.
+ */
+const STATUS_META: Record<
+  Status,
+  { label: string; tone: 'positive' | 'accent' | 'caution' | 'outline' }
+> = {
+  configured: { label: 'Connected', tone: 'positive' },
   available: { label: 'Available', tone: 'accent' },
-  setup: { label: 'Needs setup', tone: 'caution' },
+  not_connected: { label: 'Not connected', tone: 'caution' },
+  setup: { label: 'Configuration required', tone: 'caution' },
   unavailable: { label: 'Unavailable', tone: 'outline' },
 }
 
@@ -75,7 +86,7 @@ export default async function CapabilitiesSettingsPage() {
       id: 'ai',
       label: 'AI reasoning',
       icon: Sparkles,
-      status: ai.generative ? 'running' : 'setup',
+      status: ai.generative ? 'configured' : 'setup',
       detail: ai.generative
         ? `${ai.provider} · ${ai.model}. Briefs combine your records, retrieved evidence and relationship memory.`
         : 'No language model is configured, so briefs are composed deterministically from your records. Everything is still evidence-backed — it simply reasons less.',
@@ -99,7 +110,7 @@ export default async function CapabilitiesSettingsPage() {
       id: 'discovery',
       label: 'Finding sources automatically',
       icon: Search,
-      status: research.canDiscover ? 'running' : 'setup',
+      status: research.canDiscover ? 'configured' : 'setup',
       detail: research.canDiscover
         ? `Searches for a person's public professional footprint using ${research.searchProvider}.`
         : 'Discovery from a name alone needs a search API key. Until then, paste a link and it is analysed the same way.',
@@ -128,10 +139,19 @@ export default async function CapabilitiesSettingsPage() {
             },
     },
     {
+      id: 'documents',
+      label: 'Document and transcript analysis',
+      icon: FileText,
+      status: 'available',
+      detail:
+        'Paste a transcript, meeting notes or a professional bio and it is analysed the same way a fetched page is. File upload is not built — the text has to be pasted.',
+      userAction: { label: 'Add context to someone', href: '/people' },
+    },
+    {
       id: 'enrichment',
       label: 'Licensed enrichment',
       icon: BookOpenText,
-      status: research.enrichmentProvider === 'none' ? 'unavailable' : 'running',
+      status: research.enrichmentProvider === 'none' ? 'unavailable' : 'configured',
       detail:
         research.enrichmentProvider === 'none'
           ? `Optional vendor data. None is configured, and ${brand.name} does not require any — every claim comes from a source you can open.`
@@ -141,7 +161,7 @@ export default async function CapabilitiesSettingsPage() {
       id: 'email',
       label: 'Email',
       icon: Mail,
-      status: features.emailDelivery ? 'running' : 'setup',
+      status: features.emailDelivery ? 'configured' : 'not_connected',
       detail: features.emailDelivery
         ? `Sent from ${brand.email.fromAddress}. Meeting reminders and your weekly summary only.`
         : 'Transactional email is written to the server log rather than delivered. Nothing else is affected.',
@@ -156,7 +176,7 @@ export default async function CapabilitiesSettingsPage() {
       id: 'billing',
       label: 'Payments',
       icon: CreditCard,
-      status: features.billing ? 'running' : 'setup',
+      status: features.billing ? 'configured' : 'not_connected',
       detail: features.billing
         ? `Checkout and subscription management are live. You are on ${entitlements.plan === 'free' ? 'the free plan' : `the ${entitlements.plan} plan`}.`
         : 'Payments are not connected, so upgrading is unavailable. Every non-metered feature works normally.',
@@ -170,13 +190,13 @@ export default async function CapabilitiesSettingsPage() {
     },
   ]
 
-  const ready = capabilities.filter((c) => c.status === 'running' || c.status === 'available')
-  const pending = capabilities.filter((c) => c.status === 'setup' || c.status === 'unavailable')
+  const ready = capabilities.filter((c) => c.status === 'configured' || c.status === 'available')
+  const pending = capabilities.filter((c) => c.status !== 'configured' && c.status !== 'available')
 
   return (
     <div>
       <Eyebrow>Capabilities</Eyebrow>
-      <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-secondary">
+      <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
         What this deployment can actually do. {brand.name} tells you which parts are running, and
         what would turn on the rest, rather than degrading quietly.
       </p>
@@ -184,7 +204,7 @@ export default async function CapabilitiesSettingsPage() {
       {ready.length > 0 ? (
         <section className="mt-8">
           <div className="flex items-center gap-2">
-            <CircleCheck className="size-3.5 text-positive" aria-hidden="true" />
+            <CircleCheck className="text-positive size-3.5" aria-hidden="true" />
             <h2 className="label">Working now</h2>
           </div>
           <ul className="mt-3 grid gap-2.5">
@@ -198,7 +218,7 @@ export default async function CapabilitiesSettingsPage() {
       {pending.length > 0 ? (
         <section className="mt-9">
           <h2 className="label">Not set up</h2>
-          <p className="mt-2 max-w-lg text-xs leading-relaxed text-ink-muted">
+          <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
             None of these stop you working. Each one names exactly what is missing. Where a setting
             is shown as code, it is a server credential — it needs whoever runs this install rather
             than your account.
@@ -223,13 +243,13 @@ function CapabilityCard({ capability }: { capability: Capability }) {
       <Panel className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <Icon className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
-            <span className="text-sm font-medium text-ink">{capability.label}</span>
+            <Icon className="text-ink-faint size-4 shrink-0" aria-hidden="true" />
+            <span className="text-ink text-sm font-medium">{capability.label}</span>
           </div>
           <Badge tone={meta.tone}>{meta.label}</Badge>
         </div>
 
-        <p className="mt-2 max-w-prose text-xs leading-relaxed text-ink-muted">
+        <p className="text-ink-muted mt-2 max-w-prose text-xs leading-relaxed">
           {capability.detail}
         </p>
 
@@ -242,17 +262,17 @@ function CapabilityCard({ capability }: { capability: Capability }) {
         ) : null}
 
         {capability.deploymentAction ? (
-          <div className="mt-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-line bg-bg-sunken px-3 py-2.5">
-            <Terminal className="mt-px size-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
+          <div className="border-line bg-bg-sunken mt-3 flex items-start gap-2 rounded-[var(--radius-md)] border px-3 py-2.5">
+            <Terminal className="text-ink-faint mt-px size-3.5 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="text-xs leading-relaxed text-ink-secondary">
+              <p className="text-ink-secondary text-xs leading-relaxed">
                 {capability.deploymentAction.summary}
               </p>
               <p className="mt-1 flex flex-wrap gap-1.5">
                 {capability.deploymentAction.env.map((key) => (
                   <code
                     key={key}
-                    className="rounded-[3px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[0.6875rem] text-ink-muted"
+                    className="border-line bg-surface text-ink-muted rounded-[3px] border px-1.5 py-0.5 font-mono text-[0.6875rem]"
                   >
                     {key}
                   </code>

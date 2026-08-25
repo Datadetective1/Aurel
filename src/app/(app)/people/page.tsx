@@ -8,6 +8,8 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { relativeDay, pluralise } from '@/lib/format'
 import { brand } from '@/lib/brand'
+import { findDuplicates } from './actions'
+import { DuplicateReview } from '@/components/app/duplicate-review'
 
 export const metadata: Metadata = { title: 'People', robots: { index: false, follow: false } }
 
@@ -67,7 +69,8 @@ export default async function PeoplePage() {
   const activeByPerson = new Map<string, number>()
   const proposedByPerson = new Map<string, number>()
   for (const o of observations ?? []) {
-    const map = o.status === 'active' ? activeByPerson : o.status === 'proposed' ? proposedByPerson : null
+    const map =
+      o.status === 'active' ? activeByPerson : o.status === 'proposed' ? proposedByPerson : null
     if (map) map.set(o.person_id, (map.get(o.person_id) ?? 0) + 1)
   }
 
@@ -75,6 +78,9 @@ export default async function PeoplePage() {
   for (const c of commitments ?? []) {
     if (c.person_id) openByPerson.set(c.person_id, (openByPerson.get(c.person_id) ?? 0) + 1)
   }
+
+  // Only worth computing once there is enough to collide.
+  const duplicates = list.length > 1 ? await findDuplicates() : []
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -97,6 +103,12 @@ export default async function PeoplePage() {
         }
       />
 
+      {duplicates.length > 0 ? (
+        <div className="mt-8">
+          <DuplicateReview pairs={duplicates} />
+        </div>
+      ) : null}
+
       {list.length === 0 ? (
         <EmptyState
           className="mt-10"
@@ -110,7 +122,7 @@ export default async function PeoplePage() {
           }
         />
       ) : (
-        <ul className="mt-8 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line">
+        <ul className="border-line bg-line mt-8 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
           {list.map((person) => {
             const name = person.preferred_name || person.full_name
             const known = activeByPerson.get(person.id) ?? 0
@@ -121,31 +133,25 @@ export default async function PeoplePage() {
               <li key={person.id} className="bg-bg">
                 <Link
                   href={`/people/${person.id}`}
-                  className="flex items-center gap-4 p-4 transition-colors hover:bg-bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:p-5"
+                  className="hover:bg-bg-sunken flex items-center gap-4 p-4 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:p-5"
                 >
                   <Avatar name={person.full_name} src={person.avatar_url} size="md" />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                      <span className="font-medium text-ink">{name}</span>
+                      <span className="text-ink font-medium">{name}</span>
                       {person.is_demo ? <Badge tone="outline">Demo</Badge> : null}
-                      {proposed > 0 ? (
-                        <Badge tone="accent">
-                          {proposed} to review
-                        </Badge>
-                      ) : null}
+                      {proposed > 0 ? <Badge tone="accent">{proposed} to review</Badge> : null}
                       {open > 0 ? <Badge tone="caution">{open} open</Badge> : null}
                     </div>
 
-                    <p className="mt-0.5 truncate text-sm text-ink-secondary">
+                    <p className="text-ink-secondary mt-0.5 truncate text-sm">
                       {[person.job_title, person.organizations?.name].filter(Boolean).join(' · ') ||
                         RELATIONSHIP_LABEL[person.relationship_type]}
                     </p>
 
-                    <p className="mt-1 text-xs text-ink-muted">
-                      {known > 0
-                        ? `${pluralise(known, 'thing')} learned`
-                        : 'Nothing recorded yet'}
+                    <p className="text-ink-muted mt-1 text-xs">
+                      {known > 0 ? `${pluralise(known, 'thing')} learned` : 'Nothing recorded yet'}
                       {person.last_interaction_at
                         ? ` · last spoke ${relativeDay(person.last_interaction_at).toLowerCase()}`
                         : ''}
@@ -154,7 +160,7 @@ export default async function PeoplePage() {
 
                   <div className="hidden shrink-0 items-center gap-3 sm:flex">
                     <Badge tone="neutral">{RELATIONSHIP_LABEL[person.relationship_type]}</Badge>
-                    <ArrowRight className="size-4 text-ink-faint" aria-hidden="true" />
+                    <ArrowRight className="text-ink-faint size-4" aria-hidden="true" />
                   </div>
                 </Link>
               </li>
@@ -164,15 +170,15 @@ export default async function PeoplePage() {
       )}
 
       {list.length > 8 ? (
-        <p className="mt-6 flex items-center gap-2 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-6 flex items-center gap-2 text-xs">
           <Search className="size-3.5" aria-hidden="true" />
-          Press <kbd className="rounded border border-line px-1.5 py-0.5 font-sans">⌘K</kbd> to jump
+          Press <kbd className="border-line rounded border px-1.5 py-0.5 font-sans">⌘K</kbd> to jump
           to anyone.
         </p>
       ) : null}
 
       <Eyebrow className="mt-12 block">A note on what this is</Eyebrow>
-      <p className="mt-3 max-w-xl text-xs leading-relaxed text-ink-muted">
+      <p className="text-ink-muted mt-3 max-w-xl text-xs leading-relaxed">
         This is your private working record of the people you interact with professionally. It is
         visible only to you, it focuses on professional context, and you can delete any person, any
         observation or the whole record at any time.

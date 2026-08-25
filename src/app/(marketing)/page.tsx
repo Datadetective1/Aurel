@@ -10,6 +10,7 @@ import {
   MessageSquareQuote,
   PenLine,
   Rewind,
+  Telescope,
   Users,
 } from 'lucide-react'
 import { ApertureField, ApertureRule } from '@/components/brand/aperture'
@@ -51,14 +52,13 @@ function Hero() {
         The motif appears where it has room to be itself: the mark, the section
         rules, the reveal and the final CTA.
       */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-graphic/40 to-transparent" />
+      <div className="via-accent-graphic/40 pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent" />
       {/* A single warm lift behind the panel, so it sits above the page. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute right-0 top-0 hidden h-[42rem] w-[46rem] rounded-full opacity-[0.55] blur-3xl lg:block"
+        className="pointer-events-none absolute top-0 right-0 hidden h-[42rem] w-[46rem] rounded-full opacity-[0.55] blur-3xl lg:block"
         style={{
-          background:
-            'radial-gradient(closest-side, var(--accent-wash), transparent 70%)',
+          background: 'radial-gradient(closest-side, var(--accent-wash), transparent 70%)',
         }}
       />
 
@@ -71,11 +71,11 @@ function Hero() {
               Professional relationship intelligence
             </Badge>
 
-            <h1 className="font-display text-[2.75rem] leading-[1.04] tracking-[-0.02em] text-ink sm:text-6xl">
+            <h1 className="font-display text-ink text-[2.75rem] leading-[1.04] tracking-[-0.02em] sm:text-6xl">
               Walk into every room prepared.
             </h1>
 
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-secondary sm:text-lg">
+            <p className="text-ink-secondary mt-6 max-w-xl text-base leading-relaxed sm:text-lg">
               {brand.name} turns the people, the history and the context around a meeting into
               practical guidance for the conversations that decide things.
             </p>
@@ -92,7 +92,7 @@ function Hero() {
               </Button>
             </div>
 
-            <p className="mt-5 text-xs text-ink-muted">
+            <p className="text-ink-muted mt-5 text-xs">
               Free to start. No card required. Your relationship record is yours — export or delete
               it at any time.
             </p>
@@ -107,13 +107,13 @@ function Hero() {
 
 function Problem() {
   return (
-    <section className="border-y border-line bg-bg-sunken py-20 sm:py-24">
+    <section className="border-line bg-bg-sunken border-y py-20 sm:py-24">
       <Container size="narrow">
         <Eyebrow>The problem</Eyebrow>
-        <h2 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-[2.5rem]">
+        <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
           Important conversations usually start cold.
         </h2>
-        <div className="mt-7 space-y-5 text-base leading-relaxed text-ink-secondary">
+        <div className="text-ink-secondary mt-7 space-y-5 text-base leading-relaxed">
           <p>
             You know this person. You have met them nine times. But the detail that actually
             mattered — the objection they raised in March, the evidence they asked for before they
@@ -128,10 +128,10 @@ function Problem() {
 
         <ApertureRule className="my-12" />
 
-        <p className="font-display text-2xl leading-snug text-ink sm:text-3xl">
+        <p className="font-display text-ink text-2xl leading-snug sm:text-3xl">
           Personality is only the beginning. Context changes everything.
         </p>
-        <p className="mt-5 max-w-xl leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mt-5 max-w-xl leading-relaxed">
           The same person needs a different conversation depending on your relationship with them,
           what is being decided, who else is in the room, and what happened last time. A profile
           cannot tell you that. A record can.
@@ -141,24 +141,38 @@ function Problem() {
   )
 }
 
+/**
+ * The four-beat story, in the order a user actually lives it.
+ *
+ * The first beat is the V2 addition and the reason the arc changed: value now
+ * begins BEFORE the first meeting, not after the first debrief. Every claim
+ * here describes behaviour that ships — pasting a link genuinely produces a
+ * source-backed footprint, which is why it is safe to say so publicly.
+ */
 const STEPS = [
   {
-    icon: PenLine,
-    eyebrow: 'One',
-    title: 'Record what you learn',
-    body: `Add the people who matter and what you notice about working with them. After a meeting, paste your notes — ${brand.name} proposes what is worth remembering and you decide what to keep.`,
+    icon: Telescope,
+    eyebrow: 'Before the first meeting',
+    title: 'Start with public context',
+    body: `Paste a link — a company bio, a talk, an article — and ${brand.name} reads it, checks it is genuinely about that person, and builds a professional footprint where every claim links back to its source. Useful before you have ever spoken.`,
   },
   {
     icon: Users,
-    eyebrow: 'Two',
+    eyebrow: 'Walking in',
     title: 'Prepare for the room',
-    body: 'Pick a meeting, state what you need to achieve, and get a brief: how to open, what to emphasise, what each person will want to see, and the objections you should expect.',
+    body: 'State what you need to achieve and get a brief: how to open, what to emphasise, what each person will want to see, and the objections to expect. Public context is labelled as public — never dressed up as a read on the person.',
+  },
+  {
+    icon: PenLine,
+    eyebrow: 'Afterwards',
+    title: 'Capture what actually happened',
+    body: `Paste your notes and ${brand.name} proposes what is worth remembering. Nothing enters your record until you confirm it.`,
   },
   {
     icon: Rewind,
-    eyebrow: 'Three',
-    title: 'It compounds',
-    body: `Every debrief sharpens the next brief. After five interactions with someone, ${brand.name} is briefing you on your actual relationship — not on a personality type.`,
+    eyebrow: 'Next time',
+    title: 'Your record outranks the internet',
+    body: 'Once you have worked with someone, what you observed leads the brief and the public material falls behind it. That reversal is the point: a bio tells you who someone is, your record tells you how they work with you.',
   },
 ]
 
@@ -168,18 +182,18 @@ function HowItWorks() {
       <Container size="wide">
         <div className="max-w-2xl">
           <Eyebrow>How it works</Eyebrow>
-          <h2 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-[2.5rem]">
-            From a person to a plan for the conversation.
+          <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
+            Useful before the first meeting. Sharper after it.
           </h2>
         </div>
 
-        <div className="mt-14 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line md:grid-cols-3">
+        <div className="border-line bg-line mt-14 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border md:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step) => (
             <div key={step.title} className="bg-bg p-7 sm:p-8">
-              <step.icon className="size-5 text-accent" aria-hidden="true" />
+              <step.icon className="text-accent size-5" aria-hidden="true" />
               <Eyebrow className="mt-5 block">{step.eyebrow}</Eyebrow>
-              <h3 className="mt-2 font-display text-xl text-ink">{step.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-ink-secondary">{step.body}</p>
+              <h3 className="font-display text-ink mt-2 text-xl">{step.title}</h3>
+              <p className="text-ink-secondary mt-3 text-sm leading-relaxed">{step.body}</p>
             </div>
           ))}
         </div>
@@ -190,15 +204,15 @@ function HowItWorks() {
 
 function Memory() {
   return (
-    <section id="memory" className="scroll-mt-20 border-y border-line bg-bg-sunken py-20 sm:py-24">
+    <section id="memory" className="border-line bg-bg-sunken scroll-mt-20 border-y py-20 sm:py-24">
       <Container size="wide">
         <div className="grid items-center gap-14 lg:grid-cols-2">
           <div>
             <Eyebrow>Relationship memory</Eyebrow>
-            <h2 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-[2.5rem]">
+            <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
               It remembers what you learned last time.
             </h2>
-            <p className="mt-6 leading-relaxed text-ink-secondary">
+            <p className="text-ink-secondary mt-6 leading-relaxed">
               This is the part a general-purpose assistant cannot do. It does not know that Maya
               challenged your assumptions in March and came around when you showed the historical
               data. {brand.name} does, because you told it — and it brings that back the next time
@@ -211,23 +225,23 @@ function Memory() {
                 'Commitments still open between you',
                 'What you have actually learned about working together',
               ].map((item) => (
-                <li key={item} className="flex gap-3 text-sm text-ink-secondary">
-                  <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+                <li key={item} className="text-ink-secondary flex gap-3 text-sm">
+                  <CircleCheck className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
 
-          <figure className="rounded-[var(--radius-lg)] border border-line bg-surface p-7 sm:p-9">
-            <MessageSquareQuote className="size-5 text-accent-graphic" aria-hidden="true" />
-            <blockquote className="mt-5 font-display text-xl leading-snug text-ink sm:text-2xl">
+          <figure className="border-line bg-surface rounded-[var(--radius-lg)] border p-7 sm:p-9">
+            <MessageSquareQuote className="text-accent-graphic size-5" aria-hidden="true" />
+            <blockquote className="font-display text-ink mt-5 text-xl leading-snug sm:text-2xl">
               &ldquo;Last time you presented this forecast, Maya challenged the assumptions but
               moved once you showed the historical utilisation. Bring that evidence earlier this
               time.&rdquo;
             </blockquote>
-            <figcaption className="mt-6 flex items-center gap-2 text-xs text-ink-muted">
-              <Eye className="size-3.5 text-info" aria-hidden="true" />
+            <figcaption className="text-ink-muted mt-6 flex items-center gap-2 text-xs">
+              <Eye className="text-info size-3.5" aria-hidden="true" />
               Observed across two recorded interactions
             </figcaption>
           </figure>
@@ -270,27 +284,27 @@ function Trust() {
       <Container size="wide">
         <div className="max-w-2xl">
           <Eyebrow>Evidence and transparency</Eyebrow>
-          <h2 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-[2.5rem]">
+          <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
             You can always see why it said that.
           </h2>
-          <p className="mt-6 leading-relaxed text-ink-secondary">
+          <p className="text-ink-secondary mt-6 leading-relaxed">
             Guidance about real colleagues has to be honest about how much it actually knows. Every
             claim in {brand.name} carries its evidence level, and every brief shows the record it
             was built from.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <div className="border-line bg-line mt-12 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border sm:grid-cols-2 lg:grid-cols-4">
           {EVIDENCE_TIERS.map((tier) => (
             <div key={tier.label} className="bg-bg p-6">
               <tier.icon className={`size-4 ${tier.tone}`} aria-hidden="true" />
-              <p className="mt-4 text-sm font-medium text-ink">{tier.label}</p>
-              <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-muted">{tier.body}</p>
+              <p className="text-ink mt-4 text-sm font-medium">{tier.label}</p>
+              <p className="text-ink-muted mt-2 text-[0.8125rem] leading-relaxed">{tier.body}</p>
             </div>
           ))}
         </div>
 
-        <p className="mt-8 max-w-xl text-sm leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mt-8 max-w-xl text-sm leading-relaxed">
           {brand.name} is comfortable saying{' '}
           <span className="text-ink">&ldquo;I don&rsquo;t have enough evidence yet.&rdquo;</span>{' '}
           That is a feature. Confident guidance built on nothing is worse than no guidance.
@@ -302,24 +316,24 @@ function Trust() {
 
 function AfterTheMeeting() {
   return (
-    <section className="border-y border-line bg-bg-sunken py-20 sm:py-24">
+    <section className="border-line bg-bg-sunken border-y py-20 sm:py-24">
       <Container size="narrow">
         <Eyebrow>After the meeting</Eyebrow>
-        <h2 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-[2.5rem]">
+        <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
           Nothing is remembered without your say-so.
         </h2>
-        <p className="mt-6 leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mt-6 leading-relaxed">
           Paste your notes and {brand.name} pulls out the decisions, the commitments and the
           objections — then proposes what is worth keeping about each person. You save it, edit it,
           or throw it away.
         </p>
 
-        <div className="mt-9 rounded-[var(--radius-lg)] border border-line bg-surface p-6">
+        <div className="border-line bg-surface mt-9 rounded-[var(--radius-lg)] border p-6">
           <Eyebrow>Worth remembering?</Eyebrow>
-          <p className="mt-3 text-sm leading-relaxed text-ink">
+          <p className="text-ink mt-3 text-sm leading-relaxed">
             &ldquo;Daniel asked for the cost impact before the recommendation.&rdquo;
           </p>
-          <p className="mt-2 text-xs text-ink-muted">
+          <p className="text-ink-muted mt-2 text-xs">
             From your notes on &ldquo;Q3 capacity review&rdquo;.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -345,14 +359,14 @@ function Privacy() {
       <Container size="wide">
         <div className="grid gap-12 lg:grid-cols-[1fr_1.2fr]">
           <div>
-            <Lock className="size-5 text-accent" aria-hidden="true" />
+            <Lock className="text-accent size-5" aria-hidden="true" />
             <Eyebrow className="mt-5 block">Privacy and control</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl leading-tight text-ink">
+            <h2 className="font-display text-ink mt-3 text-3xl leading-tight">
               You are storing notes about real colleagues.
             </h2>
           </div>
           <div>
-            <p className="leading-relaxed text-ink-secondary">
+            <p className="text-ink-secondary leading-relaxed">
               That deserves to be treated carefully. {brand.name} is a private record you keep about
               your own working relationships — not a database of people, and not something shared
               with anyone else.
@@ -366,15 +380,15 @@ function Privacy() {
                 'No hiring, firing, promotion or compensation scoring',
                 'Your notes are never used to train a shared model',
               ].map((item) => (
-                <li key={item} className="flex gap-2.5 text-sm text-ink-secondary">
-                  <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+                <li key={item} className="text-ink-secondary flex gap-2.5 text-sm">
+                  <CircleCheck className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   {item}
                 </li>
               ))}
             </ul>
             <Link
               href="/privacy"
-              className="mt-7 inline-flex items-center gap-1.5 text-sm text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent"
+              className="text-accent decoration-accent/40 hover:decoration-accent mt-7 inline-flex items-center gap-1.5 text-sm underline underline-offset-2"
             >
               Read the privacy approach
               <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -388,20 +402,20 @@ function Privacy() {
 
 function FinalCta() {
   return (
-    <section className="relative overflow-hidden border-t border-line bg-bg-sunken py-24">
+    <section className="border-line bg-bg-sunken relative overflow-hidden border-t py-24">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <ApertureField
-          className="absolute -bottom-40 left-1/2 h-[30rem] w-[34rem] -translate-x-1/2 text-ink"
+          className="text-ink absolute -bottom-40 left-1/2 h-[30rem] w-[34rem] -translate-x-1/2"
           rings={5}
           accentRing={1}
           intensity={1.1}
         />
       </div>
       <Container size="narrow" className="relative text-center">
-        <h2 className="font-display text-3xl leading-tight text-ink sm:text-[2.75rem]">
+        <h2 className="font-display text-ink text-3xl leading-tight sm:text-[2.75rem]">
           The next conversation that matters is already on your calendar.
         </h2>
-        <p className="mx-auto mt-6 max-w-lg leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mx-auto mt-6 max-w-lg leading-relaxed">
           Build your {brand.assessmentName.toLowerCase()}, add the people who matter, and walk in
           knowing what to say first.
         </p>
@@ -438,9 +452,6 @@ function StructuredData() {
     },
   }
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-    />
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
   )
 }

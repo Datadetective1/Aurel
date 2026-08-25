@@ -144,6 +144,22 @@ function cleanTarget(raw: string): string {
  * The page is fetched through the same SSRF-guarded fetcher as research, and
  * its contents are never treated as instructions.
  */
+/** "3 November 2001". Never an ISO timestamp in copy a person reads. */
+function humanDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(d)
+}
+
+function stripTrailingStop(value: string): string {
+  return value.replace(/\.\s*$/, '')
+}
+
 async function reviewUrl(
   supabase: Client,
   userId: string,
@@ -207,10 +223,13 @@ async function reviewUrl(
       : undefined) ?? (people ?? []).find((p) => haystack.includes(p.full_name.toLowerCase()))
 
   const lines: string[] = []
+  // stripTrailingStop: publishers frequently end in "Inc." and produced "Inc..".
   lines.push(
-    `${content.title ?? 'That page'}${content.publisher ? ` — ${content.publisher}` : ''}.`,
+    `${content.title ?? 'That page'}${
+      content.publisher ? ` — ${stripTrailingStop(content.publisher)}` : ''
+    }.`,
   )
-  if (content.publishedAt) lines.push(`Published ${content.publishedAt.slice(0, 10)}.`)
+  if (content.publishedAt) lines.push(`Published ${humanDate(content.publishedAt)}.`)
   if (content.description) lines.push(content.description)
   lines.push(`About ${content.wordCount.toLocaleString()} words of readable text.`)
 
