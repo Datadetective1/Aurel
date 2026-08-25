@@ -635,6 +635,25 @@ function asSentence(s: string): string {
 function citeMeeting(input: MeetingBriefInput): Citation[] {
   const citations: Citation[] = []
   for (const p of input.meeting.participants) {
+    // What the user wrote on the person, cited first.
+    //
+    // renderPerson has always put these notes in the prompt, and generated
+    // briefs quote them almost verbatim — but nothing cited them, so a person
+    // with detailed notes and no logged interactions produced a brief whose
+    // evidence panel said "there was no recorded evidence to build on". The
+    // panel was contradicting the paragraph directly above it, and the claim
+    // was the false one. Evidence used is evidence shown.
+    //
+    // 'confirmed' because the user wrote it themselves about someone they know;
+    // nothing in the product is more directly attested than that.
+    if (p.notes?.trim()) {
+      citations.push({
+        label: `Your notes on ${p.displayName}: ${p.notes.trim()}`,
+        evidenceLevel: 'confirmed',
+        personId: p.id,
+      })
+    }
+
     for (const group of [
       p.observations.confirmed,
       p.observations.observed,

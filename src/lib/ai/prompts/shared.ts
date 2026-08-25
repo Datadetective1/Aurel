@@ -222,5 +222,9 @@ export function styleBlock(style: CoachingStyle): string {
 
 /** Today's date, so relative language ("last week") is anchored. */
 export function dateBlock(now = new Date()): string {
-  return `Today is ${now.toISOString().slice(0, 10)}.`
+  // The weekday is not decoration. Notes say "by Friday" far more often than
+  // they say a date, and without knowing what day it is now the model cannot
+  // turn that into one — it returns null and the due date is lost.
+  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
+  return `Today is ${weekday}, ${now.toISOString().slice(0, 10)}.`
 }

@@ -101,3 +101,40 @@ describe('debrief commitment extraction', () => {
     expect(result.commitments[0]!.owner).toBe('user')
   })
 })
+
+describe('debrief prompt contract', () => {
+  const system = debriefPrompt.system({
+    interaction: {
+      id: 'i1',
+      title: 'Migration timeline',
+      occurredAt: '2026-08-25T10:00:00Z',
+      source: 'notes',
+      wentWell: null,
+    },
+    participants: [person()],
+    user,
+    priorObjective: null,
+  })
+
+  it('forbids putting a name where an id belongs', () => {
+    // The first production run against a real model returned the user's display
+    // name as ownerPersonId for every commitment. The column is a uuid, so each
+    // insert failed and — because the result was unchecked — both commitments
+    // vanished while the UI reported the debrief saved.
+    expect(system).toMatch(/ownerPersonId must be null unless owner is "person"/)
+    expect(system).toMatch(/Never put a name here/)
+  })
+
+  it('asks for relative due dates to be resolved rather than dropped', () => {
+    // "by Friday" is how people write, and returning null for it loses the
+    // due date on most real commitments.
+    expect(system).toMatch(/Resolve relative references against today's date/)
+    expect(system).toMatch(/by Friday/)
+  })
+
+  it('gives the model the weekday, without which no weekday is resolvable', () => {
+    expect(system).toMatch(
+      /Today is (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{4}-\d{2}-\d{2}\./,
+    )
+  })
+})

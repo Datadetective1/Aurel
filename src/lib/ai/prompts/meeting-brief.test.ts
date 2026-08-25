@@ -457,3 +457,27 @@ describe('public context copy quality', () => {
     expect(result.sixtySecond).toContain('You want to')
   })
 })
+
+describe('brief citations', () => {
+  it("cites the user's notes, which the prompt has always used", () => {
+    // Found in production: a person with detailed notes and no logged
+    // interactions produced a brief that quoted those notes throughout, under
+    // an evidence panel reading "there was no recorded evidence to build on".
+    // Evidence used has to be evidence shown, or the panel is not a record of
+    // where the advice came from.
+    const withNotes = person()
+    withNotes.notes = 'Asked for utilisation numbers before agreeing to the headcount change.'
+
+    const citations = meetingBriefPrompt.cite(input('Agree the timeline', [withNotes]))
+    const note = citations.find((c) => c.label.includes('utilisation numbers'))
+
+    expect(note).toBeDefined()
+    expect(note?.evidenceLevel).toBe('confirmed')
+    expect(note?.personId).toBe(withNotes.id)
+  })
+
+  it('cites nothing for a person with no notes and no history', () => {
+    // The empty-state copy is only honest when the list is genuinely empty.
+    expect(meetingBriefPrompt.cite(input('Agree the timeline'))).toHaveLength(0)
+  })
+})

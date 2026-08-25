@@ -324,7 +324,9 @@ export const debriefPrompt: PromptModule<DebriefInput, Debrief> = {
       `EXTRACTION RULES
 - Only extract what the notes actually say. Do not infer a decision that was not recorded.
 - A commitment needs an owner. If the notes do not make the owner clear, use "shared".
-- Only set dueOn when the notes contain an unambiguous date. Otherwise null.
+- owner is "user" when the user owes it ("I owe her...", "I need to send..."), "person" when someone else owes it, "shared" otherwise.
+- ownerPersonId must be null unless owner is "person", and then it must be one of the ids listed under PEOPLE PRESENT. Never put a name here - it is an id or it is null.
+- dueOn is a YYYY-MM-DD date. Resolve relative references against today's date: "by Friday" means the next Friday, "next week" means seven days on, "end of month" means the last day of this month. If the notes give nothing to resolve, use null.
 
 MEMORY PROPOSAL RULES - THESE MATTER MOST
 - Propose only durable, reusable facts about how a person works. Not what happened once, but what it suggests about working with them.

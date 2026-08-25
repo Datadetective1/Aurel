@@ -360,23 +360,45 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
       .eq('id', interaction.id)
       .eq('user_id', user.id)
 
+    const validPersonIds = new Set(meeting.participants.map((p) => p.id))
+
     // Commitments extracted from the notes.
+    //
+    // ownerPersonId is whatever the model returned, and a model asked for an id
+    // will sometimes hand back a name instead. That is not a hypothetical: the
+    // first production run returned the user's display name for both
+    // commitments, every insert failed the uuid cast, and because the result was
+    // never checked they vanished in silence while the UI reported success.
+    // Anything that is not a participant id is discarded rather than trusted.
     for (const commitment of output.commitments.slice(0, 8)) {
-      await supabase.from('commitments').insert({
+      const ownerPersonId =
+        commitment.ownerPersonId && validPersonIds.has(commitment.ownerPersonId)
+          ? commitment.ownerPersonId
+          : null
+
+      const { error: commitmentError } = await supabase.from('commitments').insert({
         ...own,
         description: commitment.description.slice(0, 500),
-        owner: commitment.owner,
-        owner_person_id: commitment.ownerPersonId,
-        person_id:
-          commitment.ownerPersonId ?? meeting.participants[0]?.id ?? null,
+        // An owner of 'person' with nobody to point at is not a usable record.
+        owner: commitment.owner === 'person' && !ownerPersonId ? 'shared' : commitment.owner,
+        owner_person_id: ownerPersonId,
+        person_id: ownerPersonId ?? meeting.participants[0]?.id ?? null,
         interaction_id: interaction.id,
         meeting_id: v.meetingId,
         due_on: commitment.dueOn,
       })
+
+      if (commitmentError) {
+        // Losing a commitment is losing the thing the user most needs to
+        // remember. It must not fail quietly again.
+        logger.warn('debrief.commitment_insert_failed', {
+          meetingId: v.meetingId,
+          code: commitmentError.code,
+        })
+      }
     }
 
     // Memory proposals — inert until the user accepts them.
-    const validPersonIds = new Set(meeting.participants.map((p) => p.id))
     for (const proposal of output.proposedMemories.slice(0, 8)) {
       if (!validPersonIds.has(proposal.personId)) continue
 
