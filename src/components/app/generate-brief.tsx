@@ -99,7 +99,7 @@ export function GenerateBriefPanel({
                 <li className="flex gap-2 text-xs text-ink-muted">
                   <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
                   No objective recorded. The brief will be much sharper with one —{' '}
-                  <Link href={`/meetings/${meetingId}`} className="text-accent hover:underline">
+                  <Link href={`/meetings/${meetingId}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
                     add it
                   </Link>
                   .
@@ -109,7 +109,7 @@ export function GenerateBriefPanel({
                 <li className="flex gap-2 text-xs text-ink-muted">
                   <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
                   Nobody is added to this meeting yet.{' '}
-                  <Link href={`/meetings/${meetingId}`} className="text-accent hover:underline">
+                  <Link href={`/meetings/${meetingId}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
                     Add participants
                   </Link>
                   .

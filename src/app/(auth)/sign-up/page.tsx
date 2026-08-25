@@ -28,7 +28,7 @@ export default function SignUpPage() {
 
       <p className="mt-8 text-sm text-ink-muted">
         Already have an account?{' '}
-        <Link href="/sign-in" className="text-accent hover:underline">
+        <Link href="/sign-in" className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
           Sign in
         </Link>
       </p>

@@ -25,7 +25,7 @@ export default function SignInPage() {
 
       <p className="mt-8 text-sm text-ink-muted">
         New to {brand.name}?{' '}
-        <Link href="/sign-up" className="text-accent hover:underline">
+        <Link href="/sign-up" className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
           Create an account
         </Link>
       </p>

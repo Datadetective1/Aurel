@@ -87,6 +87,28 @@ E2E runs against `next build`, not the dev server. Prerendering, Suspense
 boundaries and environment validation have each broken this project while dev
 was green.
 
+### Accessibility
+
+`tests/e2e/accessibility.spec.ts` runs axe-core against every public page in
+both themes and both viewports, at WCAG 2.1 A and AA, plus checks for a working
+skip link, a single `main` landmark, and a visible focus ring on first Tab.
+
+Adding it found real violations on **every page in both themes**, all fixed:
+
+- **`--ink-faint` failed AA wherever it carried words** (3.19:1 in Pearl).
+  Its own comment said "decorative and large text only" — and it was used for
+  12px body copy anyway, repeatedly, by me. A comment is not an enforcement
+  mechanism. It is now the faintest tone that is still legible as text
+  (≥4.5:1 worst case), and the scale gives up some separation to get there.
+- **Inline prose links were distinguished by colour alone**, with underline on
+  hover only. They now carry a permanent underline.
+- **Reduced motion cancelled `animation-duration` but not `animation-delay`.**
+  With `fill-mode: both`, an un-cancelled delay holds the element at
+  `opacity: 0` — so someone who asked for no motion still got staggered
+  content that was invisible for up to 0.7s. That is the opposite of the
+  accommodation, and it is what axe was actually reporting when it flagged the
+  hero: it was sampling a half-faded pixel.
+
 ### Security
 
 `supabase/tests/rls-isolation.sql` creates two users and asserts isolation in
@@ -112,9 +134,11 @@ away is not.
   misses what a diff would.
 - **No load testing.** Query shapes are indexed for the access patterns the app
   actually uses, but nothing has been run at volume.
-- **No accessibility audit tool in the pipeline.** Semantics come from the
-  platform — real radios, real labels, `FormField` wiring `aria-describedby` —
-  and focus states are visible throughout. That is not the same as an audit.
+- **axe is automated; a real audit is not.** axe-core runs over every public
+  page in both themes and both viewports, but it catches perhaps a third to a
+  half of real barriers. It can tell you a control has no accessible name; it
+  cannot tell you the name is misleading. Nothing here has been tested with an
+  actual screen reader, or by anyone who uses one.
 - **Email rendering is verified in a browser, not in Outlook.** The layout uses
   tables and inline styles precisely because Outlook is unforgiving; a real
   client test is still a real client test.

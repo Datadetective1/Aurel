@@ -34,7 +34,7 @@ export default async function CheckEmailPage({
         request a new one by signing up again with the same address.
       </p>
       <p className="mt-8 text-sm text-ink-muted">
-        <Link href="/sign-in" className="text-accent hover:underline">
+        <Link href="/sign-in" className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
           Back to sign in
         </Link>
       </p>

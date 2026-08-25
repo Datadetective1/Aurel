@@ -144,11 +144,11 @@ export default function PrivacyPage() {
         <Section title="Contact">
           <p>
             Privacy questions:{' '}
-            <a href={`mailto:${brand.email.privacy}`} className="text-accent hover:underline">
+            <a href={`mailto:${brand.email.privacy}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
               {brand.email.privacy}
             </a>
             . Anything else:{' '}
-            <a href={`mailto:${brand.email.support}`} className="text-accent hover:underline">
+            <a href={`mailto:${brand.email.support}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
               {brand.email.support}
             </a>
             .

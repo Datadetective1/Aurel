@@ -31,12 +31,30 @@ carrying meaning the moment it appears at body size.
 
 ## Contrast
 
-`--ink-secondary` ~8.2:1, `--ink-muted` ~5.4:1 on the page background.
-`--ink-faint` is ~3.5:1 and is restricted to decorative and large text — it is
-never the only carrier of information.
+Every text tone clears WCAG AA (4.5:1) against the *worst-case* surface it can
+appear on, not just the page background:
+
+| Token | Pearl | Obsidian |
+| --- | --- | --- |
+| `--ink-secondary` | ~8.2:1 | ~8.0:1 |
+| `--ink-muted` | ~4.9:1 | ~5.9:1 |
+| `--ink-faint` | ~4.5:1 | ~4.5:1 |
+
+`--ink-faint` used to be a genuinely faint 3.19:1, documented as "decorative and
+large text only". That comment did not stop it being used for 12px body copy on
+half the pages — a comment is not an enforcement mechanism. It is now the
+faintest tone that is still legible as text, which costs some separation from
+`--ink-muted`. A tone that looks like text and cannot be read is the worse
+trade. Decorative strokes use `--line`, `--line-strong` and `--accent-graphic`,
+which have no such requirement.
 
 Status colour is always paired with an icon or a word. Colour alone never
-carries meaning.
+carries meaning, and inline links in prose carry a permanent underline for the
+same reason — brass on ink is a 1.01:1 difference to someone who cannot
+distinguish the hues.
+
+Verified by `tests/e2e/accessibility.spec.ts`: axe-core over every public page,
+in both themes, at both viewports.
 
 ## The Aperture
 
@@ -59,6 +77,11 @@ slides, bounces, or announces itself.
 `usePrefersReducedMotion()` (via `useSyncExternalStore`, so it is
 hydration-safe) and a global `prefers-reduced-motion` block cover both the
 CSS and JS paths, including custom keyframes.
+
+The CSS block cancels `animation-delay` as well as `animation-duration`. With
+`fill-mode: both`, zeroing only the duration leaves an element holding its
+`from` state — `opacity: 0` — for the whole delay, so a staggered entrance
+stayed invisible for up to 0.7s for exactly the person who asked for no motion.
 
 ## Layout
 

@@ -120,7 +120,7 @@ export default function TermsPage() {
 
         <Section title="Contact">
           <p>
-            <a href={`mailto:${brand.email.support}`} className="text-accent hover:underline">
+            <a href={`mailto:${brand.email.support}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
               {brand.email.support}
             </a>
           </p>

@@ -201,7 +201,7 @@ export function SourceLink({
       // noreferrer as well as noopener: research sources are arbitrary third
       // parties and should not receive our URLs as referrer.
       rel="noopener noreferrer nofollow"
-      className="inline-flex max-w-full items-center gap-1 truncate text-xs text-accent hover:underline"
+      className="inline-flex max-w-full items-center gap-1 truncate text-xs text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent"
     >
       <span className="truncate">{label}</span>
       <ExternalLink className="size-3 shrink-0" aria-hidden="true" />

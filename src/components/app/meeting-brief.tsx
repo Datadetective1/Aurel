@@ -316,7 +316,7 @@ export function MeetingBriefView({
       </section>
 
       <p className="text-xs text-ink-faint">
-        <Link href={`/meetings/${meetingId}/debrief`} className="text-accent hover:underline">
+        <Link href={`/meetings/${meetingId}/debrief`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
           After the meeting, debrief it
         </Link>{' '}
         — that is what makes the next brief better.

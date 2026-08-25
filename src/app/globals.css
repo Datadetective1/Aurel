@@ -22,8 +22,14 @@
   /* --- Pearl: type -------------------------------------------------------- */
   --ink: #1a1815;
   --ink-secondary: #4a4741; /* ~8.2:1 on --bg */
-  --ink-muted: #6b6862;   /* ~5.4:1 on --bg */
-  --ink-faint: #8a867e;   /* ~3.5:1 on --bg: decorative and large text only */
+  --ink-muted: #6b6862;   /* ~4.9:1 worst case: AA for body text */
+  /* The faintest tone that is still TEXT. It was #8a867e, which measured 3.19:1
+     on --bg-sunken and failed AA wherever it was used for 12px copy — which it
+     was, repeatedly, despite a comment saying not to. A tone that looks like
+     text and cannot be read is worse than one step less contrast range, so the
+     scale gives up some separation here. Decorative strokes use --line,
+     --line-strong or --accent-graphic and are unaffected. */
+  --ink-faint: #716d65;   /* ~4.5:1 worst case */
   --ink-inverse: #f7f4ee;
 
   /* --- Pearl: structure --------------------------------------------------- */
@@ -61,8 +67,8 @@
 
   --ink: #f2efe9;
   --ink-secondary: #b4b0a8;
-  --ink-muted: #9b978f;   /* ~7.1:1 on --bg */
-  --ink-faint: #75716a;   /* ~4.1:1 on --bg */
+  --ink-muted: #9b978f;   /* ~5.9:1 worst case */
+  --ink-faint: #87837c;   /* ~4.5:1 worst case: see the Pearl note above */
   --ink-inverse: #16161a;
 
   --line: #26262b;
@@ -290,8 +296,15 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* Delay must be cancelled too, not just duration. Our entrance keyframes
+       use `both` fill mode, so during an un-cancelled delay the element holds
+       its `from` state — opacity: 0. Zeroing only the duration left staggered
+       content invisible for up to 0.7s for someone who asked for no motion,
+       which is the opposite of the accommodation. */
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }

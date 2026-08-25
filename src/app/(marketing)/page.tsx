@@ -374,7 +374,7 @@ function Privacy() {
             </ul>
             <Link
               href="/privacy"
-              className="mt-7 inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+              className="mt-7 inline-flex items-center gap-1.5 text-sm text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent"
             >
               Read the privacy approach
               <ArrowRight className="size-3.5" aria-hidden="true" />
