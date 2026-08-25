@@ -239,9 +239,16 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
 
   // --- opening ---
   const howToOpen = overdue.length
-    ? `"Before we get into it — I owe you ${lowerFirst(overdue[0]!.description)}. Here's where that stands." Then move to the ask.`
+    ? // Commitment descriptions are user-written and usually imperative
+      // ("Send the utilisation numbers"), so they cannot be spliced into a
+      // spoken sentence. Quote the item instead of conjugating it.
+      `Close the loop before you ask for anything: say where "${stripTrailingStop(overdue[0]!.description)}" stands.`
     : meeting.objective
-      ? `Name the outcome you want in the first thirty seconds: "I'd like us to leave today having ${lowerFirst(stripLeadingVerb(meeting.objective))}."`
+      ? // Objectives are written in whatever voice the user chose ("Get approval",
+        // "I need sign-off", "Agreement on scope"). Any frame that splices the
+        // objective into a verb phrase will be ungrammatical for some of them,
+        // so the objective is quoted as a goal rather than conjugated.
+        `Name the outcome in the first thirty seconds: "What I'd like us to settle today is ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
       : `Open by stating what you want the meeting to produce, so the room is working toward the same thing.`
 
   // --- emphasise / avoid ---
@@ -299,7 +306,7 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
 
   // --- outcome + checklist ---
   const outcomeToLeaveWith = meeting.objective
-    ? `A clear answer on: ${lowerFirst(meeting.objective)} — plus a named owner and a date.`
+    ? `A clear answer on ${stripTrailingStop(lowerFirst(meeting.objective))}, plus a named owner and a date.`
     : 'A named owner and a date for the next step, even if the decision itself is deferred.'
 
   const checklist: string[] = []
@@ -362,7 +369,7 @@ function buildSequencing(people: PersonContext[], decisionOwner: PersonContext |
   for (const p of byRole('influencer').slice(0, 2)) {
     const signal = communicationSignals(p)[0]
     steps.push(
-      `Address ${firstName(p)}${signal ? ` — ${lowerFirst(signal.content)}` : ' and their area of the decision'}`,
+      `Address ${firstName(p)}${signal ? `: ${stripTrailingStop(lowerFirst(signal.content))}` : ' and their area of the decision'}`,
     )
   }
   for (const p of byRole('contributor').slice(0, 2)) {
@@ -387,7 +394,7 @@ function buildAnticipatedQuestions(people: PersonContext[]) {
     }
     for (const c of p.openCommitments.slice(0, 1)) {
       out.push({
-        question: `"Where did we land on ${lowerFirst(c.description)}" — likely from ${firstName(p)}`,
+        question: `"Where did we land on ${stripTrailingStop(lowerFirst(c.description))}?" — likely from ${firstName(p)}`,
         response: 'Give the current status and a date, even if the answer is that it has not moved.',
       })
     }
@@ -400,6 +407,11 @@ function lowerFirst(s: string) {
   if (!t) return t
   const out = t[0]!.toLowerCase() + t.slice(1)
   return out.endsWith('.') ? out : `${out}.`
+}
+
+/** Drop a trailing full stop so a clause can be continued mid-sentence. */
+function stripTrailingStop(s: string) {
+  return s.replace(/\.\s*$/, '')
 }
 
 function stripLeadingVerb(s: string) {
