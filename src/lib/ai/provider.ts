@@ -83,7 +83,7 @@ export async function runPrompt<TInput, TOutput>(
   const started = Date.now()
   const citations = module.cite(input)
 
-  const composed = (reason: string): Generation<TOutput> => {
+  const composed = (): Generation<TOutput> => {
     const output = module.schema.parse(module.compose(input))
     return {
       output,
@@ -100,7 +100,7 @@ export async function runPrompt<TInput, TOutput>(
   }
 
   if (!features.generativeAI) {
-    return composed('no provider configured')
+    return composed()
   }
 
   const modelId = options.model ?? serverEnv.AI_MODEL
@@ -166,7 +166,7 @@ export async function runPrompt<TInput, TOutput>(
     capability: module.id,
     reason: lastError instanceof Error ? lastError.name : 'unknown',
   })
-  return composed('generation failed')
+  return composed()
 }
 
 /**

@@ -76,7 +76,9 @@ export function AssessmentRunner({
   const [error, setError] = React.useState<string | null>(null)
   const [durations, setDurations] = React.useState<number[]>([])
 
-  const shownAt = React.useRef(Date.now())
+  // Initialised in the round effect, not during render: Date.now() is impure
+  // and reading it while rendering makes the component non-deterministic.
+  const shownAt = React.useRef(0)
   const advanceTimer = React.useRef<number | null>(null)
   const headingRef = React.useRef<HTMLHeadingElement>(null)
 

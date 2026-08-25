@@ -40,8 +40,9 @@ export function Avatar({
 
   if (src) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- avatars are arbitrary
-      // remote or data URLs; the optimiser would need an allowlist per user.
+      /* Avatars are arbitrary remote or data URLs supplied per user, so
+         next/image would need a per-user remote allowlist to be configured.
+         eslint-disable-next-line @next/next/no-img-element */
       <img
         src={src}
         alt=""

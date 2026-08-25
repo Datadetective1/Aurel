@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { AuthForm } from '@/components/auth/auth-form'
+import { Skeleton } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -18,7 +20,11 @@ export default function SignUpPage() {
         your next meeting prepared.
       </p>
 
-      <AuthForm mode="sign-up" className="mt-8" />
+      {/* AuthForm reads useSearchParams to preserve a post-auth destination,
+          which requires a Suspense boundary to prerender. */}
+      <Suspense fallback={<Skeleton className="mt-8 h-80 w-full" />}>
+        <AuthForm mode="sign-up" className="mt-8" />
+      </Suspense>
 
       <p className="mt-8 text-sm text-ink-muted">
         Already have an account?{' '}

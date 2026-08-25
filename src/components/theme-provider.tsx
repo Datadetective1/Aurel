@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { ThemeProvider as NextThemes, useTheme } from 'next-themes'
+import { useHasMounted } from '@/lib/use-has-mounted'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -36,8 +37,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 /** Compact segmented theme switch for headers and settings. */
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-  React.useEffect(() => setMounted(true), [])
+  const mounted = useHasMounted()
 
   return (
     <div
@@ -78,8 +78,7 @@ export function ThemeToggle({ className }: { className?: string }) {
  */
 export function ThemePicker({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-  React.useEffect(() => setMounted(true), [])
+  const mounted = useHasMounted()
 
   return (
     <div className={cn('grid gap-3 sm:grid-cols-3', className)} role="radiogroup" aria-label="Appearance">

@@ -43,14 +43,16 @@ export function MemoryReview({
   proposals: Proposal[]
   personName: string
 }) {
-  const [items, setItems] = React.useState(proposals)
-
-  // Keep in sync when the server revalidates after an ingest.
-  React.useEffect(() => setItems(proposals), [proposals])
+  // Track which proposals this session has resolved, and DERIVE the visible
+  // list from the server's props. Mirroring props into state needed an effect
+  // to resync after each revalidation, which is both a cascading render and a
+  // source of stale UI.
+  const [resolved, setResolved] = React.useState<Set<string>>(() => new Set())
+  const items = proposals.filter((p) => !resolved.has(p.id))
 
   if (items.length === 0) return null
 
-  const remove = (id: string) => setItems((prev) => prev.filter((p) => p.id !== id))
+  const remove = (id: string) => setResolved((prev) => new Set(prev).add(id))
 
   return (
     <section className="rounded-[var(--radius-lg)] border border-accent/25 bg-accent-wash p-5 sm:p-6">

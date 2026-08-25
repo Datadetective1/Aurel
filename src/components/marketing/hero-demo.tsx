@@ -4,6 +4,8 @@ import * as React from 'react'
 import { ArrowRight, CircleCheck, CircleHelp, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/primitives'
+import { useHasMounted } from '@/lib/use-has-mounted'
+import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion'
 import { brand } from '@/lib/brand'
 
 /**
@@ -64,11 +66,9 @@ const EVIDENCE_META = {
 export function HeroDemo({ className }: { className?: string }) {
   // Gate the animation on mount so server-rendered HTML is the finished state.
   // If JS never runs, the user still sees the complete, correct composition.
-  const [playing, setPlaying] = React.useState(false)
-  React.useEffect(() => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!reduce) setPlaying(true)
-  }, [])
+  const mounted = useHasMounted()
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const playing = mounted && !prefersReducedMotion
 
   const stage = (index: number) =>
     playing

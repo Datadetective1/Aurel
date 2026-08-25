@@ -95,10 +95,10 @@ export function CommandPalette({
   // typing a name is one query rather than six.
   React.useEffect(() => {
     const trimmed = query.trim()
-    if (trimmed.length < 2) {
-      setResults([])
-      return
-    }
+    // Too short to search: nothing to schedule. Stale results are hidden by
+    // `visibleResults` below rather than cleared through state, which would be
+    // a second render pass on every keystroke.
+    if (trimmed.length < 2) return
     const timer = window.setTimeout(() => {
       startTransition(async () => {
         const found = await searchEverything(trimmed)
@@ -114,14 +114,17 @@ export function CommandPalette({
     router.push(href)
   }
 
+  // Results only apply to a query long enough to have produced them.
+  const visibleResults = query.trim().length < 2 ? [] : results
+
   const grouped = React.useMemo(() => {
     const map = new Map<string, SearchResult[]>()
-    for (const result of results) {
+    for (const result of visibleResults) {
       const group = ENTITY_META[result.entity].group
       map.set(group, [...(map.get(group) ?? []), result])
     }
     return [...map.entries()]
-  }, [results])
+  }, [visibleResults])
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>

@@ -7,7 +7,6 @@ import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getScoredAssessment } from '@/lib/ai/context'
-import { describeDimension } from '@/lib/assessment/scoring'
 import type { ProfileNarrative } from '@/lib/ai/prompts/coaching'
 import { brand } from '@/lib/brand'
 

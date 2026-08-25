@@ -60,7 +60,13 @@ export function AddContext({
   const meta = kind ? KIND_META[kind] : null
 
   // Clear the box after a successful save.
+  //
+  // This genuinely is "synchronise the UI with the result of an external
+  // system": useActionState offers no success callback, and the alternatives
+  // (remount keys, uncontrolled inputs) would break the live input-type
+  // detection below. The cascading render happens once per successful submit.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (state.ok) setValue('')
   }, [state.ok])
 
