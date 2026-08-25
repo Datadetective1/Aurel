@@ -144,7 +144,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: FileText,
       status: 'available',
       detail:
-        'Paste a transcript, meeting notes or a professional bio and it is analysed the same way a fetched page is. File upload is not built — the text has to be pasted.',
+        'Attach a PDF, a Word document or plain text, or paste a transcript — either way it is analysed the same as a fetched page, with the same citations. A scanned PDF with no text layer is refused rather than saved empty.',
       userAction: { label: 'Add context to someone', href: '/people' },
     },
     {
