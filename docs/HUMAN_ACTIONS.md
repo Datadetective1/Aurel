@@ -64,6 +64,12 @@ environment settings — **never** in `.env.production`, which is committed.
 
 ### 2.1 AI provider — turns on generated guidance
 
+**Blocked in production today: no model is configured, so every AI feature is
+running on the deterministic composer.** That path is real and evidence-backed,
+and the UI says "Composed directly from your records" rather than implying
+reasoning that did not happen — but nothing here should be described as an
+active AI feature until this key is set.
+
 ```
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
@@ -76,13 +82,46 @@ still real and still cited; they reason less. The UI says
 
 ### 2.2 Search provider — turns on automatic source discovery
 
-```
-SEARCH_PROVIDER=brave
-BRAVE_SEARCH_API_KEY=...
-```
+**This is the one genuinely blocked production capability.** Everything around
+it is built and tested; only the credential is missing.
 
-Without this, **pasting a link still works** — fetching and analysing a URL
-needs no credentials. Only discovery from a name alone is gated.
+| | |
+| --- | --- |
+| **Service** | Brave Search API (reference implementation) or Serper |
+| **Why required** | Turning a *name* into candidate URLs needs a web index. There is no legitimate way to do that without a search API — the alternative is scraping a search engine, which violates its terms. |
+| **Sign-up** | https://brave.com/search/api/ — or https://serper.dev |
+| **Credential** | An API subscription token from the dashboard |
+| **Env** | `SEARCH_PROVIDER=brave` and `BRAVE_SEARCH_API_KEY=…`<br>(or `SEARCH_PROVIDER=serper` and `SERPER_API_KEY=…`) |
+
+**Already implemented** — nothing here is left for you:
+
+- Provider abstraction with two real implementations (Brave, Serper), resolved
+  from env at call time
+- The full discovery → rank → fetch → extract → identity-resolve → fact →
+  memory-proposal pipeline
+- `research_jobs` rows recording stage, sources considered/accepted, facts
+  created and cost units
+- Entitlements and usage metering on `person_research`
+- Loading, empty, error and rate-limited states in the UI
+- A deterministic `SEARCH_PROVIDER=mock` provider for automated tests, which
+  **refuses to run when NODE_ENV is production** so it can never fabricate
+  evidence for a real user
+
+**How to verify afterwards:**
+
+1. Set the two variables and redeploy.
+2. Settings → Capabilities: "Finding sources automatically" flips from
+   *Configuration required* to **Connected**, naming the provider.
+3. Add a person with a name and company but **no** profile URL.
+4. Press **Research public footprint**. Without the key this returns "paste a
+   link instead"; with it, sources are discovered, fetched and cited.
+
+Until then the product does not pretend: the capability screen says
+configuration is required, and the research panel tells the user to paste a
+link — which genuinely works and produces the same source-backed footprint.
+
+**Pasting a link needs no credential and is fully working today.** Only
+discovery from a name alone is gated.
 
 ### 2.3 Email delivery
 
