@@ -39,12 +39,19 @@ export function SettingsNav() {
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <nav aria-label="Settings sections" className="lg:sticky lg:top-8 lg:self-start">
+    // min-w-0 is load-bearing. A grid item defaults to min-width:auto, so the
+    // scrolling row below would size to its full content width, widen the
+    // column, and scroll the whole page sideways instead of scrolling itself.
+    <nav
+      aria-label="Settings sections"
+      className="min-w-0 lg:sticky lg:top-8 lg:self-start"
+    >
       <ul
         className={cn(
           // Mobile: a scrollable row. Desktop: a stacked rail.
-          '-mx-1 flex gap-1 overflow-x-auto pb-1',
-          'lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:pb-0',
+          '-mx-1 flex gap-1 overflow-x-auto px-1 pb-1',
+          'scrollbar-none [scroll-padding-inline:0.25rem]',
+          'lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:px-0 lg:pb-0',
         )}
       >
         {SECTIONS.map((section) => (

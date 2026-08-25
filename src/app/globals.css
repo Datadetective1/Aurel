@@ -263,6 +263,18 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Horizontal rails whose affordance is the clipped item at the edge, not a
+     scrollbar. Desktop browsers draw a heavy trough here that reads as chrome
+     bolted onto the design; touch platforms overlay a transient one anyway. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* =============================================================================

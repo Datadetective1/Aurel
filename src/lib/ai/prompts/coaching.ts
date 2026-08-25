@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { Citation, CommitmentContext, PersonContext, PromptModule, UserContext } from '../types'
 import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
 import { brand } from '@/lib/brand'
+import { relativeDay } from '@/lib/format'
 
 /**
  * DAILY FOCUS, RELATIONSHIP SUMMARY, WEEKLY REFLECTION, PROFILE NARRATIVE
@@ -85,7 +86,10 @@ function composeDailyFocus(input: DailyFocusInput): DailyFocus {
   for (const c of overdueCommitments.slice(0, 2)) {
     priorities.push({
       what: c.description,
-      why: `Overdue${c.dueOn ? ` since ${c.dueOn}` : ''}${c.personName ? `, and ${c.personName} is waiting on it` : ''}.`,
+      // relativeDay, not the raw date. This string is read by a person on the
+      // Today page — "Overdue since 2026-08-19" is a database value wearing a
+      // sentence; "6 days overdue" is the thing they need to feel.
+      why: `Overdue${c.dueOn ? ` — ${relativeDay(c.dueOn).toLowerCase()}` : ''}${c.personName ? `, and ${c.personName} is waiting on it` : ''}.`,
       meetingId: null,
       personId: null,
     })
