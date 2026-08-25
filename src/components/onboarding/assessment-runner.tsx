@@ -89,6 +89,22 @@ export function AssessmentRunner({
   const isLast = round === BLOCK_COUNT - 1
   const allAnswered = answeredCount === BLOCK_COUNT
 
+  /**
+   * The first round still missing an answer.
+   *
+   * Answering out of order is allowed — the pager invites it — so it is
+   * possible to reach the last round with gaps behind you. Without this, that
+   * state offers a disabled "Next", an inactive finish button and no
+   * explanation of either.
+   */
+  const firstUnanswered = React.useMemo(() => {
+    for (let i = 0; i < BLOCK_COUNT; i += 1) {
+      const a = answers[i]
+      if (!a?.most || !a?.least) return i
+    }
+    return null
+  }, [answers])
+
   React.useEffect(() => {
     shownAt.current = Date.now()
     headingRef.current?.focus()
@@ -260,7 +276,11 @@ export function AssessmentRunner({
       {/* Live region: announces validity without stealing focus. */}
       <p aria-live="polite" className="sr-only">
         {isComplete
-          ? 'Both choices made. Moving to the next round.'
+          ? isLast
+            ? allAnswered
+              ? 'Both choices made. Your profile is ready.'
+              : `Both choices made. ${BLOCK_COUNT - answeredCount} earlier rounds still need an answer.`
+            : 'Both choices made. Moving to the next round.'
           : answer.most
             ? 'Most chosen. Now choose the statement least like you.'
             : answer.least
@@ -299,6 +319,13 @@ export function AssessmentRunner({
               </>
             )}
           </Button>
+        ) : isLast && firstUnanswered !== null ? (
+          // A disabled "Next" here would be a dead end: the finish button is
+          // not shown yet, and nothing would say why or what to do about it.
+          <Button variant="secondary" onClick={() => setRound(firstUnanswered)}>
+            Go to round {firstUnanswered + 1}
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Button>
         ) : (
           <Button
             variant="secondary"
@@ -316,6 +343,13 @@ export function AssessmentRunner({
           {answer.most || answer.least
             ? `Choose the statement ${answer.most ? 'least' : 'most'} like you to continue.`
             : 'Choose one statement for each to continue.'}
+        </p>
+      ) : isLast && firstUnanswered !== null ? (
+        <p className="mt-3 text-xs text-ink-muted">
+          {BLOCK_COUNT - answeredCount === 1
+            ? 'One earlier round still needs an answer.'
+            : `${BLOCK_COUNT - answeredCount} earlier rounds still need an answer.`}{' '}
+          Every round counts towards the result, so none can be skipped.
         </p>
       ) : null}
 

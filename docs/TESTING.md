@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test          # unit — 134 tests, ~1s
+npm test          # unit — 137 tests, ~1s
 npm run typecheck
 npm run lint
 npm run test:e2e  # Playwright, desktop + Pixel 7, against `next build`
@@ -22,7 +22,7 @@ silent. Several were written *after* a bug, and the comment above them says so.
 | `assessment/scoring` | Normalisation constant derived from the instrument, not guessed. Items are rejected if they do not belong to their claimed block. |
 | `source-extraction` | *"Satya Nadella Once Gave Up His Green Card For Love"* became `current_role: "Once Gave Up His Green Card" at "Love"`. Title vocabulary gates, prose validation and connector restrictions all date from that. |
 | `sources/url` | Prepending `https://` to input that already has a scheme turns `file:///etc/passwd` into a fetchable URL. |
-| `brief grammar` | "leave today having get approval". A five-phrasing matrix, because generated prose reads fine until it does not. |
+| `brief grammar` | "leave today having get approval". A nine-phrasing matrix, because generated prose reads fine until it does not. |
 | `brand-centralisation` | The name must not be hard-coded outside the registry, and the former codename must not survive in copy. |
 | `email` | Hostile display names must not inject markup; security mail must have no unsubscribe link; preheaders must not carry note content. |
 
@@ -50,12 +50,38 @@ credentials, so it runs on any fork.
 - No page scrolls horizontally at 360px
 - The dev-only email preview is not served on a production build
 
-`tests/e2e/critical-flow.spec.ts` — sign-up → onboarding → person → meeting.
-Creates a throwaway account through the real form. Two alternatives were
+`tests/e2e/critical-flow.spec.ts` — sign-up → onboarding → person → meeting →
+brief. Creates a throwaway account through the real form. Two alternatives were
 rejected: a committed `storageState` would put a live session token in the
-repository, and a fixed shared account makes tests order-dependent. It **skips**
-where email confirmation is required, because a red pipeline that means "not
-configured" trains people to ignore red pipelines.
+repository, and a fixed shared account makes tests order-dependent.
+
+It **skips** where the auth provider refuses unattended sign-up — email
+confirmation required, send rate limit, address rejected — because a red
+pipeline that means "not configured" trains people to ignore red pipelines. It
+still fails loudly on a form validation error, which is a real product bug; the
+two are told apart explicitly.
+
+**The flow itself has been walked end to end by hand** against a pre-confirmed
+account, and it works: sign-in redirects an un-onboarded user to onboarding, the
+timezone control stores IANA while showing a city and the correct local time,
+all 24 assessment rounds score into a profile with a calibration step, a new
+person and meeting can be created, and the brief generates. What is gated is
+automating it, not whether it works.
+
+That walkthrough found three real bugs, all fixed:
+
+1. **The sign-up form has a required name field** the test never filled, so the
+   form sat invalid and the inner wait consumed the whole test budget — which
+   surfaced as "test timed out" rather than the actual cause.
+2. **The assessment could strand you.** Answering out of order is allowed, so
+   you can reach round 24 with gaps behind you. The finish button is not shown
+   until all 24 are answered and "Next" is disabled on the last round, leaving
+   an enabled "Back" and no explanation. There is now a "Go to round N" action
+   and a line saying how many remain. The live region also claimed "Moving to
+   the next round" on the final round, where nothing moves.
+3. **An imperative objective was spliced into a noun-phrase frame**, producing
+   "A clear answer on leave with a decision on the platform investment". The
+   composer now picks a frame that fits the grammar of what the user wrote.
 
 E2E runs against `next build`, not the dev server. Prerendering, Suspense
 boundaries and environment validation have each broken this project while dev

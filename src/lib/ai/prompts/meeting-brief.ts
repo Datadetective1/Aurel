@@ -248,7 +248,11 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
         // "I need sign-off", "Agreement on scope"). Any frame that splices the
         // objective into a verb phrase will be ungrammatical for some of them,
         // so the objective is quoted as a goal rather than conjugated.
-        `Name the outcome in the first thirty seconds: "What I'd like us to settle today is ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
+        (readsAsImperative(meeting.objective)
+          ? // An imperative objective is already a sentence. Announcing it as
+            // one beats forcing it into "...is <command>".
+            `Name the outcome in the first thirty seconds: "Here is what I want us to do today: ${lowerFirst(stripLeadingVerb(meeting.objective))}"`
+          : `Name the outcome in the first thirty seconds: "What I'd like us to settle today is ${lowerFirst(stripLeadingVerb(meeting.objective))}"`)
       : `Open by stating what you want the meeting to produce, so the room is working toward the same thing.`
 
   // --- emphasise / avoid ---
@@ -306,7 +310,11 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
 
   // --- outcome + checklist ---
   const outcomeToLeaveWith = meeting.objective
-    ? `A clear answer on ${stripTrailingStop(lowerFirst(meeting.objective))}, plus a named owner and a date.`
+    ? readsAsImperative(meeting.objective)
+      ? // "A clear answer on leave with a decision" is not a sentence. When the
+        // objective is a command, state it as one and append the conditions.
+        `${asSentence(stripLeadingVerb(meeting.objective))} — with a named owner and a date.`
+      : `A clear answer on ${stripTrailingStop(lowerFirst(meeting.objective))}, plus a named owner and a date.`
     : 'A named owner and a date for the next step, even if the decision itself is deferred.'
 
   const checklist: string[] = []
@@ -416,6 +424,39 @@ function stripTrailingStop(s: string) {
 
 function stripLeadingVerb(s: string) {
   return s.trim().replace(/^(I want to|I need to|We need to|To)\s+/i, '')
+}
+
+/**
+ * Common ways people open an objective with a bare imperative.
+ *
+ * Not an attempt at part-of-speech tagging — just the verbs that actually turn
+ * up at the start of a meeting objective. A miss costs a slightly stiffer
+ * sentence, never a broken one, because both branches are grammatical on their
+ * own; the list only decides which frame reads better.
+ */
+const IMPERATIVE_OPENERS =
+  /^(leave|get|secure|agree|decide|close|align|persuade|convince|understand|learn|present|propose|ask|confirm|resolve|unblock|negotiate|raise|discuss|review|land|settle|sign|approve|defer|win|find|make|set|start|stop|keep|build|fix|open|push|pull|move|book|hire|choose|pick|clarify|establish|reach|walk|come)\b/i
+
+/**
+ * True when the objective reads as a command rather than a thing.
+ *
+ * "Leave with a decision" cannot be spliced into "A clear answer on ___" —
+ * that produces "A clear answer on leave with a decision". A gerund
+ * ("Getting sign-off") or a plain noun phrase ("Agreement on scope") can.
+ */
+export function readsAsImperative(objective: string): boolean {
+  const trimmed = stripLeadingVerb(objective).trim()
+  if (!trimmed) return false
+  // A gerund is already a noun phrase; "Meeting" and similar are nouns too.
+  if (/^\w+ing\b/i.test(trimmed)) return false
+  return IMPERATIVE_OPENERS.test(trimmed)
+}
+
+/** The objective as its own sentence: capitalised, single trailing stop. */
+function asSentence(s: string): string {
+  const t = stripTrailingStop(s.trim())
+  if (!t) return t
+  return t[0]!.toUpperCase() + t.slice(1)
 }
 
 // --- citations ----------------------------------------------------------------

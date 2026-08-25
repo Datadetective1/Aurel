@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { meetingBriefPrompt } from './meeting-brief'
+import { meetingBriefPrompt, readsAsImperative } from './meeting-brief'
 import type { MeetingContext, PersonContext, UserContext } from '../types'
 
 /**
@@ -67,6 +67,14 @@ function assertCleanSentence(text: string, label: string) {
   expect(text, `${label}: ungrammatical "having <verb>"`).not.toMatch(
     /having (get|make|secure|obtain|agree|approve)\b/i,
   )
+  // "A clear answer on leave with a decision" — an imperative objective spliced
+  // into a frame that needs a noun phrase. This shipped once.
+  expect(text, `${label}: command spliced after a preposition`).not.toMatch(
+    /\b(on|about|regarding)\s+(leave|get|secure|agree|decide|close|align|confirm|approve|settle)\b/i,
+  )
+  expect(text, `${label}: command spliced after "is"`).not.toMatch(
+    /\bis\s+(leave|get|secure|agree|decide|close|align|confirm|approve|settle)\b/i,
+  )
 }
 
 const OBJECTIVE_PHRASINGS = [
@@ -75,6 +83,11 @@ const OBJECTIVE_PHRASINGS = [
   'Agreement on the scope for phase two.',
   'We need to decide whether to delay the launch',
   'To confirm the owner for the compliance workstream.',
+  // The phrasing that produced "A clear answer on leave with a decision".
+  'Leave with a decision on the platform investment.',
+  'Close the loop on the migration timeline',
+  'Getting sign-off on the hiring plan.',
+  'Alignment between engineering and finance',
 ]
 
 describe('meeting brief copy quality', () => {
@@ -88,6 +101,33 @@ describe('meeting brief copy quality', () => {
         assertCleanSentence(step, `approach step for "${objective}"`)
       }
     }
+  })
+
+  it('tells a command apart from a thing', () => {
+    expect(readsAsImperative('Leave with a decision on the platform investment')).toBe(true)
+    expect(readsAsImperative('Get approval for the extra headcount')).toBe(true)
+    expect(readsAsImperative('Close the loop on the timeline')).toBe(true)
+
+    expect(readsAsImperative('Agreement on the scope for phase two')).toBe(false)
+    expect(readsAsImperative('Getting sign-off on the hiring plan')).toBe(false)
+    expect(readsAsImperative('Alignment between engineering and finance')).toBe(false)
+    expect(readsAsImperative('')).toBe(false)
+
+    // "I want to" / "To" are stripped first, so what follows decides.
+    expect(readsAsImperative('I want to secure sign-off')).toBe(true)
+    expect(readsAsImperative('To confirm the owner')).toBe(true)
+  })
+
+  it('states an imperative objective rather than splicing it', () => {
+    const result = brief('Leave with a decision on the platform investment.')
+    expect(result.outcomeToLeaveWith).not.toContain('answer on leave')
+    expect(result.outcomeToLeaveWith.toLowerCase()).toContain('leave with a decision')
+    expect(result.howToOpen).not.toContain('is leave with')
+  })
+
+  it('still splices a noun-phrase objective, which reads better', () => {
+    const result = brief('Agreement on the scope for phase two.')
+    expect(result.outcomeToLeaveWith).toContain('A clear answer on agreement on the scope')
   })
 
   it('never emits the "having get approval" construction', () => {

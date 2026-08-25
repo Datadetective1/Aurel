@@ -14,17 +14,33 @@ import { expect, test, type Page } from '@playwright/test'
  *   - a fixed shared test account, which makes tests order-dependent and
  *     accumulates junk in whatever database it points at
  *
- * Requires a Supabase project with email confirmation OFF for the test domain.
- * Where that is not true the suite skips rather than failing, because a red
- * pipeline that means "not configured" trains people to ignore red pipelines.
+ * Requires a Supabase project with email confirmation OFF. Where that is not
+ * true the suite SKIPS rather than failing, because a red pipeline that means
+ * "not configured" trains people to ignore red pipelines. It still fails
+ * loudly on a real product bug — the two are told apart explicitly below.
+ *
+ * The flow itself has been walked end to end by hand against a confirmed
+ * account; what is gated here is automating it, not whether it works.
  * =============================================================================
  */
 
 const CONFIRMATION_REQUIRED = /check your (email|inbox)/i
+// Supabase rejects the reserved .invalid TLD outright, so a syntactically
+// ordinary domain is required even though nothing is ever delivered to it.
+const TEST_DOMAIN = process.env.E2E_EMAIL_DOMAIN ?? 'atturel-e2e.example.com'
+
+/**
+ * Provider-level refusals, as distinct from a form validation error.
+ * Matched against the product's own copy, not the provider's: Atturel
+ * translates a 429 into "Too many attempts", which is right for a user and
+ * meant this pattern missed it the first time.
+ */
+const PROVIDER_REFUSED =
+  /could not create that account|too many attempts|rate limit|already registered/i
 
 function throwawayCredentials() {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  return { email: `e2e-${id}@atturel-e2e.invalid`, password: `Test-${id}-Aa1!` }
+  return { email: `e2e-${id}@${TEST_DOMAIN}`, password: `Test-${id}-Aa1!` }
 }
 
 /** Returns false when the deployment requires email confirmation. */
@@ -32,14 +48,32 @@ async function signUp(page: Page): Promise<boolean> {
   const { email, password } = throwawayCredentials()
 
   await page.goto('/sign-up')
+  // Every required field, not just the credentials. Omitting the name left the
+  // form in an invalid state that never submitted, and the wait below then ate
+  // the entire test budget waiting for a navigation that could not happen.
+  await page.getByLabel(/your name/i).fill('E2E Tester')
   await page.getByLabel(/email/i).fill(email)
   await page.getByLabel(/password/i).first().fill(password)
-  await page.getByRole('button', { name: /create|sign up/i }).first().click()
+  await page.getByRole('button', { name: /create account/i }).first().click()
 
-  await page.waitForURL(/onboarding|check-email|today/, { timeout: 30_000 }).catch(() => {})
+  // Comfortably under the test timeout, so a failure here reports the real
+  // reason rather than surfacing as "test timed out".
+  await page
+    .waitForURL(/onboarding|check-email|today/, { timeout: 15_000 })
+    .catch(() => {})
 
   const body = await page.locator('body').innerText()
+
   if (CONFIRMATION_REQUIRED.test(body) || page.url().includes('check-email')) return false
+
+  // Distinguish two very different failures. A provider refusal — confirmation
+  // required, send rate limit, address rejected — is an environment condition
+  // and must not turn the pipeline red. A form validation error is a real
+  // product bug and must.
+  if (page.url().includes('/sign-up')) {
+    if (PROVIDER_REFUSED.test(body)) return false
+    throw new Error(`Sign-up was rejected by the form: ${body.slice(0, 300)}`)
+  }
 
   return true
 }
@@ -49,10 +83,16 @@ test.describe('critical flow', () => {
   test.describe.configure({ mode: 'serial' })
 
   test('a new user can get from sign-up to a meeting brief', async ({ page }) => {
+    // Sign-up, onboarding, a person and a meeting is a lot of round trips for
+    // the default 30s.
+    test.setTimeout(120_000)
+
     const signedUp = await signUp(page)
     test.skip(
       !signedUp,
-      'Sign-up requires email confirmation on this deployment; cannot complete unattended.',
+      'Unattended sign-up is unavailable here — the project requires email ' +
+        'confirmation. See docs/HUMAN_ACTIONS.md; this needs a deliberate ' +
+        'decision about the auth settings for this project, not a test change.',
     )
 
     // --- onboarding ---------------------------------------------------------
