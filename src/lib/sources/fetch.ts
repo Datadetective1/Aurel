@@ -2,6 +2,10 @@ import 'server-only'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { logger } from '@/lib/logger'
+import { parseUrl } from './url'
+
+// Re-exported so existing server callers keep a single import site.
+export { parseUrl } from './url'
 
 /**
  * SAFE OUTBOUND FETCH
@@ -74,33 +78,6 @@ export interface FetchFailureResult {
 
 export type SafeFetchResult = FetchSuccess | FetchFailureResult
 
-/** Parse and scheme-check a user-supplied URL. */
-export function parseUrl(input: string): URL | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-
-  // Detect an explicit scheme first. Prepending https:// to input that already
-  // carries a scheme would silently rewrite `file:///etc/passwd` into the
-  // fetchable `https://file///etc/passwd` — turning a rejected scheme into an
-  // accepted request. Anything with a non-http scheme is refused outright.
-  const schemeMatch = trimmed.match(/^([a-z][a-z0-9+.-]*):/i)
-  if (schemeMatch) {
-    const scheme = schemeMatch[1]!.toLowerCase()
-    if (scheme !== 'http' && scheme !== 'https') return null
-  }
-
-  try {
-    const withScheme = schemeMatch ? trimmed : `https://${trimmed}`
-    const url = new URL(withScheme)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-    if (!url.hostname) return null
-    // A hostname with no dot and no port is not a real public host.
-    if (!url.hostname.includes('.') && url.hostname !== 'localhost') return null
-    return url
-  } catch {
-    return null
-  }
-}
 
 /**
  * True for addresses that must never be reachable from a user-supplied URL:

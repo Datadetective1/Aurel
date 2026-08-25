@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Citation, CommitmentContext, PersonContext, PromptModule, UserContext } from '../types'
 import { AUREL_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
+import { brand } from '@/lib/brand'
 
 /**
  * DAILY FOCUS, RELATIONSHIP SUMMARY, WEEKLY REFLECTION, PROFILE NARRATIVE
@@ -239,7 +240,7 @@ function composeRelationshipSummary(input: RelationshipSummaryInput): Relationsh
 
   const snapshot =
     p.interactionCount === 0
-      ? `You have added ${p.displayName}${p.jobTitle ? `, ${p.jobTitle}` : ''}, but there is no interaction history yet. Aurel has nothing to tell you about working with them until you log something.`
+      ? `You have added ${p.displayName}${p.jobTitle ? `, ${p.jobTitle}` : ''}, but there is no interaction history yet. ${brand.name} has nothing to tell you about working with them until you log something.`
       : `${p.interactionCount} recorded interaction${p.interactionCount === 1 ? '' : 's'} with ${p.displayName}` +
         (p.lastInteractionAt ? `, most recently ${p.lastInteractionAt.slice(0, 10)}` : '') +
         `. ${p.observations.confirmed.length} confirmed and ${p.observations.observed.length} observed points on record.`
@@ -263,7 +264,7 @@ function composeRelationshipSummary(input: RelationshipSummaryInput): Relationsh
   if (nextInteraction.length === 0) {
     nextInteraction.push(
       p.interactionCount === 0
-        ? 'Log your first interaction so Aurel has something to work from.'
+        ? `Log your first interaction so ${brand.name} has something to work from.`
         : 'Note how they respond to how you framed things this time.',
     )
   }
@@ -339,7 +340,14 @@ export interface ProfileNarrativeInput {
   user: UserContext
   archetype: string
   confidence: 'provisional' | 'moderate' | 'strong'
-  dimensions: { label: string; pole: string; blurb: string; score: number; lean: 'high' | 'low' | null }[]
+  dimensions: {
+    id: string
+    label: string
+    pole: string
+    blurb: string
+    score: number
+    lean: 'high' | 'low' | null
+  }[]
 }
 
 function composeProfileNarrative(input: ProfileNarrativeInput): ProfileNarrative {
@@ -357,11 +365,11 @@ function composeProfileNarrative(input: ProfileNarrativeInput): ProfileNarrative
   return {
     summary,
     naturalDefault: leaning.slice(0, 6).map((d) => `${d.label}: ${d.blurb}`),
-    atYourBest: leaning.slice(0, 3).map((d) => bestOf(d.pole)),
-    underPressure: leaning.slice(0, 3).map((d) => pressureOf(d.pole)),
-    howOthersExperienceYou: leaning.slice(0, 3).map((d) => experienceOf(d.pole)),
+    atYourBest: leaning.slice(0, 3).map((d) => copyFor(d).best),
+    underPressure: leaning.slice(0, 3).map((d) => copyFor(d).pressure),
+    howOthersExperienceYou: leaning.slice(0, 3).map((d) => copyFor(d).experience),
     youWorkBestWhen: [
-      ...leaning.slice(0, 2).map((d) => contextOf(d.pole)),
+      ...leaning.slice(0, 2).map((d) => copyFor(d).context),
       ...(balanced.length > 2
         ? ['The situation calls for reading the room rather than running a default.']
         : []),
@@ -373,98 +381,106 @@ function composeProfileNarrative(input: ProfileNarrativeInput): ProfileNarrative
  * Pole-keyed copy. Each is written to be genuinely useful and non-judgemental:
  * every strength has a matching cost, and no pole is framed as the better one.
  */
+/**
+ * Keyed by `${dimensionId}:${lean}` rather than by pole NAME.
+ *
+ * The instrument has two pole vocabularies — archetype nouns ("Architect") and
+ * display adjectives ("Structured") — and keying on either one silently missed
+ * for the other, so every reveal fell back to the same generic sentence. The
+ * composite key cannot drift.
+ */
 const POLE_COPY: Record<string, { best: string; pressure: string; experience: string; context: string }> = {
-  Plainspoken: {
+  'directness:high': {
     best: 'People know where you stand, which makes decisions move faster.',
     pressure: 'Directness can arrive before the reasoning, and land harder than you intended.',
     experience: 'Clear and unambiguous — occasionally blunter than you meant to be.',
     context: 'The room rewards candour and you have standing to use it.',
   },
-  Measured: {
+  'directness:low': {
     best: 'Difficult messages land without putting people on the defensive.',
     pressure: 'The real point can get buried, and people may miss that you disagreed at all.',
     experience: 'Considerate and safe to disagree with — sometimes hard to read.',
     context: 'The relationship matters as much as the outcome.',
   },
-  Convener: {
+  'social_energy:high': {
     best: 'You get a room talking and surface what people actually think.',
     pressure: 'You may fill space that someone else needed in order to speak.',
     experience: 'Energising and inclusive — occasionally dominant in the conversation.',
     context: 'The problem is best worked out live, with people in the room.',
   },
-  Considerer: {
+  'social_energy:low': {
     best: 'What you say is worth listening to, because you have already thought it through.',
     pressure: 'You may go quiet exactly when your view was most needed.',
     experience: 'Thoughtful and unhurried — sometimes read as disengaged.',
     context: 'You get material in advance and time to form a view.',
   },
-  Mover: {
+  'pace:high': {
     best: 'Decisions stop drifting once you are involved.',
     pressure: 'You may commit before the risk is understood, and have to walk it back.',
     experience: 'Decisive and energising — sometimes ahead of where others are.',
     context: 'The cost of delay is higher than the cost of adjusting.',
   },
-  Deliberator: {
+  'pace:low': {
     best: 'You catch the flaw that a faster decision would have carried forward.',
     pressure: 'Deliberation can look like avoidance to people waiting on you.',
     experience: 'Careful and dependable — sometimes slower than others need.',
     context: 'The decision is expensive to reverse.',
   },
-  Verifier: {
+  'detail:high': {
     best: 'You find the error before it becomes someone else’s problem.',
     pressure: 'You can spend attention on detail the decision did not turn on.',
     experience: 'Rigorous and trustworthy — occasionally exhausting to present to.',
     context: 'Accuracy matters more than speed, and you have time to check.',
   },
-  Synthesist: {
+  'detail:low': {
     best: 'You keep a discussion attached to what it is actually for.',
     pressure: 'You may accept a summary that does not hold up underneath.',
     experience: 'Clear-headed and fast to the point — sometimes impatient with detail.',
     context: 'You trust the people handling the specifics.',
   },
-  Analyst: {
+  'decision_style:high': {
     best: 'Your decisions hold up when someone asks how you got there.',
     pressure: 'You may keep asking for evidence past the point where it changes the answer.',
     experience: 'Objective and persuadable by argument — sometimes slow to commit.',
     context: 'The evidence exists and can be gathered in time.',
   },
-  Reader: {
+  'decision_style:low': {
     best: 'You move on a good read while others are still gathering.',
     pressure: 'A confident read is hard to distinguish from a correct one.',
     experience: 'Decisive and intuitive — sometimes hard to argue with on evidence.',
     context: 'The data is thin and judgement is the only tool available.',
   },
-  Explorer: {
+  'change_comfort:high': {
     best: 'You are willing to try the thing that has not been tried.',
     pressure: 'You may change direction before the last change has been given time.',
     experience: 'Open and generative — sometimes unsettling to people who need stability.',
     context: 'The downside is survivable and the upside is real.',
   },
-  Steward: {
+  'change_comfort:low': {
     best: 'You protect what is working while everyone else is chasing the new thing.',
     pressure: 'Caution can read as resistance, even when the concern is sound.',
     experience: 'Steady and risk-literate — sometimes the brake in the room.',
     context: 'The cost of failure lands on people who did not choose the risk.',
   },
-  Challenger: {
+  'conflict:high': {
     best: 'Bad ideas do not survive contact with you, which saves everyone time later.',
     pressure: 'Pressure-testing can feel personal to the person being tested.',
     experience: 'Rigorous and honest — sometimes combative.',
     context: 'The group trusts each other enough to be challenged.',
   },
-  Harmoniser: {
+  'conflict:low': {
     best: 'You find the version of a decision that people will actually follow through on.',
     pressure: 'A disagreement you smoothed over can resurface later, larger.',
     experience: 'Steadying and generous — sometimes hard to get a real objection from.',
     context: 'The relationship has to survive the decision.',
   },
-  Architect: {
+  'structure:high': {
     best: 'Things you own do not get relitigated, because the decision was written down.',
     pressure: 'Structure can outlive its usefulness and become the work itself.',
     experience: 'Organised and reliable — occasionally rigid.',
     context: 'The work spans enough people that structure is doing real load-bearing.',
   },
-  Improviser: {
+  'structure:low': {
     best: 'You adapt in the moment when the plan stops matching reality.',
     pressure: 'Without structure, commitments can be dropped rather than declined.',
     experience: 'Flexible and responsive — sometimes hard to plan around.',
@@ -479,10 +495,8 @@ const fallback = {
   context: 'The situation matches your natural approach.',
 }
 
-const bestOf = (pole: string) => (POLE_COPY[pole] ?? fallback).best
-const pressureOf = (pole: string) => (POLE_COPY[pole] ?? fallback).pressure
-const experienceOf = (pole: string) => (POLE_COPY[pole] ?? fallback).experience
-const contextOf = (pole: string) => (POLE_COPY[pole] ?? fallback).context
+const copyKey = (d: { id: string; lean: 'high' | 'low' | null }) => `${d.id}:${d.lean ?? 'high'}`
+const copyFor = (d: { id: string; lean: 'high' | 'low' | null }) => POLE_COPY[copyKey(d)] ?? fallback
 
 export const profileNarrativePrompt: PromptModule<ProfileNarrativeInput, ProfileNarrative> = {
   id: 'profile-narrative',

@@ -122,28 +122,36 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
     .map((s) => s.trim())
     .filter((s) => s.length > 12 && s.length < 400)
 
-  // Current role: "<Name> is <Title> at <Org>" / "<Name>, <Title> at <Org>"
-  const roleMatch = text.match(
-    new RegExp(
-      `${escapeRegExp(person.fullName)}\\s*(?:,|\\s+is|\\s+serves as|\\s+joined as)?\\s*(?:the\\s+)?([A-Z][A-Za-z /&-]{2,60}?)\\s+(?:at|of|for)\\s+([A-Z][A-Za-z0-9 .,&-]{2,60})`,
-      'i',
-    ),
-  )
-  if (roleMatch?.[1]) {
+  // Current role. Deliberately strict.
+  //
+  // The permissive version of this ("<Name> <AnythingCapitalised> for <Org>")
+  // matched the headline "Satya Nadella Once Gave Up His Green Card For Love"
+  // and recorded a current_role of "Once Gave Up His Green Card" at an
+  // organisation of "Love". A confidently wrong fact about a real person is the
+  // worst output this product can produce, so the phrase must now actually look
+  // like a job title and the connector must be "at"/"of", never "for".
+  const roleMatch =
+    matchCurrentRole(text, person.fullName) ??
+    // Second chance for pages that state a role without a copula — infoboxes,
+    // speaker bios, "Title: CEO of Acme" rows. Gated on the organisation the
+    // user already recorded, so this can only ever CONFIRM an employer they
+    // asserted, never invent one.
+    matchRoleAtKnownOrg(text, person.organization)
+  if (roleMatch) {
     facts.push({
       kind: 'current_role',
-      value: cleanValue(roleMatch[1]),
-      detail: roleMatch[2] ? cleanValue(roleMatch[2]) : null,
-      excerpt: roleMatch[0].slice(0, 400),
+      value: roleMatch.title,
+      detail: roleMatch.organization,
+      excerpt: roleMatch.excerpt,
       evidenceLevel: 'observed',
       isCurrent: true,
     })
-    if (roleMatch[2]) {
+    if (roleMatch.organization) {
       facts.push({
         kind: 'current_organization',
-        value: cleanValue(roleMatch[2]),
+        value: roleMatch.organization,
         detail: null,
-        excerpt: roleMatch[0].slice(0, 400),
+        excerpt: roleMatch.excerpt,
         evidenceLevel: 'observed',
         isCurrent: true,
       })
@@ -158,6 +166,7 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
     if (!nameRegex.test(sentence) && !new RegExp(`\\b${escapeRegExp(firstName)}\\b`, 'i').test(sentence)) {
       continue
     }
+    if (!isCleanProse(sentence)) continue
     facts.push({
       kind: 'prior_role',
       value: truncate(sentence, 300),
@@ -192,6 +201,7 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
   // Expertise phrasing.
   for (const sentence of sentences.slice(0, 60)) {
     if (/\b(specialis|specializ|expertise in|focuses on|leads the|responsible for)\b/i.test(sentence)) {
+      if (!isCleanProse(sentence)) continue
       facts.push({
         kind: 'expertise',
         value: truncate(sentence, 300),
@@ -215,12 +225,132 @@ function composeExtraction(input: SourceExtractionInput): SourceExtraction {
   return {
     mentionsTarget: true,
     sourceSummary: `${source.title ?? 'Source'}${source.publisher ? ` (${source.publisher})` : ''}`,
-    facts: facts.slice(0, 14),
+    // Last line of defence: never persist a fact whose value still looks like
+    // markup, script or template residue.
+    facts: facts.filter((f) => isCleanProse(f.value)).slice(0, 14),
     // Communication patterns need several instances; one page rarely proves one.
     communicationObservations: [],
     containedInstructions: false,
     gaps: gaps.slice(0, 4),
   }
+}
+
+/**
+ * Tokens that make a phrase plausibly a job title. Without one of these, a
+ * capitalised phrase next to a name is far more likely to be a headline.
+ */
+const TITLE_TOKENS =
+  /\b(ceo|cto|cfo|coo|cio|ciso|chair(?:man|woman|person)?|chief|president|vice[- ]president|vp|svp|evp|director|head|manager|lead|principal|partner|founder|co[- ]?founder|officer|engineer|architect|scientist|analyst|designer|consultant|advisor|adviser|editor|producer|professor|dean|counsel|controller|treasurer|secretary|administrator|supervisor|specialist|strategist)\b/i
+
+/** Words that mark a phrase as narrative prose rather than a job title. */
+const NOT_A_TITLE =
+  /\b(once|gave|said|told|says|announced|joined|left|born|married|won|received|his|her|their|who|which|that)\b/i
+
+/** Markup, JSON, template or reference residue that must never become a fact. */
+const MARKUP_RESIDUE = /[<>{}[\]|]|&[a-z]+;|\/ref|https?:\/\//i
+
+/**
+ * True when a string is clean human prose rather than leaked markup, script or
+ * template residue.
+ *
+ * Real pages embed JSON in attributes and wiki markup in body text; when any of
+ * that reaches a "fact" it is displayed to the user as something Aurel believes
+ * about a real person. Cheap to check, and it catches the realistic failures.
+ */
+/** Built without literal escapes so the pattern survives code generation. */
+const REPEATED_PUNCTUATION = new RegExp("[\"'`]{2,}")
+const BACKSLASH = String.fromCharCode(92)
+
+export function isCleanProse(value: string): boolean {
+  const v = value.trim()
+  if (v.length < 2) return false
+  if (MARKUP_RESIDUE.test(v)) return false
+  // Repeated quotes or backslashes signal leaked structure.
+  if (REPEATED_PUNCTUATION.test(v) || v.includes(BACKSLASH)) return false
+  if (!/[a-z]{2,}/i.test(v)) return false
+  return true
+}
+
+/**
+ * Extract a current role only when the text genuinely reads as one:
+ * "<Name> is <Title> at <Organisation>".
+ *
+ * Built with a RegExp from a string, so every backslash is doubled — inside a
+ * template literal "\s" collapses to a literal "s" and silently breaks the
+ * pattern.
+ */
+export function matchCurrentRole(
+  text: string,
+  fullName: string,
+): { title: string; organization: string | null; excerpt: string } | null {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  const first = escapeRegExp(parts[0] ?? fullName)
+  const last = escapeRegExp(parts[parts.length - 1] ?? fullName)
+
+  // Allow middle names between first and last: encyclopaedic prose routinely
+  // writes "Satya Narayana Nadella" where the user recorded "Satya Nadella".
+  const nameFragment =
+    parts.length > 1 ? String.raw`${first}(?:\s+[A-Z][\w'-]{1,20}){0,2}\s+${last}` : first
+
+  // Allow a bounded gap between the name and the copula, so parentheticals and
+  // short relative clauses ("(born 1967) ... who is the") do not defeat the
+  // match. The gap is capped and cannot contain sentence-ending punctuation, so
+  // this still cannot reach across into an unrelated sentence.
+  //
+  // String.raw so a single backslash in source reaches the RegExp as a single
+  // backslash. Ordinary quoted strings are a trap here: '\s' evaluates to the
+  // literal character "s", which silently makes the pattern match nothing.
+  const pattern = new RegExp(
+    String.raw`${nameFragment}[^.!?]{0,120}?\b(?:is|was named|serves as|became|joined as)\s+(?:the\s+)?([A-Za-z][A-Za-z /&'()-]{2,70}?)\s+(?:at|of)\s+([A-Z][A-Za-z0-9 .,&'-]{1,60})`,
+    'i',
+  )
+
+  const match = text.match(pattern)
+  if (!match?.[1]) return null
+
+  const title = cleanValue(match[1])
+  const organization = match[2] ? cleanValue(match[2]) : null
+
+  // The phrase must look like a title, and must not read as narrative.
+  if (!TITLE_TOKENS.test(title)) return null
+  if (NOT_A_TITLE.test(title)) return null
+  if (!isCleanProse(title)) return null
+  if (organization && !isCleanProse(organization)) return null
+
+  return { title, organization, excerpt: match[0].slice(0, 400) }
+}
+
+/**
+ * Match "<Title> of|at <Organisation>" where the organisation is one the user
+ * already recorded for this person.
+ *
+ * Many bio pages state a role without a copula: an infobox row, a speaker
+ * byline, "Title: CEO of Acme". A general pattern for that shape would be far
+ * too loose on a page mentioning several people — so this only fires when the
+ * organisation matches what the user themselves told us. The worst case is
+ * confirming a role at an employer they already asserted.
+ */
+export function matchRoleAtKnownOrg(
+  text: string,
+  organization: string | null,
+): { title: string; organization: string | null; excerpt: string } | null {
+  const org = organization?.trim()
+  if (!org || org.length < 3) return null
+
+  const pattern = new RegExp(
+    String.raw`([A-Z][A-Za-z /&'-]{2,60}?)\s+(?:of|at)\s+${escapeRegExp(org)}\b`,
+    'i',
+  )
+
+  const match = text.match(pattern)
+  if (!match?.[1]) return null
+
+  const title = cleanValue(match[1])
+  if (!TITLE_TOKENS.test(title)) return null
+  if (NOT_A_TITLE.test(title)) return null
+  if (!isCleanProse(title)) return null
+
+  return { title, organization: org, excerpt: match[0].slice(0, 400) }
 }
 
 function escapeRegExp(s: string) {

@@ -7,6 +7,7 @@ import { type StepState } from '@/lib/onboarding'
 import { FormField, Input, Select } from '@/components/ui/field'
 import { StepShell } from './step-shell'
 import { Avatar } from '@/components/ui/avatar'
+import { brand } from '@/lib/brand'
 
 const FUNCTIONS = [
   'Engineering',
@@ -73,7 +74,7 @@ export function AboutForm({
       <StepShell
         title="Tell us about you"
         description="Only what makes the guidance specific to your role. Nothing here is shared with anyone."
-        note="Aurel never asks for anything about your colleagues' personal characteristics, and it will not infer them."
+        note={`${brand.name} never asks for anything about your colleagues' personal characteristics, and it will not infer them.`}
       >
         <div className="border-line bg-surface flex items-center gap-4 rounded-[var(--radius-lg)] border p-4">
           <Avatar name={preferred || name || '?'} size="lg" />
@@ -108,7 +109,7 @@ export function AboutForm({
           <FormField
             id="preferredName"
             label="Preferred name"
-            description="What Aurel calls you."
+            description={`What ${brand.name} calls you.`}
             error={state.fieldErrors?.preferredName?.[0]}
           >
             {(props) => (

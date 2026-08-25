@@ -146,7 +146,7 @@ const STEPS = [
     icon: PenLine,
     eyebrow: 'One',
     title: 'Record what you learn',
-    body: 'Add the people who matter and what you notice about working with them. After a meeting, paste your notes — Aurel proposes what is worth remembering and you decide what to keep.',
+    body: `Add the people who matter and what you notice about working with them. After a meeting, paste your notes — ${brand.name} proposes what is worth remembering and you decide what to keep.`,
   },
   {
     icon: Users,
@@ -158,7 +158,7 @@ const STEPS = [
     icon: Rewind,
     eyebrow: 'Three',
     title: 'It compounds',
-    body: 'Every debrief sharpens the next brief. After five interactions with someone, Aurel is briefing you on your actual relationship — not on a personality type.',
+    body: `Every debrief sharpens the next brief. After five interactions with someone, ${brand.name} is briefing you on your actual relationship — not on a personality type.`,
   },
 ]
 
@@ -260,7 +260,7 @@ const EVIDENCE_TIERS = [
     icon: Layers,
     label: 'Unknown',
     tone: 'text-ink-muted',
-    body: 'Not enough to say. Aurel tells you so instead of filling the gap.',
+    body: `Not enough to say. ${brand.name} tells you so instead of filling the gap.`,
   },
 ]
 

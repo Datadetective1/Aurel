@@ -136,7 +136,7 @@ export default async function RevealPage() {
           <div>
             <h2 className="font-display text-2xl text-ink">Does this sound like you?</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-secondary">
-              Your answer carries more weight than the instrument does. If this is off, Aurel treats
+              Your answer carries more weight than the instrument does. If this is off, {brand.name} treats
               your correction as the higher-priority evidence from here on.
             </p>
           </div>

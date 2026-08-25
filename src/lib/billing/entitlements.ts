@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
+import { brand } from '@/lib/brand'
 
 /**
  * ENTITLEMENTS
@@ -264,7 +265,7 @@ const LABELS: Record<Capability, string> = {
   debrief: 'Debriefs',
   transcriptAnalysis: 'Transcript analysis',
   documentAnalysis: 'Document analysis',
-  aiCoach: 'Ask Aurel',
+  aiCoach: brand.assistantName,
   messageAdaptation: 'Message adaptation',
   relationshipAtlas: 'The Relationship Atlas',
   weeklyIntelligence: 'Weekly relationship intelligence',

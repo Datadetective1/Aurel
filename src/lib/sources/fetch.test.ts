@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isBlockedAddress, parseUrl } from './fetch'
+import { isBlockedAddress } from './fetch'
+import { parseUrl } from './url'
 
 /**
  * SSRF guard tests.

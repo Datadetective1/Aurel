@@ -4,6 +4,7 @@ import * as React from 'react'
 import { ArrowRight, CircleCheck, CircleHelp, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/primitives'
+import { brand } from '@/lib/brand'
 
 /**
  * HERO DEMONSTRATION
@@ -146,7 +147,7 @@ export function HeroDemo({ className }: { className?: string }) {
 
       {/* What Aurel produces */}
       <div className="bg-bg-sunken px-5 py-5 sm:px-7" style={stage(4)}>
-        <span className="label">Aurel&rsquo;s brief</span>
+        <span className="label">{brand.name}&rsquo;s brief</span>
 
         <p className="mt-3 text-sm leading-relaxed text-ink">
           Open with the decision, not the method. Daniel wants the cost impact first; Maya will ask
@@ -170,7 +171,7 @@ export function HeroDemo({ className }: { className?: string }) {
         <div className="mt-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-3.5 py-3">
           <CircleHelp className="mt-0.5 size-3.5 shrink-0 text-caution" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-ink-secondary">
-            <span className="font-medium text-ink">What Aurel doesn&rsquo;t know — </span>
+            <span className="font-medium text-ink">What {brand.name} doesn&rsquo;t know — </span>
             you have no recorded history with Priya. Nothing above is a read on her.
           </p>
         </div>

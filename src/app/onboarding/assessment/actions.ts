@@ -161,6 +161,7 @@ export async function completeAssessment(assessmentId: string) {
       dimensions: scored.ranked.map((d) => {
         const described = describeDimension(d)
         return {
+          id: d.dimension,
           label: described.label,
           pole: described.pole,
           blurb: described.blurb,

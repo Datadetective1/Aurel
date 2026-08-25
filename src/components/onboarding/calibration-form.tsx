@@ -8,6 +8,7 @@ import { calibrateAssessment } from '@/app/onboarding/assessment/actions'
 import { Button } from '@/components/ui/button'
 import { OptionCard, Textarea } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
+import { brand } from '@/lib/brand'
 
 const RATINGS = [
   { value: 'very_accurate', label: 'Very accurate', hint: 'That is me.' },
@@ -64,7 +65,7 @@ export function CalibrationForm({
             What did it get wrong?
           </label>
           <p className="mt-1 text-xs text-ink-muted">
-            Optional, but this is the correction Aurel will weight above the score.
+            Optional, but this is the correction {brand.name} will weight above the score.
           </p>
           <Textarea
             id="calibration-note"
@@ -100,7 +101,7 @@ function Submit({ disabled }: { disabled: boolean }) {
           </>
         ) : (
           <>
-            Enter Aurel
+            Enter {brand.name}
             <ArrowRight className="size-4" aria-hidden="true" />
           </>
         )}

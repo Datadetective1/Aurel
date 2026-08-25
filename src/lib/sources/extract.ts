@@ -112,11 +112,17 @@ export function extractFromHtml(html: string, url?: string): ExtractedContent {
       /"publisher"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i,
     ]) ?? (url ? safeHostname(url) : null)
 
+  // Only accept an EXPLICIT publication declaration.
+  //
+  // A bare <time datetime> was previously used as a fallback, but that matches
+  // any date in the body — an infobox birth date, a cited article, a footnote.
+  // The value drives the "as of" freshness label on facts, so a wrong one is
+  // worse than none: it presents today's finding as years out of date.
   const publishedAt = metaContent(html, [
     /<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+name=["']date["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["'](?:date|pubdate|publish[-_]?date)["'][^>]+content=["']([^"']+)["']/i,
     /"datePublished"\s*:\s*"([^"]+)"/i,
-    /<time[^>]+datetime=["']([^"']+)["']/i,
+    /<time[^>]+(?:pubdate|itemprop=["']datePublished["'])[^>]*datetime=["']([^"']+)["']/i,
   ])
 
   // Strip hostile/noisy blocks first, then remaining tags, then decode.
@@ -124,7 +130,7 @@ export function extractFromHtml(html: string, url?: string): ExtractedContent {
   const withBreaks = withoutBlocks
     .replace(/<\/(p|div|section|article|li|h[1-6]|tr|blockquote)>/gi, '\n')
     .replace(/<li\b[^>]*>/gi, '\n- ')
-  const stripped = withBreaks.replace(/<[^>]+>/g, ' ')
+  const stripped = stripTags(withBreaks)
   const text = normaliseWhitespace(decodeEntities(stripped))
 
   return {
@@ -152,6 +158,51 @@ export function extractFromText(raw: string, title?: string | null): ExtractedCo
     contentHash: hashContent(text),
     wordCount: text ? text.split(/\s+/).length : 0,
   }
+}
+
+/**
+ * Remove tags, respecting quoted attribute values.
+ *
+ * The obvious `/<[^>]+>/g` is wrong: an attribute value may itself contain ">".
+ * Real pages do this constantly — Wikipedia embeds JSON in data attributes — and
+ * a naive stripper terminates the tag early, spilling raw markup and JSON into
+ * the extracted text. That garbage then gets extracted as "facts" about a
+ * person, which is far worse than missing the content entirely.
+ */
+function stripTags(input: string): string {
+  let out = ''
+  let i = 0
+  const n = input.length
+
+  while (i < n) {
+    const lt = input.indexOf('<', i)
+    if (lt === -1) {
+      out += input.slice(i)
+      break
+    }
+    out += input.slice(i, lt)
+
+    // Walk the tag, tracking quote state so a ">" inside an attribute value
+    // does not end it prematurely.
+    let j = lt + 1
+    let quote: string | null = null
+    while (j < n) {
+      const ch = input[j]!
+      if (quote) {
+        if (ch === quote) quote = null
+      } else if (ch === '"' || ch === "'") {
+        quote = ch
+      } else if (ch === '>') {
+        break
+      }
+      j++
+    }
+
+    out += ' '
+    i = j + 1
+  }
+
+  return out
 }
 
 function normaliseWhitespace(input: string): string {

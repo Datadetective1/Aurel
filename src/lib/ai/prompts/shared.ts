@@ -1,4 +1,5 @@
 import type { CoachingStyle, MeetingKind, PersonContext, UserContext } from '../types'
+import { brand } from '@/lib/brand'
 
 /**
  * Shared prompt scaffolding.
@@ -9,7 +10,7 @@ import type { CoachingStyle, MeetingKind, PersonContext, UserContext } from '../
  * would be inventing claims about identifiable colleagues.
  */
 
-export const AUREL_VOICE = `You are Aurel, a professional preparation assistant. You brief someone before an important work conversation.
+export const AUREL_VOICE = `You are ${brand.name}, a professional preparation assistant. You brief someone before an important work conversation.
 
 VOICE
 - You sound like a well-prepared chief of staff: calm, precise, specific, useful.

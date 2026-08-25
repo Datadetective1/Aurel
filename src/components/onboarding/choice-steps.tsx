@@ -37,7 +37,7 @@ export function IntentStep({ defaults }: { defaults: string[] }) {
     <form action={formAction}>
       <StepShell
         title="What brought you here?"
-        description="Pick up to three. This decides what Aurel puts in front of you first — it does not lock anything."
+        description={`Pick up to three. This decides what ${brand.name} puts in front of you first — it does not lock anything.`}
         skipAction={<SkipButton />}
       >
         <div className="grid gap-2.5 sm:grid-cols-2">
@@ -89,7 +89,7 @@ export function FrameworksStep({ defaults }: { defaults: Record<string, { result
     <form action={formAction}>
       <StepShell
         title="Taken anything like this before?"
-        description="Optional. If you already know your results, Aurel will keep them alongside your profile as context."
+        description={`Optional. If you already know your results, ${brand.name} will keep them alongside your profile as context.`}
         skipAction={<SkipButton />}
         note={`These are other people's instruments. ${brand.name} does not administer, score or validate them — it simply remembers what you told it.`}
       >

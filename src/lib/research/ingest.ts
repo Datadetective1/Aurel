@@ -8,6 +8,7 @@ import { runPrompt } from '@/lib/ai/provider'
 import { sourceExtractionPrompt } from '@/lib/ai/prompts/source-extraction'
 import { logger } from '@/lib/logger'
 import { recordUsage } from '@/lib/billing/entitlements'
+import { brand } from '@/lib/brand'
 
 type Client = SupabaseClient<Database>
 type SourceType = Database['public']['Enums']['source_type']
@@ -183,7 +184,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       ...emptyResult(
         wall,
         wall === 'login_required'
-          ? 'That page needs a sign-in, so Aurel cannot read it. Paste the relevant text instead.'
+          ? `That page needs a sign-in, so ${brand.name} cannot read it. Paste the relevant text instead.`
           : wall === 'paywall'
             ? 'That page is behind a paywall. Paste the relevant text instead.'
             : 'There was not enough readable text on that page.',
@@ -322,7 +323,7 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       factsCreated: 0,
       observationsProposed: 0,
       message: needsReview(assessment)
-        ? `${assessment.explanation} Confirm whether this is the right person before Aurel uses it.`
+        ? `${assessment.explanation} Confirm whether this is the right person before ${brand.name} uses it.`
         : assessment.explanation,
     }
   }

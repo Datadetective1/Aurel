@@ -9,6 +9,7 @@ import {
   renderUser,
   styleBlock,
 } from './shared'
+import { brand } from '@/lib/brand'
 
 /**
  * MEETING BRIEF
@@ -327,7 +328,7 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
   }
   if (people.every((p) => p.interactionCount < 2)) {
     uncertainties.push(
-      'This relationship record is still thin. Aurel gets materially more useful after a few logged interactions.',
+      `This relationship record is still thin. ${brand.name} gets materially more useful after a few logged interactions.`,
     )
   }
   if (!user.interactionProfile) {
