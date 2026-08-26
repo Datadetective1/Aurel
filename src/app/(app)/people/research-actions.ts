@@ -10,6 +10,13 @@ import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
 import { ingestText, ingestUrl } from '@/lib/research/ingest'
 import { extractDocument } from '@/lib/sources/document'
 import { resolveSearchProvider, researchCapability } from '@/lib/research/providers'
+import {
+  MAX_ANALYSED,
+  MAX_CANDIDATES,
+  MAX_SEARCH_REQUESTS,
+  hasEnough,
+  planQueries,
+} from '@/lib/research/queries'
 import { detectInputKind } from '@/lib/sources/url'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
@@ -240,7 +247,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
 
   const { data: person } = await supabase
     .from('people')
-    .select('id, full_name, job_title, profile_url, identity_locked, organizations(name)')
+    .select('id, full_name, job_title, profile_url, email, identity_locked, organizations(name)')
     .eq('id', personId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -277,24 +284,61 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
   let usedProvider: string | undefined
   let usedModel: string | undefined
   const candidateUrls: string[] = []
+  let searchRequests = 0
+  let searchCostUnits = 0
+  let searchFailure: 'not_configured' | 'rate_limited' | null = null
 
   try {
     // --- discovery -----------------------------------------------------------
+    // A ladder of increasingly speculative queries rather than one broad
+    // search, stopping as soon as there are enough strong candidates. On most
+    // people the first rung -- name plus employer -- is the only one that runs.
     if (capabilities.canDiscover) {
       await updateJob(supabase, jobId, { stage: 'searching_sources' })
       const provider = resolveSearchProvider()
-      const search = await provider.search({
+
+      const plan = planQueries({
         name: person.full_name,
         organization: person.organizations?.name ?? null,
         jobTitle: person.job_title,
-        limit: 10,
+        // The email domain, when there is one. Nothing else narrows a search
+        // this hard: a page on the employer's own domain naming the person is
+        // about as close to a primary source as public research gets.
+        domain: person.email?.includes('@') ? person.email.split('@')[1] : null,
       })
 
-      if (search.ok) {
-        considered = search.results.length
-        // Prefer official and substantive sources over aggregators.
-        candidateUrls.push(...rankCandidates(search.results.map((r) => r.url)).slice(0, 6))
+      const strong: string[] = []
+
+      for (const planned of plan) {
+        if (searchRequests >= MAX_SEARCH_REQUESTS) break
+
+        searchRequests++
+        const search = await provider.search(planned.query)
+
+        if (!search.ok) {
+          // A rejected key or an exhausted quota will not improve on the next
+          // rung, so stop rather than spend the remaining budget discovering
+          // the same failure twice more.
+          if (search.reason === 'not_configured' || search.reason === 'rate_limited') {
+            searchFailure = search.reason
+            break
+          }
+          continue
+        }
+
+        searchCostUnits += search.costUnits
+        considered += search.results.length
+
+        // Ranking runs per rung so `sufficient` counts sources worth reading,
+        // not raw hits. Ten aggregator pages do not settle anything.
+        const ranked = rankCandidates(search.results.map((r) => r.url))
+        const fresh = ranked.filter((url) => !strong.includes(url))
+        strong.push(...fresh)
+
+        if (hasEnough(planned, fresh.length, strong.length, MAX_CANDIDATES)) break
       }
+
+      candidateUrls.push(...strong.slice(0, MAX_CANDIDATES))
     }
 
     // The user-supplied profile URL is always worth reading, and is the only
@@ -313,9 +357,13 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       })
       return {
         ok: false,
-        error: capabilities.canDiscover
-          ? `I could not find enough reliable professional information about ${person.full_name}.`
-          : (capabilities.discoveryHint ?? 'Add a link to research from.'),
+        error: searchFailure
+          ? searchFailure === 'rate_limited'
+            ? 'Professional research has hit its rate limit for the moment. You can still paste a source.'
+            : 'Professional research is temporarily unavailable. You can still paste a source.'
+          : capabilities.canDiscover
+            ? `I could not find enough reliable professional information about ${person.full_name}.`
+            : (capabilities.discoveryHint ?? 'Add a link to research from.'),
       }
     }
 
@@ -326,6 +374,10 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     for (const url of candidateUrls) {
       if (seen.has(url)) continue
       seen.add(url)
+
+      // Each analysed page is a fetch plus a model call. The cap is what keeps
+      // the cost of one research run bounded and predictable.
+      if (seen.size > MAX_ANALYSED) break
 
       const result = await ingestUrl(url, {
         supabase,
@@ -360,6 +412,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       sources_accepted: accepted,
       facts_created: facts,
       observations_proposed: proposals,
+      cost_units: searchCostUnits,
     })
 
     await supabase

@@ -1,5 +1,5 @@
 import 'server-only'
-import { serverEnv } from '@/lib/env'
+import { searchProvider, serverEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { safeFetch } from '@/lib/sources/fetch'
 import { brand } from '@/lib/brand'
@@ -36,6 +36,8 @@ export interface SearchQuery {
   jobTitle?: string | null
   /** Extra terms, e.g. "conference talk", "interview". */
   qualifiers?: string[]
+  /** Company or email domain. Restricts results to that site where supported. */
+  domain?: string | null
   limit?: number
 }
 
@@ -132,6 +134,120 @@ function braveSearch(apiKey: string): SearchProvider {
         return { ok: false, reason: 'error' }
       }
     },
+  }
+}
+
+/**
+ * Exa.
+ *
+ * The preferred provider. Its index is embeddings-based, so a query like
+ * `"Jordan Avery" "Meridian Systems"` retrieves pages that are *about* that
+ * person at that company rather than pages containing those tokens — which is
+ * the difference that matters when the input is a name two thousand people
+ * share.
+ *
+ * Three deliberate choices about cost, in a feature that bills per request:
+ *
+ *   - `type: 'auto'`, never 'deep'. Deep search runs additional queries server
+ *     side and costs a multiple. Discovery here is one cheap request per rung,
+ *     and the ladder in queries.ts stops early — see MAX_SEARCH_REQUESTS.
+ *   - No `contents`. Asking Exa for page text costs more AND would bypass our
+ *     own fetch, which is the thing enforcing SSRF protection, size limits,
+ *     paywall detection and the identity check. Discovery returns URLs; the
+ *     existing pipeline reads them. A snippet must never become a fact.
+ *   - `excludeDomains` for the aggregator sites we would discard anyway, so we
+ *     are not paying for results destined for the deny list.
+ */
+function exaSearch(apiKey: string): SearchProvider {
+  return {
+    id: 'exa',
+    configured: true,
+    async search(query) {
+      try {
+        const response = await fetch('https://api.exa.ai/search', {
+          method: 'POST',
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: buildQueryString(query),
+            type: 'auto',
+            numResults: Math.min(query.limit ?? 10, 25),
+            ...(query.domain ? { includeDomains: [normaliseDomain(query.domain)] } : {}),
+            excludeDomains: EXCLUDED_DOMAINS,
+          }),
+          signal: AbortSignal.timeout(15_000),
+        })
+
+        if (response.status === 429) return { ok: false, reason: 'rate_limited' }
+        if (response.status === 401 || response.status === 403) {
+          // A rejected key is not a transient error, and reporting it as one
+          // would have the UI suggest retrying forever.
+          logger.warn('research.search_unauthorised', { provider: 'exa' })
+          return { ok: false, reason: 'not_configured', detail: String(response.status) }
+        }
+        if (!response.ok) return { ok: false, reason: 'error', detail: String(response.status) }
+
+        const payload = (await response.json()) as {
+          results?: { url?: string; title?: string | null; text?: string | null }[]
+        }
+
+        const results = (payload.results ?? [])
+          .filter((item): item is { url: string; title?: string | null } => Boolean(item.url))
+          .map((item, index) => ({
+            url: item.url,
+            title: item.title ?? '',
+            // Exa returns no snippet unless contents are requested, and we do
+            // not request them. Ranking uses the URL and title; the page itself
+            // is read later by the pipeline that can do it safely.
+            snippet: '',
+            rank: index,
+          }))
+
+        return { ok: true, results, costUnits: 1 }
+      } catch (error) {
+        logger.warn('research.search_failed', {
+          provider: 'exa',
+          error: error instanceof Error ? error.name : 'unknown',
+        })
+        return { ok: false, reason: 'error' }
+      }
+    },
+  }
+}
+
+/**
+ * Sites whose results are never usable, sent to the provider so we do not pay
+ * for them. This mirrors the deny list applied during ranking rather than
+ * replacing it — a provider that ignores the parameter must still be filtered.
+ */
+const EXCLUDED_DOMAINS = [
+  'facebook.com',
+  'instagram.com',
+  'tiktok.com',
+  'pinterest.com',
+  'zoominfo.com',
+  'rocketreach.co',
+  'signalhire.com',
+  'apollo.io',
+  'lusha.com',
+  'spokeo.com',
+  'whitepages.com',
+  'beenverified.com',
+  // Fetching LinkedIn programmatically is against their terms. A user-supplied
+  // LinkedIn URL is still useful as identity metadata; discovering one is not.
+  'linkedin.com',
+]
+
+/** `https://acme.com/careers` or `someone@acme.com` -> `acme.com`. */
+function normaliseDomain(value: string): string {
+  const trimmed = value.trim().toLowerCase()
+  const afterAt = trimmed.includes('@') ? (trimmed.split('@').pop() ?? trimmed) : trimmed
+  try {
+    return new URL(afterAt.includes('://') ? afterAt : `https://${afterAt}`).hostname.replace(
+      /^www\./,
+      '',
+    )
+  } catch {
+    return afterAt.replace(/^www\./, '').split('/')[0] ?? afterAt
   }
 }
 
@@ -241,16 +357,29 @@ function buildQueryString(query: SearchQuery): string {
   return parts.join(' ')
 }
 
+/**
+ * The active provider.
+ *
+ * Which one is active is decided in env.ts by `searchProvider`, so the key that
+ * is present is the provider that runs. This function only builds it.
+ */
 export function resolveSearchProvider(): SearchProvider {
-  const provider = serverEnv.SEARCH_PROVIDER
-  if (provider === 'mock') return mockSearch()
-  if (provider === 'brave' && serverEnv.BRAVE_SEARCH_API_KEY) {
-    return braveSearch(serverEnv.BRAVE_SEARCH_API_KEY)
+  switch (searchProvider) {
+    case 'exa':
+      return serverEnv.EXA_API_KEY ? exaSearch(serverEnv.EXA_API_KEY) : unconfiguredSearch
+    case 'brave':
+      return serverEnv.BRAVE_SEARCH_API_KEY
+        ? braveSearch(serverEnv.BRAVE_SEARCH_API_KEY)
+        : unconfiguredSearch
+    case 'serper':
+      return serverEnv.SERPER_API_KEY
+        ? serperSearch(serverEnv.SERPER_API_KEY)
+        : unconfiguredSearch
+    case 'mock':
+      return mockSearch()
+    default:
+      return unconfiguredSearch
   }
-  if (provider === 'serper' && serverEnv.SERPER_API_KEY) {
-    return serperSearch(serverEnv.SERPER_API_KEY)
-  }
-  return unconfiguredSearch
 }
 
 // =============================================================================

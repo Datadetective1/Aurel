@@ -14,7 +14,7 @@ are off.
 | # | Capability | Blocked by | Free tier? | Code status |
 | --- | --- | --- | --- | --- |
 | 1 | **AI reasoning** | — | — | **Live — OpenAI** |
-| 2 | **Automatic research** | API key | **Yes — 2,000/mo free** | Complete |
+| 2 | **Automatic research** | `EXA_API_KEY` | Trial credit | **Complete — one key away** |
 | 3 | Document ingestion | — | — | **Live** |
 | 4 | Calendar | OAuth client **+ code** | Yes | **Not built** |
 | 5 | Billing | Stripe account | Yes (test mode) | Complete |
@@ -85,47 +85,64 @@ gracefully. It is the line to watch.
 
 ---
 
-## 2. Automatic professional research
+## 2. Automatic professional research — **one key away**
 
-Pasting a link already works and needs no credential. What is gated is turning
-a *name* into candidate URLs, which needs a web index. There is no legitimate
-way to do that without a search API — the alternative is scraping a search
-engine, which violates its terms.
+Everything is built and tested. Pasting a link already works and needs no
+credential. What is gated is turning a *name* into candidate URLs, which needs a
+web index — there is no legitimate way to do that without a search API, and the
+alternative is scraping a search engine, which violates its terms.
+
+```
+EXA_API_KEY=...
+```
+
+**That is the whole configuration.** `SEARCH_PROVIDER` is optional and should
+stay unset: the provider is inferred from whichever key is present, with Exa
+preferred when more than one is. Do not leave a stale `SEARCH_PROVIDER=none` in
+the deployment — it is the off switch and wins over any key.
 
 | | |
 | --- | --- |
-| **Service** | Brave Search API (recommended) or Serper |
-| **Sign-up** | https://api-dashboard.search.brave.com/register → **Subscriptions** → choose *Data for Search*<br>or https://serper.dev → *API Key* |
-| **Free tier** | **Brave: yes** — 2,000 queries/month free, one query per second. A card is required to activate even the free plan.<br>**Serper:** 2,500 one-off trial credits, no card. |
-| **Cost** | Beyond Brave's free tier, roughly \$3–5 per 1,000 queries depending on plan. One *Research person* run costs **one** query. |
+| **Service** | Exa (recommended) — or Brave / Serper, both still supported |
+| **Sign-up** | https://dashboard.exa.ai → **API Keys** → *Create API key* |
+| **Billing** | https://dashboard.exa.ai/billing |
+| **Free tier** | Exa gives new accounts a starting credit; after that it is pay-as-you-go per request. Brave has an ongoing free tier of 2,000 queries/month but requires a card to activate. |
+| **Cost** | Billed per search request. **One Research Person run costs at most three requests** — usually one. See below. |
 
-```
-SEARCH_PROVIDER=brave
-BRAVE_SEARCH_API_KEY=BSA...
-```
+**Why Exa.** Its index is embeddings-based, so `"Jordan Avery" "Meridian
+Systems"` retrieves pages *about* that person at that company rather than pages
+containing those words. That difference is what makes identity resolution
+tractable when the input is a name thousands of people share.
 
-or
+**What one run costs, and why it is bounded.** Discovery walks a ladder of
+increasingly speculative queries — name plus employer, then the employer's own
+domain, then role, then authored material, then talks — and stops as soon as it
+has enough strong candidates. On most people the first rung is the only one that
+runs. `MAX_SEARCH_REQUESTS` in `src/lib/research/queries.ts` caps it at three
+regardless. It uses `type: 'auto'`, never `deep`, which bills a multiple, and it
+never asks Exa for page contents: pages are fetched by Atturel's own SSRF-hardened
+fetcher so they pass the identity check, and a search snippet can never become a
+fact. At most five pages are analysed per run.
 
-```
-SEARCH_PROVIDER=serper
-SERPER_API_KEY=...
-```
-
-**Already built — nothing engineering-side is left:** provider abstraction with
-two implementations, the discovery → rank → fetch → extract → identity-resolve
-→ fact → memory-proposal pipeline, research jobs recording stages and cost,
-entitlements and metering, and every loading, empty, error and rate-limited
-state.
+**Already built — nothing engineering-side is left:** the provider abstraction
+with four implementations, the staged query ladder, source ranking with an
+aggregator deny list, the discovery → fetch → identity → source → fact →
+observation pipeline shared with manually pasted URLs, research jobs recording
+stage and cost, entitlements and metering, and every loading, empty, error,
+rate-limited and wrong-person state.
 
 **Verify after configuring**
 
-1. Settings → Capabilities: **Finding sources automatically** shows
-   **Connected** and names the provider.
+1. Settings → Capabilities: **Finding sources automatically** → **Connected**,
+   naming `exa`.
 2. Add a person with a name and company but **no profile URL**.
 3. Press **Research public footprint**.
    - Before: *"paste a link instead"*.
    - After: sources are discovered, fetched, identity-checked and cited.
 4. Settings → Plan: *People researched* increments.
+
+If Exa is unreachable or the key is rejected, research reports that it is
+temporarily unavailable and points at pasting a link. It never invents results.
 
 ---
 

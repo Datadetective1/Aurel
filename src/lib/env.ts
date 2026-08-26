@@ -64,10 +64,17 @@ const serverSchema = z.object({
   // user supplies does not, which is why research still works without these.
   // 'mock' is a deterministic development provider for tests; it refuses to
   // run in production, so it can never fabricate evidence for a real user.
+  //
+  // SEARCH_PROVIDER is OPTIONAL and normally left unset: the provider is
+  // inferred from whichever key is present. Set it to force a choice when more
+  // than one key exists, or to 'none' to switch discovery off while leaving the
+  // keys in place. Requiring the name and the key to agree was a foot-gun -- the
+  // same one that left OPENAI_API_KEY doing nothing for a day.
   SEARCH_PROVIDER: z.preprocess(
     blankToUndefined,
-    z.enum(['brave', 'serper', 'mock', 'none']).catch('none'),
+    z.enum(['exa', 'brave', 'serper', 'mock', 'none']).optional(),
   ),
+  EXA_API_KEY: optional,
   BRAVE_SEARCH_API_KEY: optional,
   SERPER_API_KEY: optional,
 })
@@ -178,6 +185,49 @@ export const emailFromOverride: string | undefined =
 
 export const emailReplyToOverride: string | undefined = serverEnv.ATTUREL_EMAIL_REPLY_TO
 
+export type SearchProviderId = 'exa' | 'brave' | 'serper' | 'mock' | 'none'
+
+/**
+ * Which search provider is actually active.
+ *
+ * Inferred from the keys rather than requiring SEARCH_PROVIDER to agree with
+ * them, for the same reason the AI provider is: a key that silently does
+ * nothing, under a screen reporting the capability as unconfigured, is the
+ * worst of both worlds.
+ *
+ * Exa is preferred when several keys are present because it is the provider
+ * this pipeline is tuned for -- see `exaSearch` in research/providers.ts.
+ * An explicit SEARCH_PROVIDER always wins, so 'none' remains a real off switch,
+ * and naming a provider whose key is absent degrades to no discovery rather
+ * than booting into certain failure.
+ */
+export function resolveSearchProviderId(input: {
+  provider?: SearchProviderId
+  exaKey?: string
+  braveKey?: string
+  serperKey?: string
+}): SearchProviderId {
+  if (input.provider === 'none') return 'none'
+  // The deterministic development provider needs no key, and refuses to run in
+  // production on its own account.
+  if (input.provider === 'mock') return 'mock'
+  if (input.provider === 'exa') return input.exaKey ? 'exa' : 'none'
+  if (input.provider === 'brave') return input.braveKey ? 'brave' : 'none'
+  if (input.provider === 'serper') return input.serperKey ? 'serper' : 'none'
+
+  if (input.exaKey) return 'exa'
+  if (input.braveKey) return 'brave'
+  if (input.serperKey) return 'serper'
+  return 'none'
+}
+
+export const searchProvider: SearchProviderId = resolveSearchProviderId({
+  provider: serverEnv.SEARCH_PROVIDER,
+  exaKey: serverEnv.EXA_API_KEY,
+  braveKey: serverEnv.BRAVE_SEARCH_API_KEY,
+  serperKey: serverEnv.SERPER_API_KEY,
+})
+
 /** Capability flags — the UI uses these to degrade honestly instead of erroring. */
 export const features = {
   /** True when a real model is reachable; false means the grounded fallback. */
@@ -190,9 +240,7 @@ export const features = {
   /** Privileged server operations (webhooks, hard account deletion). */
   serviceRole: Boolean(serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** Automatic discovery of sources from a name alone. */
-  researchDiscovery:
-    (serverEnv.SEARCH_PROVIDER === 'brave' && Boolean(serverEnv.BRAVE_SEARCH_API_KEY)) ||
-    (serverEnv.SEARCH_PROVIDER === 'serper' && Boolean(serverEnv.SERPER_API_KEY)),
+  researchDiscovery: searchProvider !== 'none',
   /** Analysing a user-supplied URL. Requires no credentials. */
   researchUrls: true,
 } as const

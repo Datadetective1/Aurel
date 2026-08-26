@@ -118,8 +118,11 @@ export default async function CapabilitiesSettingsPage() {
       deploymentAction: research.canDiscover
         ? undefined
         : {
+            // The key alone is enough — SEARCH_PROVIDER is inferred from
+            // whichever one is present, so naming it here would suggest a
+            // second step that does not exist.
             summary: 'Add a search provider key and redeploy.',
-            env: ['SEARCH_PROVIDER', 'BRAVE_SEARCH_API_KEY'],
+            env: ['EXA_API_KEY'],
           },
     },
     {
