@@ -21,9 +21,7 @@ are off.
 | 6 | **Email** | — | — | **Live — Resend** |
 
 Items 2 and 5 are credential-only: paste the variables, redeploy, done. Item 4
-needs implementation as well — see §4 for why I have not written it blind. And
-§7 is one dashboard setting away: Atturel's own mail is live, but Supabase is
-still sending confirmation and reset emails from its shared address.
+needs implementation as well — see §4 for why I have not written it blind.
 
 Set every variable in **Vercel → Project → Settings → Environment Variables**
 (Production), never in `.env.production`, which is committed.
@@ -242,8 +240,8 @@ older alias. The address must be on the domain verified in Resend — an
 unverified sender is a 403, and the send fails.
 
 **Note the separation.** These variables govern Atturel's own mail. The
-confirmation and password-reset emails are sent by Supabase, and are configured
-separately — see §7, which is not yet done.
+confirmation and password-reset emails are sent by Supabase and are configured
+separately, in §7 — also live.
 
 **Verify**
 
@@ -260,44 +258,39 @@ triggered it.
 
 ---
 
-## 7. Supabase — auth email is still on the shared sender
+## 7. Supabase auth email — **live, nothing needed**
 
-Site URL and redirect URLs are **done**. Verified on production: a fresh signup
-produced `redirect_to=https://www.atturel.com/auth/callback?next=/onboarding`,
-confirmation landed back on Atturel, and the session worked. Password recovery
-likewise. No localhost anywhere.
+Confirmation and password-reset emails are sent by Supabase, not by the
+application, so they are configured separately from §6. Both halves are now
+done and verified end to end on production.
 
-**What is still outstanding:** Supabase Custom SMTP is not in effect. A signup
-and a password reset run at 01:00 UTC on 26 Aug both arrived from
-`noreply@mail.app.supabase.io`, byte-identical in sender to one sent before
-Resend was configured. If Custom SMTP were routing through Resend, the From
-header would be on `atturel.com` — Atturel's own transactional mail sent in the
-same minute was, and passed DKIM as `header.i=@atturel.com header.s=resend`.
-
-This matters for two reasons. Supabase's shared sender is rate-limited to a
-handful of messages an hour, so signups will silently stop arriving as soon as
-more than a few people try at once. And the first email a new user ever sees
-comes from a supabase.io address rather than from Atturel.
-
-Fix it at **Auth → Emails → SMTP Settings** in the Supabase dashboard:
-
-| Field | Value |
+| | |
 | --- | --- |
-| Enable Custom SMTP | on |
-| Host | `smtp.resend.com` |
-| Port | `465` |
-| Username | `resend` |
-| Password | your Resend API key |
-| Sender email | an address on the verified domain, e.g. `notifications@atturel.com` |
-| Sender name | `Atturel` |
+| **Site URL** | `https://www.atturel.com` |
+| **Redirect URLs** | `https://www.atturel.com/**`, `https://atturel.com/**` |
+| **Custom SMTP** | Resend — `smtp.resend.com`, port `465`, username `resend` |
+| **Sender** | `Atturel <no-reply@atturel.com>` |
 
-Two things worth checking, because they are the usual reasons this silently
-does not take: the settings must be **saved** (the toggle alone does not
-persist), and the sender address must be on the domain verified in Resend —
-Supabase will accept an address that Resend then refuses.
+Verified 26 Aug 2026 with a fresh signup and a password reset:
 
-Verify by signing up with a fresh address: the confirmation email's From should
-read `Atturel <notifications@atturel.com>`, not `noreply@mail.app.supabase.io`.
+- Both arrived from `Atturel <no-reply@atturel.com>` — not
+  `noreply@mail.app.supabase.io`, which is what they came from before.
+- Both passed `dkim=pass header.i=@atturel.com header.s=resend`, so they were
+  signed with Resend's key for the verified domain. SPF passed on
+  `send.atturel.com`, and each carried
+  `X-Pm-Metadata-Project-Ref: mfvomtwwnkqsaiqzjbxy` — Supabase-originated,
+  Resend-delivered.
+- Both `redirect_to` values pointed at `https://www.atturel.com/auth/callback`.
+  Following the confirmation link created an authenticated session on
+  `www.atturel.com` and started onboarding; following the reset link reached
+  the change-password screen.
+- Both landed in the inbox rather than spam.
+
+**If this ever regresses,** the symptom is the From header reverting to
+`noreply@mail.app.supabase.io`. The two usual causes: the SMTP settings were
+not **saved** (the toggle alone does not persist), or the sender address is not
+on the domain verified in Resend — Supabase accepts an address that Resend then
+refuses.
 
 ---
 
