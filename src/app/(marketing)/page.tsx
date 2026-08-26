@@ -159,25 +159,25 @@ const STEPS = [
     // Discovery leads. This card used to open with "Paste a link", which was
     // accurate before automatic research shipped and became a description of
     // the fallback the moment it did.
-    body: `Give ${brand.name} a name, a company and a role. It searches legitimate public professional sources, verifies each one is genuinely about the right person, and builds a footprint where every claim links back to its source. You can still add a link, bio or transcript yourself when you have something specific.`,
+    body: `Give ${brand.name} a name, company and role. It finds legitimate public professional sources, verifies the identity, and builds a source-backed footprint. Add your own links or notes when useful.`,
   },
   {
     icon: Users,
     eyebrow: 'Walking in',
     title: 'Prepare for the room',
-    body: `Say what you need to achieve. ${brand.name} combines the public research, your objective and whatever history you already have: how to open, what to emphasise, what matters to each person, the questions and objections to expect, and what to leave with. Public evidence, your own observations and its inference stay clearly apart.`,
+    body: `Tell ${brand.name} what you need to accomplish. It combines public context with your relationship history to suggest how to open, what to emphasise, and what to leave with.`,
   },
   {
     icon: PenLine,
     eyebrow: 'Afterwards',
     title: 'Capture what actually happened',
-    body: `Paste your notes or a transcript and ${brand.name} proposes the decisions, commitments, open questions, observations and next actions it found. Nothing becomes part of your relationship record until you confirm it.`,
+    body: `Paste your notes or a transcript. ${brand.name} proposes the decisions, commitments, questions, observations and next actions it found. Nothing enters your record until you confirm it.`,
   },
   {
     icon: Rewind,
     eyebrow: 'Next time',
     title: 'Your record outranks the internet',
-    body: 'Public research helps before you know someone. Once you have worked together, your confirmed observations and interaction history take priority. A bio tells you who someone is. Your record tells you how the relationship actually works.',
+    body: 'Public research helps before you know someone. Once you have worked together, your confirmed observations take priority. A bio tells you who someone is. Your record tells you how the relationship actually works.',
   },
 ]
 
