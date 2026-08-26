@@ -199,6 +199,14 @@ export function toPlainText(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/[ \t]+/g, ' ')
+    // Every line trimmed BEFORE blank runs are collapsed. Stripping a table
+    // layout leaves lines holding a single space, and a line like that is not
+    // empty - so `\\n{3,}` never matched and the plain-text part opened with a
+    // dozen blank lines before the first word. It was a fallback that existed
+    // and was not worth reading.
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }

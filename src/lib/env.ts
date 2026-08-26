@@ -41,6 +41,11 @@ const serverSchema = z.object({
   ANTHROPIC_API_KEY: optional,
   OPENAI_API_KEY: optional,
   RESEND_API_KEY: optional,
+  // ATTUREL_EMAIL_* are the names the production deployment uses.
+  // EMAIL_FROM_ADDRESS is the older name, still read so an existing deployment
+  // does not silently lose its sender on upgrade.
+  ATTUREL_EMAIL_FROM: optional,
+  ATTUREL_EMAIL_REPLY_TO: optional,
   EMAIL_FROM_ADDRESS: optional,
   STRIPE_SECRET_KEY: optional,
   STRIPE_WEBHOOK_SECRET: optional,
@@ -155,6 +160,23 @@ const resolvedAI = resolveAI({
 
 export const aiProvider = resolvedAI.provider
 export const aiModel = resolvedAI.model
+
+/**
+ * The sender addresses transactional mail actually goes out with.
+ *
+ * Resolved here rather than read at each call site, because getting this wrong
+ * is invisible until nothing arrives: a `from` on a domain the provider has not
+ * verified is rejected with a 403, and the Capabilities screen would still say
+ * Email was connected. It happened — the deployment set ATTUREL_EMAIL_FROM on
+ * atturel.com while the code only read EMAIL_FROM_ADDRESS and fell back to a
+ * hardcoded address on a domain that was never registered.
+ *
+ * Both accept either a bare address or a full `Name <address>` string.
+ */
+export const emailFromOverride: string | undefined =
+  serverEnv.ATTUREL_EMAIL_FROM ?? serverEnv.EMAIL_FROM_ADDRESS
+
+export const emailReplyToOverride: string | undefined = serverEnv.ATTUREL_EMAIL_REPLY_TO
 
 /** Capability flags — the UI uses these to degrade honestly instead of erroring. */
 export const features = {

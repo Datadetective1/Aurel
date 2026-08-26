@@ -44,7 +44,7 @@ export const brand = {
   /** Registered company name used in legal copy and email footers. */
   legalEntity: 'Atturel Labs',
   /** Primary marketing domain, display form (no protocol). */
-  domain: 'atturel.app',
+  domain: 'atturel.com',
 
   /**
    * One-line positioning statement. Used in metadata and email preheaders.
@@ -69,13 +69,13 @@ export const brand = {
   email: {
     /** Sender for transactional mail. Domain must be verified in Resend. */
     fromName: 'Atturel',
-    fromAddress: 'hello@atturel.app',
+    fromAddress: 'hello@atturel.com',
     /** Where replies land. */
-    replyTo: 'support@atturel.app',
+    replyTo: 'support@atturel.com',
     /** Public support address shown in UI and legal pages. */
-    support: 'support@atturel.app',
+    support: 'support@atturel.com',
     /** Privacy / data-rights contact required by the privacy policy. */
-    privacy: 'privacy@atturel.app',
+    privacy: 'privacy@atturel.com',
   },
 
   legal: {

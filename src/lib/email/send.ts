@@ -1,6 +1,6 @@
 import 'server-only'
 import { brand, emailFrom } from '@/lib/brand'
-import { serverEnv, features } from '@/lib/env'
+import { serverEnv, features, emailFromOverride, emailReplyToOverride } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { toPlainText } from './layout'
 
@@ -66,7 +66,7 @@ export async function sendEmail(message: OutgoingEmail): Promise<SendResult> {
         subject: message.subject,
         html: message.html,
         text,
-        reply_to: message.replyTo ?? brand.email.replyTo,
+        reply_to: message.replyTo ?? replyToAddress(),
       }),
       // A hung mail API must not hold a server action open indefinitely.
       signal: AbortSignal.timeout(10_000),
@@ -98,13 +98,32 @@ export async function sendEmail(message: OutgoingEmail): Promise<SendResult> {
 /**
  * The verified sender, overridable by env.
  *
- * `EMAIL_FROM_ADDRESS` exists because the registry's address is only sendable
- * once its domain is verified with the provider — a deployment on a different
- * domain needs to override it without editing the brand file.
+ * The override exists because the registry's address is only sendable once its
+ * domain is verified with the provider — a deployment on a different domain has
+ * to be able to change it without editing the brand file. Getting this wrong is
+ * silent: the provider rejects an unverified `from` with a 403 and the UI still
+ * reports email as connected.
  */
-function senderAddress(): string {
-  const override = serverEnv.EMAIL_FROM_ADDRESS
-  return override ? `${brand.email.fromName} <${override}>` : emailFrom
+export function senderAddress(): string {
+  return withDisplayName(emailFromOverride, brand.email.fromName) ?? emailFrom
+}
+
+/** Where replies land. Falls back to the registry. */
+export function replyToAddress(): string {
+  return emailReplyToOverride?.trim() || brand.email.replyTo
+}
+
+/**
+ * Accepts either a bare address or a full `Name <address>` string.
+ *
+ * Both are natural things to put in an env var, and wrapping an already-wrapped
+ * value produces `Atturel <Atturel <hello@…>>`, which is not a valid RFC 5322
+ * address and which the provider rejects.
+ */
+function withDisplayName(value: string | undefined, displayName: string): string | undefined {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  return trimmed.includes('<') ? trimmed : `${displayName} <${trimmed}>`
 }
 
 /** `a***@example.com` — enough to correlate a support ticket, not to identify. */

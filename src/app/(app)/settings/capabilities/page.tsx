@@ -19,6 +19,7 @@ import { aiStatus } from '@/lib/ai/provider'
 import { researchCapability } from '@/lib/research/providers'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { features } from '@/lib/env'
+import { senderAddress } from '@/lib/email/send'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = { title: 'Capabilities', robots: { index: false, follow: false } }
@@ -163,7 +164,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: Mail,
       status: features.emailDelivery ? 'configured' : 'not_connected',
       detail: features.emailDelivery
-        ? `Sent from ${brand.email.fromAddress}. Meeting reminders and your weekly summary only.`
+        ? `Sent from ${senderAddress()}. Meeting reminders and your weekly summary only.`
         : 'Transactional email is written to the server log rather than delivered. Nothing else is affected.',
       userAction: features.emailDelivery
         ? { label: 'Email preferences', href: '/settings/appearance' }
