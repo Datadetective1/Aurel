@@ -72,11 +72,35 @@ export function ForgotPasswordForm() {
   )
 }
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ email }: { email?: string }) {
   const [state, formAction] = useActionState<AuthState, FormData>(updatePassword, {})
 
   return (
     <form action={formAction} className="mt-8" noValidate>
+      {/* The account this password belongs to.
+          
+          A password form with no username field leaves a password manager
+          nothing to attach the new credential to, so it saves nothing and the
+          entry it already holds goes stale. The user then finishes a successful
+          reset and is locked out at the next sign-in by their own saved
+          password — the failure lands well away from its cause.
+          
+          Not display:none, which managers skip. Present and readable to them,
+          invisible and unreachable to everyone else. The server ignores it;
+          updatePassword takes the user from the session. */}
+      {email ? (
+        <input
+          type="text"
+          name="username"
+          value={email}
+          readOnly
+          autoComplete="username"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="pointer-events-none absolute -m-px h-px w-px overflow-hidden border-0 p-0 opacity-0"
+        />
+      ) : null}
+
       <div className="grid gap-4">
         <FormField
           id="password"

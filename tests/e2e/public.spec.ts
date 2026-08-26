@@ -51,6 +51,27 @@ test.describe('auth', () => {
     await page.getByRole('link', { name: /forgot/i }).click()
     await expect(page).toHaveURL(/forgot-password/)
   })
+
+  test('the password fields are ones a manager will actually fill', async ({ page }) => {
+    // Chrome warned about this on the live reset page. A password form with no
+    // username field gives a manager nothing to attach the credential to, so it
+    // saves nothing and the entry it already holds goes stale — the user
+    // completes a successful reset and is locked out at the next sign-in by
+    // their own saved password.
+    //
+    // Signed out, /reset-password redirects, so the pair that can be checked
+    // without a session is on sign-up: the new-password hint has to be right
+    // there too or a manager offers the old password for a new account.
+    await page.goto('/sign-up')
+    await expect(page.locator('input[type=password]').first()).toHaveAttribute(
+      'autocomplete',
+      'new-password',
+    )
+    await expect(page.locator('input[type=email]').first()).toHaveAttribute(
+      'autocomplete',
+      /username|email/,
+    )
+  })
 })
 
 test.describe('route protection', () => {
