@@ -404,11 +404,18 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
         lastResearchedAt={person.last_researched_at}
-        // Sources that actually support a claim, not every row stored. A run
-        // that stores five and derives facts from two was reporting "Built
-        // from 5 sources" above a list where three said "No facts rest on
-        // this" -- the summary contradicting the detail directly beneath it.
-        sourceCount={sources.filter((source) => source.factCount > 0).length}
+        // Sources actually standing behind a claim: something rests on them,
+        // and they have not been marked as somebody else. A run that stores
+        // five and derives facts from two was reporting "Built from 5 sources"
+        // above a list where three said "No facts rest on this" -- the summary
+        // contradicting the detail directly beneath it. A source the user has
+        // rejected keeps its citations on facts that other sources corroborate,
+        // which is right, but it must not still be counted as evidence.
+        sourceCount={
+          sources.filter(
+            (source) => source.factCount > 0 && source.identityStatus !== 'no_match',
+          ).length
+        }
         storedSourceCount={sources.length}
       />
 

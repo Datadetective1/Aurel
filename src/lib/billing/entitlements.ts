@@ -116,7 +116,7 @@ export async function checkCapability(
     return {
       allowed: false,
       reason: 'not_in_plan',
-      message: `${LABELS[capability]} is available on Pro.`,
+      message: `${CAPABILITY_LABELS[capability]} is available on Pro.`,
       limit: null,
       used: 0,
       plan: entitlements.plan,
@@ -138,7 +138,12 @@ export async function checkCapability(
       reason: 'quota_exhausted',
       message:
         entitlements.plan === 'free'
-          ? `You have used all ${limit} of this month's ${LABELS[capability].toLowerCase()}. Upgrade for more, or wait until next month.`
+          ? // The label leads, rather than being spliced into a possessive.
+            // "all 3 of this month's researching a person" was the result of
+            // the old frame: these labels are noun phrases sized for "X is
+            // available on Pro", and no single frame can make every one of
+            // them read as a countable plural.
+            `${CAPABILITY_LABELS[capability]}: you have used all ${limit} for this month. Upgrade for more, or wait until next month.`
           : `You have reached this month's fair-use limit of ${limit}. Contact support if you need more.`,
       limit,
       used,
@@ -257,7 +262,8 @@ export async function checkPersonLimit(): Promise<CapabilityCheck> {
   return { allowed: true, remaining: entitlements.limits.people - used, limit: entitlements.limits.people }
 }
 
-const LABELS: Record<Capability, string> = {
+/** Exported so the copy that embeds them can be tested. */
+export const CAPABILITY_LABELS: Record<Capability, string> = {
   researchPerson: 'Researching a person',
   deepResearch: 'Deep research',
   meetingBrief: 'Meeting briefs',
