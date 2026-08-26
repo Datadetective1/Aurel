@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { ownershipNoVisibility } from '@/lib/workspace'
 import { logger } from '@/lib/logger'
+import { track } from '@/lib/analytics'
 
 const RATINGS = ['yes', 'partly', 'no'] as const
 
@@ -50,6 +51,8 @@ export async function submitArtifactFeedback(
     logger.warn('feedback.save_failed', { code: error.code })
     return { ok: false as const }
   }
+
+  await track('brief_feedback', { rating, hasNote: Boolean(note?.trim()) })
 
   return { ok: true as const }
 }

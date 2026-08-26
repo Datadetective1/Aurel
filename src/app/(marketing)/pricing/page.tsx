@@ -29,7 +29,7 @@ const FAQ = [
   },
   {
     q: 'What does "research" actually do?',
-    a: `It reads legitimate public professional material — company biographies, talks, articles, interviews — checks that the page is genuinely about the right person, and extracts professional facts with a link back to the source. It does not scrape platforms that prohibit it, and it ignores anything about someone's private life.`,
+    a: `From a name, a company and a role it searches for legitimate public professional material — company biographies, talks, articles, interviews — checks that each page is genuinely about the right person, and extracts professional facts with a link back to the source. You can add a link or a note yourself when you have something specific. It does not scrape platforms that prohibit it, and it ignores anything about someone's private life.`,
   },
   {
     q: 'Can I cancel?',

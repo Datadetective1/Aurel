@@ -1,6 +1,8 @@
 import 'server-only'
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { track } from '@/lib/analytics'
+import { estimateCostMicros, hasKnownPrice } from './provider-cost'
 import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
@@ -133,6 +135,10 @@ export async function checkCapability(
   const used = await usageInPeriod(meter, entitlements.periodStart)
 
   if (used >= limit) {
+    // Defined since the beginning and never fired. Which quota bites first, and
+    // how often, is what tells us whether the free tier is the right shape --
+    // and that is a pilot question, not a launch one.
+    await track('limit_reached', { capability, meter, limit, plan: entitlements.plan })
     return {
       allowed: false,
       reason: 'quota_exhausted',
@@ -185,6 +191,10 @@ export interface UsageRecord {
   model?: string
   inputTokens?: number
   outputTokens?: number
+  /** Billable search-provider calls this unit of work made. */
+  searchRequests?: number
+  /** Which search vendor, when it differs from the model provider. */
+  searchProvider?: string
   subjectKind?: string
   subjectId?: string
 }
@@ -223,7 +233,24 @@ export async function recordUsage(record: UsageRecord): Promise<void> {
       output_tokens: record.outputTokens ?? null,
       subject_kind: record.subjectKind ?? null,
       subject_id: record.subjectId ?? null,
+      search_requests: record.searchRequests ?? 0,
+      // Priced at the moment the work ran, so a later price change does not
+      // silently rewrite what last month cost.
+      estimated_cost_micros: estimateCostMicros({
+        provider: record.provider,
+        model: record.model,
+        inputTokens: record.inputTokens,
+        outputTokens: record.outputTokens,
+        searchRequests: record.searchRequests,
+        searchProvider: record.searchProvider,
+      }),
     })
+
+    // An unpriced model still bills; it just bills invisibly. Worth a line so
+    // the gap is findable rather than showing up as a suspiciously cheap month.
+    if (record.model && !hasKnownPrice(record.model)) {
+      logger.warn('usage.unpriced_model', { meter: record.meter, model: record.model })
+    }
   } catch (error) {
     logger.warn('entitlements.record_failed', {
       meter: record.meter,

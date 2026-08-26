@@ -66,6 +66,13 @@ function isRetryable(error: unknown): boolean {
   )
 }
 
+/**
+ * Above this, a generation is slow enough to be worth a log line even though it
+ * succeeded. Set below the request timeout on purpose: the interesting case is
+ * the one that finished but should not have taken that long.
+ */
+const SLOW_GENERATION_MS = 20_000
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
@@ -125,6 +132,20 @@ export async function runPrompt<TInput, TOutput>(
         temperature: 0.3,
       })
 
+      const latencyMs = Date.now() - started
+
+      // A generation this slow has not failed, so nothing else will mention it
+      // -- but the user is watching a spinner and the request is occupying a
+      // serverless invocation. Worth knowing before a pilot user reports it.
+      if (latencyMs > SLOW_GENERATION_MS) {
+        logger.warn('ai.slow_generation', {
+          kind: module.kind,
+          model: modelId,
+          latencyMs,
+          attempt,
+        })
+      }
+
       return {
         output: result.object,
         citations,
@@ -132,7 +153,7 @@ export async function runPrompt<TInput, TOutput>(
           provider: aiProvider,
           model: modelId,
           promptVersion: module.version,
-          latencyMs: Date.now() - started,
+          latencyMs,
           groundedFallback: false,
           tokenUsage: {
             input: result.usage?.inputTokens ?? 0,

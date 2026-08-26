@@ -25,6 +25,19 @@ export type AnalyticsEvent =
   | 'assessment_completed'
   | 'assessment_calibrated'
   | 'person_added'
+  // The research funnel. `person_research_started` and `..._completed` are a
+  // pair on purpose: the gap between their counts is the failure rate, and the
+  // gap between their timestamps is how long a user waits. Before these
+  // existed, a completed research run fired `person_added` -- which inflated
+  // the person count and left research itself unmeasurable.
+  | 'person_research_started'
+  | 'person_research_completed'
+  | 'research_source_accepted'
+  | 'research_source_rejected'
+  | 'brief_feedback'
+  // Emitted when a signed-in page loads after a gap longer than the session
+  // window. Retention, without storing anything about what the session did.
+  | 'return_session'
   | 'observation_added'
   | 'observation_confirmed'
   | 'observation_dismissed'

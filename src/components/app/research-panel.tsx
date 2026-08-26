@@ -96,7 +96,7 @@ export function ResearchPanel({
                     ? ` of ${storedSourceCount} reviewed`
                     : ''
                 }. Every claim links back to where it came from.`
-              : `${brand.name} can build a source-backed professional picture of ${personName} from legitimate public material — company bios, talks, articles, interviews.`}
+              : `${brand.name} will search legitimate public professional sources for ${personName} — company bios, talks, articles, interviews — check each one is genuinely about them, and build a source-backed picture. Add a link or a note yourself whenever you have something specific.`}
           </p>
         </div>
 

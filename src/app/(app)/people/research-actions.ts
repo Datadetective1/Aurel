@@ -237,9 +237,19 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
  * Either way the result is source-backed. There is no path that invents a
  * profile when nothing was found.
  */
+/** A research run longer than this is worth a look, even when it succeeds. */
+const SLOW_RESEARCH_MS = 60_000
+
 export async function researchPerson(personId: string): Promise<ResearchState> {
   const capability = await checkCapability('researchPerson', 'person_research')
-  if (!capability.allowed) return { error: capability.message }
+  if (!capability.allowed) {
+    // The analytics event measures how often this happens; this line is what an
+    // operator sees when a pilot user says research "stopped working".
+    logger.info('research.quota_exhausted', { reason: capability.reason })
+    return { error: capability.message }
+  }
+
+  const startedAt = Date.now()
 
   const user = await requireUser()
   const { workspaceId } = await getWorkspace()
@@ -273,6 +283,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     .single()
 
   const jobId = job?.id ?? null
+  await track('person_research_started', { provider: resolveSearchProvider().id })
   const capabilities = researchCapability()
 
   let considered = 0
@@ -437,8 +448,33 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       model: usedModel,
       inputTokens,
       outputTokens,
+      searchRequests,
+      searchProvider: resolveSearchProvider().id,
     })
-    await track('person_added', { researched: true, sourcesAccepted: accepted })
+    await track('person_research_completed', {
+      sourcesConsidered: considered,
+      sourcesAccepted: accepted,
+      factsCreated: facts,
+      observationsProposed: proposals,
+      searchRequests,
+      searchCostUnits,
+      inputTokens,
+      outputTokens,
+      succeeded: accepted > 0,
+    })
+
+    const elapsedMs = Date.now() - startedAt
+    if (elapsedMs > SLOW_RESEARCH_MS) {
+      // Each analysed page is a fetch plus a model call, so a slow run usually
+      // means slow sources rather than a slow model. Both counts are here so
+      // the difference is visible without reproducing it.
+      logger.warn('research.slow_run', {
+        elapsedMs,
+        searchRequests,
+        sourcesConsidered: considered,
+        sourcesAccepted: accepted,
+      })
+    }
 
     revalidatePath(`/people/${personId}`)
 
@@ -552,6 +588,7 @@ export async function rejectSourceMatch(sourceId: string, personId: string) {
   // Facts supported ONLY by this source lose their basis and are removed.
   await removeOrphanedFacts(supabase, personId, sourceId, user.id)
 
+  await track('research_source_rejected', {})
   revalidatePath(`/people/${personId}`)
   return { ok: true as const }
 }
@@ -578,6 +615,7 @@ export async function confirmSourceMatch(sourceId: string, personId: string) {
     .eq('id', sourceId)
     .eq('user_id', user.id)
 
+  await track('research_source_accepted', {})
   revalidatePath(`/people/${personId}`)
   return { ok: true as const }
 }

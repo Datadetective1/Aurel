@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { safeRedirectPath } from '@/lib/auth'
 import { absoluteUrl } from '@/lib/brand'
 import { logger } from '@/lib/logger'
+import { track } from '@/lib/analytics'
 import { sendEmail } from '@/lib/email/send'
 import { passwordChangedEmail, welcomeEmail } from '@/lib/email/templates'
 
@@ -81,6 +82,8 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   // beyond delivery: sendEmail never throws, and a mail outage must not fail a
   // signup that already succeeded. Without a provider configured this writes a
   // log line instead, which is the supported unconfigured state.
+  await track('signup_completed', { confirmationRequired: !data.session })
+
   const welcome = welcomeEmail({ firstName: firstNameOf(parsed.data.fullName) })
   await sendEmail({
     to: parsed.data.email,

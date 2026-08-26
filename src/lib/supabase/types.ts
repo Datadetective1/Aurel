@@ -1498,6 +1498,7 @@ export type Database = {
           id: string
           intents: string[]
           job_function: string | null
+          last_seen_at: string | null
           job_title: string | null
           known_frameworks: Json
           onboarding_completed_at: string | null
@@ -1522,6 +1523,7 @@ export type Database = {
           id: string
           intents?: string[]
           job_function?: string | null
+          last_seen_at?: string | null
           job_title?: string | null
           known_frameworks?: Json
           onboarding_completed_at?: string | null
@@ -1546,6 +1548,7 @@ export type Database = {
           id?: string
           intents?: string[]
           job_function?: string | null
+          last_seen_at?: string | null
           job_title?: string | null
           known_frameworks?: Json
           onboarding_completed_at?: string | null
@@ -1937,6 +1940,8 @@ export type Database = {
           cost_units: number
           id: string
           input_tokens: number | null
+          estimated_cost_micros?: number
+          search_requests?: number
           kind: Database["public"]["Enums"]["meter_kind"]
           model: string | null
           occurred_at: string
@@ -1953,6 +1958,8 @@ export type Database = {
           cost_units?: number
           id?: string
           input_tokens?: number | null
+          estimated_cost_micros?: number
+          search_requests?: number
           kind: Database["public"]["Enums"]["meter_kind"]
           model?: string | null
           occurred_at?: string
@@ -1969,6 +1976,8 @@ export type Database = {
           cost_units?: number
           id?: string
           input_tokens?: number | null
+          estimated_cost_micros?: number
+          search_requests?: number
           kind?: Database["public"]["Enums"]["meter_kind"]
           model?: string | null
           occurred_at?: string
