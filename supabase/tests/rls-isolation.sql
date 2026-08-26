@@ -209,6 +209,50 @@ begin
   end;
   perform pg_temp.assert(denied, 'anon cannot read observations');
 
+  -- --- Calendar grants and events are private -------------------------------
+  -- The most sensitive rows in the database. An OAuth refresh token readable by
+  -- another account would hand them a standing grant to read a stranger's
+  -- working life, and the event rows are that person's schedule.
+  perform pg_temp.become_superuser();
+  insert into public.integration_accounts (user_id, provider, status, scopes, refresh_token_encrypted)
+  values (alice, 'microsoft', 'connected', array['Calendars.Read'], 'v1.ciphertext.for.alice');
+
+  perform pg_temp.become(bob);
+  perform pg_temp.assert(
+    not exists (select 1 from public.integration_accounts where user_id = alice),
+    'bob cannot see alice''s calendar grant'
+  );
+
+  denied := false;
+  begin
+    update public.integration_accounts set refresh_token_encrypted = 'stolen' where user_id = alice;
+    denied := not exists (
+      select 1 from public.integration_accounts
+      where user_id = alice and refresh_token_encrypted = 'stolen'
+    );
+  exception when insufficient_privilege then
+    denied := true;
+  end;
+  perform pg_temp.assert(denied, 'bob cannot overwrite alice''s calendar token');
+
+  perform pg_temp.become_superuser();
+  insert into public.external_calendar_events
+    (user_id, integration_id, provider, external_id, starts_at, attendees)
+  values (
+    alice,
+    (select id from public.integration_accounts where user_id = alice limit 1),
+    'microsoft',
+    'evt-alice-1',
+    now() + interval '1 day',
+    '[]'::jsonb
+  );
+
+  perform pg_temp.become(bob);
+  perform pg_temp.assert(
+    not exists (select 1 from public.external_calendar_events where user_id = alice),
+    'bob cannot see alice''s meetings'
+  );
+
   perform pg_temp.become_superuser();
   raise notice 'ALL RLS ISOLATION ASSERTIONS PASSED';
 end

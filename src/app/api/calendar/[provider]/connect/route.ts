@@ -1,0 +1,83 @@
+import { NextResponse, type NextRequest } from 'next/server'
+import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto'
+import { requireOnboardedUser } from '@/lib/auth'
+import { calendarProvider, CALENDAR_PROVIDERS, providerConfigured } from '@/lib/calendar'
+import type { CalendarProviderId } from '@/lib/calendar'
+import { canStoreSecrets } from '@/lib/crypto'
+import { serverEnv } from '@/lib/env'
+import { track } from '@/lib/analytics'
+import { logger } from '@/lib/logger'
+import { absoluteUrl } from '@/lib/brand'
+
+/**
+ * Start the OAuth dance.
+ *
+ * The `state` parameter is signed rather than random-and-stored. It carries the
+ * user id and provider, HMAC'd with the token encryption key, so the callback
+ * can verify that this authorization belongs to the session completing it
+ * without a round trip to a table of pending requests. Without that binding,
+ * an attacker could complete an OAuth flow they started and have the resulting
+ * grant attached to someone else's account.
+ */
+
+export function stateSecret(): string {
+  return serverEnv.TOKEN_ENCRYPTION_KEY ?? ''
+}
+
+export function signState(payload: string): string {
+  const mac = createHmac('sha256', stateSecret()).update(payload).digest('base64url')
+  return `${payload}.${mac}`
+}
+
+/** Constant-time verification, returning the payload or null. */
+export function verifyState(state: string | null): string | null {
+  if (!state) return null
+  const index = state.lastIndexOf('.')
+  if (index <= 0) return null
+
+  const payload = state.slice(0, index)
+  const provided = Buffer.from(state.slice(index + 1))
+  const expected = Buffer.from(createHmac('sha256', stateSecret()).update(payload).digest('base64url'))
+
+  if (provided.length !== expected.length) return null
+  return timingSafeEqual(provided, expected) ? payload : null
+}
+
+export function calendarRedirectUri(provider: CalendarProviderId): string {
+  return absoluteUrl(`/api/calendar/${provider}/callback`)
+}
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ provider: string }> },
+) {
+  const { provider: raw } = await params
+  const origin = absoluteUrl('').replace(/\/$/, '')
+
+  if (!CALENDAR_PROVIDERS.includes(raw as CalendarProviderId)) {
+    return NextResponse.redirect(`${origin}/settings/capabilities?calendar=unknown_provider`)
+  }
+  const id = raw as CalendarProviderId
+
+  const { user } = await requireOnboardedUser()
+
+  // Refusing here rather than at the callback: sending someone through a
+  // consent screen we cannot honour wastes their time and leaves a granted
+  // permission we never use.
+  if (!providerConfigured(id) || !canStoreSecrets()) {
+    logger.warn('calendar.connect_unconfigured', { provider: id })
+    return NextResponse.redirect(`${origin}/settings/capabilities?calendar=not_configured`)
+  }
+
+  await track('calendar_connect_started', { provider: id })
+
+  const nonce = randomBytes(16).toString('base64url')
+  const state = signState(`${id}:${user.id}:${nonce}`)
+
+  return NextResponse.redirect(
+    calendarProvider(id).authorizationUrl({
+      redirectUri: calendarRedirectUri(id),
+      state,
+    }),
+  )
+}

@@ -38,9 +38,14 @@ function walk(dir: string, out: string[] = []): string[] {
 function routes(): Set<string> {
   const found = new Set<string>()
   for (const file of walk(APP)) {
-    // basename, not a regex: the separator differs by platform and a regex
-    // that only matched '/' silently found no routes at all on Windows.
-    if (basename(file) !== 'page.tsx') continue
+    // Pages and route handlers both. An API route is a real destination -- a
+    // link to a missing one is exactly as broken as a link to a missing page --
+    // and leaving them out made the test report a working endpoint as dead.
+    //
+    // basename, not a regex: the separator differs by platform and a regex that
+    // only matched '/' silently found no routes at all on Windows.
+    const name = basename(file)
+    if (name !== 'page.tsx' && name !== 'route.ts') continue
     const path = relative(APP, file)
       .split(sep)
       .slice(0, -1)
@@ -74,7 +79,10 @@ function linkTargets(): Map<string, string[]> {
         if (!raw?.startsWith('/')) continue // external, mailto:, tel:, #anchor
 
         const normalised = raw
-          .replace(/\$\{[^}]+\}/g, '[id]')
+          // Any template hole is a dynamic segment. Which one it is called in
+          // the file tree -- [id], [provider] -- is not knowable from the call
+          // site, so both sides are reduced to the same placeholder below.
+          .replace(/\$\{[^}]+\}/g, '[dynamic]')
           .replace(/[?#].*$/, '')
           .replace(/\/$/, '')
 
@@ -105,9 +113,14 @@ describe('internal links', () => {
   it('never points at a route that does not exist', () => {
     const dead: string[] = []
     for (const [target, files] of linkTargets()) {
-      // A dynamic segment matches whatever it was named in the file tree.
-      const candidate = target.replace(/\/\[id\]/g, '/[id]')
-      if (!known.has(candidate)) dead.push(`${target}  <-  ${[...new Set(files)].join(', ')}`)
+      // Compare with every dynamic segment reduced to the same token, so a
+      // link built from `${provider}` matches a route directory named
+      // [provider] without the test having to know the parameter's name.
+      const shape = (path: string) => path.replace(/\[[^\]]+\]/g, '[dynamic]')
+      const candidate = shape(target)
+      if (![...known].some((route) => shape(route) === candidate)) {
+        dead.push(`${target}  <-  ${[...new Set(files)].join(', ')}`)
+      }
     }
 
     expect(dead, `Links with no route behind them:\n${dead.join('\n')}`).toEqual([])

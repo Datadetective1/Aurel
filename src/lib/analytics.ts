@@ -38,6 +38,19 @@ export type AnalyticsEvent =
   // Emitted when a signed-in page loads after a gap longer than the session
   // window. Retention, without storing anything about what the session did.
   | 'return_session'
+  // Calendar. Counts, providers and reasons only -- never a meeting title, an
+  // attendee name or an email address. A calendar is the most sensitive thing
+  // Atturel reads, and analytics is the last place it should surface.
+  | 'calendar_connect_started'
+  | 'calendar_connected'
+  | 'calendar_connect_failed'
+  | 'calendar_disconnected'
+  | 'calendar_sync_completed'
+  | 'calendar_sync_failed'
+  | 'calendar_event_imported'
+  | 'calendar_attendee_matched'
+  | 'calendar_attendee_unmatched'
+  | 'calendar_prepare_started'
   | 'observation_added'
   | 'observation_confirmed'
   | 'observation_dismissed'

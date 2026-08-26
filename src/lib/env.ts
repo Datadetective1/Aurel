@@ -55,6 +55,14 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_SECRET: optional,
   MICROSOFT_CLIENT_ID: optional,
   MICROSOFT_CLIENT_SECRET: optional,
+  // Multitenant by default. Set to a specific tenant id only to restrict the
+  // app to one Entra organisation.
+  MICROSOFT_TENANT: z.preprocess(blankToUndefined, z.string().trim().min(1).default('common')),
+  // Encrypts OAuth tokens at rest. Any random string of 32+ characters; it is
+  // hashed to a key, so it does not need to be exactly 32 bytes. Without it,
+  // calendar connection refuses to store a token rather than storing it in the
+  // clear -- see lib/crypto.ts.
+  TOKEN_ENCRYPTION_KEY: optional,
   MICROSOFT_TENANT_ID: z.preprocess(blankToUndefined, z.string().trim().min(1).catch('common')),
   SENTRY_DSN: optional,
   ALLOW_DB_SEED: z.string().catch('false'),
@@ -235,8 +243,22 @@ export const features = {
   emailDelivery: Boolean(serverEnv.RESEND_API_KEY),
   billing: Boolean(serverEnv.STRIPE_SECRET_KEY),
   billingWebhooks: Boolean(serverEnv.STRIPE_SECRET_KEY && serverEnv.STRIPE_WEBHOOK_SECRET),
-  googleCalendar: Boolean(serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET),
-  microsoftCalendar: Boolean(serverEnv.MICROSOFT_CLIENT_ID && serverEnv.MICROSOFT_CLIENT_SECRET),
+  /**
+   * Whether the deployment can OFFER this provider. Not whether anyone has
+   * connected: that needs a user grant, and Capabilities checks for one rather
+   * than inferring a connection from the presence of a client secret.
+   *
+   * Token storage is part of being able to offer it at all -- a connect button
+   * that cannot persist a refresh token is a button that fails after an hour.
+   */
+  googleCalendar: Boolean(
+    serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.TOKEN_ENCRYPTION_KEY,
+  ),
+  microsoftCalendar: Boolean(
+    serverEnv.MICROSOFT_CLIENT_ID &&
+      serverEnv.MICROSOFT_CLIENT_SECRET &&
+      serverEnv.TOKEN_ENCRYPTION_KEY,
+  ),
   /** Privileged server operations (webhooks, hard account deletion). */
   serviceRole: Boolean(serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** Automatic discovery of sources from a name alone. */

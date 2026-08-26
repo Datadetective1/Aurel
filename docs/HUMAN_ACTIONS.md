@@ -20,7 +20,7 @@ are off.
 | 1 | **AI reasoning** | — | — | **Live — OpenAI** |
 | 2 | **Automatic research** | — | — | **Live — Exa** |
 | 3 | Document ingestion | — | — | **Live** |
-| 4 | Calendar | OAuth client **+ code** | Yes | **Not built** |
+| 4 | **Calendar** | OAuth app | Yes | **Built — needs an OAuth app** |
 | 5 | Billing | Stripe account | Yes (test mode) | Complete |
 | 6 | **Email** | — | — | **Live — Resend** |
 
@@ -160,37 +160,91 @@ refused by name rather than saved as an empty source.
 
 ---
 
-## 4. Calendar — needs code as well as credentials
+## 4. Calendar — **built, needs an OAuth app**
 
-**I have not built this, and I want to be straight about why.**
+Read-only calendar is implemented end to end: provider abstraction, Microsoft
+Graph and Google adapters, OAuth connect/disconnect, encrypted token storage,
+a fourteen-day idempotent sync, attendee matching to existing People, upcoming
+meetings on Today, and Prepare straight from a synced event.
 
-The database tables exist (`integration_accounts`, `external_calendar_events`)
-and the capability screen reports it honestly as *Unavailable*. But there is no
-OAuth flow, no token encryption, no sync, and no attendee-to-person matching.
+**Atturel never writes to your calendar.** No create, edit, delete, accept or
+decline — the provider interface has no vocabulary for it, and a test asserts
+the calendar modules only ever issue GET requests to a provider.
 
-Writing an OAuth integration I cannot execute even once would mean shipping
-several hundred lines of unverifiable code into the security-sensitive part of
-the product — token storage and refresh. I would rather tell you it is missing
-than have you discover it is subtly wrong.
+### 4.1 Shared — token encryption (required for either provider)
 
-If you want it, the credential half is:
+```
+TOKEN_ENCRYPTION_KEY=<any random string, 32+ characters>
+```
+
+Generate one with `openssl rand -base64 48`. Without it, Connect refuses to
+start rather than storing a refresh token in the clear, and both providers show
+as **Unavailable**. Keep it out of the database and do not rotate it casually:
+changing it invalidates every stored grant and every user has to reconnect.
+
+### 4.2 Microsoft 365 / Outlook
 
 | | |
 | --- | --- |
-| **Service** | Google Cloud (Calendar API) and/or Microsoft Entra ID |
-| **Setup** | https://console.cloud.google.com/apis/credentials → *Create OAuth client ID* → Web application<br>Enable **Google Calendar API** under *APIs & Services → Library* |
-| **Scope** | `https://www.googleapis.com/auth/calendar.readonly` — read-only, nothing else |
-| **Free tier** | Yes. Calendar API has no charge at this volume. |
-| **Cost** | None directly. Google **verification** is required before outside users can connect, and takes weeks. |
-| **Redirect URI** | `https://<your-domain>/auth/google/callback` |
+| **Portal** | https://entra.microsoft.com → **App registrations** → *New registration* |
+| **Name** | Atturel |
+| **Supported account types** | *Accounts in any organizational directory and personal Microsoft accounts* — this is what makes it multitenant. Choosing single-tenant restricts it to your own organization. |
+| **Redirect URI** | Platform **Web** → `https://www.atturel.com/api/calendar/microsoft/callback` |
+| **API permissions** | *Add a permission* → Microsoft Graph → **Delegated** → `Calendars.Read`. `openid`, `email` and `offline_access` are also delegated and usually listed by default; add them if not. **Do not add** `Calendars.ReadWrite`, `Mail.Read`, `Contacts.Read` or `Files.Read` — Atturel does not use them and requesting them will fail enterprise review. |
+| **Client secret** | *Certificates & secrets* → *New client secret*. Copy the **Value**, not the Secret ID. It is shown once. |
 
 ```
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
+MICROSOFT_CLIENT_ID=<Application (client) ID>
+MICROSOFT_CLIENT_SECRET=<the secret Value>
 ```
 
-Say the word and I will build it — but it needs the credentials in place first
-so it can be tested against a real account rather than guessed at.
+`MICROSOFT_TENANT` is optional and defaults to `common`, which is what allows
+users from any organization to connect. Set it to a tenant ID only if you want
+to restrict Atturel to one organization.
+
+**Admin consent.** Many organizations disable user consent. Those users will see
+*"Your organization requires administrator approval"* rather than a failure, and
+their administrator can grant it from *Enterprise applications → Atturel →
+Permissions → Grant admin consent*. Nothing needs changing in Atturel for that
+to work.
+
+### 4.3 Google Calendar
+
+| | |
+| --- | --- |
+| **Console** | https://console.cloud.google.com → create or pick a project |
+| **Enable API** | *APIs & Services → Library* → **Google Calendar API** → Enable |
+| **Consent screen** | *APIs & Services → OAuth consent screen* → **External**. App name, support email, and `atturel.com` under Authorized domains. |
+| **Scope** | `https://www.googleapis.com/auth/calendar.events.readonly` — narrower than `calendar.readonly`: events without the calendar list and settings. |
+| **Credentials** | *Create credentials → OAuth client ID → Web application* |
+| **Redirect URI** | `https://www.atturel.com/api/calendar/google/callback` |
+
+```
+GOOGLE_CLIENT_ID=<client id>
+GOOGLE_CLIENT_SECRET=<client secret>
+```
+
+**Verification is the real blocker.** `calendar.events.readonly` is a sensitive
+scope, so until Google verifies the app it works only for accounts added under
+*Audience → Test users* (up to 100), and everyone else sees an unverified-app
+warning. Submit from the consent screen — Google asks for a demo video, a
+scope justification and a privacy-policy URL (`https://www.atturel.com/privacy`
+exists and describes real behaviour). Review typically takes several weeks.
+
+Microsoft has no equivalent gate, which is why it is the provider to pilot with.
+
+### 4.4 Verify after configuring
+
+1. Settings → Capabilities → **Calendar**: the provider shows **Not connected**
+   with a Connect button. It must never say Connected from configuration alone.
+2. Connect, approve the consent screen, and land back on Capabilities showing
+   **Connected** and the account address.
+3. Today shows your next two days of meetings, with attendees you already track
+   matched to their People records.
+4. Press **Prepare** on one — it becomes an Atturel meeting with those people
+   attached, and the brief works as it does for a manual meeting.
+5. Press **Sync now** twice: the second is a no-op, not a duplicate set.
+6. **Disconnect** removes the stored grant and the synced events.
 
 ---
 

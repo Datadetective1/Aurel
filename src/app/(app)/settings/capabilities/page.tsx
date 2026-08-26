@@ -17,6 +17,13 @@ import { Button } from '@/components/ui/button'
 import { requireOnboardedUser } from '@/lib/auth'
 import { aiStatus } from '@/lib/ai/provider'
 import { researchCapability } from '@/lib/research/providers'
+import { calendarCapability } from '@/lib/calendar'
+import { createClient } from '@/lib/supabase/server'
+import {
+  CalendarConnections,
+  type CalendarConnection,
+  type CalendarConnectionStatus,
+} from '@/components/app/calendar-connections'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { features } from '@/lib/env'
 import { senderAddress } from '@/lib/email/send'
@@ -55,6 +62,8 @@ interface Capability {
   userAction?: { label: string; href: string }
   /** Server-side configuration, named so an operator knows exactly what to set. */
   deploymentAction?: { summary: string; env: string[] }
+  /** Rendered under the card. Calendar is the only capability a user connects. */
+  calendarConnections?: CalendarConnection[]
 }
 
 /**
@@ -81,6 +90,45 @@ export default async function CapabilitiesSettingsPage() {
   const ai = aiStatus()
   const research = researchCapability()
   const entitlements = await getEntitlements()
+
+  // Real grants, not environment configuration. `configured` says the provider
+  // can be offered; only a row here means somebody actually connected it.
+  const { user } = await requireOnboardedUser()
+  const supabase = await createClient()
+  const providers = calendarCapability()
+
+  const { data: integrations } = await supabase
+    .from('integration_accounts')
+    .select('provider, status, external_account_email, last_synced_at')
+    .eq('user_id', user.id)
+
+  const { data: eventCounts } = await supabase
+    .from('external_calendar_events')
+    .select('provider')
+    .eq('user_id', user.id)
+    .eq('status', 'confirmed')
+    .gte('starts_at', new Date().toISOString())
+
+  const connections: CalendarConnection[] = providers.map((provider) => {
+    const row = (integrations ?? []).find((i) => i.provider === provider.id)
+    const status: CalendarConnectionStatus = !provider.configured
+      ? 'unavailable'
+      : !row
+        ? 'not_connected'
+        : (row.status as CalendarConnectionStatus)
+
+    return {
+      provider: provider.id,
+      label: provider.label,
+      status,
+      accountEmail: row?.external_account_email ?? null,
+      lastSyncedAt: row?.last_synced_at ?? null,
+      eventCount: (eventCounts ?? []).filter((e) => e.provider === provider.id).length,
+    }
+  })
+
+  const anyCalendarConfigured = providers.some((p) => p.configured)
+  const anyCalendarConnected = connections.some((c) => c.status === 'connected')
 
   const capabilities: Capability[] = [
     {
@@ -129,18 +177,26 @@ export default async function CapabilitiesSettingsPage() {
       id: 'calendar',
       label: 'Calendar',
       icon: CalendarDays,
-      status: features.googleCalendar || features.microsoftCalendar ? 'setup' : 'unavailable',
-      detail:
-        features.googleCalendar || features.microsoftCalendar
-          ? 'Meetings can be imported so preparation follows your real day. Read-only, and you choose which calendar.'
+      // Connected means a working user grant, never a client secret in the
+      // environment. Anything else would promise meetings that never arrive.
+      status: anyCalendarConnected
+        ? 'configured'
+        : anyCalendarConfigured
+          ? 'setup'
+          : 'unavailable',
+      detail: anyCalendarConnected
+        ? 'Your upcoming meetings are read so preparation follows your real day. Read-only — nothing is created, edited or answered on your behalf.'
+        : anyCalendarConfigured
+          ? 'Connect a calendar and your next two weeks of meetings appear on Today, with attendees matched to the people you already track.'
           : 'No calendar provider is configured on this deployment, so meetings are added by hand.',
-      deploymentAction:
-        features.googleCalendar || features.microsoftCalendar
-          ? undefined
-          : {
-              summary: 'Register an OAuth client with Google or Microsoft.',
-              env: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
-            },
+      deploymentAction: anyCalendarConfigured
+        ? undefined
+        : {
+            summary: 'Register an OAuth client and set a token encryption key, then redeploy.',
+            env: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'TOKEN_ENCRYPTION_KEY'],
+          },
+      // Rendered under the card: per-provider connect, sync and disconnect.
+      calendarConnections: anyCalendarConfigured ? connections : undefined,
     },
     {
       id: 'documents',
@@ -256,6 +312,12 @@ function CapabilityCard({ capability }: { capability: Capability }) {
         <p className="text-ink-muted mt-2 max-w-prose text-xs leading-relaxed">
           {capability.detail}
         </p>
+
+        {capability.calendarConnections ? (
+          <div className="mt-3">
+            <CalendarConnections connections={capability.calendarConnections} />
+          </div>
+        ) : null}
 
         {capability.userAction ? (
           <div className="mt-3">

@@ -13,6 +13,11 @@ import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, EmptyState, Eyebrow, Panel } from '@/components/ui/primitives'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
+import {
+  UpcomingMeetings,
+  type UpcomingAttendee,
+  type UpcomingEvent,
+} from '@/components/app/upcoming-meetings'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getUserContext, getPeopleContext, getQuietRelationships } from '@/lib/ai/context'
@@ -143,6 +148,55 @@ export default async function TodayPage({
   const hasAnything = (meetings ?? []).length > 0 || (commitments ?? []).length > 0
   const firstName = profile.preferred_name || profile.full_name?.split(' ')[0] || 'there'
 
+  // Calendar, when one is connected. Two days only: preparation is a today and
+  // tomorrow activity, and a fortnight of rows would bury the focus card.
+  const calendarHorizon = new Date()
+  calendarHorizon.setDate(calendarHorizon.getDate() + 2)
+
+  const { data: calendarRows } = await supabase
+    .from('external_calendar_events')
+    .select('id, title, starts_at, ends_at, is_all_day, is_private, meeting_url, status, meeting_id, attendees')
+    .eq('user_id', user.id)
+    .gte('starts_at', new Date().toISOString())
+    .lte('starts_at', calendarHorizon.toISOString())
+    .order('starts_at', { ascending: true })
+    .limit(8)
+
+  const briefedMeetingIds = new Set<string>()
+  const calendarMeetingIds = (calendarRows ?? [])
+    .map((row) => row.meeting_id)
+    .filter((id): id is string => Boolean(id))
+
+  if (calendarMeetingIds.length > 0) {
+    const { data: briefed } = await supabase
+      .from('ai_artifacts')
+      .select('subject_id')
+      .eq('user_id', user.id)
+      .eq('kind', 'meeting_brief')
+      .in('subject_id', calendarMeetingIds)
+    for (const row of briefed ?? []) {
+      if (row.subject_id) briefedMeetingIds.add(row.subject_id)
+    }
+  }
+
+  const upcomingEvents: UpcomingEvent[] = (calendarRows ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    isAllDay: row.is_all_day ?? false,
+    isPrivate: row.is_private ?? false,
+    meetingUrl: row.meeting_url ?? null,
+    status: row.status ?? 'confirmed',
+    meetingId: row.meeting_id,
+    hasBrief: Boolean(row.meeting_id && briefedMeetingIds.has(row.meeting_id)),
+    attendees: ((row.attendees ?? []) as unknown as UpcomingAttendee[]).map((a) => ({
+      email: a.email ?? null,
+      displayName: a.displayName ?? null,
+      personId: a.personId ?? null,
+    })),
+  }))
+
   return (
     <Container size="default" className="py-8 sm:py-12">
       {welcome ? <WelcomeBanner name={firstName} className="mb-8" /> : null}
@@ -187,6 +241,8 @@ export default async function TodayPage({
           </div>
         </Panel>
       </section>
+
+      <UpcomingMeetings events={upcomingEvents} />
 
       {!hasAnything ? (
         <EmptyState

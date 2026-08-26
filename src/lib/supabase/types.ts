@@ -498,6 +498,16 @@ export type Database = {
           attendees: Json
           ends_at: string | null
           external_id: string
+          calendar_id: string | null
+          description: string | null
+          time_zone: string | null
+          meeting_url: string | null
+          recurrence_id: string | null
+          is_recurring?: boolean
+          is_all_day?: boolean
+          is_private?: boolean
+          status?: string
+          provider_updated_at: string | null
           id: string
           integration_id: string
           location: string | null
@@ -513,6 +523,16 @@ export type Database = {
           attendees?: Json
           ends_at?: string | null
           external_id: string
+          calendar_id: string | null
+          description: string | null
+          time_zone: string | null
+          meeting_url: string | null
+          recurrence_id: string | null
+          is_recurring?: boolean
+          is_all_day?: boolean
+          is_private?: boolean
+          status?: string
+          provider_updated_at: string | null
           id?: string
           integration_id: string
           location?: string | null
@@ -528,6 +548,16 @@ export type Database = {
           attendees?: Json
           ends_at?: string | null
           external_id?: string
+          calendar_id?: string | null
+          description?: string | null
+          time_zone?: string | null
+          meeting_url?: string | null
+          recurrence_id?: string | null
+          is_recurring?: boolean
+          is_all_day?: boolean
+          is_private?: boolean
+          status?: string
+          provider_updated_at?: string | null
           id?: string
           integration_id?: string
           location?: string | null
@@ -689,6 +719,9 @@ export type Database = {
           id: string
           last_error: string | null
           last_synced_at: string | null
+          sync_cursor?: string | null
+          calendar_id?: string | null
+          last_sync_attempt_at?: string | null
           provider: Database["public"]["Enums"]["integration_provider"]
           refresh_token_encrypted: string | null
           scopes: string[]
@@ -704,6 +737,9 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_synced_at?: string | null
+          sync_cursor?: string | null
+          calendar_id?: string | null
+          last_sync_attempt_at?: string | null
           provider: Database["public"]["Enums"]["integration_provider"]
           refresh_token_encrypted?: string | null
           scopes?: string[]
@@ -719,6 +755,9 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_synced_at?: string | null
+          sync_cursor?: string | null
+          calendar_id?: string | null
+          last_sync_attempt_at?: string | null
           provider?: Database["public"]["Enums"]["integration_provider"]
           refresh_token_encrypted?: string | null
           scopes?: string[]
@@ -2186,7 +2225,12 @@ export type Database = {
         | "conflicting"
         | "unreviewed"
       integration_provider: "google" | "microsoft"
-      integration_status: "connected" | "expired" | "revoked" | "error"
+      integration_status:
+        | "connected"
+        | "expired"
+        | "revoked"
+        | "error"
+        | "admin_consent_required"
       interaction_kind:
         | "meeting"
         | "call"
@@ -2503,7 +2547,13 @@ export const Constants = {
         "unreviewed",
       ],
       integration_provider: ["google", "microsoft"],
-      integration_status: ["connected", "expired", "revoked", "error"],
+      integration_status: [
+        "connected",
+        "expired",
+        "revoked",
+        "error",
+        "admin_consent_required",
+      ],
       interaction_kind: [
         "meeting",
         "call",
