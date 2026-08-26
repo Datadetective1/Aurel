@@ -164,6 +164,40 @@ product does not claim it has.
 
 ---
 
+## Production status
+
+Live at **www.atturel.com**. Each line below was verified against production,
+not against a local build — the date is when it was last exercised end to end.
+
+| Subsystem | Status | Verified |
+| --- | --- | --- |
+| Supabase Custom SMTP | **COMPLETE** | 26 Aug 2026 |
+| Resend transactional email | **COMPLETE** | 26 Aug 2026 |
+| Signup confirmation | **COMPLETE** | 26 Aug 2026 |
+| Password reset | **COMPLETE** | 26 Aug 2026 |
+| Production auth redirects | **COMPLETE** | 26 Aug 2026 |
+| Atturel domain email authentication | **COMPLETE** | 26 Aug 2026 |
+| AI reasoning (OpenAI `gpt-4.1-mini`) | **COMPLETE** | 25 Aug 2026 |
+| Document and transcript ingestion | **COMPLETE** | 25 Aug 2026 |
+| Reading a link you provide | **COMPLETE** | 25 Aug 2026 |
+| Automatic source discovery | Blocked — needs a search API key | — |
+| Billing | Implemented; needs a Stripe account | — |
+| Calendar | Not built — see HUMAN_ACTIONS §4 | — |
+
+**Auth and email are accepted and stable.** Treat that subsystem as closed:
+change it for a real defect or an explicit requirement, not for tidiness. What
+holds it in place is `src/lib/email/send.test.ts`, which pins sender
+resolution, the plain-text fallback, and the two provider failures that actually
+happen in production — a rejected message and a request that never completes.
+`ATTUREL_EMAIL_FROM` / `ATTUREL_EMAIL_REPLY_TO` are the live variable names;
+`EMAIL_FROM_ADDRESS` is read as an older alias.
+
+Domain email authentication is `dkim=pass header.i=@atturel.com
+header.s=resend` with SPF on `send.atturel.com`, for both application mail and
+Supabase auth mail.
+
+---
+
 ## Documentation
 
 | | |

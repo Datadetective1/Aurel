@@ -318,7 +318,8 @@ Then set `policiesLegallyReviewed: true` and fill in `legal.entityAddress` and
 
 ### 8.2 The name
 
-`ATTUREL` has not been trademark-cleared and `atturel.app` is not registered.
+`ATTUREL` has not been trademark-cleared. `atturel.com` is registered and live
+(and is the sending domain for all mail); `atturel.app` never was.
 The brand registry keeps a rename to one file — do not commission a logo or
 build SEO authority on it until a search comes back clean.
 
