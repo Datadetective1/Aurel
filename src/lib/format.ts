@@ -65,6 +65,19 @@ export function relativeDay(value: string | Date | null | undefined): string {
   return capitalise(rtf.format(Math.round(days / 365), 'year'))
 }
 
+/**
+ * True when a timestamp is still ahead of now.
+ *
+ * Exists because a person header read "Last spoke tomorrow": a debrief had
+ * dated a conversation from its meeting's scheduled_at, which can be in the
+ * future. Both write paths refuse a future date now, but rows written before
+ * they did still carry one, so anything phrased in the past tense has to check.
+ */
+export function isFuture(value: string | Date | null | undefined): boolean {
+  const date = toDate(value)
+  return date ? date.getTime() > Date.now() : false
+}
+
 /** Days elapsed since a timestamp, or null. */
 export function daysSince(value: string | Date | null | undefined): number | null {
   const date = toDate(value)

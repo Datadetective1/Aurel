@@ -22,7 +22,7 @@ import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
-import { formatDate, relativeDay, pluralise } from '@/lib/format'
+import { formatDate, isFuture, relativeDay, pluralise } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
 export async function generateMetadata({
@@ -280,9 +280,16 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">{RELATIONSHIP_LABEL[person.relationship_type]}</Badge>
             <Badge tone="outline">Importance {person.relevance}/5</Badge>
+            {/* Both write paths now refuse a future date, but rows created
+                before they did still carry one, and "Last spoke tomorrow" is a
+                past-tense claim about something that has not happened. Where
+                the record is dated ahead, say what is actually true: it is
+                logged for then. */}
             {person.last_interaction_at ? (
               <Badge tone="neutral">
-                Last spoke {relativeDay(person.last_interaction_at).toLowerCase()}
+                {isFuture(person.last_interaction_at)
+                  ? `Logged for ${relativeDay(person.last_interaction_at).toLowerCase()}`
+                  : `Last spoke ${relativeDay(person.last_interaction_at).toLowerCase()}`}
               </Badge>
             ) : (
               <Badge tone="outline">No interactions yet</Badge>

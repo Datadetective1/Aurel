@@ -428,6 +428,18 @@ export async function addInteraction(_prev: ActionState, formData: FormData): Pr
     return { fieldErrors: { occurredAt: ['That date is not valid.'] } }
   }
 
+  // Logging is for conversations that have happened. A future date makes the
+  // person header claim a last contact that is still ahead of them, and quietly
+  // corrupts the contact-cadence signal on Today. A minute of slack absorbs a
+  // clock that is slightly ahead.
+  if (occurredAt.getTime() > Date.now() + 60_000) {
+    return {
+      fieldErrors: {
+        occurredAt: ['That is in the future. Log a conversation once it has happened.'],
+      },
+    }
+  }
+
   const { data: interaction, error } = await supabase
     .from('interactions')
     .insert({

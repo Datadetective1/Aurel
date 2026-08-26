@@ -302,7 +302,18 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
   if (!meeting) return { error: 'That meeting could not be found.' }
 
   const userContext = await getUserContext(supabase, user.id)
-  const occurredAt = meeting.scheduledAt ?? new Date().toISOString()
+  // A debrief is written about a conversation that has already taken place,
+  // so the interaction cannot be dated later than now even when the meeting
+  // it belongs to is scheduled for later. Taking scheduledAt unguarded put
+  // future dates on interactions, and the person header then read
+  // "Last spoke tomorrow" - a past-tense claim about something that has
+  // not happened. The meeting keeps its own scheduled_at; this is the
+  // record of the conversation, not of the calendar entry.
+  const scheduled = meeting.scheduledAt ? new Date(meeting.scheduledAt) : null
+  const occurredAt =
+    scheduled && scheduled.getTime() <= Date.now()
+      ? scheduled.toISOString()
+      : new Date().toISOString()
 
   // Record the interaction itself first: it is the anchor everything else
   // attaches to, and it must exist even if extraction fails.
