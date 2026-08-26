@@ -36,7 +36,32 @@ const APP_PAGES = [
   '/settings/capabilities',
   '/settings/billing',
   '/settings/data',
+  '/people/new',
 ]
+
+/**
+ * Pages that need a real record to exist.
+ *
+ * These were left out originally because they need an id, which meant the
+ * person page and both of its forms -- the most interaction-dense screens in
+ * the product, and the ones most likely to carry a violation -- were the only
+ * ones never checked. The id is discovered at runtime from /people instead.
+ */
+const PERSON_PAGES = (id: string) => [`/people/${id}`, `/people/${id}/edit`, `/people/${id}/log`]
+
+/** The first person's id, or null when the account has none. */
+async function firstPersonId(page: Page): Promise<string | null> {
+  await page.goto('/people')
+  const href = await page
+    .locator('a[href^="/people/"]')
+    .filter({ hasNotText: /add|new/i })
+    .first()
+    .getAttribute('href')
+    .catch(() => null)
+
+  const match = href?.match(/^\/people\/([0-9a-f-]{36})$/)
+  return match?.[1] ?? null
+}
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
@@ -82,7 +107,20 @@ test.describe('accessibility (signed in)', () => {
 
       const failures: string[] = []
 
-      for (const path of APP_PAGES) {
+      // A person page and its forms, when the account has anyone recorded.
+      const personId = await firstPersonId(page)
+      const paths = personId ? [...APP_PAGES, ...PERSON_PAGES(personId)] : APP_PAGES
+
+      // Say so when the person pages were skipped. Without this the sweep
+      // passes just as green on an account with nobody in it, and the pages
+      // most likely to carry a violation are the ones silently not checked.
+      console.log(
+        personId
+          ? `  sweeping ${paths.length} pages (person pages included)`
+          : `  sweeping ${paths.length} pages - PERSON PAGES SKIPPED, the account has nobody recorded`,
+      )
+
+      for (const path of paths) {
         await page.goto(path)
         await expect(page.locator('html')).toHaveClass(new RegExp(theme))
         await settle(page)
