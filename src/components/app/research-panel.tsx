@@ -7,6 +7,7 @@ import { researchPerson, type ResearchState } from '@/app/(app)/people/research-
 import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
+import { formatDate } from '@/lib/format'
 
 /**
  * RESEARCH PERSON
@@ -41,6 +42,7 @@ export function ResearchPanel({
   hasProfileUrl,
   lastResearchedAt,
   sourceCount,
+  storedSourceCount,
 }: {
   personId: string
   personName: string
@@ -49,6 +51,8 @@ export function ResearchPanel({
   hasProfileUrl: boolean
   lastResearchedAt: string | null
   sourceCount: number
+  /** Everything stored, including sources nothing currently rests on. */
+  storedSourceCount?: number
 }) {
   const router = useRouter()
   const [running, setRunning] = React.useState(false)
@@ -87,7 +91,11 @@ export function ResearchPanel({
           </Eyebrow>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-secondary">
             {sourceCount > 0
-              ? `Built from ${sourceCount} source${sourceCount === 1 ? '' : 's'}. Every claim links back to where it came from.`
+              ? `Built from ${sourceCount} source${sourceCount === 1 ? '' : 's'}${
+                  storedSourceCount && storedSourceCount > sourceCount
+                    ? ` of ${storedSourceCount} reviewed`
+                    : ''
+                }. Every claim links back to where it came from.`
               : `${brand.name} can build a source-backed professional picture of ${personName} from legitimate public material — company bios, talks, articles, interviews.`}
           </p>
         </div>
@@ -171,7 +179,7 @@ export function ResearchPanel({
 
       {lastResearchedAt && !running ? (
         <p className="mt-4 text-xs text-ink-faint">
-          Last researched {new Date(lastResearchedAt).toLocaleDateString()}.
+          Last researched {formatDate(lastResearchedAt)}.
         </p>
       ) : null}
     </section>

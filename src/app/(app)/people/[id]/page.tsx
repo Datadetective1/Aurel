@@ -404,7 +404,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
         lastResearchedAt={person.last_researched_at}
-        sourceCount={sources.length}
+        // Sources that actually support a claim, not every row stored. A run
+        // that stores five and derives facts from two was reporting "Built
+        // from 5 sources" above a list where three said "No facts rest on
+        // this" -- the summary contradicting the detail directly beneath it.
+        sourceCount={sources.filter((source) => source.factCount > 0).length}
+        storedSourceCount={sources.length}
       />
 
       {hasFootprint ? (

@@ -17,7 +17,7 @@ import {
   hasEnough,
   planQueries,
 } from '@/lib/research/queries'
-import { detectInputKind } from '@/lib/sources/url'
+import { canonicalUrl, detectInputKind } from '@/lib/sources/url'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -370,10 +370,15 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     // --- ingest --------------------------------------------------------------
     await updateJob(supabase, jobId, { stage: 'reviewing_material' })
 
+    // Deduplicated on the canonical URL, not the raw string. Discovery returned
+    // both the plain Wikipedia article and `?useskin=vector` for the same
+    // person: two fetches, two identity checks, two model calls, two stored
+    // sources, and a footprint counting one document's evidence twice.
     const seen = new Set<string>()
     for (const url of candidateUrls) {
-      if (seen.has(url)) continue
-      seen.add(url)
+      const key = canonicalUrl(url) ?? url
+      if (seen.has(key)) continue
+      seen.add(key)
 
       // Each analysed page is a fetch plus a model call. The cap is what keeps
       // the cost of one research run bounded and predictable.
