@@ -83,7 +83,13 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
     source.identityStatus === 'conflicting'
 
   return (
-    <li className="border-line bg-surface rounded-[var(--radius-md)] border px-4 py-3">
+    // min-w-0 on the li itself, which is the grid item. Without it a grid
+    // item defaults to min-width:auto and refuses to shrink below the
+    // min-content width of a long source title, holding the whole page wider
+    // than the viewport. The same default that broke the Settings nav on
+    // mobile -- and adding min-w-0 to the flex children inside was the wrong
+    // level to fix it, because they were never the ones being held open.
+    <li className="border-line bg-surface min-w-0 rounded-[var(--radius-md)] border px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           {source.url ? (
