@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test          # unit — 137 tests, ~1s
+npm test          # unit — 218 tests, ~2s
 npm run typecheck
 npm run lint
 npm run test:e2e  # Playwright, desktop + Pixel 7, against `next build`
@@ -25,6 +25,11 @@ silent. Several were written *after* a bug, and the comment above them says so.
 | `brief grammar` | "leave today having get approval". A nine-phrasing matrix, because generated prose reads fine until it does not. |
 | `brand-centralisation` | The name must not be hard-coded outside the registry, and the former codename must not survive in copy. |
 | `email` | Hostile display names must not inject markup; security mail must have no unsubscribe link; preheaders must not carry note content. |
+| `email/send` | Sender resolution. Production set `ATTUREL_EMAIL_FROM` while the code read only `EMAIL_FROM_ADDRESS`, fell back to a hardcoded address on an unregistered domain, and Settings reported Email as connected while every send would have been refused. Also pins that a rejected message and a dead request resolve rather than throw, and that the provider's error body — which echoes the request — stays out of the log. |
+| `internal-links` | Two links shipped to routes that were never written, each with a finished server action behind it and no page. Next prefetches links, so both 404s landed in the browser console rather than under a cursor. Every internal target is now checked against the route tree. |
+| `env` | Provider resolution. `OPENAI_API_KEY` alone activated nothing, because `AI_PROVIDER` still said `grounded` and `AI_MODEL` still named a Claude id — a 404 the retry loop would have swallowed as a fallback. |
+| `debrief/normaliseCommitment` | A model answered with a display name where a uuid belongs, every insert failed the cast, and the unchecked result meant both commitments vanished while the UI reported the debrief saved. |
+| `format` | A person header read *"Last spoke tomorrow"* — a past-tense claim about a conversation that had not happened, from a debrief dated by its meeting's `scheduled_at`. |
 
 ### A note on that last guard
 
@@ -93,11 +98,19 @@ was green.
 both themes and both viewports, at WCAG 2.1 A and AA, plus checks for a working
 skip link, a single `main` landmark, and a visible focus ring on first Tab.
 
-`tests/e2e/accessibility-app.spec.ts` does the same for the twelve signed-in
-pages, which is where the interaction-dense screens live. It needs an account,
-so it runs only when `E2E_EMAIL` and `E2E_PASSWORD` are set and skips otherwise.
-Last run: all twelve pages clean in both themes, and the assessment — the most
-complex screen in the product — clean as well.
+`tests/e2e/accessibility-app.spec.ts` does the same for the signed-in pages,
+which is where the interaction-dense screens live. It needs an account, so it
+runs only when `E2E_EMAIL` and `E2E_PASSWORD` are set and skips otherwise.
+
+The person page and its two forms are included by discovering a person id from
+`/people` at runtime. They were originally left out because they need an id,
+which meant the screens most likely to carry a violation were the only ones
+never checked. The sweep prints how many pages it covered and whether the
+person pages were among them — on an account with nobody recorded it would
+otherwise pass just as green while skipping them.
+
+Last run: 16 pages clean in both themes at both viewports, against production,
+and the assessment — the most complex screen in the product — clean as well.
 
 Between them they found real violations on **every public page in both themes**
 plus two signed-in pages, all fixed:
