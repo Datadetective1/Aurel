@@ -155,26 +155,29 @@ const STEPS = [
   {
     icon: Telescope,
     eyebrow: 'Before the first meeting',
-    title: 'Start with public context',
-    body: `Paste a link — a company bio, a talk, an article — and ${brand.name} reads it, checks it is genuinely about that person, and builds a professional footprint where every claim links back to its source. Useful before you have ever spoken.`,
+    title: 'Research the person before you meet them',
+    // Discovery leads. This card used to open with "Paste a link", which was
+    // accurate before automatic research shipped and became a description of
+    // the fallback the moment it did.
+    body: `Give ${brand.name} a name, a company and a role. It searches legitimate public professional sources, verifies each one is genuinely about the right person, and builds a footprint where every claim links back to its source. You can still add a link, bio or transcript yourself when you have something specific.`,
   },
   {
     icon: Users,
     eyebrow: 'Walking in',
     title: 'Prepare for the room',
-    body: 'State what you need to achieve and get a brief: how to open, what to emphasise, what each person will want to see, and the objections to expect. Public context is labelled as public — never dressed up as a read on the person.',
+    body: `Say what you need to achieve. ${brand.name} combines the public research, your objective and whatever history you already have: how to open, what to emphasise, what matters to each person, the questions and objections to expect, and what to leave with. Public evidence, your own observations and its inference stay clearly apart.`,
   },
   {
     icon: PenLine,
     eyebrow: 'Afterwards',
     title: 'Capture what actually happened',
-    body: `Paste your notes and ${brand.name} proposes what is worth remembering. Nothing enters your record until you confirm it.`,
+    body: `Paste your notes or a transcript and ${brand.name} proposes the decisions, commitments, open questions, observations and next actions it found. Nothing becomes part of your relationship record until you confirm it.`,
   },
   {
     icon: Rewind,
     eyebrow: 'Next time',
     title: 'Your record outranks the internet',
-    body: 'Once you have worked with someone, what you observed leads the brief and the public material falls behind it. That reversal is the point: a bio tells you who someone is, your record tells you how they work with you.',
+    body: 'Public research helps before you know someone. Once you have worked together, your confirmed observations and interaction history take priority. A bio tells you who someone is. Your record tells you how the relationship actually works.',
   },
 ]
 
@@ -194,7 +197,14 @@ function HowItWorks() {
             <div key={step.title} className="bg-bg p-7 sm:p-8">
               <step.icon className="text-accent size-5" aria-hidden="true" />
               <Eyebrow className="mt-5 block">{step.eyebrow}</Eyebrow>
-              <h3 className="font-display text-ink mt-2 text-xl">{step.title}</h3>
+              {/* Two lines reserved at the four-up breakpoint, so the body
+                  copy starts on the same line across the row. Only the
+                  first heading wraps, and without this its card sits a
+                  line lower than the other three. Below lg the cards
+                  stack and there is nothing to align to. */}
+              <h3 className="font-display text-ink mt-2 text-xl lg:min-h-[3.5rem]">
+                {step.title}
+              </h3>
               <p className="text-ink-secondary mt-3 text-sm leading-relaxed">{step.body}</p>
             </div>
           ))}

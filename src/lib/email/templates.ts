@@ -61,8 +61,12 @@ export function welcomeEmail({ firstName }: { firstName: string }): BuiltEmail {
         paragraph('The fastest path is three steps, and none of them take long:'),
         card(
           [
-            step(1, 'Add the person you are meeting next', 'Name and role is enough.'),
-            step(2, 'Paste one public link about them', 'A company bio, a talk, an article.'),
+            step(1, 'Add the person you are meeting next', 'A name, a company and a role.'),
+            // Step two used to be "paste one public link", which was the right
+            // first action until automatic research shipped and made it the
+            // fallback. The first email a new user gets should not send them
+            // hunting for a URL the product will find on its own.
+            step(2, 'Press Research', 'It finds and checks the public sources itself.'),
             step(
               3,
               'Open the brief before the meeting',
