@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { ApertureField, ApertureRule } from '@/components/brand/aperture'
 import { HeroDemo } from '@/components/marketing/hero-demo'
+import { FootprintDemo } from '@/components/marketing/footprint-demo'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
 import { brand, title } from '@/lib/brand'
@@ -32,6 +33,7 @@ export default function LandingPage() {
       <Hero />
       <Problem />
       <HowItWorks />
+      <Research />
       <Memory />
       <Trust />
       <AfterTheMeeting />
@@ -202,6 +204,54 @@ function HowItWorks() {
   )
 }
 
+function Research() {
+  return (
+    <section id="research" className="scroll-mt-20 pb-20 sm:pb-24">
+      <Container size="wide">
+        <ApertureRule className="mb-20 sm:mb-24" />
+        {/* Copy left, product right — the same asymmetry as the hero, so the
+            page has one grammar for "here is the thing itself" rather than a
+            new layout each time. */}
+        {/* Top-aligned, like the hero and for the same reason: the panel is
+            much taller than the copy, and centring strands the heading in the
+            middle of a column of empty page. */}
+        <div className="grid items-start gap-14 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+          <div className="lg:pt-4">
+            <Eyebrow>Before you have met them</Eyebrow>
+            <h2 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-[2.5rem]">
+              A name and a company is enough to start.
+            </h2>
+            <p className="text-ink-secondary mt-6 max-w-xl leading-relaxed">
+              {brand.name} searches legitimate public material — company bios, talks, interviews,
+              written work — checks each source is genuinely about the right person, and pulls out
+              what is professionally relevant. Nothing about their private life, and nothing it
+              cannot show you the source for.
+            </p>
+
+            <ul className="mt-8 grid gap-3">
+              {[
+                'Identity is resolved before a single claim is accepted.',
+                'Every fact carries the source it came from, and opens it.',
+                'Reject a source and what rested on it alone is withdrawn.',
+              ].map((line) => (
+                <li key={line} className="text-ink-secondary flex gap-3 text-sm leading-relaxed">
+                  <span
+                    aria-hidden="true"
+                    className="bg-accent-graphic mt-2 h-px w-3 shrink-0"
+                  />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <FootprintDemo className="elevate" />
+        </div>
+      </Container>
+    </section>
+  )
+}
+
 function Memory() {
   return (
     <section id="memory" className="border-line bg-bg-sunken scroll-mt-20 border-y py-20 sm:py-24">
@@ -257,24 +307,28 @@ const EVIDENCE_TIERS = [
     label: 'Confirmed',
     tone: 'text-positive',
     body: 'They said it, or you confirmed it. Stated plainly, as fact.',
+    example: 'Daniel wants the cost impact stated before the recommendation.',
   },
   {
     icon: Eye,
     label: 'Observed',
     tone: 'text-info',
     body: 'It happened, across interactions you recorded. Always attributed to them.',
+    example: 'Maya has asked for utilisation evidence in the last two reviews.',
   },
   {
     icon: CircleHelp,
     label: 'Inferred',
     tone: 'text-caution',
     body: 'A reading of thin evidence. Always hedged, and always yours to correct.',
+    example: 'Priya may be carrying the timeline risk — worth checking, not assuming.',
   },
   {
     icon: Layers,
     label: 'Unknown',
     tone: 'text-ink-muted',
     body: `Not enough to say. ${brand.name} tells you so instead of filling the gap.`,
+    example: 'No recorded history with Priya. This is a read, not a record.',
   },
 ]
 
@@ -296,10 +350,16 @@ function Trust() {
 
         <div className="border-line bg-line mt-12 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border sm:grid-cols-2 lg:grid-cols-4">
           {EVIDENCE_TIERS.map((tier) => (
-            <div key={tier.label} className="bg-bg p-6">
+            <div key={tier.label} className="bg-bg flex flex-col p-6">
               <tier.icon className={`size-4 ${tier.tone}`} aria-hidden="true" />
               <p className="text-ink mt-4 text-sm font-medium">{tier.label}</p>
               <p className="text-ink-muted mt-2 text-[0.8125rem] leading-relaxed">{tier.body}</p>
+              {/* The same sentence at four different levels of confidence.
+                  mt-auto keeps the examples on one line across the row even
+                  when the definitions above them wrap to different heights. */}
+              <p className="border-line text-ink-secondary mt-auto border-t pt-4 text-[0.8125rem] leading-relaxed italic">
+                &ldquo;{tier.example}&rdquo;
+              </p>
             </div>
           ))}
         </div>
