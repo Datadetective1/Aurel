@@ -203,14 +203,23 @@ the date is when it was last exercised end to end.
 | Ask Atturel | **COMPLETE** | 26 Aug 2026 |
 | Pilot analytics and cost telemetry | **COMPLETE** | 26 Aug 2026 |
 
-### Future major integrations
+| Read-only calendar (engineering) | **COMPLETE** | 26 Aug 2026 |
 
-Neither is started, and neither blocks a pilot.
+### Waiting on an external account
+
+Both are built. Neither blocks a pilot.
 
 | | |
 | --- | --- |
-| **Calendar** | Not built. Tables exist and Capabilities reports it as unavailable, but there is no OAuth flow, token storage or sync. See HUMAN_ACTIONS §4 for why it was not written blind. |
-| **Billing** | Implemented end to end — checkout, portal, webhook, entitlements, metering, founding offer — and waiting only on a Stripe account. See HUMAN_ACTIONS §5. |
+| **Calendar** | Microsoft Graph and Google adapters behind one provider abstraction, encrypted tokens, 14-day idempotent sync, attendee matching, upcoming meetings on Today, Prepare from an event. Needs an Entra app registration (Microsoft) or a Cloud project plus scope verification (Google) — see HUMAN_ACTIONS §4. **Read-only: Atturel never creates, edits, accepts or declines anything.** |
+| **Billing** | Checkout, portal, webhook, entitlements, metering and the founding offer, waiting only on a Stripe account. See HUMAN_ACTIONS §5. |
+
+### The demo workspace
+
+`Alex Rivera` is retained deliberately as the guided demo account. Its people,
+meetings and observations are `is_demo` rows seeded by the in-product demo
+feature, and `clear_demo_data()` removes them if that is ever wanted. It is not
+test residue and should not be cleaned up.
 
 ### Operating a pilot
 

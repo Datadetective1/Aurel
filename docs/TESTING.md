@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test          # unit — 274 tests, ~2s
+npm test          # unit — 325 tests, ~3s
 npm run typecheck
 npm run lint
 npm run test:e2e  # Playwright, desktop + Pixel 7, against `next build`
@@ -29,6 +29,9 @@ silent. Several were written *after* a bug, and the comment above them says so.
 | `internal-links` | Two links shipped to routes that were never written, each with a finished server action behind it and no page. Next prefetches links, so both 404s landed in the browser console rather than under a cursor. Every internal target is now checked against the route tree. |
 | `env` | Provider resolution. `OPENAI_API_KEY` alone activated nothing, because `AI_PROVIDER` still said `grounded` and `AI_MODEL` still named a Claude id — a 404 the retry loop would have swallowed as a fallback. |
 | `debrief/normaliseCommitment` | A model answered with a display name where a uuid belongs, every insert failed the cast, and the unchecked result meant both commitments vanished while the UI reported the debrief saved. |
+| `calendar/normalize` | Graph returns wall-clock time rather than an instant, Google splits all-day events into a different field, and the two express "cancelled" differently. Each is a way a real meeting silently goes missing or lands an hour out. |
+| `calendar/privacy` | A private event must keep its time and its people and store nothing about what it says, and no calendar event content may reach analytics or logs. Enforced by reading the call sites, because a unit test only checks the paths it thinks to call. |
+| `crypto` | The token columns were named `_encrypted` from the beginning and nothing encrypted them. Round-trip, tamper detection, wrong-key, and refusing to store a secret at all when no key is configured. |
 | `format` | A person header read *"Last spoke tomorrow"* — a past-tense claim about a conversation that had not happened, from a debrief dated by its meeting's `scheduled_at`. |
 
 ### A note on that last guard
