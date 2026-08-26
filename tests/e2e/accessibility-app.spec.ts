@@ -148,11 +148,9 @@ test.describe('accessibility (signed in)', () => {
           )
           if (overflows) overflowing.push(path)
         }
-        expect(overflowing, `Pages scrolling sideways on a phone:
-${overflowing.join('
-')}`).toEqual(
-          [],
-        )
+        // Comma-joined, not newline-joined: a literal escape in this string
+        // has been mangled by tooling once already.
+        expect(overflowing.join(', '), 'Pages scrolling sideways on a phone').toBe('')
       }
 
       expect(failures, `\n${failures.join('\n\n')}`).toEqual([])
