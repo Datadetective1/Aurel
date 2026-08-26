@@ -33,7 +33,22 @@ export function formatTime(value: string | Date): string {
 export function formatDate(value: string | Date | null | undefined): string {
   const date = toDate(value)
   if (!date) return '—'
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  // Locale and time zone are pinned, not left ambient.
+  //
+  // `undefined` means "whatever this runtime is", which is en-US/UTC on the
+  // server and the browser's own settings on the client. The two disagree, and
+  // because client components render on both sides that disagreement is a
+  // hydration mismatch -- React discards the server HTML and re-renders. It was
+  // throwing error #418 on every person page in production.
+  //
+  // UTC is right for these in particular: they date documents -- when a source
+  // was published, when it was read -- not moments in the reader's own day.
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
 }
 
 /**

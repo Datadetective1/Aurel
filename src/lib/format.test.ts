@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isFuture, relativeDay } from './format'
+import { formatDate, isFuture, relativeDay } from './format'
 describe('a conversation is never described as having happened in the future', () => {
   /**
    * Found on production: a person header read "Last spoke tomorrow".
@@ -35,5 +35,33 @@ describe('a conversation is never described as having happened in the future', (
     expect(isFuture(null)).toBe(false)
     expect(isFuture(undefined)).toBe(false)
     expect(isFuture('not a date')).toBe(false)
+  })
+})
+
+describe('formatDate is the same on the server and in the browser', () => {
+  /**
+   * React error #418 — a hydration text mismatch — was firing on every person
+   * page in production. `toLocaleDateString(undefined, ...)` means "whatever
+   * this runtime is": en-US/UTC on the server, the browser's own settings on
+   * the client. Client components render on both sides, so the two disagreed
+   * and React threw away the server HTML and re-rendered.
+   */
+
+  it('does not shift the day with the ambient time zone', () => {
+    // 23:30 UTC is already the next day east of London and still the previous
+    // one in California. Pinned to UTC it is one date everywhere.
+    expect(formatDate('2026-08-25T23:30:00Z')).toBe('25 Aug 2026')
+    expect(formatDate('2026-08-25T00:30:00Z')).toBe('25 Aug 2026')
+  })
+
+  it('is stable regardless of the runtime locale', () => {
+    // Same instant, formatted twice — if the locale were ambient this would be
+    // the assertion that broke on a machine set to anything but en-GB.
+    expect(formatDate('2003-05-13T12:00:00Z')).toBe('13 May 2003')
+  })
+
+  it('still renders an em dash for a missing date', () => {
+    expect(formatDate(null)).toBe('—')
+    expect(formatDate(undefined)).toBe('—')
   })
 })
