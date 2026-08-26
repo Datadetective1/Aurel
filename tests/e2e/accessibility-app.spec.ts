@@ -52,11 +52,16 @@ const PERSON_PAGES = (id: string) => [`/people/${id}`, `/people/${id}/edit`, `/p
 /** The first person's id, or null when the account has none. */
 async function firstPersonId(page: Page): Promise<string | null> {
   await page.goto('/people')
+  // An explicit timeout, because there may be no people at all. Playwright's
+  // default action timeout is unbounded, so on an empty account this waited on
+  // a locator that would never match until the whole test timed out -- and the
+  // catch never fired, because nothing ever rejected. Earlier runs passed only
+  // because those accounts happened to have people in them.
   const href = await page
     .locator('a[href^="/people/"]')
     .filter({ hasNotText: /add|new/i })
     .first()
-    .getAttribute('href')
+    .getAttribute('href', { timeout: 5_000 })
     .catch(() => null)
 
   const match = href?.match(/^\/people\/([0-9a-f-]{36})$/)
@@ -100,7 +105,10 @@ test.describe('accessibility (signed in)', () => {
     test(`the signed-in app has no WCAG A/AA violations in ${theme === 'light' ? 'Pearl' : 'Obsidian'}`, async ({
       page,
     }) => {
-      test.setTimeout(180_000)
+      // Sixteen pages, axe on each, in two themes and two viewports. It is a
+      // thorough sweep rather than a unit test, and it outgrew three minutes
+      // once the overflow check joined it -- the pages themselves are fast.
+      test.setTimeout(360_000)
       await signIn(page)
 
       await page.evaluate((t) => localStorage.setItem('theme', t), theme)
@@ -120,6 +128,11 @@ test.describe('accessibility (signed in)', () => {
           : `  sweeping ${paths.length} pages - PERSON PAGES SKIPPED, the account has nobody recorded`,
       )
 
+      const overflowing: string[] = []
+      // Nothing may scroll sideways on a phone. Checked in the same pass as
+      // axe rather than a second one: re-navigating every page doubled the
+      // sweep and pushed it past its timeout.
+      const checkOverflow = test.info().project.name === 'mobile'
       for (const path of paths) {
         await page.goto(path)
         await expect(page.locator('html')).toHaveClass(new RegExp(theme))
@@ -133,25 +146,16 @@ test.describe('accessibility (signed in)', () => {
         if (results.violations.length > 0) {
           failures.push(`${path}\n${describe(results.violations)}`)
         }
-      }
 
-      // Nothing may scroll sideways on a phone. The public suite checks this
-      // for signed-out pages; the signed-in ones were never covered, and the
-      // source list on a person page was overflowing a 390px viewport by 50px.
-      if (test.info().project.name === 'mobile') {
-        const overflowing: string[] = []
-        for (const path of paths) {
-          await page.goto(path)
-          await settle(page)
+        if (checkOverflow) {
           const overflows = await page.evaluate(
             () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           )
           if (overflows) overflowing.push(path)
         }
-        // Comma-joined, not newline-joined: a literal escape in this string
-        // has been mangled by tooling once already.
-        expect(overflowing.join(', '), 'Pages scrolling sideways on a phone').toBe('')
       }
+
+      expect(overflowing.join(', '), 'Pages scrolling sideways on a phone').toBe('')
 
       expect(failures, `\n${failures.join('\n\n')}`).toEqual([])
     })
