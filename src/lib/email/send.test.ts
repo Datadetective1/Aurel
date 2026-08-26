@@ -115,7 +115,8 @@ describe('plain-text fallback', () => {
     // A single blank line between paragraphs is wanted. What is not wanted is a
     // line that looks blank but holds whitespace, and runs of them.
     expect(text).not.toMatch(/\n[ \t]+\n/)
-    expect(text.split('\n')[0].trim()).toBe(text.split('\n')[0])
+    const firstLine = text.split('\n')[0] ?? ''
+    expect(firstLine.trim()).toBe(firstLine)
     expect(text).not.toMatch(/\n{3,}/)
     expect(text.slice(0, 40).trim().length).toBeGreaterThan(10)
   })
