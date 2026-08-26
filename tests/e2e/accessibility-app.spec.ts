@@ -135,6 +135,26 @@ test.describe('accessibility (signed in)', () => {
         }
       }
 
+      // Nothing may scroll sideways on a phone. The public suite checks this
+      // for signed-out pages; the signed-in ones were never covered, and the
+      // source list on a person page was overflowing a 390px viewport by 50px.
+      if (test.info().project.name === 'mobile') {
+        const overflowing: string[] = []
+        for (const path of paths) {
+          await page.goto(path)
+          await settle(page)
+          const overflows = await page.evaluate(
+            () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+          )
+          if (overflows) overflowing.push(path)
+        }
+        expect(overflowing, `Pages scrolling sideways on a phone:
+${overflowing.join('
+')}`).toEqual(
+          [],
+        )
+      }
+
       expect(failures, `\n${failures.join('\n\n')}`).toEqual([])
     })
   }

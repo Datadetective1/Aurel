@@ -93,7 +93,7 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
               rel="noopener noreferrer nofollow"
               className="text-ink hover:text-accent inline-flex max-w-full items-center gap-1 text-sm"
             >
-              <span className="truncate">{source.title ?? source.url}</span>
+              <span className="min-w-0 truncate">{source.title ?? source.url}</span>
               <ExternalLink className="size-3 shrink-0 opacity-60" aria-hidden="true" />
             </a>
           ) : (
@@ -117,7 +117,7 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <Badge tone="outline">{source.sourceType.replace(/_/g, ' ')}</Badge>
           {identity ? <Badge tone={identity.tone}>{identity.label}</Badge> : null}
         </div>
