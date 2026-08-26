@@ -1,7 +1,11 @@
 # Human actions
 
-Everything here needs you. Not because the work is unfinished, but because it
-needs a credential, a payment, a legal judgement, or a signature.
+**Core Atturel V2 is pilot ready.** Everything here needs you. Not because the
+work is unfinished, but because it needs a credential, a payment, a legal
+judgment, or a signature.
+
+Nothing on this list blocks a pilot. Calendar (§4) and Billing (§5) are the two
+future major integrations; the rest of the product runs without them.
 
 **The product runs today without a single item on this list.** It degrades
 honestly instead, and Settings → Capabilities tells the user exactly which parts

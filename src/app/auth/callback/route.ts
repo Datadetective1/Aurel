@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { safeRedirectPath } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { track } from '@/lib/analytics'
 
 /**
  * OAuth / email-link callback.
@@ -45,6 +46,27 @@ export async function GET(request: NextRequest) {
       .select('onboarding_completed_at')
       .eq('id', user.id)
       .maybeSingle()
+
+    // The funnel's first step, recorded here rather than at form submission.
+    // With email confirmation on there is no session when signUp() returns, so
+    // track() had no user to attribute to and the event fired into nothing --
+    // the funnel had no top. This is also the truer moment: an account that is
+    // never confirmed never became a signup.
+    //
+    // Recorded at most once. Supabase does not pass `type` through to the
+    // redirect, so this endpoint cannot tell a confirmation from a password
+    // recovery, and a reset before onboarding would otherwise count as a second
+    // signup. Asking whether the event already exists is exact, and a callback
+    // is rare enough to afford the query.
+    const { count: alreadyCounted } = await supabase
+      .from('analytics_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('name', 'signup_completed')
+
+    if (!alreadyCounted) {
+      await track('signup_completed', {})
+    }
 
     if (!profile?.onboarding_completed_at && next === '/today') {
       return NextResponse.redirect(`${origin}/onboarding`)

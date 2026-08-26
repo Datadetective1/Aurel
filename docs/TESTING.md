@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test          # unit — 218 tests, ~2s
+npm test          # unit — 274 tests, ~2s
 npm run typecheck
 npm run lint
 npm run test:e2e  # Playwright, desktop + Pixel 7, against `next build`

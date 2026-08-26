@@ -166,8 +166,22 @@ product does not claim it has.
 
 ## Production status
 
-Live at **www.atturel.com**. Each line below was verified against production,
-not against a local build — the date is when it was last exercised end to end.
+# CORE ATTUREL V2: PILOT READY
+
+Live at **www.atturel.com**. Verified 26 August 2026 by running the whole
+journey against production on a fresh account: signup, Interaction Profile, a
+person added with no URL, automatic research, footprint review, evidence
+inspection, first meeting, brief, debrief, memory confirmation, second meeting,
+second brief.
+
+The acceptance test that mattered: the first brief said to lead with technical
+depth, because that is what the public record suggests. After one confirmed
+observation to the contrary, the second brief said to lead with business
+outcome and cost. Confirmed relationship evidence outranks public inference —
+in production, on a real person, without being told to.
+
+Each line below was verified against production, not against a local build —
+the date is when it was last exercised end to end.
 
 | Subsystem | Status | Verified |
 | --- | --- | --- |
@@ -181,8 +195,37 @@ not against a local build — the date is when it was last exercised end to end.
 | Document and transcript ingestion | **COMPLETE** | 25 Aug 2026 |
 | Reading a link you provide | **COMPLETE** | 25 Aug 2026 |
 | Automatic source discovery (Exa) | **COMPLETE** | 26 Aug 2026 |
-| Billing | Implemented; needs a Stripe account | — |
-| Calendar | Not built — see HUMAN_ACTIONS §4 | — |
+| Identity resolution | **COMPLETE** | 26 Aug 2026 |
+| Public professional footprint | **COMPLETE** | 26 Aug 2026 |
+| Evidence and provenance | **COMPLETE** | 26 Aug 2026 |
+| Meeting preparation | **COMPLETE** | 26 Aug 2026 |
+| Debrief and relationship memory | **COMPLETE** | 26 Aug 2026 |
+| Ask Atturel | **COMPLETE** | 26 Aug 2026 |
+| Pilot analytics and cost telemetry | **COMPLETE** | 26 Aug 2026 |
+
+### Future major integrations
+
+Neither is started, and neither blocks a pilot.
+
+| | |
+| --- | --- |
+| **Calendar** | Not built. Tables exist and Capabilities reports it as unavailable, but there is no OAuth flow, token storage or sync. See HUMAN_ACTIONS §4 for why it was not written blind. |
+| **Billing** | Implemented end to end — checkout, portal, webhook, entitlements, metering, founding offer — and waiting only on a Stripe account. See HUMAN_ACTIONS §5. |
+
+### Operating a pilot
+
+Cost per unit of work is in `usage_meters.estimated_cost_micros`, aggregated by
+the `usage_cost_summary` view. A measured Research Person run costs roughly
+**$0.012** — one Exa request plus about 10k input and 2k output tokens on
+`gpt-4.1-mini`. Prices live in `src/lib/billing/provider-cost.ts` and are
+estimates; update them when a vendor changes and history keeps what it actually
+cost.
+
+The funnel is in `analytics_events`: signup through second brief, with
+timestamps, so activation, time-to-first-research, research success rate and
+retention are queryable without a dashboard. Nothing there stores user content —
+`sanitiseProps` drops anything that is not a small scalar, and `logger.redact`
+is the equivalent backstop for logs.
 
 **Auth and email are accepted and stable.** Treat that subsystem as closed:
 change it for a real defect or an explicit requirement, not for tidiness. What
