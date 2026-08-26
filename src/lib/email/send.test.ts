@@ -127,3 +127,74 @@ describe('plain-text fallback', () => {
     expect(toPlainText(welcomeEmail({ firstName: 'Amary' }).html)).toMatch(/https?:\/\//)
   })
 })
+
+describe('a provider failure never reaches the caller', () => {
+  /**
+   * The unconfigured path is well covered above, but production is no longer
+   * unconfigured — a key is set, so a send is a real network call that can fail
+   * in ways the logged path never does. These stub the transport to force the
+   * two failures that actually happen: the provider refusing the message, and
+   * the request never completing.
+   *
+   * Every caller runs after something the user already accomplished: a signup
+   * that succeeded, a password that is already changed. Throwing here would
+   * turn a delivered outcome into a visible error for the user.
+   */
+
+  const configured = { ...process.env, RESEND_API_KEY: 're_test_key_not_real' }
+
+  async function sendWithStub(stub: typeof fetch) {
+    vi.stubGlobal('fetch', stub)
+    vi.stubEnv('RESEND_API_KEY', configured.RESEND_API_KEY!)
+    vi.resetModules()
+    const { sendEmail: send } = await import('./send')
+    try {
+      return await send({
+        to: 'alex@example.invalid',
+        subject: 'Your week',
+        html: '<p>hello</p>',
+        kind: 'weekly_summary',
+      })
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  }
+
+  it('resolves rather than throwing when the provider rejects the message', async () => {
+    // A 403 is what an unverified sending domain returns — the exact failure
+    // this deployment was one config value away from.
+    const result = await sendWithStub(
+      (async () =>
+        new Response('{"message":"domain not verified"}', { status: 403 })) as typeof fetch,
+    )
+    expect(result.ok).toBe(false)
+  })
+
+  it('resolves rather than throwing when the request never completes', async () => {
+    const result = await sendWithStub(
+      (async () => {
+        throw new TypeError('fetch failed')
+      }) as typeof fetch,
+    )
+    expect(result.ok).toBe(false)
+  })
+
+  it('does not leak the provider error body into the log', async () => {
+    // Providers echo the request back in error responses, and the request
+    // carries the private relationship content of the message.
+    const logged: unknown[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation((...a) => void logged.push(a))
+    const error = vi.spyOn(console, 'error').mockImplementation((...a) => void logged.push(a))
+
+    await sendWithStub(
+      (async () =>
+        new Response('{"echo":"Maya objected to the timeline"}', { status: 422 })) as typeof fetch,
+    )
+
+    warn.mockRestore()
+    error.mockRestore()
+    expect(JSON.stringify(logged)).not.toContain('Maya objected')
+  })
+})
