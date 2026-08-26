@@ -180,7 +180,7 @@ not against a local build — the date is when it was last exercised end to end.
 | AI reasoning (OpenAI `gpt-4.1-mini`) | **COMPLETE** | 25 Aug 2026 |
 | Document and transcript ingestion | **COMPLETE** | 25 Aug 2026 |
 | Reading a link you provide | **COMPLETE** | 25 Aug 2026 |
-| Automatic source discovery | Blocked — needs a search API key | — |
+| Automatic source discovery (Exa) | **COMPLETE** | 26 Aug 2026 |
 | Billing | Implemented; needs a Stripe account | — |
 | Calendar | Not built — see HUMAN_ACTIONS §4 | — |
 

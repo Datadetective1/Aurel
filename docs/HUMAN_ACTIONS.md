@@ -14,14 +14,14 @@ are off.
 | # | Capability | Blocked by | Free tier? | Code status |
 | --- | --- | --- | --- | --- |
 | 1 | **AI reasoning** | — | — | **Live — OpenAI** |
-| 2 | **Automatic research** | `EXA_API_KEY` | Trial credit | **Complete — one key away** |
+| 2 | **Automatic research** | — | — | **Live — Exa** |
 | 3 | Document ingestion | — | — | **Live** |
 | 4 | Calendar | OAuth client **+ code** | Yes | **Not built** |
 | 5 | Billing | Stripe account | Yes (test mode) | Complete |
 | 6 | **Email** | — | — | **Live — Resend** |
 
-Items 2 and 5 are credential-only: paste the variables, redeploy, done. Item 4
-needs implementation as well — see §4 for why I have not written it blind.
+Item 5 is credential-only: paste the variables, redeploy, done. Item 4 needs
+implementation as well — see §4 for why I have not written it blind.
 
 Set every variable in **Vercel → Project → Settings → Environment Variables**
 (Production), never in `.env.production`, which is committed.
@@ -85,12 +85,14 @@ gracefully. It is the line to watch.
 
 ---
 
-## 2. Automatic professional research — **one key away**
+## 2. Automatic professional research — **live, nothing needed**
 
-Everything is built and tested. Pasting a link already works and needs no
-credential. What is gated is turning a *name* into candidate URLs, which needs a
-web index — there is no legitimate way to do that without a search API, and the
-alternative is scraping a search engine, which violates its terms.
+Running on **Exa**, from `EXA_API_KEY`. Verified on production 26 Aug 2026:
+adding *Mitchell Baker, Executive Chair, Mozilla* with no URL and pressing
+Research discovered five sources — Mozilla's own blog and annual report, the
+Internet Hall of Fame, the American Academy of Arts & Sciences and Wikipedia —
+resolved identity on each, extracted cited facts, and proposed three
+communication observations. One search request.
 
 ```
 EXA_API_KEY=...
