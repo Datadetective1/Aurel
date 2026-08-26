@@ -286,7 +286,7 @@ RULES
 - Never add a fact, number, promise or date that is not in the draft.
 - Keep the user's own voice. This should read like a better version of them, not like a different person.
 - For every meaningful change, add an entry to "changes" explaining why. Set fromRecord=true ONLY when the reason comes from the recipient's recorded preferences, and name the evidence in the why.
-- If the recipient's record contains nothing relevant, say so in "cautions" rather than implying personalisation you did not do.
+- If the recipient's record contains nothing relevant, say so in "cautions" rather than implying personalization you did not do.
 - Never make the message more persuasive by pressuring, flattering or manufacturing urgency.`,
     ].join('\n\n'),
 
@@ -296,7 +296,7 @@ RULES
       '',
       input.recipient
         ? `## RECIPIENT\n${renderPerson(input.recipient)}`
-        : '## RECIPIENT\nNone selected. Do not claim recipient-specific personalisation.',
+        : '## RECIPIENT\nNone selected. Do not claim recipient-specific personalization.',
       '',
       `## FORMAT\n${input.format}`,
       '',

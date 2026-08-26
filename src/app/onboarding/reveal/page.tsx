@@ -149,7 +149,7 @@ export default async function RevealPage() {
       </section>
 
       <p className="mt-10 max-w-2xl text-xs leading-relaxed text-ink-faint">
-        The {brand.assessmentName} is a self-report personalisation tool for professional
+        The {brand.assessmentName} is a self-report personalization tool for professional
         communication. It is not a clinical, diagnostic or psychometric instrument, it has no
         validation study behind it, and it must not be used to assess anyone&rsquo;s suitability for
         a role.

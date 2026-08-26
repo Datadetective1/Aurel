@@ -40,14 +40,14 @@ export default function TermsPage() {
         <Section title="What the service is">
           <p>
             {brand.name} helps you prepare for professional conversations by keeping a private record
-            of your working relationships and turning it into guidance. It is a personalisation and
+            of your working relationships and turning it into guidance. It is a personalization and
             preparation tool.
           </p>
         </Section>
 
         <Section title="What it is not">
           <p>
-            The {brand.assessmentName} is a self-report personalisation instrument. It is not a
+            The {brand.assessmentName} is a self-report personalization instrument. It is not a
             clinical, diagnostic or psychometric assessment, it has no validation study behind it,
             and it must not be used to assess anyone&rsquo;s suitability for a role.
           </p>

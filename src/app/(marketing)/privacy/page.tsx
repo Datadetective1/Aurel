@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
           <span>
             <strong className="font-medium text-ink">Draft.</strong> This describes the product&rsquo;s
-            actual behaviour accurately, but it has not yet been reviewed by a lawyer and is not a
+            actual behavior accurately, but it has not yet been reviewed by a lawyer and is not a
             final legal document.
           </span>
         </p>
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
-        <Section title="AI-generated content is labelled">
+        <Section title="AI-generated content is labeled">
           <p>
             Every claim about a person carries an evidence level: confirmed, observed, inferred, or
             unknown. Guidance shows the records it was built from. Where output was composed

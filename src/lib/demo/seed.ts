@@ -63,7 +63,7 @@ const PEOPLE: SeedPerson[] = [
       },
       {
         content:
-          'Across three decision meetings, asked for utilisation evidence before agreeing to a headcount change.',
+          'Across three decision meetings, asked for utilization evidence before agreeing to a headcount change.',
         category: 'decision',
         evidence: 'observed',
         status: 'active',
@@ -124,7 +124,7 @@ const PEOPLE: SeedPerson[] = [
     organization: 'Northwind',
     relationshipType: 'peer',
     relevance: 4,
-    notes: 'Coordinates the migration programme across three teams.',
+    notes: 'Coordinates the migration program across three teams.',
     observations: [
       {
         content: 'Keeps the risk register and expects it referenced in status conversations.',
@@ -272,8 +272,8 @@ export async function seedDemoData(
         title: 'Q2 platform review',
         daysAgo: 62,
         summary:
-          'Walked through the platform roadmap. Maya asked for utilisation data before committing to the headcount move.',
-        outcome: 'Deferred the headcount decision pending utilisation evidence.',
+          'Walked through the platform roadmap. Maya asked for utilization data before committing to the headcount move.',
+        outcome: 'Deferred the headcount decision pending utilization evidence.',
         people: ['maya', 'daniel'],
         wentWell: 3,
       },
@@ -337,7 +337,7 @@ export async function seedDemoData(
     // --- commitments, one deliberately overdue --------------------------------
     const commitments = [
       {
-        description: 'Send Maya the utilisation numbers for the last two quarters',
+        description: 'Send Maya the utilization numbers for the last two quarters',
         person: 'maya',
         owner: 'user' as const,
         dueOn: new Date(now - 6 * DAY).toISOString().slice(0, 10), // overdue

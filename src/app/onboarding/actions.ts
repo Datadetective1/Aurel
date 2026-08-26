@@ -73,7 +73,7 @@ const aboutSchema = z.object({
     .string()
     .trim()
     .max(64)
-    .refine((v) => v === '' || isValidTimezone(v), 'That is not a timezone we recognise.')
+    .refine((v) => v === '' || isValidTimezone(v), 'That is not a timezone we recognize.')
     .optional()
     .or(z.literal('')),
 })

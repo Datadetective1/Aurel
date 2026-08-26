@@ -59,7 +59,7 @@ export function DebriefForm({
 
       <div className="mt-7">
         <Eyebrow>How did it go?</Eyebrow>
-        <p className="mt-1.5 text-xs text-ink-muted">Optional. Your own read, not a judgement.</p>
+        <p className="mt-1.5 text-xs text-ink-muted">Optional. Your own read, not a judgment.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {RATINGS.map((option) => (
             <button

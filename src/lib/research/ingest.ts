@@ -102,7 +102,7 @@ function accessStatusFor(reason: string): { status: AccessStatus; message: strin
     case 'unsupported_content_type':
       return { status: 'unsupported', message: 'That file type is not supported yet.' }
     case 'too_large':
-      return { status: 'content_unavailable', message: 'That page is too large to analyse.' }
+      return { status: 'content_unavailable', message: 'That page is too large to analyze.' }
     case 'timeout':
       return { status: 'error', message: 'That page took too long to respond.' }
     case 'invalid_url':

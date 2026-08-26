@@ -31,7 +31,7 @@ const profileSchema = z.object({
     .string()
     .trim()
     .max(64)
-    .refine(isValidTimezone, 'That is not a timezone we recognise.')
+    .refine(isValidTimezone, 'That is not a timezone we recognize.')
     .optional(),
 })
 

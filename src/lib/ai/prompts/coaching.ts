@@ -293,13 +293,13 @@ export const relationshipSummaryPrompt: PromptModule<RelationshipSummaryInput, R
       BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
       dateBlock(),
-      `TASK: summarise what the user has actually learned about working with this one person.
+      `TASK: summarize what the user has actually learned about working with this one person.
 
 RULES
 - This is a summary of a RECORD, not a personality profile. If the record is thin, the summary is short. Do not pad it.
 - "gaps" is required and must be honest — it is the most trusted part of this page.
 - Attribute observed patterns ("across three interactions..."). Hedge inferred ones ("may prefer...").
-- Never characterise the person. Describe behaviour and stated preferences only.`,
+- Never characterise the person. Describe behavior and stated preferences only.`,
     ].join('\n\n'),
   user: (input) => [renderUser(input.user), '', '## THE PERSON', renderPerson(input.person)].join('\n'),
   compose: composeRelationshipSummary,
@@ -450,7 +450,7 @@ const POLE_COPY: Record<string, { best: string; pressure: string; experience: st
     best: 'You move on a good read while others are still gathering.',
     pressure: 'A confident read is hard to distinguish from a correct one.',
     experience: 'Decisive and intuitive — sometimes hard to argue with on evidence.',
-    context: 'The data is thin and judgement is the only tool available.',
+    context: 'The data is thin and judgment is the only tool available.',
   },
   'change_comfort:high': {
     best: 'You are willing to try the thing that has not been tried.',
@@ -512,7 +512,7 @@ export const profileNarrativePrompt: PromptModule<ProfileNarrativeInput, Profile
       `TASK: write the reveal for the user's own Interaction Profile.
 
 RULES
-- This is a self-report personalisation instrument, not a psychological assessment. Never imply clinical validity, never diagnose, never predict performance or fitness for a role.
+- This is a self-report personalization instrument, not a psychological assessment. Never imply clinical validity, never diagnose, never predict performance or fitness for a role.
 - Every pole is legitimate. For each strength, name its cost. Never suggest the user should be at the other end.
 - "underPressure" must be careful and non-pathologising: describe what the same tendency does when stretched, not a flaw.
 - "howOthersExperienceYou" is a reflection, not a criticism.

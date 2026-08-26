@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: 'Plan', robots: { index: false, follo
 const METER_LABEL: Partial<Record<MeterKind, string>> = {
   person_research: 'People researched',
   meeting_brief: 'Meeting briefs',
-  transcript_analysis: 'Transcripts analysed',
+  transcript_analysis: 'Transcripts analyzed',
   document_analysis: 'Documents read',
   ai_coach_message: 'Coach questions',
   message_adaptation: 'Messages adapted',
@@ -61,9 +61,9 @@ export default async function BillingSettingsPage({
         </p>
       ) : null}
 
-      {checkout === 'cancelled' ? (
+      {checkout === 'canceled' ? (
         <p className="mt-4 max-w-lg text-xs leading-relaxed text-ink-muted">
-          Checkout was cancelled and nothing was charged.
+          Checkout was canceled and nothing was charged.
         </p>
       ) : null}
 

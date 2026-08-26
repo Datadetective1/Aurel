@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 const FAQ = [
   {
     q: 'Do I pay per person I add?',
-    a: `No, and that is deliberate. ${brand.name} only gets useful when you add the people you actually work with, so charging per person would work against the whole point. Pro has no limit on people. What is metered is the expensive work: researching a public footprint, generating briefs, analysing transcripts.`,
+    a: `No, and that is deliberate. ${brand.name} only gets useful when you add the people you actually work with, so charging per person would work against the whole point. Pro has no limit on people. What is metered is the expensive work: researching a public footprint, generating briefs, analyzing transcripts.`,
   },
   {
     q: 'What happens to my data if I stop paying?',
@@ -147,7 +147,7 @@ export default function PricingPage() {
 
           <p className="mt-8 max-w-2xl text-xs leading-relaxed text-ink-muted">
             Fair-use limits apply to the expensive operations — researching a person, generating
-            briefs, analysing transcripts. They are set well above normal use; if you hit one, tell
+            briefs, analyzing transcripts. They are set well above normal use; if you hit one, tell
             us and we will look at it.
           </p>
         </Container>
@@ -167,7 +167,7 @@ export default function PricingPage() {
           </p>
           <p className="mt-4 leading-relaxed text-ink-secondary">
             What is metered is the work that genuinely costs something to run: reading the public
-            web, generating a brief, analysing a transcript, and extended coach use.
+            web, generating a brief, analyzing a transcript, and extended coach use.
           </p>
 
           <ApertureRule className="my-12" />

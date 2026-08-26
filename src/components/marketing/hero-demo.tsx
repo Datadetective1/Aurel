@@ -39,7 +39,7 @@ const PARTICIPANTS: Participant[] = [
     role: 'Decision maker',
     chip: 'VP Engineering',
     evidence: 'observed',
-    signal: 'Asked for utilisation evidence before the forecast in the last two reviews.',
+    signal: 'Asked for utilization evidence before the forecast in the last two reviews.',
   },
   {
     name: 'Daniel Brooks',
@@ -151,14 +151,14 @@ export function HeroDemo({ className }: { className?: string }) {
 
         <p className="mt-3 text-sm leading-relaxed text-ink">
           Open with the decision, not the method. Daniel wants the cost impact first; Maya will ask
-          what the utilisation data shows before she commits.
+          what the utilization data shows before she commits.
         </p>
 
         <ol className="mt-4 space-y-2">
           {[
             'State the ask in one sentence.',
             'Give Daniel the cost impact before the reasoning.',
-            'Show Maya the utilisation evidence, then return to the decision.',
+            'Show Maya the utilization evidence, then return to the decision.',
             'Leave with an owner and a date.',
           ].map((step, i) => (
             <li key={step} className="flex gap-2.5 text-[0.8125rem] leading-relaxed text-ink-secondary">

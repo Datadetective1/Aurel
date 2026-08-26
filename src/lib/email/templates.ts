@@ -77,7 +77,7 @@ export function welcomeEmail({ firstName }: { firstName: string }): BuiltEmail {
         button('Prepare for a meeting', absoluteUrl('/prepare')),
         rule(),
         paragraph(
-          `<strong style="color:${palette.ink};font-weight:500;">What ${escapeHtml(brand.name)} will never do:</strong> guess at anyone's personal characteristics, score people for hiring or promotion, or present an inference as a fact. Anything it is unsure about is labelled, every time.`,
+          `<strong style="color:${palette.ink};font-weight:500;">What ${escapeHtml(brand.name)} will never do:</strong> guess at anyone's personal characteristics, score people for hiring or promotion, or present an inference as a fact. Anything it is unsure about is labeled, every time.`,
         ),
       ].join(''),
       footerNote: `You are receiving this because you created an ${escapeHtml(brand.name)} account.`,

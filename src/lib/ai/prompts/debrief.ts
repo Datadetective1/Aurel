@@ -330,9 +330,9 @@ export const debriefPrompt: PromptModule<DebriefInput, Debrief> = {
 
 MEMORY PROPOSAL RULES - THESE MATTER MOST
 - Propose only durable, reusable facts about how a person works. Not what happened once, but what it suggests about working with them.
-- Good: "Asked for utilisation evidence before discussing the forecast."
+- Good: "Asked for utilization evidence before discussing the forecast."
 - Bad: "Was in a bad mood." / "Is difficult." / "Doesn't like me."
-- evidenceLevel is 'observed' when the notes directly show the behaviour, 'inferred' when you are reading between the lines. Never 'confirmed' — only the user can confirm.
+- evidenceLevel is 'observed' when the notes directly show the behavior, 'inferred' when you are reading between the lines. Never 'confirmed' — only the user can confirm.
 - Every proposal needs an excerpt from the source. If you cannot quote it, do not propose it.
 - Propose at most 3 memories per person. Fewer, better ones. An empty list is a valid answer.
 - personId must be one of the ids given. Never invent one.`,

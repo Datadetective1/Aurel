@@ -432,6 +432,6 @@ export function researchCapability() {
     /** Shown in the UI when discovery is unavailable. */
     discoveryHint: search.configured
       ? null
-      : `Automatic source discovery is not configured. Paste a link — a company bio, a talk, an article — and ${brand.name} will analyse it.`,
+      : `Automatic source discovery is not configured. Paste a link — a company bio, a talk, an article — and ${brand.name} will analyze it.`,
   } as const
 }

@@ -78,7 +78,7 @@ export async function startCheckout(
         automatic_tax: { enabled: false },
 
         success_url: absoluteUrl('/settings/billing?checkout=success'),
-        cancel_url: absoluteUrl('/settings/billing?checkout=cancelled'),
+        cancel_url: absoluteUrl('/settings/billing?checkout=canceled'),
       },
       // Idempotent per user per interval per day: a double-submitted form
       // must not create two subscriptions.

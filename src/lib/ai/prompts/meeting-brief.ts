@@ -499,7 +499,7 @@ function composeMeetingBrief(input: MeetingBriefInput): MeetingBrief {
     )
   }
   if (!meeting.objective) {
-    uncertainties.push('No objective recorded, so this brief cannot tell you what to optimise for.')
+    uncertainties.push('No objective recorded, so this brief cannot tell you what to optimize for.')
   }
   const inferredCount = people.reduce((n, p) => n + p.observations.inferred.length, 0)
   if (inferredCount > 0) {

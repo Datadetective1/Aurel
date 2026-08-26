@@ -84,12 +84,12 @@ const FACTS: DemoFact[] = [
   {
     group: 'Professional identity',
     claim: 'VP Engineering at Northwind',
-    detail: 'Leads platform, developer tooling and the cloud migration programme.',
+    detail: 'Leads platform, developer tooling and the cloud migration program.',
     source: 'Leadership — Northwind Engineering',
   },
   {
     group: 'Expertise',
-    claim: 'Platform reliability and organisational scaling',
+    claim: 'Platform reliability and organizational scaling',
     detail: 'Recurring subject across her talks and written work.',
     source: 'Rebuilding a platform team without stopping delivery',
   },

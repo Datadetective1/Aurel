@@ -165,7 +165,10 @@ const STEPS = [
     icon: Users,
     eyebrow: 'Walking in',
     title: 'Prepare for the room',
-    body: `Tell ${brand.name} what you need to accomplish. It combines public context with your relationship history to suggest how to open, what to emphasise, and what to leave with.`,
+    // The trust sentence is short on purpose. The Evidence section below gives
+    // the distinction four labelled tiers and an example of each; this exists so
+    // a visitor who never scrolls that far still meets it once.
+    body: `Tell ${brand.name} what you need to accomplish. It combines public context with your relationship history: how to open, what to emphasize, what to leave with. Public evidence, your observations and its inferences stay separate.`,
   },
   {
     icon: PenLine,
@@ -297,7 +300,7 @@ function Memory() {
             <MessageSquareQuote className="text-accent-graphic size-5" aria-hidden="true" />
             <blockquote className="font-display text-ink mt-5 text-xl leading-snug sm:text-2xl">
               &ldquo;Last time you presented this forecast, Maya challenged the assumptions but
-              moved once you showed the historical utilisation. Bring that evidence earlier this
+              moved once you showed the historical utilization. Bring that evidence earlier this
               time.&rdquo;
             </blockquote>
             <figcaption className="text-ink-muted mt-6 flex items-center gap-2 text-xs">
@@ -324,7 +327,7 @@ const EVIDENCE_TIERS = [
     label: 'Observed',
     tone: 'text-info',
     body: 'It happened, across interactions you recorded. Always attributed to them.',
-    example: 'Maya has asked for utilisation evidence in the last two reviews.',
+    example: 'Maya has asked for utilization evidence in the last two reviews.',
   },
   {
     icon: CircleHelp,

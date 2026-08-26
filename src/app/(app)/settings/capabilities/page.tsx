@@ -114,7 +114,7 @@ export default async function CapabilitiesSettingsPage() {
       status: research.canDiscover ? 'configured' : 'setup',
       detail: research.canDiscover
         ? `Searches for a person's public professional footprint using ${research.searchProvider}.`
-        : 'Discovery from a name alone needs a search API key. Until then, paste a link and it is analysed the same way.',
+        : 'Discovery from a name alone needs a search API key. Until then, paste a link and it is analyzed the same way.',
       deploymentAction: research.canDiscover
         ? undefined
         : {
@@ -148,7 +148,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: FileText,
       status: 'available',
       detail:
-        'Attach a PDF, a Word document or plain text, or paste a transcript — either way it is analysed the same as a fetched page, with the same citations. A scanned PDF with no text layer is refused rather than saved empty.',
+        'Attach a PDF, a Word document or plain text, or paste a transcript — either way it is analyzed the same as a fetched page, with the same citations. A scanned PDF with no text layer is refused rather than saved empty.',
       userAction: { label: 'Add context to someone', href: '/people' },
     },
     {

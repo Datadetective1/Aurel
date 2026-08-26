@@ -226,10 +226,10 @@ export function MeetingBriefView({
 
       <ApertureRule />
 
-      {/* --- emphasise / avoid ------------------------------------------------- */}
+      {/* --- emphasize / avoid ------------------------------------------------- */}
       <section className="grid gap-8 sm:grid-cols-2">
         {brief.emphasize.length > 0 ? (
-          <BriefList label="Emphasise" items={brief.emphasize} accent />
+          <BriefList label="Emphasize" items={brief.emphasize} accent />
         ) : null}
         {brief.avoid.length > 0 ? <BriefList label="Avoid" items={brief.avoid} /> : null}
       </section>
