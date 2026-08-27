@@ -159,6 +159,32 @@ export async function matchAttendees(
   return matches
 }
 
+/** Equal moments, whatever text each side used to express them. */
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false
+  const left = new Date(a).getTime()
+  const right = new Date(b).getTime()
+  return !Number.isNaN(left) && !Number.isNaN(right) && left === right
+}
+
+/**
+ * Whether the stored attendee-to-Person resolution still matches the one we
+ * just computed. Email plus personId only -- a display name changing in
+ * somebody's address book is not a reason to rewrite the row.
+ */
+function sameMatches(stored: unknown, computed: { email: string | null; personId: string | null }[]): boolean {
+  if (!Array.isArray(stored)) return false
+  if (stored.length !== computed.length) return false
+
+  const key = (a: { email: string | null; personId: string | null }) => `${a.email ?? ''}:${a.personId ?? ''}`
+  const before = new Set(
+    (stored as { email?: string | null; personId?: string | null }[]).map((a) =>
+      key({ email: a.email ?? null, personId: a.personId ?? null }),
+    ),
+  )
+  return computed.every((a) => before.has(key(a)))
+}
+
 /**
  * Persist one normalized event.
  *
@@ -192,19 +218,32 @@ async function persistEvent(
 
   const { data: existing } = await supabase
     .from('external_calendar_events')
-    .select('id, provider_updated_at, status')
+    .select('id, provider_updated_at, status, attendees')
     .eq('integration_id', input.integrationId)
     .eq('external_id', event.externalId)
     .maybeSingle()
 
-  // The provider's own change marker, so an untouched event costs one read
-  // rather than a write plus an attendee rebuild.
+  // Skip an event that has not moved AND whose people we already resolved the
+  // same way.
+  //
+  // Two things make this less obvious than it looks.
+  //
+  // The timestamps are compared as instants, not as strings. Postgres returns
+  // '2026-08-27 02:00:53.016446+00' where Graph sent
+  // '2026-08-27T02:00:53.0164460Z' -- the same moment, never the same text. As
+  // a string comparison this branch could not fire even once, so every sync
+  // rewrote every event.
+  //
+  // And the matches have to agree too. Repairing only the timestamp would have
+  // introduced a worse bug than the one it fixed: a user adds someone to
+  // Atturel, presses Sync now, and the attendee still reads as unknown, because
+  // the event itself has not changed on Microsoft's side and never will just
+  // because our end learned who somebody is.
   if (
     existing &&
-    existing.provider_updated_at &&
-    event.providerUpdatedAt &&
-    existing.provider_updated_at === event.providerUpdatedAt &&
-    existing.status === event.status
+    existing.status === event.status &&
+    sameInstant(existing.provider_updated_at, event.providerUpdatedAt) &&
+    sameMatches(existing.attendees, attendees)
   ) {
     return 'skipped'
   }
