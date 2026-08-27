@@ -9,6 +9,7 @@ import { FOUNDING_OFFER, PLANS, formatPrice, type MeterKind } from '@/lib/billin
 import { foundingPlacesRemaining } from './actions'
 import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
 import { InvitationPanel } from '@/components/app/invitation-panel'
+import { hasFullAccess } from '@/lib/billing/access'
 import { features } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
@@ -38,6 +39,11 @@ export default async function BillingSettingsPage({
     const limit = entitlements.quotas[kind]
     return typeof limit === 'number' && limit > 0
   })
+
+  // Owner and pilot: the plan is still Free commercially, but its ceilings do
+  // not apply, so the copy that describes them would contradict the Access
+  // section a few lines below it.
+  const fullAccess = hasFullAccess(entitlements.tier)
 
   const usage = await Promise.all(
     metered.map(async (kind) => ({
@@ -80,14 +86,19 @@ export default async function BillingSettingsPage({
 
       <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">{plan.tagline}</p>
 
-      <ul className="mt-6 grid gap-2.5">
-        {plan.highlights.map((item) => (
-          <li key={item} className="flex gap-2.5 text-sm text-ink-secondary">
-            <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-            {item}
-          </li>
-        ))}
-      </ul>
+      {/* The Free highlights enumerate quotas -- "3 researched people and 3
+          meeting briefs a month" -- which is not true of an account those
+          quotas do not apply to. */}
+      {!fullAccess ? (
+        <ul className="mt-6 grid gap-2.5">
+          {plan.highlights.map((item) => (
+            <li key={item} className="flex gap-2.5 text-sm text-ink-secondary">
+              <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {usage.length > 0 ? (
         <section className="mt-10">
@@ -129,7 +140,10 @@ export default async function BillingSettingsPage({
         </section>
       ) : null}
 
-      <div className="mt-10 flex flex-wrap items-start gap-2">
+      {/* No upgrade path is offered to an account that already has everything.
+          Nothing here is hidden from them -- Compare plans is still reachable
+          from the marketing site -- it is simply not a prompt they need. */}
+      <div className={fullAccess ? 'hidden' : 'mt-10 flex flex-wrap items-start gap-2'}>
         {features.billing && entitlements.plan === 'free' ? (
           <UpgradeButton
             label={

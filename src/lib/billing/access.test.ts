@@ -128,3 +128,27 @@ describe('metering is not part of this', () => {
     expect(record).not.toMatch(/\btier\b|hasFullAccess|applyAccessTier/)
   })
 })
+
+describe('what a full-access account is shown', () => {
+  const billing = readFileSync(
+    join(process.cwd(), 'src', 'app', '(app)', 'settings', 'billing', 'page.tsx'),
+    'utf8',
+  )
+
+  it('hides the quota-bearing plan highlights', () => {
+    // "3 researched people and 3 meeting briefs a month" is not true of an
+    // account those quotas do not apply to, and it sat directly above a line
+    // saying no quotas apply.
+    expect(billing).toMatch(/!fullAccess \? \([\s\S]{0,200}plan\.highlights/)
+  })
+
+  it('offers no upgrade prompt', () => {
+    expect(billing).toMatch(/fullAccess \? 'hidden'/)
+  })
+
+  it('drops the usage bars by itself, without a special case', () => {
+    // metered filters on a numeric limit, and full access sets every quota to
+    // null -- so "This month" disappears because the data says so.
+    expect(billing).toMatch(/typeof limit === 'number' && limit > 0/)
+  })
+})
