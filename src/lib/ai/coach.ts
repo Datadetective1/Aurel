@@ -722,4 +722,20 @@ export const COACH_EXAMPLES = [
   'Prepare me for my next meeting',
 ] as const
 
+/**
+ * The same screen, for an account with nothing in it yet.
+ *
+ * Offering "What commitments do I owe people?" to an empty record invites a
+ * question that can only come back empty, and a first answer of "I have nothing
+ * on that" reads as a broken product rather than an honest one. This says what
+ * it needs first.
+ */
+export const COACH_EXAMPLES_EMPTY = [
+  `What does ${brand.name} know about me so far?`,
+  'How should I approach a first meeting with someone new?',
+  'What should I record after a meeting?',
+] as const
+
 export const COACH_INTRO = `Ask about the people you work with, what is still open, or what is coming up. ${brand.name} answers from your own record and shows the evidence.`
+
+export const COACH_INTRO_EMPTY = `${brand.name} answers from your own record, so it needs one first. Add a person and record a conversation, or connect your calendar, and this becomes the fastest way to ask what you are walking into.`

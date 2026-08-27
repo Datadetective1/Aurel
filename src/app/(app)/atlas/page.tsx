@@ -91,7 +91,7 @@ export default async function AtlasPage() {
         as="h1"
         eyebrow="Overview"
         title="Relationship Atlas"
-        description="Your working relationships grouped by organisation, and the signals worth acting on."
+        description="Every person you track, grouped by where they work, with the relationships going quiet surfaced before you notice yourself."
       />
 
       {list.length === 0 ? (
@@ -99,7 +99,11 @@ export default async function AtlasPage() {
           className="mt-10"
           icon={<Compass className="size-6" />}
           title="Nothing to map yet"
-          description={`Add the people you work with and ${brand.name} will group them by organisation and surface which relationships need attention.`}
+          // "Atlas" tells a new user nothing, and neither did the old copy.
+          // What it is for is the part worth saying: this is the view that
+          // gets more useful the longer the account runs, because it is built
+          // out of contact you have actually recorded.
+          description={`This is the long view. Once you are tracking a few people, ${brand.name} groups them by where they work and flags the relationships going quiet — the ones you would not notice slipping until you needed them.`}
           action={
             <Button asChild>
               <Link href="/people/new">
@@ -181,7 +185,7 @@ export default async function AtlasPage() {
 
           {/* --- by organisation ------------------------------------------------ */}
           <section>
-            <Eyebrow>By organisation</Eyebrow>
+            <Eyebrow>By organization</Eyebrow>
             <div className="mt-5 grid gap-6">
               {organisations.map((org) => (
                 <div key={org.name}>
@@ -227,7 +231,7 @@ export default async function AtlasPage() {
 
               {unaffiliated.length > 0 ? (
                 <div>
-                  <h2 className="font-display text-lg text-ink">No organisation recorded</h2>
+                  <h2 className="font-display text-lg text-ink">No organization recorded</h2>
                   <ul className="mt-3 flex flex-wrap gap-2">
                     {unaffiliated.map((person) => (
                       <li key={person.id}>

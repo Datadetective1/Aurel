@@ -113,12 +113,17 @@ describe('internal links', () => {
   it('never points at a route that does not exist', () => {
     const dead: string[] = []
     for (const [target, files] of linkTargets()) {
-      // Compare with every dynamic segment reduced to the same token, so a
-      // link built from `${provider}` matches a route directory named
-      // [provider] without the test having to know the parameter's name.
-      const shape = (path: string) => path.replace(/\[[^\]]+\]/g, '[dynamic]')
-      const candidate = shape(target)
-      if (![...known].some((route) => shape(route) === candidate)) {
+      // A dynamic segment in the route matches whatever stands in that
+      // position in the link -- a template hole, or a literal like `microsoft`
+      // for [provider]. Reducing both sides to a token only handled the first,
+      // so a perfectly good link written out in full was reported dead.
+      const matches = (route: string) => {
+        const a = route.split('/')
+        const b = target.split('/')
+        if (a.length !== b.length) return false
+        return a.every((segment, i) => segment.startsWith('[') || segment === b[i])
+      }
+      if (![...known].some(matches)) {
         dead.push(`${target}  <-  ${[...new Set(files)].join(', ')}`)
       }
     }

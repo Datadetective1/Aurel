@@ -22,6 +22,8 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getUserContext, getPeopleContext, getQuietRelationships } from '@/lib/ai/context'
 import { runPrompt } from '@/lib/ai/provider'
+import { getFirstRunState } from '@/lib/first-run'
+import { FirstRun, firstRunComplete } from '@/components/app/first-run'
 import { dailyFocusPrompt } from '@/lib/ai/prompts/coaching'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
 import { brand } from '@/lib/brand'
@@ -110,7 +112,16 @@ export default async function TodayPage({
   const displayName = (p: { full_name: string; preferred_name: string | null } | null) =>
     p ? p.preferred_name || p.full_name : null
 
-  const focus = await runPrompt(dailyFocusPrompt, {
+  const firstRun = await getFirstRunState(supabase, user.id)
+
+  // Nothing recorded means nothing to reason about. Sending an empty record to
+  // a model costs a request and a few seconds to be told, at length, that the
+  // day is empty -- which the account already knows and can say better itself.
+  const hasSignals =
+    (meetings ?? []).length > 0 || (commitments ?? []).length > 0 || quiet.length > 0
+
+  const focus = hasSignals
+    ? await runPrompt(dailyFocusPrompt, {
     user: userContext,
     today,
     meetings: (meetings ?? []).map((m) => ({
@@ -143,7 +154,8 @@ export default async function TodayPage({
       personName: displayName(c.people),
     })),
     quietRelationships: quiet,
-  })
+      })
+    : null
 
   const hasAnything = (meetings ?? []).length > 0 || (commitments ?? []).length > 0
   const firstName = profile.preferred_name || profile.full_name?.split(' ')[0] || 'there'
@@ -208,7 +220,14 @@ export default async function TodayPage({
         </h1>
       </header>
 
-      {/* Today's focus — the single most important thing, with its reasoning. */}
+      {/* The three things that make an empty account useful. Disappears on its
+          own once they are done — see components/app/first-run. */}
+      <FirstRun state={firstRun} className="mt-9" />
+
+      {/* Today's focus — the single most important thing, with its reasoning.
+          Only rendered when there is something to reason about; the first-run
+          panel above is the better answer on an empty account. */}
+      {focus ? (
       <section className="mt-9">
         <Panel className="p-6 sm:p-7">
           <div className="flex items-start gap-3">
@@ -241,6 +260,7 @@ export default async function TodayPage({
           </div>
         </Panel>
       </section>
+      ) : null}
 
       <UpcomingMeetings
         events={upcomingEvents}
@@ -248,19 +268,21 @@ export default async function TodayPage({
         nowIso={new Date().toISOString()}
       />
 
-      {!hasAnything ? (
+      {/* Only once the checklist above has gone. Before that it would say the
+          same thing twice, in two different shapes, on the same screen. */}
+      {!hasAnything && firstRunComplete(firstRun) ? (
         <EmptyState
           className="mt-8"
           icon={<UserPlus className="size-6" />}
-          title="Start with someone you work with often"
-          description={`${brand.name} gets useful as soon as it has one real relationship to work from. Add a person, then prepare for your next conversation with them.`}
+          title="A quiet day"
+          description={`Nothing is scheduled and nothing is overdue. When you add a person or connect a meeting, ${brand.name} will have something to say here.`}
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild>
                 <Link href="/people/new">Add a person</Link>
               </Button>
               <Button asChild variant="secondary">
-                <Link href="/settings/data">Load demo data</Link>
+                <Link href="/meetings">Prepare for a meeting</Link>
               </Button>
             </div>
           }
@@ -393,7 +415,7 @@ export default async function TodayPage({
       ) : null}
 
       {/* Relationship signals */}
-      {focus.output.watchItems.length > 0 ? (
+      {focus && focus.output.watchItems.length > 0 ? (
         <section className="mt-12">
           <Eyebrow>Worth watching</Eyebrow>
           <ul className="mt-4 grid gap-2.5">
@@ -407,13 +429,16 @@ export default async function TodayPage({
         </section>
       ) : null}
 
-      {/* Honest attribution of how this page was produced. */}
-      <p className="mt-14 flex items-center gap-2 text-xs text-ink-faint">
-        <CalendarClock className="size-3.5" aria-hidden="true" />
-        {focus.provenance.groundedFallback
-          ? 'Composed directly from your records.'
-          : 'Generated from your records.'}
-      </p>
+      {/* Honest attribution of how this page was produced. Absent when nothing
+          was produced -- an empty account has nothing to attribute. */}
+      {focus ? (
+        <p className="mt-14 flex items-center gap-2 text-xs text-ink-faint">
+          <CalendarClock className="size-3.5" aria-hidden="true" />
+          {focus.provenance.groundedFallback
+            ? 'Composed directly from your records.'
+            : 'Generated from your records.'}
+        </p>
+      ) : null}
     </Container>
   )
 }

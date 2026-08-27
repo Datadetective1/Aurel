@@ -27,12 +27,22 @@ export async function startOrResumeAssessment() {
   const user = await requireUser()
   const supabase = await createClient()
 
+  // Any run of this instrument, not just an unfinished one.
+  //
+  // Filtering on in_progress meant that landing on this page after finishing
+  // found nothing to resume and started a brand new assessment: an empty row
+  // with zero responses, plus a second assessment_started, every time. It fired
+  // on the way to the reveal screen, so every completed account carried one and
+  // the started-to-completed funnel understated completion by half.
+  //
+  // Retaking is a deliberate act and belongs behind a deliberate control, not
+  // behind navigating back to a page you have already finished.
   const { data: existing } = await supabase
     .from('assessments')
     .select('id, instrument_version')
     .eq('user_id', user.id)
-    .eq('status', 'in_progress')
     .eq('instrument_version', INSTRUMENT_VERSION)
+    .in('status', ['in_progress', 'completed'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

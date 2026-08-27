@@ -10,6 +10,7 @@ import {
   type UpcomingEvent,
 } from '@/components/app/upcoming-meetings'
 import { requireOnboardedUser } from '@/lib/auth'
+import { getFirstRunState } from '@/lib/first-run'
 import { createClient } from '@/lib/supabase/server'
 import { formatTime, relativeDay } from '@/lib/format'
 import { brand } from '@/lib/brand'
@@ -72,6 +73,8 @@ export default async function MeetingsPage() {
    * looked like a feature that did nothing. This is where the rest of the
    * fortnight lives, and where Prepare becomes reachable for it.
    */
+  const firstRun = await getFirstRunState(supabase, user.id)
+
   const calendarHorizon = new Date()
   calendarHorizon.setDate(calendarHorizon.getDate() + 14)
 
@@ -129,12 +132,39 @@ export default async function MeetingsPage() {
         <EmptyState
           className="mt-10"
           icon={<CalendarClock className="size-6" />}
-          title="Prepare for a conversation"
-          description={`Tell ${brand.name} who is in the room and what you need to achieve, and it will turn your relationship record into a brief for that specific conversation.`}
+          title={
+            firstRun.calendarConnected
+              ? 'Nothing scheduled in the next two weeks'
+              : 'Prepare for a conversation'
+          }
+          description={
+            // Three different truths, and saying the wrong one is what made
+            // this screen a dead end: a user with no calendar was told to
+            // enter meetings by hand, and never learned there was another way.
+            firstRun.calendarConnected
+              ? `Your calendar is connected and ${brand.name} is watching the next two weeks. When something is scheduled it will appear here, with the people already matched. You can also prepare for a conversation that is not in your calendar.`
+              : firstRun.calendarAvailable
+                ? `Connect your calendar and your next two weeks appear here automatically, with attendees matched to the people you already track. Read-only — ${brand.name} never creates, edits or answers anything. You can also add a meeting by hand.`
+                : `Tell ${brand.name} who is in the room and what you need to achieve, and it will turn your relationship record into a brief for that specific conversation.`
+          }
           action={
-            <Button asChild>
-              <Link href="/meetings/new">Prepare for a meeting</Link>
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {!firstRun.calendarConnected && firstRun.calendarAvailable ? (
+                <Button asChild>
+                  <Link href="/api/calendar/microsoft/connect">Connect Microsoft 365</Link>
+                </Button>
+              ) : null}
+              <Button
+                asChild
+                variant={
+                  !firstRun.calendarConnected && firstRun.calendarAvailable
+                    ? 'secondary'
+                    : 'primary'
+                }
+              >
+                <Link href="/meetings/new">Prepare for a meeting</Link>
+              </Button>
+            </div>
           }
         />
       ) : null}

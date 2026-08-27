@@ -59,6 +59,10 @@ export type AnalyticsEvent =
   // Somebody the calendar invite did not carry, added by hand. A rising count
   // means attendee matching is missing people it should be finding.
   | 'meeting_participant_added'
+  // Paired with meeting_prepared, which is the completion. The gap between
+  // their counts is how often generation fails or is abandoned; the gap between
+  // their timestamps is how long somebody waits at the spinner.
+  | 'meeting_prepare_started'
   | 'meeting_prepared'
   | 'quick_brief_viewed'
   | 'meeting_debriefed'

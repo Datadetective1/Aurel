@@ -3,7 +3,12 @@ import { AdaptPanel, AskPanel, CoachTabs, type CoachPerson } from '@/components/
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { COACH_EXAMPLES, COACH_INTRO } from '@/lib/ai/coach'
+import {
+  COACH_EXAMPLES,
+  COACH_EXAMPLES_EMPTY,
+  COACH_INTRO,
+  COACH_INTRO_EMPTY,
+} from '@/lib/ai/coach'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -52,8 +57,10 @@ export default async function CoachPage({
           initialTab={mode === 'adapt' ? 'adapt' : 'ask'}
           ask={
             <AskPanel
-              examples={COACH_EXAMPLES}
-              intro={COACH_INTRO}
+              // An empty record cannot answer the normal prompts, and being
+              // asked one anyway is a bad first impression of an honest system.
+              examples={people.length === 0 ? COACH_EXAMPLES_EMPTY : COACH_EXAMPLES}
+              intro={people.length === 0 ? COACH_INTRO_EMPTY : COACH_INTRO}
               initialQuestion={initialQuestion}
             />
           }

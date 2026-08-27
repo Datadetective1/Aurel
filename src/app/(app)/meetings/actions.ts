@@ -243,6 +243,12 @@ export async function generateBrief(meetingId: string) {
   const meeting = await getMeetingContext(supabase, user.id, meetingId)
   if (!meeting) return { ok: false as const, error: 'That meeting could not be found.' }
 
+  // Counts only. The pair is what makes the wait measurable.
+  await track('meeting_prepare_started', {
+    participants: meeting.participants.length,
+    hasObjective: Boolean(meeting.objective),
+  })
+
   const userContext = await getUserContext(supabase, user.id)
 
   try {

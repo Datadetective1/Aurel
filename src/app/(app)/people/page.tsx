@@ -114,7 +114,10 @@ export default async function PeoplePage() {
           className="mt-10"
           icon={<UserPlus className="size-6" />}
           title="Start with someone you work with often"
-          description={`${brand.name} becomes useful the moment it has one real relationship to work from. Add a colleague, then research their public professional context or record what you already know.`}
+          // The old copy said research was something you could do; it did not
+          // say Atturel does it for you, from three fields, which is the part
+          // that changes whether somebody bothers.
+          description={`A name, a company and a role is all ${brand.name} needs. It searches legitimate public professional sources — company bios, talks, interviews, articles — checks each one is genuinely about that person, and builds a record you can see the evidence behind. Add what you already know as well.`}
           action={
             <Button asChild>
               <Link href="/people/new">Add your first person</Link>
