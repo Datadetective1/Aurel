@@ -38,7 +38,16 @@ export interface CalendarConnection {
   label: string
   status: CalendarConnectionStatus
   accountEmail: string | null
-  lastSyncedAt: string | null
+  /**
+   * Formatted on the server, in the account holder's own time zone.
+   *
+   * Not an ISO string formatted here: this is a client component, so it renders
+   * on both sides, and toLocaleTimeString with an ambient locale gives en-US/UTC
+   * on the server and the browser's own settings on the client. The two
+   * disagree, React discards the server HTML, and it was throwing #418 on this
+   * screen in production.
+   */
+  lastSyncedLabel: string | null
   eventCount: number
 }
 
@@ -138,12 +147,7 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
             <p className="text-ink-faint mt-1 text-[0.6875rem]">
               {connection.eventCount} upcoming{' '}
               {connection.eventCount === 1 ? 'meeting' : 'meetings'}
-              {connection.lastSyncedAt
-                ? ` · synced ${new Date(connection.lastSyncedAt).toLocaleTimeString(undefined, {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}`
-                : ''}
+              {connection.lastSyncedLabel ? ` · synced ${connection.lastSyncedLabel}` : ''}
             </p>
           ) : null}
         </div>

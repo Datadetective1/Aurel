@@ -43,20 +43,56 @@ export interface UpcomingEvent {
   attendees: UpcomingAttendee[]
 }
 
-function timeLabel(event: UpcomingEvent): string {
+/**
+ * Times render in the account holder's own zone, pinned rather than ambient.
+ *
+ * This is a client component, so every label renders twice -- once on the
+ * server, once at hydration. `undefined` for locale means "whatever this
+ * runtime is": en-US/UTC on the server, the browser's settings on the client.
+ * They disagree, React throws away the server HTML, and #418 fires.
+ *
+ * UTC is not the fix here the way it was for document dates. A meeting at 1pm
+ * is a moment in the reader's day, and showing it in UTC would be wrong for
+ * everyone outside it. The account's own zone is both correct and identical on
+ * both renders, which is why onboarding asks for it.
+ */
+function timeLabel(event: UpcomingEvent, timeZone: string): string {
   if (event.isAllDay) return 'All day'
-  return new Date(event.startsAt).toLocaleTimeString(undefined, {
+  return new Date(event.startsAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone,
   })
 }
 
-function dayLabel(iso: string): string {
-  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const days = Math.round((start(new Date(iso)) - start(new Date())) / 86_400_000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Tomorrow'
-  return new Date(iso).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })
+/** Calendar date in a named zone, as yyyy-mm-dd, for comparing days. */
+function dayKey(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  }).format(new Date(iso))
+}
+
+function dayLabel(iso: string, timeZone: string, nowIso: string): string {
+  // `now` comes from the server rather than the client clock, so the two
+  // renders agree about which day "Today" is even across a midnight boundary.
+  const today = dayKey(nowIso, timeZone)
+  const tomorrow = dayKey(
+    new Date(new Date(nowIso).getTime() + 86_400_000).toISOString(),
+    timeZone,
+  )
+  const day = dayKey(iso, timeZone)
+
+  if (day === today) return 'Today'
+  if (day === tomorrow) return 'Tomorrow'
+  return new Date(iso).toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    timeZone,
+  })
 }
 
 /** The single most useful thing to say about a meeting at a glance. */
@@ -77,7 +113,17 @@ function readiness(event: UpcomingEvent): { label: string; tone: 'positive' | 'a
   return { label: 'Not prepared', tone: 'neutral' }
 }
 
-export function UpcomingMeetings({ events }: { events: UpcomingEvent[] }) {
+export function UpcomingMeetings({
+  events,
+  timeZone = 'UTC',
+  nowIso,
+}: {
+  events: UpcomingEvent[]
+  /** The account holder's zone, from their profile. */
+  timeZone?: string
+  /** Server render time, so both renders agree on which day is "Today". */
+  nowIso: string
+}) {
   if (events.length === 0) return null
 
   return (
@@ -89,14 +135,22 @@ export function UpcomingMeetings({ events }: { events: UpcomingEvent[] }) {
 
       <ul className="mt-4 grid gap-2.5">
         {events.map((event) => (
-          <EventCard key={event.id} event={event} />
+          <EventCard key={event.id} event={event} timeZone={timeZone} nowIso={nowIso} />
         ))}
       </ul>
     </section>
   )
 }
 
-function EventCard({ event }: { event: UpcomingEvent }) {
+function EventCard({
+  event,
+  timeZone,
+  nowIso,
+}: {
+  event: UpcomingEvent
+  timeZone: string
+  nowIso: string
+}) {
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
   const status = readiness(event)
@@ -122,7 +176,7 @@ function EventCard({ event }: { event: UpcomingEvent }) {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
           <p className="text-ink-muted text-[0.6875rem] tracking-[0.06em] uppercase">
-            {dayLabel(event.startsAt)} · {timeLabel(event)}
+            {dayLabel(event.startsAt, timeZone, nowIso)} · {timeLabel(event, timeZone)}
           </p>
 
           <p className="text-ink mt-1 flex items-center gap-2 text-sm font-medium">

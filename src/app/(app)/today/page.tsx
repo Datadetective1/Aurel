@@ -242,7 +242,11 @@ export default async function TodayPage({
         </Panel>
       </section>
 
-      <UpcomingMeetings events={upcomingEvents} />
+      <UpcomingMeetings
+        events={upcomingEvents}
+        timeZone={profile.timezone ?? 'UTC'}
+        nowIso={new Date().toISOString()}
+      />
 
       {!hasAnything ? (
         <EmptyState

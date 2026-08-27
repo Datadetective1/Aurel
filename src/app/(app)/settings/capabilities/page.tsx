@@ -98,7 +98,7 @@ export default async function CapabilitiesSettingsPage() {
 
   // Real grants, not environment configuration. `configured` says the provider
   // can be offered; only a row here means somebody actually connected it.
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
   const supabase = await createClient()
   const providers = calendarCapability()
 
@@ -127,7 +127,15 @@ export default async function CapabilitiesSettingsPage() {
       label: provider.label,
       status,
       accountEmail: row?.external_account_email ?? null,
-      lastSyncedAt: row?.last_synced_at ?? null,
+      // Formatted here, in the account holder's zone, because the component
+      // that shows it renders on both sides -- see CalendarConnection.
+      lastSyncedLabel: row?.last_synced_at
+        ? new Date(row.last_synced_at).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: profile.timezone ?? 'UTC',
+          })
+        : null,
       eventCount: (eventCounts ?? []).filter((e) => e.provider === provider.id).length,
     }
   })
