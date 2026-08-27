@@ -155,19 +155,24 @@ export function GenerateBriefPanel({
                 </li>
               ) : null}
               {attendeeCount === 0 ? (
-                <li className="grid gap-2 text-xs text-ink-muted">
-                  <span className="flex gap-2">
-                    <CircleAlert
-                      className="mt-px size-3.5 shrink-0 text-caution"
-                      aria-hidden="true"
-                    />
-                    Nobody is added to this meeting yet.
-                  </span>
-                  <AddParticipants meetingId={meetingId} people={addablePeople} />
+                <li className="flex gap-2 text-xs text-ink-muted">
+                  <CircleAlert
+                    className="mt-px size-3.5 shrink-0 text-caution"
+                    aria-hidden="true"
+                  />
+                  Nobody is added to this meeting yet.
                 </li>
               ) : null}
             </ul>
           )}
+
+          {/* Not gated on an empty room. A calendar meeting where two of three
+              attendees matched needs the third added just as much as an empty
+              one does, and gating on zero left exactly that case with nowhere
+              to do it. */}
+          <div className="mt-5">
+            <AddParticipants meetingId={meetingId} people={addablePeople} />
+          </div>
 
           <Button size="lg" onClick={run} className="mt-7">
             Generate brief
