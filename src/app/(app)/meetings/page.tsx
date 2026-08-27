@@ -151,7 +151,9 @@ export default async function MeetingsPage() {
             <div className="flex flex-wrap justify-center gap-2">
               {!firstRun.calendarConnected && firstRun.calendarAvailable ? (
                 <Button asChild>
-                  <Link href="/api/calendar/microsoft/connect">Connect Microsoft 365</Link>
+                  {/* Anchor, not Link -- Link would prefetch and start the
+                      OAuth flow on page load. See components/app/first-run. */}
+                  <a href="/api/calendar/microsoft/connect">Connect Microsoft 365</a>
                 </Button>
               ) : null}
               <Button

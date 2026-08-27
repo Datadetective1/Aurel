@@ -177,7 +177,17 @@ function Step({
 
         {action ? (
           <Button asChild size="sm" variant="secondary" className="mt-2.5">
-            <Link href={action.href}>{action.label}</Link>
+            {/* A plain anchor for the OAuth start, never next/link.
+                Link prefetches its href, and prefetching this one executed the
+                connect route on page load: it minted OAuth state, fired
+                calendar_connect_started, and redirected to Microsoft -- so
+                every visit to Today counted as a connection attempt nobody
+                made, and the funnel said connection almost never converts. */}
+            {action.href.startsWith('/api/') ? (
+              <a href={action.href}>{action.label}</a>
+            ) : (
+              <Link href={action.href}>{action.label}</Link>
+            )}
           </Button>
         ) : null}
       </div>
