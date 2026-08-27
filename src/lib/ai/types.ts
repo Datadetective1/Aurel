@@ -198,4 +198,17 @@ export interface PromptModule<TInput, TOutput> {
   compose: (input: TInput) => TOutput
   /** Citations for the composed output, and the floor for generated output. */
   cite: (input: TInput) => Citation[]
+  /**
+   * Overwrite fields the model is not entitled to decide.
+   *
+   * Some fields in these schemas are not judgments -- they are facts about
+   * where evidence came from, and the record already knows them. A model handed
+   * a person's interaction history will cheerfully summarise it into a field
+   * labelled "public", because it has no way to know the label is a promise to
+   * the user rather than a heading.
+   *
+   * Applied to generated output only. Composed output is already built from the
+   * record and has nothing to reconcile.
+   */
+  reconcile?: (output: TOutput, input: TInput) => TOutput
 }

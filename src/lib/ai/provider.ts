@@ -147,7 +147,8 @@ export async function runPrompt<TInput, TOutput>(
       }
 
       return {
-        output: result.object,
+        // Provenance fields come from the record, never from the model.
+        output: module.reconcile ? module.reconcile(result.object, input) : result.object,
         citations,
         provenance: {
           provider: aiProvider,

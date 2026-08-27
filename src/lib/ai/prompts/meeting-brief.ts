@@ -707,8 +707,51 @@ function citeMeeting(input: MeetingBriefInput): Citation[] {
 export const meetingBriefPrompt: PromptModule<MeetingBriefInput, MeetingBrief> = {
   id: 'meeting-brief',
   kind: 'meeting_brief',
-  version: 'meeting-brief@1.0.0',
+  // 1.1.0: publicContext and publicOnly are taken from the record after
+  // generation rather than accepted from the model.
+  version: 'meeting-brief@1.1.0',
   schema: meetingBriefSchema,
+
+  /**
+   * Take provenance back off the model.
+   *
+   * publicContext is rendered to the user under the heading "From public
+   * sources", and publicOnly prints "this is who they are professionally, not
+   * how they work with you". Both are claims about where evidence came from,
+   * and the model is in no position to make them: it is handed the user's own
+   * interaction history as context, so it summarises that history into the
+   * public field and sets publicOnly on someone the user has already met.
+   *
+   * Observed on production. A brief for a person with one logged interaction
+   * and zero accepted public sources displayed that private interaction under
+   * "From public sources", cited to the user's own meeting note, above a line
+   * telling them the guidance was preliminary until they had met.
+   *
+   * Separating public evidence from what the user has seen themselves is the
+   * thing this product is for, so neither field is a judgment call. Both are
+   * recomputed from professional_facts and the interaction count, exactly as
+   * the deterministic composer does it.
+   */
+  reconcile: (output, input) => ({
+    ...output,
+    participants: output.participants.map((participant) => {
+      const person = input.meeting.participants.find(
+        (p) => p.id === participant.personId || p.displayName === participant.name,
+      )
+      if (!person) {
+        // Unmatched participant: strip rather than trust. An unattributable
+        // public claim is the one we least want to display.
+        return { ...participant, publicContext: [], publicOnly: false }
+      }
+
+      const publicContext = composePublicContext(person)
+      return {
+        ...participant,
+        publicContext,
+        publicOnly: person.interactionCount === 0 && publicContext.length > 0,
+      }
+    }),
+  }),
 
   system: (input) =>
     [
