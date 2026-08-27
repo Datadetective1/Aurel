@@ -298,11 +298,14 @@ export function VoiceDebrief({
               <span className="text-ink-faint"> / {formatElapsed(MAX_SECONDS)}</span>
             </span>
             <span className="ms-auto flex gap-2">
-              <Button type="button" size="sm" onClick={stop}>
+              {/* 44px, matching the rating buttons in this same form. The
+                  small variant is 32px, which is a hard tap on a phone -- and
+                  Stop is the one control nobody should have to aim at. */}
+              <Button type="button" size="sm" className="min-h-11" onClick={stop}>
                 <Square className="size-3.5" aria-hidden="true" />
                 Stop
               </Button>
-              <Button type="button" size="sm" variant="quiet" onClick={discard}>
+              <Button type="button" size="sm" variant="quiet" className="min-h-11" onClick={discard}>
                 <X className="size-3.5" aria-hidden="true" />
                 Discard
               </Button>
@@ -320,6 +323,7 @@ export function VoiceDebrief({
               type="button"
               size="sm"
               variant="secondary"
+              className="min-h-11"
               onClick={start}
             >
               <Mic className="size-3.5" aria-hidden="true" />

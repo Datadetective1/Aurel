@@ -109,6 +109,17 @@ describe('the promises this component makes', () => {
     expect(source).toMatch(/role="status"/)
   })
 
+  it('gives every control a real tap target', () => {
+    // The small button variant is 32px. On a phone that is a hard tap, and
+    // Stop is the one control nobody should have to aim at. 44px matches the
+    // rating buttons in the same form.
+    const controls = source.match(/<Button[\s\S]*?>/g) ?? []
+    expect(controls.length).toBeGreaterThan(2)
+    for (const control of controls) {
+      expect(control).toMatch(/min-h-11/)
+    }
+  })
+
   it('does not signal recording with colour alone', () => {
     // A dot and the word, so the state survives a monochrome display.
     expect(source).toMatch(/Recording/)
