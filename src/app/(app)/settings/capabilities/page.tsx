@@ -128,6 +128,13 @@ export default async function CapabilitiesSettingsPage() {
   })
 
   const anyCalendarConfigured = providers.some((p) => p.configured)
+  /**
+   * When no provider is configured, name the gap for whichever one is closest
+   * to working rather than for Microsoft by default. An operator who has set
+   * both Microsoft keys and forgotten the encryption key should be told about
+   * the encryption key, not handed the same list of three they just filled in.
+   */
+  const closestProvider = [...providers].sort((a, b) => a.missingEnv.length - b.missingEnv.length)[0]
   const anyCalendarConnected = connections.some((c) => c.status === 'connected')
 
   const capabilities: Capability[] = [
@@ -192,8 +199,11 @@ export default async function CapabilitiesSettingsPage() {
       deploymentAction: anyCalendarConfigured
         ? undefined
         : {
-            summary: 'Register an OAuth client and set a token encryption key, then redeploy.',
-            env: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'TOKEN_ENCRYPTION_KEY'],
+            summary:
+              (closestProvider?.missingEnv.length ?? 0) === 1
+                ? 'One setting is still missing on this deployment. Set it and redeploy.'
+                : 'Register an OAuth client and set a token encryption key, then redeploy.',
+            env: closestProvider?.missingEnv ?? [],
           },
       // Rendered under the card: per-provider connect, sync and disconnect.
       calendarConnections: anyCalendarConfigured ? connections : undefined,

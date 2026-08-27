@@ -1,7 +1,12 @@
 import 'server-only'
 import { googleProvider } from './google'
 import { microsoftProvider } from './microsoft'
-import { providerConfigured, type CalendarProvider, type CalendarProviderId } from './provider'
+import {
+  missingProviderEnv,
+  providerConfigured,
+  type CalendarProvider,
+  type CalendarProviderId,
+} from './provider'
 
 /**
  * Provider registry.
@@ -29,6 +34,8 @@ export function calendarCapability() {
        * has granted access.
        */
       configured: providerConfigured(id),
+      /** Named so an operator knows which setting is the one still missing. */
+      missingEnv: missingProviderEnv(id),
       scopes: provider.scopes,
     }
   })

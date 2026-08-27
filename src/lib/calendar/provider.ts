@@ -172,3 +172,34 @@ export function providerConfigured(id: CalendarProviderId): boolean {
     serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.TOKEN_ENCRYPTION_KEY,
   )
 }
+
+/**
+ * Which of the variables this provider needs are absent at runtime.
+ *
+ * Names only, never values, and only ever the names of variables that are
+ * unset -- which discloses nothing a reader could not already infer from the
+ * feature being off.
+ *
+ * It exists because the alternative misleads. Listing all three whenever the
+ * calendar is unavailable sends an operator who has already set two of them
+ * back to re-check settings that were never the problem, and gives no way to
+ * tell "I have not configured this yet" apart from "I configured it and the
+ * deployment cannot see one of them" -- which are different problems with
+ * different fixes.
+ */
+export function missingProviderEnv(id: CalendarProviderId): string[] {
+  const required: [name: string, value: string | undefined][] =
+    id === 'microsoft'
+      ? [
+          ['MICROSOFT_CLIENT_ID', serverEnv.MICROSOFT_CLIENT_ID],
+          ['MICROSOFT_CLIENT_SECRET', serverEnv.MICROSOFT_CLIENT_SECRET],
+          ['TOKEN_ENCRYPTION_KEY', serverEnv.TOKEN_ENCRYPTION_KEY],
+        ]
+      : [
+          ['GOOGLE_CLIENT_ID', serverEnv.GOOGLE_CLIENT_ID],
+          ['GOOGLE_CLIENT_SECRET', serverEnv.GOOGLE_CLIENT_SECRET],
+          ['TOKEN_ENCRYPTION_KEY', serverEnv.TOKEN_ENCRYPTION_KEY],
+        ]
+
+  return required.filter(([, value]) => !value).map(([name]) => name)
+}
