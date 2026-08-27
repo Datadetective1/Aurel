@@ -4,7 +4,7 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CircleAlert, Loader2, Sparkles } from 'lucide-react'
-import { generateBrief } from '@/app/(app)/meetings/actions'
+import { generateBrief, updateMeetingObjective } from '@/app/(app)/meetings/actions'
 import { Button } from '@/components/ui/button'
 import { Eyebrow, Panel } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
@@ -35,6 +35,30 @@ export function GenerateBriefPanel({
   attendeeCount: number
 }) {
   const router = useRouter()
+  const [objective, setObjective] = React.useState('')
+  const [savingObjective, setSavingObjective] = React.useState(false)
+
+  /**
+   * The objective is set here rather than behind a link.
+   *
+   * It used to point at /meetings/[id], which redirects straight back to this
+   * brief -- so the app told you the brief would be sharper with an objective,
+   * offered a link, and returned you to the page you were already on. A meeting
+   * created from a calendar event has no other surface, so there was no way to
+   * give one at all.
+   */
+  async function saveObjective() {
+    const text = objective.trim()
+    if (!text) return
+    setSavingObjective(true)
+    const form = new FormData()
+    form.set('meetingId', meetingId)
+    form.set('objective', text)
+    const result = await updateMeetingObjective({}, form)
+    setSavingObjective(false)
+    if (result?.error) setError(result.error)
+    else router.refresh()
+  }
   const [running, setRunning] = React.useState(false)
   const [stage, setStage] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
@@ -96,13 +120,35 @@ export function GenerateBriefPanel({
           {(!hasObjective || attendeeCount === 0) && (
             <ul className="mt-5 grid gap-2">
               {!hasObjective ? (
-                <li className="flex gap-2 text-xs text-ink-muted">
-                  <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
-                  No objective recorded. The brief will be much sharper with one —{' '}
-                  <Link href={`/meetings/${meetingId}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
-                    add it
-                  </Link>
-                  .
+                <li className="grid gap-2 text-xs text-ink-muted">
+                  <span className="flex gap-2">
+                    <CircleAlert
+                      className="mt-px size-3.5 shrink-0 text-caution"
+                      aria-hidden="true"
+                    />
+                    No objective recorded. The brief will be much sharper with one.
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <label htmlFor="brief-objective" className="sr-only">
+                      What do you need out of this conversation?
+                    </label>
+                    <input
+                      id="brief-objective"
+                      value={objective}
+                      onChange={(event) => setObjective(event.target.value)}
+                      placeholder="What do you need out of this conversation?"
+                      className="border-line bg-surface text-ink min-w-0 flex-1 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={saveObjective}
+                      disabled={savingObjective || objective.trim().length === 0}
+                    >
+                      {savingObjective ? 'Saving…' : 'Save'}
+                    </Button>
+                  </span>
                 </li>
               ) : null}
               {attendeeCount === 0 ? (
