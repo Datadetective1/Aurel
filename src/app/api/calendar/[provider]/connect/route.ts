@@ -47,8 +47,41 @@ export function calendarRedirectUri(provider: CalendarProviderId): string {
   return absoluteUrl(`/api/calendar/${provider}/callback`)
 }
 
+/**
+ * TEMPORARY configuration diagnostic.
+ *
+ * Answers one question and no other: does the running deployment see the
+ * variables this route needs? Booleans, a length and variable NAMES -- never a
+ * value, never a fragment of one. Behind the same authentication as the rest of
+ * the route, because even names are worth not handing to a stranger.
+ *
+ * similarKeyNames is the part that earns its place: a variable misspelled or
+ * saved with stray whitespace in its name is invisible to every other check,
+ * because the code looks for the correct name and correctly does not find it.
+ * Listing what the runtime actually holds is the only way to see that.
+ *
+ * Remove once the calendar is connected.
+ */
+function configurationDiagnostic(id: CalendarProviderId) {
+  const key = serverEnv.TOKEN_ENCRYPTION_KEY
+  return {
+    tokenEncryptionKeyPresent: Boolean(key),
+    tokenEncryptionKeyLength: key?.length ?? 0,
+    tokenEncryptionKeyUsable: canStoreSecrets(),
+    microsoftClientIdPresent: Boolean(serverEnv.MICROSOFT_CLIENT_ID),
+    microsoftClientSecretPresent: Boolean(serverEnv.MICROSOFT_CLIENT_SECRET),
+    providerConfigured: providerConfigured(id),
+    runtime: process.env.NEXT_RUNTIME ?? 'nodejs',
+    // Names only. Reveals a typo or stray whitespace in the variable name,
+    // which no check for the correct name can ever surface.
+    similarKeyNames: Object.keys(process.env)
+      .filter((name) => /TOKEN|ENCRYPT|MICROSOFT/i.test(name))
+      .sort(),
+  }
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider: raw } = await params
@@ -60,6 +93,12 @@ export async function GET(
   const id = raw as CalendarProviderId
 
   const { user } = await requireOnboardedUser()
+
+  if (request.nextUrl.searchParams.get('diagnose') === '1') {
+    return NextResponse.json(configurationDiagnostic(id), {
+      headers: { 'cache-control': 'no-store' },
+    })
+  }
 
   // Refusing here rather than at the callback: sending someone through a
   // consent screen we cannot honour wastes their time and leaves a granted
