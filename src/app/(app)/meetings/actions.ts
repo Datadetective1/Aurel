@@ -348,6 +348,10 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
   }
 
+  // A flag, not the transcript. Whether the words were spoken or typed changes
+  // nothing about how they are analysed -- it only closes the voice funnel.
+  const voiceUsed = formData.get('usedVoice') === '1'
+
   const capability = await checkCapability('debrief', 'transcript_analysis')
   if (!capability.allowed) return { error: capability.message }
 
@@ -519,7 +523,19 @@ export async function debriefMeeting(_prev: MeetingState, formData: FormData): P
       commitments: output.commitments.length,
       proposals: output.proposedMemories.length,
       grounded: generation.provenance.groundedFallback,
+      // Whether the notes started as speech. The debrief pipeline itself does
+      // not care and behaves identically either way -- this only closes the
+      // voice funnel, which otherwise ends at "transcribed" and never shows
+      // whether a transcript was actually used.
+      usedVoice: voiceUsed,
     })
+
+    if (voiceUsed) {
+      await track('voice_debrief_submitted', {
+        commitments: output.commitments.length,
+        proposals: output.proposedMemories.length,
+      })
+    }
   } catch (error) {
     logger.error('debrief.extract_failed', {
       error: error instanceof Error ? error.name : 'unknown',

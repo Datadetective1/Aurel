@@ -45,6 +45,7 @@ export type MeterKind =
   | 'ai_coach_message'
   | 'message_adaptation'
   | 'source_ingest'
+  | 'voice_transcription'
 
 export interface PlanDefinition {
   id: PlanId

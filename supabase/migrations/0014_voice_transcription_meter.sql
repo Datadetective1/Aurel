@@ -1,0 +1,17 @@
+-- Voice debrief transcription, as a metered unit of work.
+--
+-- Its own kind rather than reusing transcript_analysis: that meter counts
+-- analysing a transcript somebody supplied, which is a different piece of work
+-- with a different provider, a different model and a different cost shape.
+-- Folding them together would make both numbers useless.
+--
+-- No quota is attached. Recording exists so the cost of the pilot is
+-- observable, not to ration it.
+--
+-- NOTE ON COST: estimated_cost_micros will be 0 for these rows. The price table
+-- in lib/billing/provider-cost.ts is per million tokens, and transcription is
+-- billed per minute of audio, so the existing estimator cannot price it. The
+-- row records the real model and the real token counts the API returns; the
+-- existing usage.unpriced_model warning fires, which is the honest outcome
+-- rather than a fabricated number.
+alter type meter_kind add value if not exists 'voice_transcription';

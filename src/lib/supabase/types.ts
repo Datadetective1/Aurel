@@ -2265,6 +2265,7 @@ export type Database = {
         | "ai_coach_message"
         | "message_adaptation"
         | "source_ingest"
+        | "voice_transcription"
       observation_category:
         | "communication"
         | "decision"

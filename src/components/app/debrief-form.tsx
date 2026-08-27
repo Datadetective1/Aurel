@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { CircleAlert, Loader2 } from 'lucide-react'
 import { debriefMeeting, type MeetingState } from '@/app/(app)/meetings/actions'
+import { VoiceDebrief } from '@/components/app/voice-debrief'
 import { Button } from '@/components/ui/button'
 import { FormField, Textarea } from '@/components/ui/field'
 import { Eyebrow } from '@/components/ui/primitives'
@@ -27,6 +28,39 @@ export function DebriefForm({
 }) {
   const [state, formAction] = useActionState<MeetingState, FormData>(debriefMeeting, {})
   const [rating, setRating] = React.useState<number | null>(null)
+  const notesRef = React.useRef<HTMLTextAreaElement | null>(null)
+  const [usedVoice, setUsedVoice] = React.useState(false)
+
+  /**
+   * Put the transcript where the user was already going to type.
+   *
+   * Appended, never assigned. Somebody who typed three lines and then decided
+   * to speak the rest must not watch those three lines vanish, and asking
+   * "replace or append?" is a dialog for a question with an obviously safe
+   * answer. Nothing is submitted here -- the words land in the field and stop,
+   * and the existing Save debrief button is still the only way anything
+   * reaches the record.
+   */
+  function insertTranscript(text: string) {
+    const field = notesRef.current
+    if (!field) return
+
+    setUsedVoice(true)
+
+    const existing = field.value.trimEnd()
+    field.value = existing.length > 0 ? `${existing}
+
+${text}` : text
+
+    // React does not know about a value set on the node directly, and the form
+    // reads the DOM on submit -- but the input event keeps anything else
+    // listening (autosize, validation) in step.
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+
+    field.focus()
+    field.setSelectionRange(field.value.length, field.value.length)
+    field.scrollTop = field.scrollHeight
+  }
 
   const placeholder =
     participantNames.length > 0
@@ -37,6 +71,9 @@ export function DebriefForm({
     <form action={formAction} noValidate>
       <input type="hidden" name="meetingId" value={meetingId} />
       {rating ? <input type="hidden" name="wentWell" value={rating} /> : null}
+      {usedVoice ? <input type="hidden" name="usedVoice" value="1" /> : null}
+
+      <VoiceDebrief meetingId={meetingId} onTranscript={insertTranscript} />
 
       <FormField
         id="notes"
@@ -48,6 +85,7 @@ export function DebriefForm({
         {(props) => (
           <Textarea
             {...props}
+            ref={notesRef}
             name="notes"
             rows={10}
             maxLength={200_000}

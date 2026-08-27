@@ -66,6 +66,14 @@ export type AnalyticsEvent =
   | 'meeting_prepared'
   | 'quick_brief_viewed'
   | 'meeting_debriefed'
+  // Voice debrief. Buckets, latencies and error categories only -- never a
+  // word of what was said, and no audio ever reaches this file.
+  | 'voice_debrief_started'
+  | 'voice_debrief_cancelled'
+  | 'voice_debrief_transcription_started'
+  | 'voice_debrief_transcription_completed'
+  | 'voice_debrief_transcription_failed'
+  | 'voice_debrief_submitted'
   | 'memory_confirmed'
   | 'message_adapted'
   | 'coach_used'
