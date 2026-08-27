@@ -4,6 +4,11 @@ import { CalendarClock, CalendarPlus, CircleCheck } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, EmptyState, Eyebrow, SectionHeader } from '@/components/ui/primitives'
+import {
+  UpcomingMeetings,
+  type UpcomingAttendee,
+  type UpcomingEvent,
+} from '@/components/app/upcoming-meetings'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatTime, relativeDay } from '@/lib/format'
@@ -12,7 +17,7 @@ import { brand } from '@/lib/brand'
 export const metadata: Metadata = { title: 'Meetings', robots: { index: false, follow: false } }
 
 export default async function MeetingsPage() {
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
   const supabase = await createClient()
 
   const { data: meetings } = await supabase
@@ -56,6 +61,50 @@ export default async function MeetingsPage() {
     namesByMeeting.set(a.meeting_id, [...(namesByMeeting.get(a.meeting_id) ?? []), name])
   }
 
+  /**
+   * Synced calendar events that are not yet Atturel meetings.
+   *
+   * Today deliberately shows only the next two days, because preparation is a
+   * today-and-tomorrow activity and a fortnight of rows would bury the focus
+   * card. But the sync pulls fourteen days, and without a second home the
+   * other twelve were synced, counted on the Capabilities screen, and
+   * unreachable -- so a calendar connected on Monday for a Thursday meeting
+   * looked like a feature that did nothing. This is where the rest of the
+   * fortnight lives, and where Prepare becomes reachable for it.
+   */
+  const calendarHorizon = new Date()
+  calendarHorizon.setDate(calendarHorizon.getDate() + 14)
+
+  const { data: calendarRows } = await supabase
+    .from('external_calendar_events')
+    .select(
+      'id, title, starts_at, ends_at, is_all_day, is_private, meeting_url, status, meeting_id, attendees',
+    )
+    .eq('user_id', user.id)
+    .is('meeting_id', null)
+    .gte('starts_at', new Date().toISOString())
+    .lte('starts_at', calendarHorizon.toISOString())
+    .order('starts_at', { ascending: true })
+    .limit(20)
+
+  const upcomingEvents: UpcomingEvent[] = (calendarRows ?? []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    isAllDay: row.is_all_day ?? false,
+    isPrivate: row.is_private ?? false,
+    meetingUrl: row.meeting_url,
+    status: row.status ?? 'confirmed',
+    meetingId: row.meeting_id,
+    hasBrief: false,
+    attendees: ((row.attendees ?? []) as unknown as UpcomingAttendee[]).map((a) => ({
+      email: a.email ?? null,
+      displayName: a.displayName ?? null,
+      personId: a.personId ?? null,
+    })),
+  }))
+
   const prepared = new Set((briefs ?? []).map((b) => b.subject_id))
   const upcoming = list.filter((m) => m.status === 'upcoming')
   const past = list.filter((m) => m.status !== 'upcoming')
@@ -89,6 +138,12 @@ export default async function MeetingsPage() {
           }
         />
       ) : null}
+
+      <UpcomingMeetings
+        events={upcomingEvents}
+        timeZone={profile.timezone ?? 'UTC'}
+        nowIso={new Date().toISOString()}
+      />
 
       {upcoming.length > 0 ? (
         <section className="mt-10">
