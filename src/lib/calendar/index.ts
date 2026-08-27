@@ -3,6 +3,7 @@ import { googleProvider } from './google'
 import { microsoftProvider } from './microsoft'
 import {
   missingProviderEnv,
+  nearMatchFor,
   providerConfigured,
   tokenKeyState,
   type CalendarProvider,
@@ -39,6 +40,13 @@ export function calendarCapability() {
       missingEnv: missingProviderEnv(id),
       /** Distinguishes an absent encryption key from one too short to use. */
       tokenKey: tokenKeyState(),
+      /**
+       * For each missing variable, a name already in the environment that is
+       * one slip away from it. Turns "missing" into "you spelled it wrong".
+       */
+      nearMatches: missingProviderEnv(id)
+        .map((name) => ({ expected: name, found: nearMatchFor(name) }))
+        .filter((pair): pair is { expected: string; found: string } => pair.found !== null),
       scopes: provider.scopes,
     }
   })

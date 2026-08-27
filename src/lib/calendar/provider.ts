@@ -216,3 +216,54 @@ export function missingProviderEnv(id: CalendarProviderId): string[] {
 
   return required.filter(([, value]) => !value).map(([name]) => name)
 }
+
+/**
+ * A variable in the environment whose name is one small slip away from `name`.
+ *
+ * A misspelled variable is the one configuration mistake no other check can
+ * see. Everything else looks for the correct name and correctly fails to find
+ * it, so the screen says "missing" while the value sits in the deployment under
+ * TOKEN_ENCRIPTION_KEY, and the operator re-enters a correct value into a
+ * wrongly named box as many times as they have patience for.
+ *
+ * Names only, and only ones already present in the environment.
+ */
+export function nearMatchFor(name: string): string | null {
+  const candidates = Object.keys(process.env).filter((key) => key !== name)
+
+  for (const key of candidates) {
+    // Case and stray whitespace first -- cheaper than distance, and the two
+    // most common ways a name goes wrong when pasted.
+    if (key.trim().toUpperCase() === name) return key
+  }
+
+  // Then a genuine typo. Two edits is the ceiling: beyond that the suggestion
+  // stops being a suggestion and starts being a guess.
+  let best: string | null = null
+  let bestDistance = 3
+  for (const key of candidates) {
+    if (Math.abs(key.length - name.length) > 2) continue
+    const distance = editDistance(key.toUpperCase(), name)
+    if (distance < bestDistance) {
+      best = key
+      bestDistance = distance
+    }
+  }
+  return best
+}
+
+/** Levenshtein, iterative and allocation-light. Names are short. */
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
+
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i]
+    for (let j = 1; j <= b.length; j += 1) {
+      const substitution = previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)
+      current[j] = Math.min(current[j - 1]! + 1, previous[j]! + 1, substitution)
+    }
+    previous = current
+  }
+
+  return previous[b.length]!
+}

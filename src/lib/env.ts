@@ -243,22 +243,11 @@ export const features = {
   emailDelivery: Boolean(serverEnv.RESEND_API_KEY),
   billing: Boolean(serverEnv.STRIPE_SECRET_KEY),
   billingWebhooks: Boolean(serverEnv.STRIPE_SECRET_KEY && serverEnv.STRIPE_WEBHOOK_SECRET),
-  /**
-   * Whether the deployment can OFFER this provider. Not whether anyone has
-   * connected: that needs a user grant, and Capabilities checks for one rather
-   * than inferring a connection from the presence of a client secret.
-   *
-   * Token storage is part of being able to offer it at all -- a connect button
-   * that cannot persist a refresh token is a button that fails after an hour.
-   */
-  googleCalendar: Boolean(
-    serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.TOKEN_ENCRYPTION_KEY,
-  ),
-  microsoftCalendar: Boolean(
-    serverEnv.MICROSOFT_CLIENT_ID &&
-      serverEnv.MICROSOFT_CLIENT_SECRET &&
-      serverEnv.TOKEN_ENCRYPTION_KEY,
-  ),
+  // Calendar support is NOT a flag here. providerConfigured() in
+  // lib/calendar/provider.ts is the single answer to "can this deployment
+  // offer a calendar", because it is the one that agrees with lib/crypto about
+  // what counts as a usable encryption key. These two flags duplicated it with
+  // a looser presence check, went unused by anything, and would have drifted.
   /** Privileged server operations (webhooks, hard account deletion). */
   serviceRole: Boolean(serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** Automatic discovery of sources from a name alone. */

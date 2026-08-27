@@ -61,7 +61,12 @@ interface Capability {
   /** Something the signed-in person can do right now. */
   userAction?: { label: string; href: string }
   /** Server-side configuration, named so an operator knows exactly what to set. */
-  deploymentAction?: { summary: string; env: string[] }
+  deploymentAction?: {
+    summary: string
+    env: string[]
+    /** Variables already set under a name one slip away from the expected one. */
+    nearMatches?: { expected: string; found: string }[]
+  }
   /** Rendered under the card. Calendar is the only capability a user connects. */
   calendarConnections?: CalendarConnection[]
 }
@@ -209,6 +214,7 @@ export default async function CapabilitiesSettingsPage() {
                   ? 'One setting is still missing on this deployment. Set it and redeploy.'
                   : 'Register an OAuth client and set a token encryption key, then redeploy.',
             env: closestProvider?.missingEnv ?? [],
+            nearMatches: closestProvider?.nearMatches ?? [],
           },
       // Rendered under the card: per-provider connect, sync and disconnect.
       calendarConnections: anyCalendarConfigured ? connections : undefined,
@@ -359,6 +365,17 @@ function CapabilityCard({ capability }: { capability: Capability }) {
                   </code>
                 ))}
               </p>
+              {capability.deploymentAction.nearMatches?.length ? (
+                <p className="text-caution mt-2 text-xs leading-relaxed">
+                  {capability.deploymentAction.nearMatches.map((match) => (
+                    <span key={match.found} className="block">
+                      A variable named <code className="font-mono">{match.found}</code> is set on
+                      this deployment. Did you mean{' '}
+                      <code className="font-mono">{match.expected}</code>?
+                    </span>
+                  ))}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}

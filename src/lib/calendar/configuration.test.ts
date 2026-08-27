@@ -94,6 +94,39 @@ describe('missingProviderEnv', { timeout: 20_000 }, () => {
     expect(ok.tokenKeyState()).toBe('ok')
   })
 
+  /**
+   * These use synthetic names rather than TOKEN_ENCRYPTION_KEY itself: load()
+   * stubs that one, and on Windows process.env is case-insensitive, so a test
+   * written against the real name collides with its own setup. Production is
+   * Linux and case-sensitive; the logic under test is the same either way.
+   */
+  it('spots a variable set under a misspelled name', async () => {
+    // The real one, transposed exactly as it was found in production:
+    // ATTUREL_ENCRIPTION_PROBE sitting where ATTUREL_ENCRYPTION_PROBE belonged.
+    const { nearMatchFor } = await load({})
+    vi.stubEnv('ATTUREL_ENCRIPTION_PROBE', 'a'.repeat(48))
+    expect(nearMatchFor('ATTUREL_ENCRYPTION_PROBE')).toBe('ATTUREL_ENCRIPTION_PROBE')
+  })
+
+  it('spots a name saved with stray whitespace', async () => {
+    const { nearMatchFor } = await load({})
+    vi.stubEnv(' ATTUREL_WHITESPACE_PROBE', 'x')
+    expect(nearMatchFor('ATTUREL_WHITESPACE_PROBE')).toBe(' ATTUREL_WHITESPACE_PROBE')
+  })
+
+  it('suggests nothing when nothing is close', async () => {
+    // A wrong suggestion is worse than none: it sends someone off to rename a
+    // variable that was never the problem.
+    const { nearMatchFor } = await load({})
+    expect(nearMatchFor('ATTUREL_ABSENT_PROBE_XYZ')).toBeNull()
+  })
+
+  it('never suggests the variable itself', async () => {
+    const { nearMatchFor } = await load({})
+    vi.stubEnv('ATTUREL_EXACT_PROBE', 'x')
+    expect(nearMatchFor('ATTUREL_EXACT_PROBE')).toBeNull()
+  })
+
   it('never returns a value, only a name', async () => {
     const { missingProviderEnv } = await load({ MICROSOFT_CLIENT_ID: 'super-secret-id' })
     expect(missingProviderEnv('microsoft').join(' ')).not.toContain('super-secret-id')
