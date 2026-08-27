@@ -200,9 +200,14 @@ export default async function CapabilitiesSettingsPage() {
         ? undefined
         : {
             summary:
-              (closestProvider?.missingEnv.length ?? 0) === 1
-                ? 'One setting is still missing on this deployment. Set it and redeploy.'
-                : 'Register an OAuth client and set a token encryption key, then redeploy.',
+              closestProvider?.tokenKey === 'too_short'
+                ? // Present but refused, which reads as "missing" unless it is
+                  // named. Someone who pasted a short key would otherwise keep
+                  // re-pasting the same short key.
+                  'The token encryption key is set but too short to use. It needs 32 characters or more.'
+                : (closestProvider?.missingEnv.length ?? 0) === 1
+                  ? 'One setting is still missing on this deployment. Set it and redeploy.'
+                  : 'Register an OAuth client and set a token encryption key, then redeploy.',
             env: closestProvider?.missingEnv ?? [],
           },
       // Rendered under the card: per-provider connect, sync and disconnect.

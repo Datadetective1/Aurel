@@ -1,5 +1,6 @@
 import 'server-only'
 import { serverEnv } from '@/lib/env'
+import { canStoreSecrets } from '@/lib/crypto'
 
 /**
  * CALENDAR PROVIDER ABSTRACTION
@@ -160,17 +161,29 @@ export function looksLikeResource(input: {
   )
 }
 
+/**
+ * Configured means connecting would actually work.
+ *
+ * The encryption key is tested with canStoreSecrets rather than for presence:
+ * a key shorter than 32 characters is refused by lib/crypto, so treating a
+ * short one as configured would offer a Connect button that sends someone
+ * through a provider consent screen and then refuses to store the grant. The
+ * two checks have to agree, and this is the side that must not be the more
+ * generous of the pair.
+ */
 export function providerConfigured(id: CalendarProviderId): boolean {
   if (id === 'microsoft') {
     return Boolean(
-      serverEnv.MICROSOFT_CLIENT_ID &&
-        serverEnv.MICROSOFT_CLIENT_SECRET &&
-        serverEnv.TOKEN_ENCRYPTION_KEY,
+      serverEnv.MICROSOFT_CLIENT_ID && serverEnv.MICROSOFT_CLIENT_SECRET && canStoreSecrets(),
     )
   }
-  return Boolean(
-    serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && serverEnv.TOKEN_ENCRYPTION_KEY,
-  )
+  return Boolean(serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET && canStoreSecrets())
+}
+
+/** Whether the encryption key is absent, present but unusable, or fine. */
+export function tokenKeyState(): 'ok' | 'missing' | 'too_short' {
+  if (canStoreSecrets()) return 'ok'
+  return serverEnv.TOKEN_ENCRYPTION_KEY ? 'too_short' : 'missing'
 }
 
 /**
@@ -193,12 +206,12 @@ export function missingProviderEnv(id: CalendarProviderId): string[] {
       ? [
           ['MICROSOFT_CLIENT_ID', serverEnv.MICROSOFT_CLIENT_ID],
           ['MICROSOFT_CLIENT_SECRET', serverEnv.MICROSOFT_CLIENT_SECRET],
-          ['TOKEN_ENCRYPTION_KEY', serverEnv.TOKEN_ENCRYPTION_KEY],
+          ['TOKEN_ENCRYPTION_KEY', canStoreSecrets() ? 'set' : undefined],
         ]
       : [
           ['GOOGLE_CLIENT_ID', serverEnv.GOOGLE_CLIENT_ID],
           ['GOOGLE_CLIENT_SECRET', serverEnv.GOOGLE_CLIENT_SECRET],
-          ['TOKEN_ENCRYPTION_KEY', serverEnv.TOKEN_ENCRYPTION_KEY],
+          ['TOKEN_ENCRYPTION_KEY', canStoreSecrets() ? 'set' : undefined],
         ]
 
   return required.filter(([, value]) => !value).map(([name]) => name)

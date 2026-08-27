@@ -4,6 +4,7 @@ import { microsoftProvider } from './microsoft'
 import {
   missingProviderEnv,
   providerConfigured,
+  tokenKeyState,
   type CalendarProvider,
   type CalendarProviderId,
 } from './provider'
@@ -36,6 +37,8 @@ export function calendarCapability() {
       configured: providerConfigured(id),
       /** Named so an operator knows which setting is the one still missing. */
       missingEnv: missingProviderEnv(id),
+      /** Distinguishes an absent encryption key from one too short to use. */
+      tokenKey: tokenKeyState(),
       scopes: provider.scopes,
     }
   })

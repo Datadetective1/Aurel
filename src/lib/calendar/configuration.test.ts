@@ -71,6 +71,29 @@ describe('missingProviderEnv', { timeout: 20_000 }, () => {
     expect(missingProviderEnv('google')).toEqual(['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'])
   })
 
+  it('treats a key too short to use as missing, not as configured', async () => {
+    // canStoreSecrets refuses anything under 32 characters. If
+    // providerConfigured were the more generous of the two, the screen would
+    // offer a Connect button that sends someone through a consent screen and
+    // then refuses to store the grant it just obtained.
+    const { missingProviderEnv, providerConfigured, tokenKeyState } = await load({
+      MICROSOFT_CLIENT_ID: 'id',
+      MICROSOFT_CLIENT_SECRET: 'secret',
+      TOKEN_ENCRYPTION_KEY: 'too-short',
+    })
+    expect(providerConfigured('microsoft')).toBe(false)
+    expect(missingProviderEnv('microsoft')).toEqual(['TOKEN_ENCRYPTION_KEY'])
+    expect(tokenKeyState()).toBe('too_short')
+  })
+
+  it('tells an absent key apart from an unusable one', async () => {
+    const absent = await load({})
+    expect(absent.tokenKeyState()).toBe('missing')
+
+    const ok = await load({ TOKEN_ENCRYPTION_KEY: KEY })
+    expect(ok.tokenKeyState()).toBe('ok')
+  })
+
   it('never returns a value, only a name', async () => {
     const { missingProviderEnv } = await load({ MICROSOFT_CLIENT_ID: 'super-secret-id' })
     expect(missingProviderEnv('microsoft').join(' ')).not.toContain('super-secret-id')
