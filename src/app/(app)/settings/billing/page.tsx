@@ -8,6 +8,7 @@ import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
 import { FOUNDING_OFFER, PLANS, formatPrice, type MeterKind } from '@/lib/billing/plans'
 import { foundingPlacesRemaining } from './actions'
 import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
+import { InvitationPanel } from '@/components/app/invitation-panel'
 import { features } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
@@ -165,6 +166,9 @@ export default async function BillingSettingsPage({
           works normally.
         </p>
       ) : null}
+
+      {/* Quiet by design -- see components/app/invitation-panel. */}
+      <InvitationPanel tier={entitlements.tier} />
     </div>
   )
 }

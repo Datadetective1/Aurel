@@ -460,6 +460,96 @@ export type Database = {
         }
         Relationships: []
       }
+      access_grants: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          invitation_id: string | null
+          note: string | null
+          revoked_at: string | null
+          source: string
+          tier: Database["public"]["Enums"]["access_tier"]
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          invitation_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          source?: string
+          tier: Database["public"]["Enums"]["access_tier"]
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          invitation_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          source?: string
+          tier?: Database["public"]["Enums"]["access_tier"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pilot_invitations: {
+        Row: {
+          code_hash: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          label: string | null
+          max_redemptions: number
+          redemption_count: number
+          revoked_at: string | null
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          max_redemptions?: number
+          redemption_count?: number
+          revoked_at?: string | null
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          max_redemptions?: number
+          redemption_count?: number
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      invitation_redemptions: {
+        Row: {
+          id: string
+          invitation_id: string
+          redeemed_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invitation_id: string
+          redeemed_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invitation_id?: string
+          redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       entitlement_overrides: {
         Row: {
           capability: string
@@ -2132,6 +2222,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      redeem_pilot_invitation: {
+        Args: { code_hash_input: string }
+        Returns: string
+      }
+      create_pilot_invitation: {
+        Args: {
+          code_hash_input: string
+          label_input: string | null
+          max_redemptions_input: number
+          expires_at_input: string
+          created_by_input: string
+        }
+        Returns: string
+      }
       clear_demo_data: { Args: never; Returns: undefined }
       delete_my_data: { Args: never; Returns: undefined }
       ensure_personal_workspace: {
@@ -2255,6 +2359,7 @@ export type Database = {
         | "team_meeting"
         | "other"
       meeting_status: "upcoming" | "completed" | "cancelled"
+      access_tier: "standard" | "pilot" | "owner"
       meter_kind:
         | "person_research"
         | "deep_research"

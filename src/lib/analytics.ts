@@ -85,6 +85,10 @@ export type AnalyticsEvent =
   | 'checkout_started'
   | 'subscription_created'
   | 'limit_reached'
+  // Access tiers. Outcomes and counts only -- never a code, never a hash.
+  | 'pilot_invitation_created'
+  | 'pilot_invitation_redeemed'
+  | 'pilot_invitation_rejected'
   | 'data_exported'
   | 'account_deleted'
 

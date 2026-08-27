@@ -6,6 +6,7 @@ import { estimateCostMicros, hasKnownPrice } from './provider-cost'
 import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
+import { applyAccessTier, parseAccessTier, type AccessTier } from './access'
 import { brand } from '@/lib/brand'
 
 /**
@@ -24,6 +25,11 @@ import { brand } from '@/lib/brand'
 
 export interface Entitlements {
   plan: PlanId
+  /**
+   * Internal access tier. Orthogonal to `plan`: a pilot account is still on
+   * the free plan commercially, it simply is not subject to its ceilings.
+   */
+  tier: AccessTier
   isFounding: boolean
   /** Start of the current billing period, used as the quota bucket key. */
   periodStart: string
@@ -47,7 +53,7 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const user = await requireUser()
   const supabase = await createClient()
 
-  const [{ data: subscription }, { data: overrides }] = await Promise.all([
+  const [{ data: subscription }, { data: overrides }, { data: grant }] = await Promise.all([
     supabase
       .from('subscriptions')
       .select('plan, status, is_founding, current_period_end')
@@ -57,6 +63,15 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
       .from('entitlement_overrides')
       .select('capability, limit_value, enabled, expires_at')
       .eq('user_id', user.id),
+    // Read-only to the account it belongs to, and unwritable from any
+    // user-scoped connection -- see migration 0015. A revoked grant is a row
+    // with revoked_at set, so revocation takes effect on the next read.
+    supabase
+      .from('access_grants')
+      .select('tier, revoked_at')
+      .eq('user_id', user.id)
+      .is('revoked_at', null)
+      .maybeSingle(),
   ])
 
   // A subscription that lapsed drops to free rather than staying entitled.
@@ -67,8 +82,13 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
     rawPlan !== 'free' && status && !entitledStatuses.includes(status) ? 'free' : rawPlan
 
   const definition = PLANS[plan] ?? PLANS.free
-  const capabilities = { ...definition.capabilities }
-  const quotas = { ...definition.quotas }
+  const tier = parseAccessTier(grant?.tier)
+
+  // Standard comes back identical to the plan. Full access lifts the ceiling
+  // and nothing else -- metering is untouched, see lib/billing/access.
+  const applied = applyAccessTier(tier, definition)
+  const capabilities = applied.capabilities
+  const quotas = applied.quotas
 
   const now = Date.now()
   for (const override of overrides ?? []) {
@@ -84,11 +104,12 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
 
   return {
     plan,
+    tier,
     isFounding: subscription?.is_founding ?? false,
     periodStart: currentPeriodStart(),
     capabilities,
     quotas,
-    limits: definition.limits,
+    limits: applied.limits,
   }
 })
 
