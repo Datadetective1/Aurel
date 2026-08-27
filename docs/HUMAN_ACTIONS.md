@@ -182,6 +182,14 @@ start rather than storing a refresh token in the clear, and both providers show
 as **Unavailable**. Keep it out of the database and do not rotate it casually:
 changing it invalidates every stored grant and every user has to reconnect.
 
+**32 characters is a hard floor, not a suggestion.** A shorter value is refused
+outright, and the calendar stays **Unavailable** with the key named as the
+reason — it is not treated as "set". Set this in the same Vercel environment as
+the OAuth credentials: Production credentials with the key scoped to Preview
+leaves production looking unconfigured, with only this variable listed as
+missing. Capabilities names whichever variables the running deployment cannot
+see, so that screen is the fastest way to tell which one did not arrive.
+
 ### 4.2 Microsoft 365 / Outlook
 
 | | |
