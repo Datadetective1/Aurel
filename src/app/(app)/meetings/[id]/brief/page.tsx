@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft, Smartphone } from 'lucide-react'
 import { MeetingBriefView, type BriefCitation } from '@/components/app/meeting-brief'
 import { GenerateBriefPanel } from '@/components/app/generate-brief'
+import type { PersonChoice } from '@/components/app/add-participants'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
 import { RegenerateBrief } from '@/components/app/regenerate-brief'
 import { Button } from '@/components/ui/button'
@@ -68,6 +69,26 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
   // Checked against the things a brief actually rests on. A brief that goes on
   // citing a source the user has since deleted is the failure worth catching.
   const attendeeIds = (attendees ?? []).map((a) => a.person_id)
+
+  // People the user could still add. Excluding the ones already in the room
+  // keeps the picker honest -- offering somebody already listed reads as though
+  // the add did not work.
+  const { data: allPeople } = await supabase
+    .from('people')
+    .select('id, full_name, preferred_name, job_title, organizations(name)')
+    .eq('user_id', user.id)
+    .is('archived_at', null)
+    .order('full_name', { ascending: true })
+    .limit(200)
+
+  const addablePeople: PersonChoice[] = (allPeople ?? [])
+    .filter((p) => !attendeeIds.includes(p.id))
+    .map((p) => ({
+      id: p.id,
+      name: p.preferred_name || p.full_name,
+      subtitle:
+        [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
+    }))
   let staleReason: string | null = null
 
   if (artifact && attendeeIds.length > 0) {
@@ -178,6 +199,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
           meetingId={id}
           hasObjective={Boolean(meeting.objective)}
           attendeeCount={(attendees ?? []).length}
+          addablePeople={addablePeople}
         />
       )}
     </Container>

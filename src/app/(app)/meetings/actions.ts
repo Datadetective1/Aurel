@@ -177,6 +177,59 @@ export async function updateMeetingObjective(
  * produced it, so "why is Atturel recommending this" reads from stored rows rather
  * than being reconstructed later.
  */
+/**
+ * Attach an existing person to a meeting.
+ *
+ * The smallest thing that makes "Add participants" true. The data model already
+ * carries this -- meeting_attendees is keyed (meeting_id, person_id), so the
+ * insert is idempotent by construction and pressing add twice cannot duplicate
+ * a row -- and meeting creation has always written to it. What was missing was
+ * any way to do it after the meeting exists, which is every meeting that comes
+ * from a calendar.
+ *
+ * Deliberately not a participant manager. No roles, no reordering, no bulk
+ * edit: those belong to a screen nobody has asked for yet. Adding somebody the
+ * calendar did not know about is the case that was actually broken.
+ */
+export async function addMeetingParticipant(
+  meetingId: string,
+  personId: string,
+): Promise<MeetingState> {
+  if (!meetingId || !personId) return { error: 'Missing meeting or person.' }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+  const ownNoVis = await ownershipNoVisibility()
+
+  // Both sides must belong to the caller. Checked rather than assumed: the ids
+  // arrive from the client, and RLS protecting the write does not make an
+  // unchecked cross-account reference a good idea.
+  const [{ data: meeting }, { data: person }] = await Promise.all([
+    supabase.from('meetings').select('id').eq('id', meetingId).eq('user_id', user.id).maybeSingle(),
+    supabase.from('people').select('id').eq('id', personId).eq('user_id', user.id).maybeSingle(),
+  ])
+
+  if (!meeting) return { error: 'That meeting could not be found.' }
+  if (!person) return { error: 'That person could not be found.' }
+
+  const { error } = await supabase
+    .from('meeting_attendees')
+    .upsert(
+      { ...ownNoVis, meeting_id: meetingId, person_id: personId, role: 'contributor' as const },
+      { onConflict: 'meeting_id,person_id' },
+    )
+
+  if (error) {
+    logger.warn('meeting.participant_add_failed', { code: error.code })
+    return { error: 'We could not add that person. Try again.' }
+  }
+
+  await track('meeting_participant_added', {})
+
+  revalidatePath(`/meetings/${meetingId}/brief`)
+  return { message: 'Added.' }
+}
+
 export async function generateBrief(meetingId: string) {
   const capability = await checkCapability('meetingBrief', 'meeting_brief')
   if (!capability.allowed) {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CircleAlert, Loader2, Sparkles } from 'lucide-react'
 import { generateBrief, updateMeetingObjective } from '@/app/(app)/meetings/actions'
+import { AddParticipants, type PersonChoice } from '@/components/app/add-participants'
 import { Button } from '@/components/ui/button'
 import { Eyebrow, Panel } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
@@ -29,10 +30,12 @@ export function GenerateBriefPanel({
   meetingId,
   hasObjective,
   attendeeCount,
+  addablePeople,
 }: {
   meetingId: string
   hasObjective: boolean
   attendeeCount: number
+  addablePeople: PersonChoice[]
 }) {
   const router = useRouter()
   const [objective, setObjective] = React.useState('')
@@ -152,13 +155,15 @@ export function GenerateBriefPanel({
                 </li>
               ) : null}
               {attendeeCount === 0 ? (
-                <li className="flex gap-2 text-xs text-ink-muted">
-                  <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
-                  Nobody is added to this meeting yet.{' '}
-                  <Link href={`/meetings/${meetingId}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
-                    Add participants
-                  </Link>
-                  .
+                <li className="grid gap-2 text-xs text-ink-muted">
+                  <span className="flex gap-2">
+                    <CircleAlert
+                      className="mt-px size-3.5 shrink-0 text-caution"
+                      aria-hidden="true"
+                    />
+                    Nobody is added to this meeting yet.
+                  </span>
+                  <AddParticipants meetingId={meetingId} people={addablePeople} />
                 </li>
               ) : null}
             </ul>

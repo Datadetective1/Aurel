@@ -35,4 +35,14 @@ describe('the brief panel does not link to itself', () => {
     expect(panel).toContain('updateMeetingObjective')
     expect(panel).not.toMatch(/add it/)
   })
+
+  it('adds participants in place rather than linking away', () => {
+    // Same loop, same fix. Both CTAs on this panel pointed at /meetings/[id].
+    expect(panel).toContain('AddParticipants')
+  })
+
+  it('no longer links anywhere that redirects straight back here', () => {
+    // The property that actually broke, stated once for both.
+    expect(panel).not.toMatch(/href=\{`\/meetings\/\$\{meetingId\}`\}/)
+  })
 })

@@ -56,6 +56,9 @@ export type AnalyticsEvent =
   | 'observation_dismissed'
   | 'interaction_added'
   | 'meeting_created'
+  // Somebody the calendar invite did not carry, added by hand. A rising count
+  // means attendee matching is missing people it should be finding.
+  | 'meeting_participant_added'
   | 'meeting_prepared'
   | 'quick_brief_viewed'
   | 'meeting_debriefed'
