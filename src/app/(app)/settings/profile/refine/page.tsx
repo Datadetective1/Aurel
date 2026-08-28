@@ -30,6 +30,7 @@ export default async function RefineProfilePage() {
         initialResponses={responses}
         finishHref="/settings/profile"
         finishLabel="Save my progress"
+        headingLevel="h2"
       />
     </Container>
   )

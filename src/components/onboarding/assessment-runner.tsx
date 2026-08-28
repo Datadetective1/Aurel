@@ -54,6 +54,7 @@ export function AssessmentRunner({
   roundLimit,
   finishHref = '/onboarding/reveal',
   finishLabel,
+  headingLevel = 'h1',
 }: {
   assessmentId: string
   initialResponses: StoredResponse[]
@@ -70,6 +71,14 @@ export function AssessmentRunner({
   /** Where to go once this sitting is scored. */
   finishHref?: string
   finishLabel?: string
+  /**
+   * Heading level for the round counter.
+   *
+   * It is the page title during onboarding, where the runner is the whole
+   * screen. Embedded under Settings it is a section of a page that already has
+   * an h1, and two of those is two page titles to a screen reader.
+   */
+  headingLevel?: 'h1' | 'h2'
 }) {
   const router = useRouter()
   const limit = Math.min(Math.max(roundLimit ?? BLOCK_COUNT, 1), BLOCK_COUNT)
@@ -100,6 +109,7 @@ export function AssessmentRunner({
   const advanceTimer = React.useRef<number | null>(null)
   const headingRef = React.useRef<HTMLHeadingElement>(null)
 
+  const Heading = headingLevel
   const block = BLOCKS[round]!
   const answer = answers[round] ?? { most: null, least: null }
   // Counted within this sitting, so onboarding reads "4 of 6" rather than
@@ -225,14 +235,14 @@ export function AssessmentRunner({
     <div className="py-4">
       {/* --- header: round counter, motif rule, progress ---------------------- */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1
+        <Heading
           ref={headingRef}
           tabIndex={-1}
           className="font-display text-3xl leading-none text-ink outline-none sm:text-4xl"
         >
           <span className="tabular-nums">{String(round + 1).padStart(2, '0')}</span>
           <span className="text-ink-faint"> / {limit}</span>
-        </h1>
+        </Heading>
 
         <div className="flex items-center gap-3 text-xs text-ink-muted">
           {remainingLabel ? <span>{remainingLabel}</span> : null}
