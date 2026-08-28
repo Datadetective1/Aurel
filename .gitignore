@@ -18,3 +18,12 @@ test-results/
 supabase/.temp/
 *.png
 .playwright-mcp/
+
+# Brand asset build inputs (fonts fetched by scripts/brand/fetch-fonts.mjs)
+.brandtmp/
+
+# The blanket *.png above exists to keep stray QA screenshots out of the repo.
+# The brand exports are deliverables, so they are exempted back in -- without
+# this every raster in /brand is silently dropped from the commit and the
+# folder looks complete locally while arriving empty for everyone else.
+!brand/**/*.png
