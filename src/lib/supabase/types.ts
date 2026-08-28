@@ -297,6 +297,7 @@ export type Database = {
           created_at: string
           id: string
           instrument_version: string
+          directional_count: number | null
           narrative: Json | null
           scores: Json
           started_at: string
@@ -331,6 +332,7 @@ export type Database = {
           created_at?: string
           id?: string
           instrument_version?: string
+          directional_count?: number | null
           narrative?: Json | null
           scores?: Json
           started_at?: string
@@ -546,6 +548,36 @@ export type Database = {
           id?: string
           invitation_id?: string
           redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scenario_responses: {
+        Row: {
+          answered_at: string
+          assessment_id: string
+          id: string
+          is_depends: boolean
+          option_id: string
+          scenario_id: string
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          assessment_id: string
+          id?: string
+          is_depends?: boolean
+          option_id: string
+          scenario_id: string
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          assessment_id?: string
+          id?: string
+          is_depends?: boolean
+          option_id?: string
+          scenario_id?: string
           user_id?: string
         }
         Relationships: []

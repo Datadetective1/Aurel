@@ -5,7 +5,7 @@ import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/format'
-import { BLOCK_COUNT } from '@/lib/assessment/instrument'
+import { TOTAL_COUNT, SCENARIO_VERSION } from '@/lib/assessment/scenarios'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default async function InteractionProfileSettingsPage() {
 
   const { data: assessment } = await supabase
     .from('assessments')
-    .select('id, archetype, completed_at, calibration, calibration_note')
+    .select('id, archetype, completed_at, calibration, calibration_note, instrument_version')
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
@@ -35,16 +35,21 @@ export default async function InteractionProfileSettingsPage() {
 
   // How much of the instrument has been answered. Refinement is optional, so
   // this is stated as progress rather than as an outstanding task.
-  const { count: answered } = assessment
+  // A profile built by the retired forced-choice instrument is not refined in
+  // place. Its questions no longer exist, so the honest offer is a fresh start
+  // rather than a progress bar toward a set it was never part of.
+  const isLegacy = Boolean(assessment) && assessment!.instrument_version !== SCENARIO_VERSION
+
+  const { count: answered } = assessment && !isLegacy
     ? await supabase
-        .from('assessment_responses')
-        .select('round_index', { count: 'exact', head: true })
+        .from('scenario_responses')
+        .select('scenario_id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('assessment_id', assessment.id)
     : { count: 0 }
 
   const answeredCount = answered ?? 0
-  const refined = answeredCount >= BLOCK_COUNT
+  const refined = !isLegacy && answeredCount >= TOTAL_COUNT
 
   return (
     <div>
@@ -54,19 +59,27 @@ export default async function InteractionProfileSettingsPage() {
         <>
           <p className="mt-4 font-display text-2xl text-ink">{assessment.archetype}</p>
           <p className="mt-1 text-xs text-ink-muted">
-            {refined
-              ? `Fully refined — all ${BLOCK_COUNT} rounds answered.`
-              : `Profile refinement: ${answeredCount} of ${BLOCK_COUNT}`}
+            {isLegacy
+              ? 'Built with an earlier version of the questions.'
+              : refined
+                ? `Fully refined — all ${TOTAL_COUNT} answered.`
+                : `Profile refinement: ${answeredCount} of ${TOTAL_COUNT}`}
             {assessment.completed_at
               ? ` · last scored ${formatDate(assessment.completed_at)}`
               : ''}
           </p>
 
-          {!refined ? (
+          {isLegacy ? (
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
-              This profile is usable now and sharpens as you answer more. Each additional round
-              narrows where you actually sit on the eight tendencies, and {brand.name} says how
-              confident it is rather than presenting a partial read as a finished one.
+              The questions have been rewritten as plain workplace situations, and this profile came
+              from the earlier set. It still works, but a fresh one will be built from questions
+              that were clearer to answer.
+            </p>
+          ) : !refined ? (
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
+              This profile is usable now and sharpens as you answer more. Each additional question
+              narrows where you actually sit, and {brand.name} says how confident it is rather than
+              presenting a partial read as a finished one.
             </p>
           ) : null}
 
@@ -88,10 +101,14 @@ export default async function InteractionProfileSettingsPage() {
           ) : null}
 
           <div className="mt-8 flex flex-wrap gap-2">
-            {!refined ? (
+            {isLegacy ? (
+              <Button asChild size="sm">
+                <Link href="/settings/profile/refine">Answer the new questions</Link>
+              </Button>
+            ) : !refined ? (
               <Button asChild size="sm">
                 <Link href="/settings/profile/refine">
-                  Continue refining ({BLOCK_COUNT - answeredCount} left)
+                  Continue refining ({TOTAL_COUNT - answeredCount} left)
                 </Link>
               </Button>
             ) : null}

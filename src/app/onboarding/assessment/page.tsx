@@ -1,6 +1,6 @@
-import { AssessmentRunner } from '@/components/onboarding/assessment-runner'
-import { startOrResumeAssessment } from './actions'
-import { INITIAL_BLOCK_COUNT } from '@/lib/assessment/instrument'
+import { ScenarioRunner } from '@/components/onboarding/scenario-runner'
+import { startOrResumeScenarioAssessment } from './scenario-actions'
+import { CORE_SCENARIOS } from '@/lib/assessment/scenarios'
 import { brand } from '@/lib/brand'
 
 export const metadata = {
@@ -8,15 +8,20 @@ export const metadata = {
   robots: { index: false, follow: false },
 }
 
+/**
+ * The opening six scenarios. The remaining twelve are asked later, one at a
+ * time, from Today or Settings.
+ */
 export default async function AssessmentPage() {
-  const { assessmentId, responses } = await startOrResumeAssessment()
-  // The opening sitting only. The remaining blocks are not discarded -- they
-  // are answered later, from Settings or one at a time on Today.
+  const { assessmentId, responses } = await startOrResumeScenarioAssessment()
+
   return (
-    <AssessmentRunner
+    <ScenarioRunner
       assessmentId={assessmentId}
-      initialResponses={responses}
-      roundLimit={INITIAL_BLOCK_COUNT}
+      scenarios={CORE_SCENARIOS}
+      initialAnswers={responses}
+      finishHref="/onboarding/reveal"
+      finishLabel={`See my ${brand.assessmentName}`}
     />
   )
 }

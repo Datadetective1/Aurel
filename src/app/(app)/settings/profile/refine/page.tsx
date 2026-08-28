@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
-import { AssessmentRunner } from '@/components/onboarding/assessment-runner'
-import { startOrResumeAssessment } from '@/app/onboarding/assessment/actions'
+import { ScenarioRunner } from '@/components/onboarding/scenario-runner'
+import { startOrResumeScenarioAssessment } from '@/app/onboarding/assessment/scenario-actions'
+import { ALL_SCENARIOS } from '@/lib/assessment/scenarios'
 import { Container } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
 
@@ -10,24 +11,20 @@ export const metadata: Metadata = {
 }
 
 /**
- * Refinement.
- *
- * The same runner, the same blocks, the same order and the same scoring — the
- * only difference from the opening sitting is that this one opens the whole
- * instrument instead of the first six rounds. It resumes wherever the last
- * sitting stopped, so somebody who has answered six lands on round seven.
- *
- * Deliberately not a second assessment. There is one assessment row per
- * account, and every sitting adds responses to it and re-scores.
+ * Refinement: the same instrument, opened over all eighteen scenarios and
+ * resuming at the first unanswered one. Not a second assessment -- there is one
+ * assessment row per account per instrument version, and every sitting adds to
+ * it and re-scores.
  */
 export default async function RefineProfilePage() {
-  const { assessmentId, responses } = await startOrResumeAssessment()
+  const { assessmentId, responses } = await startOrResumeScenarioAssessment()
 
   return (
     <Container size="narrow" className="py-8 sm:py-12">
-      <AssessmentRunner
+      <ScenarioRunner
         assessmentId={assessmentId}
-        initialResponses={responses}
+        scenarios={ALL_SCENARIOS}
+        initialAnswers={responses}
         finishHref="/settings/profile"
         finishLabel="Save my progress"
         headingLevel="h2"

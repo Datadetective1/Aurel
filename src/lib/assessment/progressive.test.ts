@@ -7,10 +7,12 @@ import { scoreResponses } from './scoring'
 /**
  * Progressive profiling.
  *
- * The instrument is unchanged: same 24 blocks, same order, same weights, same
- * scoring. What changed is how many of them are put in front of somebody at
- * once. These tests exist mostly to prove that the first part of that sentence
- * is still true.
+ * Two halves. The first covers the RETIRED forced-choice instrument, which
+ * still has to score correctly because profiles recorded before the redesign
+ * are read back through it. The second covers the live path: where later
+ * scenario questions come from, and what the prompt is allowed to do.
+ *
+ * The scenario instrument's own behaviour is tested in scenario-scoring.test.
  */
 
 /** Answer the first `n` blocks, always taking the first and last item. */
@@ -22,8 +24,8 @@ function answerFirst(n: number) {
   }))
 }
 
-describe('the opening sitting', () => {
-  it('is six of the existing twenty-four', () => {
+describe('the retired instrument still scores its own records', () => {
+  it('kept its shape', () => {
     expect(INITIAL_BLOCK_COUNT).toBe(6)
     expect(BLOCK_COUNT).toBe(24)
     expect(INITIAL_BLOCK_COUNT).toBeLessThan(BLOCK_COUNT)
@@ -105,8 +107,9 @@ describe('where later questions come from', () => {
     'utf8',
   )
 
-  it('asks the next unanswered round in instrument order', () => {
-    expect(selector).toMatch(/BLOCKS\.findIndex\(\(b\) => !answered\.has\(b\.index\)\)/)
+  it('asks the next unanswered scenario in instrument order', () => {
+    // Not random, not "most informative next". The order is the instrument's.
+    expect(selector).toMatch(/ALL_SCENARIOS\.find\(\(s\) => !answered\.has\(s\.id\)\)/)
   })
 
   it('asks nothing until the account has produced a brief', () => {
@@ -121,7 +124,11 @@ describe('where later questions come from', () => {
   })
 
   it('stops once the instrument is complete', () => {
-    expect(selector).toMatch(/answered\.size >= BLOCK_COUNT\) return null/)
+    expect(selector).toMatch(/answered\.size >= TOTAL_COUNT\) return null/)
+  })
+
+  it('does not extend a legacy profile with questions it never contained', () => {
+    expect(selector).toMatch(/instrument_version', SCENARIO_VERSION/)
   })
 })
 
@@ -150,8 +157,9 @@ describe('the prompt itself', () => {
   })
 
   it('shows exactly one question', () => {
-    expect(prompt).toMatch(/block\.items\.map/)
-    expect(prompt).not.toMatch(/blocks\.map|questions\.map/)
+    // One prompt, its own options, nothing iterating over questions.
+    expect(prompt).toMatch(/block\.options\.map/)
+    expect(prompt).not.toMatch(/blocks\.map|questions\.map|scenarios\.map/)
   })
 
   it('is dismissible and does not block anything', () => {

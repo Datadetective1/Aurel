@@ -28,6 +28,7 @@ export type AnalyticsEvent =
   // which statement somebody picked.
   | 'assessment_initial_completed'
   | 'assessment_fully_completed'
+  | 'assessment_reset'
   | 'profile_question_shown'
   | 'profile_question_answered'
   | 'profile_question_dismissed'

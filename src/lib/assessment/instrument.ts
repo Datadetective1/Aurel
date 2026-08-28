@@ -1,4 +1,22 @@
 /**
+ * RETIRED FOR NEW PROFILES.
+ * =============================================================================
+ * This forced-choice instrument no longer collects anything. New profiles use
+ * the scenario instrument in ./scenarios.ts; this file and ./scoring.ts remain
+ * so that assessments recorded before the change can still be read and rendered
+ * as exactly what they were.
+ *
+ * It was retired because it did not work in practice. Ranking four unrelated
+ * abstract statements MOST and LEAST like you is two judgements about four
+ * things at once, and by the middle of a 24-round run people were choosing to
+ * finish rather than to answer -- which produces confident-looking data that
+ * means nothing.
+ *
+ * Do not add items here. Add scenarios.
+ * =============================================================================
+ */
+
+/**
  * THE INTERACTION PROFILE — INSTRUMENT v1
  * =============================================================================
  * An original forced-choice instrument measuring eight *practical* interaction

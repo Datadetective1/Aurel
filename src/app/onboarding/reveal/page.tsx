@@ -7,6 +7,8 @@ import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getScoredAssessment } from '@/lib/ai/context'
+import { SCENARIO_VERSION } from '@/lib/assessment/scenarios'
+import { scoreStoredScenarios } from '@/lib/assessment/stored-scenarios'
 import type { ProfileNarrative } from '@/lib/ai/prompts/coaching'
 import { brand } from '@/lib/brand'
 
@@ -28,12 +30,12 @@ const CONFIDENCE_COPY = {
   moderate: {
     tone: 'info' as const,
     label: 'Moderate confidence',
-    body: 'Your answers covered every dimension and mostly pointed the same way.',
+    body: 'Enough answers across enough tendencies to be useful, with room to sharpen.',
   },
   strong: {
     tone: 'positive' as const,
     label: 'Strong confidence',
-    body: 'You answered every round, covered every dimension, and answered consistently.',
+    body: 'You worked through the whole set and leaned clearly on every tendency.',
   },
 }
 
@@ -43,7 +45,7 @@ export default async function RevealPage() {
 
   const { data: assessment } = await supabase
     .from('assessments')
-    .select('id, archetype, narrative, coverage, consistency, calibration')
+    .select('id, archetype, narrative, coverage, consistency, calibration, instrument_version')
     .eq('user_id', user.id)
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
@@ -52,7 +54,14 @@ export default async function RevealPage() {
 
   if (!assessment) redirect('/onboarding/assessment')
 
-  const scored = await getScoredAssessment(supabase, user.id, assessment.id)
+  // Two instruments can be in the database at once, and they are scored by
+  // different functions over different tables. Which one produced a profile is
+  // recorded on the row rather than guessed at.
+  const isScenario = assessment.instrument_version === SCENARIO_VERSION
+
+  const scored = isScenario
+    ? await scoreStoredScenarios(supabase, user.id, assessment.id)
+    : await getScoredAssessment(supabase, user.id, assessment.id)
   const narrative = assessment.narrative as ProfileNarrative | null
   const confidence = CONFIDENCE_COPY[scored.confidence]
 

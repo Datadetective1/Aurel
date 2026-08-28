@@ -1,7 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
-import { BLOCKS, BLOCK_COUNT } from '@/lib/assessment/instrument'
+import { ALL_SCENARIOS, TOTAL_COUNT, SCENARIO_VERSION } from '@/lib/assessment/scenarios'
 import type { PromptBlock } from '@/components/app/profile-prompt'
 
 type Client = SupabaseClient<Database>
@@ -38,13 +38,17 @@ export async function getNextProfileQuestion(
 
   const { data: assessment } = await supabase
     .from('assessments')
-    .select('id')
+    .select('id, instrument_version')
     .eq('user_id', userId)
     .eq('status', 'completed')
+    .eq('instrument_version', SCENARIO_VERSION)
     .order('completed_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
+  // Only the current instrument is refined in place. A legacy profile is
+  // offered a fresh start in Settings instead of being extended with questions
+  // that were never part of it.
   if (!assessment) return null
 
   // Earned the right to ask: the account has seen a brief produced.
@@ -57,25 +61,23 @@ export async function getNextProfileQuestion(
   if (!briefs || briefs === 0) return null
 
   const { data: responses } = await supabase
-    .from('assessment_responses')
-    .select('round_index')
+    .from('scenario_responses')
+    .select('scenario_id')
     .eq('user_id', userId)
     .eq('assessment_id', assessment.id)
 
-  const answered = new Set((responses ?? []).map((r) => r.round_index))
-  if (answered.size >= BLOCK_COUNT) return null
+  const answered = new Set((responses ?? []).map((r) => r.scenario_id))
+  if (answered.size >= TOTAL_COUNT) return null
 
-  const nextIndex = BLOCKS.findIndex((b) => !answered.has(b.index))
-  if (nextIndex === -1) return null
-
-  const block = BLOCKS[nextIndex]!
+  const next = ALL_SCENARIOS.find((s) => !answered.has(s.id))
+  if (!next) return null
 
   return {
     assessmentId: assessment.id,
-    roundIndex: block.index,
-    blockId: block.id,
-    items: block.items.map((i) => ({ id: i.id, text: i.text })),
+    scenarioId: next.id,
+    prompt: next.prompt,
+    options: next.options.map((o) => ({ id: o.id, label: o.label })),
     answeredCount: answered.size,
-    totalCount: BLOCK_COUNT,
+    totalCount: TOTAL_COUNT,
   }
 }
