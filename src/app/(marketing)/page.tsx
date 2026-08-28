@@ -18,11 +18,11 @@ import { HeroDemo } from '@/components/marketing/hero-demo'
 import { FootprintDemo } from '@/components/marketing/footprint-demo'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
-import { brand, title } from '@/lib/brand'
+import { absoluteUrl, brand, seoTitle, siteUrl } from '@/lib/brand'
 
 export const metadata: Metadata = {
   // Absolute: the root template appends the brand name, which would double it here.
-  title: { absolute: title() },
+  title: { absolute: seoTitle() },
   description: brand.description,
   alternates: { canonical: '/' },
 }
@@ -521,22 +521,58 @@ function FinalCta() {
   )
 }
 
-/** JSON-LD so search engines describe the product accurately, not aspirationally. */
+/**
+ * JSON-LD so search engines describe the product accurately, not aspirationally.
+ *
+ * Three entities, because they answer three different questions Google asks:
+ * Organization is who publishes this, WebSite is what the domain is, and
+ * SoftwareApplication is what the thing does. They are linked by @id so the
+ * graph reads as one publisher rather than three unrelated blobs.
+ *
+ * Deliberately absent: aggregateRating, review, and any offer beyond the free
+ * plan that genuinely exists. Rich-result markup describing customers we do
+ * not have is a manual-action risk, and there is nothing to gain from it while
+ * the honest version says enough.
+ */
 function StructuredData() {
-  const data = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: brand.name,
-    applicationCategory: 'BusinessApplication',
-    operatingSystem: 'Web',
-    description: brand.longDescription,
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'USD',
-      description: 'Free plan with limited people and meeting briefs.',
+  const graph = [
+    {
+      '@type': 'Organization',
+      '@id': absoluteUrl('/#organization'),
+      name: brand.legalEntity,
+      url: siteUrl,
+      logo: absoluteUrl('/icon.svg'),
+      description: brand.longDescription,
+      email: brand.email.support,
     },
-  }
+    {
+      '@type': 'WebSite',
+      '@id': absoluteUrl('/#website'),
+      name: brand.name,
+      url: siteUrl,
+      description: brand.description,
+      publisher: { '@id': absoluteUrl('/#organization') },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': absoluteUrl('/#software'),
+      name: brand.name,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      description: brand.longDescription,
+      url: siteUrl,
+      publisher: { '@id': absoluteUrl('/#organization') },
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+        description: 'Free plan with limited people and meeting briefs.',
+      },
+    },
+  ]
+
+  const data = { '@context': 'https://schema.org', '@graph': graph }
+
   return (
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
   )

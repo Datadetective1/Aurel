@@ -52,6 +52,16 @@ export const brand = {
    */
   tagline: 'Walk into every room prepared.',
 
+  /**
+   * The product category, in the words someone would actually search for.
+   *
+   * The tagline is the better sentence and the wrong title tag: "Walk into
+   * every room prepared" is the only thing a search result used to say about
+   * us, and it does not tell a stranger — or a crawler — what this software
+   * is. The tagline still opens the page; this names the category above it.
+   */
+  descriptor: 'Professional relationship intelligence',
+
   /** Short description — meta description, OG, app store style blurbs. */
   description:
     'Atturel turns the people, relationship history and context around a meeting into practical guidance for the conversations that matter.',
@@ -101,6 +111,18 @@ export const emailFrom = `${brand.email.fromName} <${brand.email.fromAddress}>`
 /** Canonical page-title builder. `title()` → bare brand name. */
 export function title(page?: string): string {
   return page ? `${page} · ${brand.name}` : `${brand.name} — ${brand.tagline}`
+}
+
+/**
+ * Title tag for the homepage and social previews.
+ *
+ * Separate from title() on purpose: title() composes in-product page titles,
+ * where the reader already knows what this is. A search result has no such
+ * context, so the entry point leads with the category. Kept under 60
+ * characters so Google shows it whole.
+ */
+export function seoTitle(): string {
+  return `${brand.name} — ${brand.descriptor}`
 }
 
 export type Brand = typeof brand
