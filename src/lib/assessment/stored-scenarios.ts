@@ -45,6 +45,10 @@ export async function scoreStoredScenarios(
       consistency: null,
       lean: d.lean,
       distinctiveness: d.distinctiveness,
+      // Carried through the legacy shape rather than dropped: without it the
+      // reveal renders "they told us it varies" identically to "we never
+      // asked", which is the distinction this exists to make.
+      contextDependent: d.contextDependent,
     })),
   }
 }

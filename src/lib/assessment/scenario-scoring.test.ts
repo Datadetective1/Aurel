@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describeScenarioDimension, scoreScenarios } from './scenario-scoring'
 import {
   ALL_SCENARIOS,
@@ -282,5 +284,27 @@ describe('certainty is graded honestly', () => {
       // One answer each after the opening six.
       expect(dimension.certainty).toBe('low')
     }
+  })
+})
+
+describe('context-dependence reaches the surfaces that show it', () => {
+  const stored = readFileSync(
+    join(process.cwd(), 'src', 'lib', 'assessment', 'stored-scenarios.ts'),
+    'utf8',
+  )
+  const fingerprint = readFileSync(
+    join(process.cwd(), 'src', 'components', 'onboarding', 'fingerprint.tsx'),
+    'utf8',
+  )
+
+  it('survives the mapping onto the legacy display shape', () => {
+    // It was dropped here first time round, so the scoring knew and the reveal
+    // did not.
+    expect(stored).toMatch(/contextDependent: d\.contextDependent/)
+  })
+
+  it('renders differently from "not yet known"', () => {
+    expect(fingerprint).toContain('Varies by situation')
+    expect(fingerprint).toContain('Not yet known')
   })
 })

@@ -25,16 +25,28 @@ export function Fingerprint({
   dimensions,
   className,
   animate = true,
+  contextDependent,
 }: {
   dimensions: DimensionScore[]
   className?: string
   animate?: boolean
+  /**
+   * Dimensions the user told us vary with the situation.
+   *
+   * Kept as a separate set rather than added to DimensionScore, because that
+   * type is shared with the retired instrument, which had no way to express
+   * this — there was no "it depends" to choose.
+   */
+  contextDependent?: ReadonlySet<string>
 }) {
   return (
     <ul className={cn('grid gap-7', className)}>
       {dimensions.map((d, index) => {
         const dimension = DIMENSION_BY_ID[d.dimension]
         const isNeutral = d.lean === null
+        // "They told us it varies" reads very differently from "we have not
+        // asked", and both used to render as Balanced.
+        const varies = contextDependent?.has(d.dimension) ?? false
 
         return (
           <li
@@ -57,7 +69,9 @@ export function Fingerprint({
                 )}
               >
                 {isNeutral
-                  ? 'Balanced'
+                  ? varies
+                    ? 'Varies by situation'
+                    : 'Not yet known'
                   : d.lean === 'high'
                     ? dimension.highPole.name
                     : dimension.lowPole.name}

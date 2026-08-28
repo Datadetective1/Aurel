@@ -62,6 +62,16 @@ export default async function RevealPage() {
   const scored = isScenario
     ? await scoreStoredScenarios(supabase, user.id, assessment.id)
     : await getScoredAssessment(supabase, user.id, assessment.id)
+  // Only the scenario instrument can produce this; the retired one had no way
+  // for somebody to say "it depends".
+  const contextDependentSet = new Set(
+    isScenario
+      ? (scored as { dimensions: { dimension: string; contextDependent?: boolean }[] }).dimensions
+          .filter((d) => d.contextDependent)
+          .map((d) => d.dimension)
+      : [],
+  )
+
   const narrative = assessment.narrative as ProfileNarrative | null
   const confidence = CONFIDENCE_COPY[scored.confidence]
 
@@ -102,7 +112,11 @@ export default async function RevealPage() {
           Eight tendencies, each on a continuum. Neither end is better — the point is knowing your
           default so you can tell when a situation calls for something else.
         </p>
-        <Fingerprint dimensions={scored.dimensions} className="mt-9" />
+        <Fingerprint
+          dimensions={scored.dimensions}
+          contextDependent={contextDependentSet}
+          className="mt-9"
+        />
       </section>
 
       <ApertureRule className="my-12" />
