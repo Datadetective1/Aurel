@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Sparkles, X } from 'lucide-react'
 import {
   answerProfileQuestion,
+  recordRefinementShown,
   snoozeProfilePrompt,
 } from '@/app/(app)/profile-prompt-actions'
 import { Eyebrow, Panel } from '@/components/ui/primitives'
@@ -39,6 +40,26 @@ export interface PromptBlock {
 export function ProfilePrompt({ block }: { block: PromptBlock }) {
   const [pending, setPending] = React.useState(false)
   const [gone, setGone] = React.useState(false)
+
+  /**
+   * One "shown" per question per session.
+   *
+   * Mount means it rendered, which is exactly what the event claims.
+   * sessionStorage rather than a table: a showing is not worth a row, and
+   * firing on every mount would count somebody who reloads Today as having
+   * been asked repeatedly, making the response rate meaningless.
+   */
+  React.useEffect(() => {
+    const key = `atturel:refinement-shown:${block.scenarioId}`
+    try {
+      if (sessionStorage.getItem(key)) return
+      sessionStorage.setItem(key, '1')
+    } catch {
+      // Private mode, or storage disabled. Recording twice is a better
+      // outcome than throwing inside a telemetry path.
+    }
+    void recordRefinementShown(block.scenarioId)
+  }, [block.scenarioId])
 
   if (gone) return null
 

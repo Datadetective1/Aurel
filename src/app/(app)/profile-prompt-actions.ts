@@ -118,6 +118,27 @@ export async function answerProfileQuestion(input: z.infer<typeof answerSchema>)
 }
 
 /**
+ * Record that a refinement question was actually put in front of somebody.
+ *
+ * Fired from the component on mount rather than from the page that selects the
+ * question. Selection happens during a server render, which also runs for
+ * prefetches and for revalidations triggered by unrelated actions — counting
+ * those as "shown" would inflate the denominator of every funnel this event
+ * exists to make calculable.
+ *
+ * The component de-duplicates per question per session, so reloading Today five
+ * times without answering counts as one showing rather than five. Without that,
+ * the shown-to-answered rate measures page loads instead of opportunities.
+ *
+ * Carries the scenario id only: which question, never its wording, never an
+ * answer.
+ */
+export async function recordRefinementShown(scenarioId: string) {
+  if (typeof scenarioId !== 'string' || scenarioId.length === 0 || scenarioId.length > 32) return
+  await track('interaction_profile_refinement_shown', { scenarioId })
+}
+
+/**
  * "Not now."
  *
  * A week, not forever. Dismissing one question should not silently end

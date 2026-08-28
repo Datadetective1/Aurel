@@ -218,3 +218,77 @@ describe('analytics carry no answer content', () => {
     }
   })
 })
+
+describe('the shown event is countable', () => {
+  const prompt = readFileSync(
+    join(process.cwd(), 'src', 'components', 'app', 'profile-prompt.tsx'),
+    'utf8',
+  )
+  const actions = readFileSync(
+    join(process.cwd(), 'src', 'app', '(app)', 'profile-prompt-actions.ts'),
+    'utf8',
+  )
+  const selector = readFileSync(
+    join(process.cwd(), 'src', 'lib', 'assessment', 'next-question.ts'),
+    'utf8',
+  )
+
+  it('fires from the component, not from question selection', () => {
+    // Selection runs during a server render, which also happens on prefetch
+    // and on revalidation after unrelated actions. Those are not showings.
+    expect(prompt).toMatch(/recordRefinementShown\(block\.scenarioId\)/)
+    expect(selector).not.toMatch(/interaction_profile_refinement_shown/)
+  })
+
+  it('fires once per question per session', () => {
+    // Otherwise the shown-to-answered rate measures page loads.
+    expect(prompt).toMatch(/sessionStorage\.getItem\(key\)/)
+    expect(prompt).toMatch(/sessionStorage\.setItem\(key/)
+  })
+
+  it('survives storage being unavailable', () => {
+    // Private mode must not throw inside a telemetry path.
+    const effect = prompt.slice(prompt.indexOf('atturel:refinement-shown'))
+    expect(effect.slice(0, 400)).toMatch(/catch/)
+  })
+
+  it('carries the question id and nothing else', () => {
+    const tracked = [...actions.matchAll(/track\('interaction_profile_refinement_shown'[^)]*\)/g)]
+    expect(tracked.length).toBe(1)
+    expect(tracked[0]![0]).toContain('scenarioId')
+    expect(tracked[0]![0]).not.toMatch(/prompt|label|text|option/)
+  })
+
+  it('completes the funnel, so shown can be divided by answered', () => {
+    for (const event of [
+      'interaction_profile_refinement_shown',
+      'interaction_profile_refinement_answered',
+      'interaction_profile_refinement_dismissed',
+    ]) {
+      expect(actions).toContain(event)
+    }
+  })
+})
+
+describe('a six-question profile is not presented as broken', () => {
+  const reveal = readFileSync(
+    join(process.cwd(), 'src', 'app', 'onboarding', 'reveal', 'page.tsx'),
+    'utf8',
+  )
+
+  it('never renders a raw coverage or consistency number', () => {
+    // These are engineering metrics. 0.000 next to somebody's profile reads as
+    // a failure, and it is not one.
+    expect(reveal).not.toMatch(/\{scored\.coverage\}|\{scored\.consistency\}/)
+    expect(reveal).not.toMatch(/coverage\.toFixed|consistency\.toFixed/)
+  })
+
+  it('does not badge the first version as a warning', () => {
+    const provisional = reveal.slice(reveal.indexOf('provisional: {'), reveal.indexOf('moderate: {'))
+    expect(provisional).not.toMatch(/tone: 'caution'/)
+  })
+
+  it('says it is usable now', () => {
+    expect(reveal).toMatch(/Usable now/)
+  })
+})

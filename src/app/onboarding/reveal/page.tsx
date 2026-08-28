@@ -19,13 +19,18 @@ export const metadata = {
 
 const CONFIDENCE_COPY = {
   provisional: {
-    tone: 'caution' as const,
-    label: 'Provisional',
+    // Not `caution`. A six-question profile is the intended first version, not
+    // a fault, and a warning-coloured badge tells the user something went
+    // wrong when nothing did. The honesty is in the words -- it says plainly
+    // that it is early and will sharpen -- so the colour does not need to
+    // carry a warning as well.
+    tone: 'info' as const,
+    label: 'Early read',
     // The old wording blamed inconsistency, which was the only way to be
     // provisional when everyone answered all 24. A short opening sitting is
     // now the usual reason, and telling someone their answers contradicted
     // each other when they simply have not finished would be false.
-    body: 'Based on your opening rounds. Enough to personalize guidance, not enough to be confident — it sharpens as you answer more.',
+    body: `Usable now, built from your first answers. ${brand.name} sharpens it as you use the product, and says how sure it is rather than guessing at the gaps.`,
   },
   moderate: {
     tone: 'info' as const,

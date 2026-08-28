@@ -77,9 +77,9 @@ export default async function InteractionProfileSettingsPage() {
             </p>
           ) : !refined ? (
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
-              This profile is usable now and sharpens as you answer more. Each additional question
-              narrows where you actually sit, and {brand.name} says how confident it is rather than
-              presenting a partial read as a finished one.
+              Built from your answers and refined as you use {brand.name}. It is usable now — each
+              further question narrows where you actually sit, and {brand.name} says how sure it is
+              rather than presenting a partial read as a finished one.
             </p>
           ) : null}
 
