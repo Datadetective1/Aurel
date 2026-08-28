@@ -16,23 +16,36 @@ import { createServerClient } from '@supabase/ssr'
  * security is. Every page and action re-checks auth independently.
  */
 
-const PUBLIC_PREFIXES = [
-  '/',
-  '/pricing',
-  '/privacy',
-  '/terms',
-  '/security',
-  '/sign-in',
-  '/sign-up',
-  '/forgot-password',
-  '/reset-password',
-  '/auth',
-  '/check-email',
+/**
+ * The signed-in surface, named explicitly.
+ *
+ * This used to be the inverse — an allowlist of public paths, with everything
+ * unrecognised redirected to /sign-in. That gated the app correctly but made
+ * every mistyped or stale URL answer 307 -> /sign-in -> 200, so a crawler
+ * asking for a page that does not exist was told one does. Google reads that
+ * as a soft 404: the real 404 was unreachable, and non-existent URLs competed
+ * for crawl budget against real ones.
+ *
+ * Listing the private roots instead lets unknown paths fall through to
+ * not-found.tsx and answer 404 honestly. It does not widen access: every route
+ * beneath these prefixes sits under a layout that calls requireUser() /
+ * requireOnboardedUser(), and row level security is the actual boundary. A new
+ * private route missing from this list is still refused by its own layout —
+ * it just costs a render to say so.
+ */
+const PRIVATE_PREFIXES = [
+  '/today',
+  '/people',
+  '/meetings',
+  '/prepare',
+  '/coach',
+  '/atlas',
+  '/settings',
+  '/onboarding',
 ]
 
-function isPublic(pathname: string): boolean {
-  if (pathname === '/') return true
-  return PUBLIC_PREFIXES.some((p) => p !== '/' && (pathname === p || pathname.startsWith(`${p}/`)))
+function isPrivate(pathname: string): boolean {
+  return PRIVATE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
 export async function middleware(request: NextRequest) {
@@ -63,7 +76,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl
 
-  if (!user && !isPublic(pathname)) {
+  if (!user && isPrivate(pathname)) {
     const url = request.nextUrl.clone()
     url.pathname = '/sign-in'
     // Preserve where they were heading, but only ever as a relative path so this

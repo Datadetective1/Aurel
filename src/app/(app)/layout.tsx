@@ -1,7 +1,21 @@
+import type { Metadata } from 'next'
 import { AppShell } from '@/components/app/app-shell'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
+
+/**
+ * Belt and braces: the signed-in surface is never indexable.
+ *
+ * Anonymous requests here are redirected by middleware and robots.txt asks
+ * crawlers not to try, so this directive should never be the thing that saves
+ * us. It exists because the root layout declares index: true and every route
+ * beneath this one inherits it — and the cost of being wrong about that, on
+ * pages containing notes about named colleagues, is not recoverable.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Establishes auth AND completed onboarding for every route beneath this.
