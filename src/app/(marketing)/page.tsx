@@ -83,9 +83,22 @@ function Hero() {
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
+              {/* Was "Build your interaction profile".
+
+                  The page argues for one thing -- walking into a conversation
+                  prepared -- and then the button asked for a chore about
+                  yourself. It named an internal artefact at the highest-stakes
+                  click on the site.
+
+                  It is not "Prepare for your next meeting" either, because
+                  this link goes to sign-up and nothing is prepared by pressing
+                  it. Promising the outcome one step early is the same failure
+                  in the opposite direction. "Start free" is what actually
+                  happens next, and the sentence under it already carries the
+                  reassurance. */}
               <Button asChild size="lg">
                 <Link href="/sign-up">
-                  Build your {brand.assessmentName.toLowerCase()}
+                  Start free
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </Button>

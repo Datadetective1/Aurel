@@ -31,7 +31,12 @@ export const NAV_ITEMS = [
   { href: '/today', label: 'Today', icon: Sun },
   { href: '/people', label: 'People', icon: Users },
   { href: '/meetings', label: 'Meetings', icon: CalendarClock },
-  { href: '/atlas', label: 'Atlas', icon: Compass },
+  // "Atlas" alone tells a new user nothing -- the page's own empty state says
+  // as much. The page is already titled "Relationship Atlas", so pairing the
+  // brand word with the explanatory one here is consistent rather than
+  // invented, and the rail has room for it. Atlas is desktop-only, so the
+  // narrow tab bar never has to carry the longer label.
+  { href: '/atlas', label: 'Relationship Atlas', icon: Compass },
   { href: '/coach', label: brand.assistantName, icon: MessagesSquare },
 ] as const
 
@@ -137,10 +142,37 @@ export function MobileTopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
         <Wordmark name={brand.name} className="text-base" />
       </Link>
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" onClick={onOpenSearch} aria-label="Search">
+        {/* Prepare, on the phone.
+
+            The desktop rail has carried this as a standing primary action all
+            along; mobile had none. Today offers it per meeting and Meetings
+            offers it in its header, so it was reachable — but only if the
+            thing you wanted to prepare for happened to be on the screen you
+            landed on. This product is opened in the ten minutes before a
+            conversation, which is precisely when hunting for the action is
+            worst.
+
+            A header action rather than a fifth tab or a floating button: it
+            costs no navigation slot, sits where the desktop equivalent sits,
+            and does not hover over content. */}
+        <Button asChild size="sm" className="min-h-11">
+          <Link href="/prepare">
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            Prepare
+          </Link>
+        </Button>
+        {/* size-11, not the size-10 icon variant. Its comment claimed 44px and
+            it was 40. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-11"
+          onClick={onOpenSearch}
+          aria-label="Search"
+        >
           <Command className="size-4" aria-hidden="true" />
         </Button>
-        <Button asChild variant="ghost" size="icon" aria-label="Settings">
+        <Button asChild variant="ghost" size="icon" className="size-11" aria-label="Settings">
           <Link href="/settings">
             <Settings className="size-4" aria-hidden="true" />
           </Link>

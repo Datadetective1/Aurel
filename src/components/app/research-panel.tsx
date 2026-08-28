@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, ExternalLink, Loader2, RefreshCw, Search, Telescope } from 'lucide-react'
+import { ArrowDown, CircleAlert, ExternalLink, Loader2, RefreshCw, Search, Telescope } from 'lucide-react'
 import { researchPerson, type ResearchState } from '@/app/(app)/people/research-actions'
 import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
@@ -165,8 +165,19 @@ export function ResearchPanel({
                   {result.factsCreated} fact{result.factsCreated === 1 ? '' : 's'}
                 </Badge>
               ) : null}
+              {/* A destination, not just a count. The review queue is further
+                  down this same page; saying how many there are without saying
+                  where they are is a to-do list with no address. */}
               {result.observationsProposed ? (
-                <Badge tone="accent">{result.observationsProposed} to review</Badge>
+                <a
+                  href="#proposals"
+                  className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                >
+                  <Badge tone="accent">
+                    {result.observationsProposed} to review
+                    <ArrowDown className="ms-1 size-3" aria-hidden="true" />
+                  </Badge>
+                </a>
               ) : null}
             </div>
           ) : (

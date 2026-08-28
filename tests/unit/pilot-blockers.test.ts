@@ -97,6 +97,67 @@ describe('Today does not wait on the model before rendering', () => {
   })
 })
 
+describe('the phone can do the thing the product is for', () => {
+  const nav = stripComments(read('components', 'app', 'nav.tsx'))
+
+  it('offers Prepare from the mobile chrome', () => {
+    // The desktop rail carried a standing Prepare action; mobile had none.
+    // Today offers it per meeting and Meetings offers it in its header, so it
+    // was reachable -- but only if what you wanted to prepare for happened to
+    // be on the screen you landed on. This product is opened in the ten
+    // minutes before a conversation.
+    const topBar = nav.slice(nav.indexOf('export function MobileTopBar'))
+    expect(topBar).toMatch(/href="\/prepare"/)
+  })
+
+  it('does not spend a navigation slot on it', () => {
+    // A fifth tab or a floating button would both cost more than they buy.
+    expect(nav).toMatch(/MOBILE_ITEMS\s*=\s*NAV_ITEMS\.filter/)
+    const tabBar = nav.slice(nav.indexOf('export function MobileTabBar'))
+    expect(tabBar).not.toMatch(/href="\/prepare"/)
+  })
+
+  it('gives every control in the mobile chrome a 44px target', () => {
+    // `size="icon"` is size-10, which is 40 -- while its own comment claimed
+    // 44. The mobile chrome passes size-11 explicitly.
+    const topBar = nav.slice(
+      nav.indexOf('export function MobileTopBar'),
+      nav.indexOf('export function MobileTabBar'),
+    )
+    const buttons = topBar.match(/<Button[\s\S]*?>/g) ?? []
+    expect(buttons.length).toBeGreaterThanOrEqual(3)
+    for (const button of buttons) {
+      expect(button, `mobile chrome control under 44px:\n${button}`).toMatch(/min-h-11|size-11/)
+    }
+  })
+})
+
+describe('the voice privacy promise is legible when it matters', () => {
+  const voice = stripComments(read('components', 'app', 'voice-debrief.tsx'))
+
+  it('stays on screen while recording', () => {
+    // It used to be hidden during `phase === 'recording'` -- the reassurance
+    // vanished at exactly the moment the microphone was open.
+    expect(voice).not.toMatch(/phase !== 'recording' \?[\s\S]{0,200}not retained/)
+    expect(voice).toMatch(/phase === 'recording'[\s\S]{0,200}not retained/)
+  })
+
+  it('is not the faintest tone in the system', () => {
+    // text-ink-faint at text-xs, for the most important sentence in the
+    // feature.
+    const line = voice.slice(voice.indexOf('Audio is used to create') - 300)
+    expect(line).not.toMatch(/text-ink-faint[\s\S]{0,300}Audio is used to create/)
+  })
+
+  it('stays calm: no warning colour, no alarm icon', () => {
+    const promise = voice.slice(
+      Math.max(0, voice.indexOf('Audio is used to create') - 400),
+      voice.indexOf('Audio is used to create'),
+    )
+    expect(promise).not.toMatch(/text-critical|text-caution|CircleAlert/)
+  })
+})
+
 describe('a dead end still looks like the product', () => {
   it('has a branded 404 with a route back in', () => {
     const notFound = read('app', 'not-found.tsx')

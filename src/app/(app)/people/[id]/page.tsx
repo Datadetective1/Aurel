@@ -336,8 +336,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* --- memory review gate ----------------------------------------------- */}
+      {/* Anchored so the research panel's "N to review" can point at it. The
+          count and the queue were on the same page all along, several sections
+          apart, with nothing connecting them -- a number that told you work
+          existed and not where. */}
       {proposals.length > 0 ? (
-        <div className="mt-9">
+        <div id="proposals" className="mt-9 scroll-mt-6">
           <MemoryReview proposals={proposals} personName={name} />
         </div>
       ) : null}

@@ -35,7 +35,12 @@ const buttonVariants = cva(
         sm: 'h-8 rounded-[var(--radius-sm)] px-3 text-[0.8125rem]',
         md: 'h-10 rounded-[var(--radius-md)] px-4 text-sm',
         lg: 'h-12 rounded-[var(--radius-md)] px-6 text-[0.9375rem]',
-        // Minimum 44px touch target on the icon variants used in mobile chrome.
+        // 40px. The comment here used to claim 44 and the class said size-10,
+        // which is 40 -- so every icon button in the mobile chrome was four
+        // pixels under the target it was documented as meeting. Raising the
+        // shared variant would resize icon buttons in dense desktop rows too,
+        // so the mobile chrome passes `size-11` explicitly and this stays the
+        // compact variant it actually is.
         icon: 'size-10 rounded-[var(--radius-md)]',
         'icon-sm': 'size-8 rounded-[var(--radius-sm)]',
       },

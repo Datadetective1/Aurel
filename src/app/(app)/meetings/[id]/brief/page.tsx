@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ArrowLeft, Smartphone } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Smartphone } from 'lucide-react'
 import { MeetingBriefView, type BriefCitation } from '@/components/app/meeting-brief'
 import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import type { PersonChoice } from '@/components/app/add-participants'
@@ -19,8 +19,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function BriefPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BriefPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ debriefed?: string }>
+}) {
   const { id } = await params
+  const { debriefed } = await searchParams
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
@@ -138,6 +145,26 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
         </Link>
       </Button>
 
+      {/* Saving a debrief redirected here with `?debriefed=1` and nothing read
+          it, so the one action that visibly compounds landed in silence.
+
+          It confirms the save and says what the save bought -- carefully. The
+          record improved because the user confirmed things into it, not
+          because anything learned on its own, and the wording has to keep that
+          straight. */}
+      {debriefed ? (
+        <p
+          role="status"
+          className="border-line bg-bg-sunken text-ink-secondary mt-6 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3 text-sm leading-relaxed"
+        >
+          <CircleCheck className="text-positive mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            Debrief saved. What you confirm becomes part of this person&rsquo;s record, so the next
+            brief starts from it.
+          </span>
+        </p>
+      ) : null}
+
       <header className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
           <Eyebrow>
@@ -180,6 +207,17 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
             </span>
             <RegenerateBrief meetingId={id} stale={false} reason={null} />
           </div>
+
+          {/* The compounding promise, said once, where it is about to be true.
+              The loop -- prepare, meet, debrief, remember, prepare better --
+              is built and works, and the product never mentioned it outside a
+              single line in the first-run checklist that a returning user
+              never sees again. One sentence under the button that starts the
+              next turn of it. */}
+          <p className="text-ink-muted mt-3 text-xs leading-relaxed">
+            Afterwards, debriefing is what sharpens the next one — what you confirm becomes part of
+            the record this brief was built from.
+          </p>
 
           {staleReason ? <RegenerateBrief meetingId={id} stale reason={staleReason} /> : null}
 

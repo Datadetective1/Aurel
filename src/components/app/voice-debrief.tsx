@@ -344,12 +344,22 @@ export function VoiceDebrief({
             : ''}
       </p>
 
-      {phase !== 'recording' ? (
-        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          Record your own debrief after the conversation. Audio is used to create the transcript and
-          is not retained.
-        </p>
-      ) : null}
+      {/* Shown in every phase, including while recording.
+
+          It used to disappear the moment recording started -- the reassurance
+          vanished at exactly the moment the user was most exposed, with a live
+          microphone open. It was also `text-ink-faint`, the faintest tone in
+          the system at the smallest size, for the single most important
+          sentence in the feature.
+
+          `text-ink-muted` now: legible, still quiet. Not a banner, not a
+          warning colour, no icon. The claim is calm because it is simply
+          true. */}
+      <p className="text-ink-muted mt-2 text-xs leading-relaxed">
+        {phase === 'recording'
+          ? 'Audio is used to create the transcript and is not retained.'
+          : 'Record your own debrief after the conversation. Audio is used to create the transcript and is not retained.'}
+      </p>
 
       {error ? (
         <p
