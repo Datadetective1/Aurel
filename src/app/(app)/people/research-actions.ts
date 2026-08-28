@@ -573,7 +573,16 @@ function rankCandidates(urls: string[]): string[] {
   return scored.sort((a, b) => b.score - a.score).map((s) => s.url)
 }
 
-/** Mark a source as the wrong person and stop it influencing anything. */
+/**
+ * Mark a source as the wrong person and stop it influencing anything.
+ *
+ * The source row survives. That is the entire difference between this and
+ * deleting it: the link is kept, flagged `no_match`, so the record remembers
+ * that this page was checked and rejected. Research that meets the same URL
+ * again knows not to attribute it to this person.
+ *
+ * Everything that rested on it alone is withdrawn — facts, and proposals.
+ */
 export async function rejectSourceMatch(sourceId: string, personId: string) {
   const user = await requireUser()
   const supabase = await createClient()
@@ -587,6 +596,18 @@ export async function rejectSourceMatch(sourceId: string, personId: string) {
 
   // Facts supported ONLY by this source lose their basis and are removed.
   await removeOrphanedFacts(supabase, personId, sourceId, user.id)
+
+  // And so do proposals drawn from it.
+  //
+  // This did not happen before, and deleting the source did. So a page the
+  // user had explicitly said was about somebody else left its proposed
+  // observations sitting in the review queue, ready to be accepted into the
+  // record of a person they were never about. Saying "not them" has to mean
+  // the same thing for a proposal as it does for a fact.
+  //
+  // Confirmed observations are kept, exactly as they are on deletion: once the
+  // user has vouched for something, they are the evidence, not the page.
+  await removeProposedObservations(supabase, sourceId, user.id)
 
   await track('research_source_rejected', {})
   revalidatePath(`/people/${personId}`)
@@ -633,28 +654,41 @@ export async function deleteSource(sourceId: string, personId: string) {
   const supabase = await createClient()
 
   await removeOrphanedFacts(supabase, personId, sourceId, user.id)
-
-  // Unconfirmed proposals derived from this source lose their basis.
-  const { data: derived } = await supabase
-    .from('observation_sources')
-    .select('observation_id')
-    .eq('source_id', sourceId)
-    .eq('user_id', user.id)
-
-  const derivedIds = (derived ?? []).map((d) => d.observation_id)
-  if (derivedIds.length > 0) {
-    await supabase
-      .from('observations')
-      .delete()
-      .in('id', derivedIds)
-      .eq('user_id', user.id)
-      .eq('status', 'proposed')
-  }
+  await removeProposedObservations(supabase, sourceId, user.id)
 
   await supabase.from('sources').delete().eq('id', sourceId).eq('user_id', user.id)
 
   revalidatePath(`/people/${personId}`)
   return { ok: true as const }
+}
+
+/**
+ * Withdraw unconfirmed proposals that came from a source.
+ *
+ * Shared by rejection and deletion, because both mean "this page should not be
+ * contributing to the record" and a proposal is a contribution. Only
+ * `proposed` rows are touched: an observation the user accepted is theirs now.
+ */
+async function removeProposedObservations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sourceId: string,
+  userId: string,
+) {
+  const { data: derived } = await supabase
+    .from('observation_sources')
+    .select('observation_id')
+    .eq('source_id', sourceId)
+    .eq('user_id', userId)
+
+  const derivedIds = (derived ?? []).map((d) => d.observation_id)
+  if (derivedIds.length === 0) return
+
+  await supabase
+    .from('observations')
+    .delete()
+    .in('id', derivedIds)
+    .eq('user_id', userId)
+    .eq('status', 'proposed')
 }
 
 async function removeOrphanedFacts(

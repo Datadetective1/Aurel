@@ -489,7 +489,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </p>
           <ul className="mt-3 grid gap-2">
             {sources.map((source) => (
-              <SourceRow key={source.id} source={source} personId={id} />
+              <SourceRow key={source.id} source={source} personId={id} personName={name} />
             ))}
           </ul>
         </section>

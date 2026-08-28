@@ -50,20 +50,46 @@ export interface SourceRowData {
   observationCount: number
 }
 
-const IDENTITY_LABEL: Record<string, { label: string; tone: 'positive' | 'caution' | 'outline' }> =
+/**
+ * What the badge says, in terms of what the reader has to do about it.
+ *
+ * It used to name the identity-resolution state directly: "Probable match",
+ * "Uncertain match", "Conflicting", "Unreviewed". Four internal confidence
+ * values, and the user has to model the resolver to know which of them is
+ * their problem. "Conflicting" has no referent at all on screen — conflicting
+ * with what?
+ *
+ * A source that is fine now says nothing. Silence is the correct signal for
+ * "no action needed", and a row of green ticks is noise that trains people to
+ * stop reading badges. The three states that genuinely need a human turn into
+ * one badge that asks the actual question, and the resolved states report what
+ * the user themselves decided.
+ */
+const IDENTITY_LABEL: Record<string, { label: string; tone: 'positive' | 'caution' | 'outline' } | null> =
   {
-    confirmed: { label: 'Confirmed match', tone: 'positive' },
-    probable: { label: 'Probable match', tone: 'outline' },
-    ambiguous: { label: 'Uncertain match', tone: 'caution' },
-    conflicting: { label: 'Conflicting', tone: 'caution' },
-    no_match: { label: 'Not this person', tone: 'caution' },
-    unreviewed: { label: 'Unreviewed', tone: 'outline' },
+    // No badge: nothing for the reader to do.
+    confirmed: null,
+    probable: null,
+    ambiguous: { label: 'Check this is them', tone: 'caution' },
+    conflicting: { label: 'Check this is them', tone: 'caution' },
+    unreviewed: { label: 'Check this is them', tone: 'caution' },
+    no_match: { label: 'Marked as someone else', tone: 'outline' },
   }
 
-export function SourceRow({ source, personId }: { source: SourceRowData; personId: string }) {
+export function SourceRow({
+  source,
+  personId,
+  personName,
+}: {
+  source: SourceRowData
+  personId: string
+  /** Named in the question and the consequences, so "them" is never ambiguous. */
+  personName: string
+}) {
   const router = useRouter()
   const [busy, setBusy] = React.useState<null | 'confirm' | 'reject' | 'delete'>(null)
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
+  const [confirmingReject, setConfirmingReject] = React.useState(false)
 
   const run = async (kind: 'confirm' | 'reject' | 'delete', fn: () => Promise<unknown>) => {
     setBusy(kind)
@@ -73,8 +99,26 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
     } finally {
       setBusy(null)
       setConfirmingDelete(false)
+      setConfirmingReject(false)
     }
   }
+
+  /**
+   * What the user actually loses, counted rather than described.
+   *
+   * Both actions withdraw whatever rested on this source alone. The old copy
+   * mentioned facts and never mentioned proposals, which was accurate for
+   * deletion and silent about rejection -- and rejection did not withdraw
+   * proposals at all until this change.
+   */
+  const withdrawn = [
+    source.factCount > 0 ? `${source.factCount} fact${source.factCount === 1 ? '' : 's'}` : null,
+    source.observationCount > 0
+      ? `${source.observationCount} proposal${source.observationCount === 1 ? '' : 's'}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' and ')
 
   const identity = IDENTITY_LABEL[source.identityStatus ?? 'unreviewed']
   const needsReview =
@@ -129,11 +173,24 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
         </div>
       </div>
 
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+      {/* Asks the question before offering the answers. Somebody scanning a
+          list of sources should not have to infer from two button labels that
+          a decision is wanted. */}
+      {needsReview ? (
+        <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+          Is this about {personName}?
+        </p>
+      ) : null}
+
+      {/* 44px controls. These are irreversible decisions about whose record a
+          claim belongs to, and they were 32px -- the small variant -- on a
+          phone. */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {needsReview ? (
           <Button
             variant="ghost"
             size="sm"
+            className="min-h-11"
             disabled={busy !== null}
             onClick={() => run('confirm', () => confirmSourceMatch(source.id, personId))}
           >
@@ -142,24 +199,60 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
             ) : (
               <Check className="size-3.5" aria-hidden="true" />
             )}
-            This is them
+            Yes, this is them
           </Button>
         ) : null}
 
+        {/* Rejection now confirms, like deletion already did.
+            It used to fire on the first click while the more alarming-sounding
+            "Remove" asked first -- so the gentler-sounding action was the
+            unguarded one, which is backwards from what the words imply. Both
+            withdraw evidence; both should ask. */}
         {source.identityStatus !== 'no_match' ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy !== null}
-            onClick={() => run('reject', () => rejectSourceMatch(source.id, personId))}
-          >
-            {busy === 'reject' ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-            ) : (
+          confirmingReject ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="min-h-11"
+                disabled={busy !== null}
+                onClick={() => run('reject', () => rejectSourceMatch(source.id, personId))}
+              >
+                {busy === 'reject' ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <UserX className="size-3.5" aria-hidden="true" />
+                )}
+                Yes, someone else
+              </Button>
+              <Button
+                variant="quiet"
+                size="sm"
+                className="min-h-11"
+                onClick={() => setConfirmingReject(false)}
+              >
+                Cancel
+              </Button>
+              <span className="text-ink-muted basis-full text-[0.6875rem] leading-relaxed">
+                {brand.name} keeps the page on file so it will not use it for {personName} again.
+                {withdrawn ? ` ${withdrawn} will be withdrawn.` : ''}
+              </span>
+            </>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-11"
+              disabled={busy !== null}
+              onClick={() => {
+                setConfirmingReject(true)
+                setConfirmingDelete(false)
+              }}
+            >
               <UserX className="size-3.5" aria-hidden="true" />
-            )}
-            Not this person
-          </Button>
+              This is someone else
+            </Button>
+          )
         ) : null}
 
         {confirmingDelete ? (
@@ -167,40 +260,51 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
             <Button
               variant="danger"
               size="sm"
+              className="min-h-11"
               disabled={busy !== null}
               onClick={() => run('delete', () => deleteSource(source.id, personId))}
             >
               {busy === 'delete' ? (
                 <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
               ) : null}
-              Remove it
+              Yes, delete it
             </Button>
-            <Button variant="quiet" size="sm" onClick={() => setConfirmingDelete(false)}>
-              Keep
+            <Button
+              variant="quiet"
+              size="sm"
+              className="min-h-11"
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Cancel
             </Button>
-            <span className="text-ink-muted text-[0.6875rem]">
-              {source.factCount > 0
-                ? `${source.factCount} fact${source.factCount === 1 ? '' : 's'} with no other source will be withdrawn.`
-                : 'This cannot be undone.'}
+            {/* The distinction that matters, stated where the choice is made:
+                rejecting teaches, deleting forgets. */}
+            <span className="text-ink-muted basis-full text-[0.6875rem] leading-relaxed">
+              Deleted for good, so research may find it again later.
+              {withdrawn ? ` ${withdrawn} will be withdrawn.` : ''}
             </span>
           </>
         ) : (
           <Button
             variant="quiet"
             size="sm"
+            className="min-h-11"
             disabled={busy !== null}
-            onClick={() => setConfirmingDelete(true)}
+            onClick={() => {
+              setConfirmingDelete(true)
+              setConfirmingReject(false)
+            }}
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
-            Remove
+            Delete
           </Button>
         )}
       </div>
 
       {source.identityStatus === 'no_match' ? (
         <p className="text-ink-muted mt-2 text-[0.6875rem] leading-relaxed">
-          Marked as someone else. {brand.name} will not use it for this person, and anything it
-          alone supported has been withdrawn.
+          You marked this as someone else. {brand.name} keeps it on file so it will not use it for{' '}
+          {personName} again, and anything it alone supported has been withdrawn.
         </p>
       ) : null}
     </li>
