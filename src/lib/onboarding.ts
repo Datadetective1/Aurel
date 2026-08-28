@@ -5,13 +5,26 @@
  * functions — every non-async export there becomes a build error.
  */
 
+/**
+ * What a new account is asked before it can use the product.
+ *
+ * `appearance` used to sit here, between coaching and the assessment. It asked
+ * for a theme and a coaching style — a preference about screens the user had
+ * not seen yet — and it was the only step in the flow with no way past it.
+ * Both fields default sensibly in the database and both are fully editable at
+ * Settings → Appearance & voice, so asking up front bought nothing and cost a
+ * screen on the path to first value.
+ *
+ * `intent`, `frameworks` and `coaching` stay because each already offers Skip,
+ * and because nothing else in the product collects them — removing them would
+ * strand the configuration rather than defer it.
+ */
 export const ONBOARDING_STEPS = [
   'welcome',
   'about',
   'intent',
   'frameworks',
   'coaching',
-  'appearance',
   'assessment',
 ] as const
 
@@ -22,8 +35,19 @@ export function stepPath(step: OnboardingStep): string {
   return step === 'welcome' ? '/onboarding' : `/onboarding/${step}`
 }
 
+/**
+ * The step after this one.
+ *
+ * `onboarding_stage` is a text column, so it can hold a stage this build no
+ * longer knows about — an account parked on `appearance` when that step was
+ * retired, or any future rename. `indexOf` returns -1 for those, and the old
+ * arithmetic turned that into index 0: the user was sent back to the welcome
+ * screen and made to walk the whole flow again. A retired stage is a stage the
+ * user already passed, so it advances to the last one instead.
+ */
 export function nextStep(current: OnboardingStep): OnboardingStep {
   const index = ONBOARDING_STEPS.indexOf(current)
+  if (index === -1) return ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1]!
   return ONBOARDING_STEPS[Math.min(index + 1, ONBOARDING_STEPS.length - 1)]!
 }
 

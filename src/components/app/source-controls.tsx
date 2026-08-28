@@ -10,26 +10,31 @@ import {
 } from '@/app/(app)/people/research-actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/primitives'
-import { formatDate, formatPublishedDate } from '@/lib/format'
+import { formatPublishedDate } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
 /**
  * SOURCE ROW
  * =============================================================================
  * A source is a claim about a real person, so the user has to be able to
- * overrule it. Three corrections, each with a distinct meaning:
+ * overrule it. Three corrections:
  *
- *   "Not them"  — the source is real but about someone else. The link is marked
- *                 no_match and anything it alone supported is withdrawn.
- *   "Confirm"   — yes, this is them. Raises identity confidence to certain.
- *   "Remove"    — delete the source entirely.
+ *   "Yes, this is them"    raises identity confidence to certain.
+ *   "This is someone else" keeps the page on file, flagged no_match, so
+ *                          research will not attribute it to this person
+ *                          again. Rejecting TEACHES.
+ *   "Delete"               removes the source row entirely. Research may
+ *                          rediscover the same URL later. Deleting FORGETS.
  *
- * Removing a source withdraws the facts that rested on it alone. Observations
- * the user personally confirmed are kept, because at that point the user is the
- * evidence, not the page.
+ * That last distinction is the one a real user could not make, so it is stated
+ * in the confirmation of each rather than left to be inferred from the schema.
  *
- * The destructive action asks first. Everything here is reversible by
- * re-researching except deletion, which is not.
+ * Both corrections withdraw whatever rested on that source alone — facts and
+ * unconfirmed proposals alike. Observations the user personally confirmed are
+ * kept, because at that point the user is the evidence, not the page.
+ *
+ * Both ask first. Rejection used to fire on the first click while deletion
+ * asked, which made the gentler-sounding action the unguarded one.
  * =============================================================================
  */
 

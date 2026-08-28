@@ -152,35 +152,20 @@ export async function saveCoaching(_prev: StepState, formData: FormData): Promis
     .map(String)
     .filter((v) => (coachingValues as readonly string[]).includes(v))
 
+  // Fired here since `appearance` was retired from the flow. This is the last
+  // step before the assessment, so it is where the profile questions end.
+  await track('onboarding_profile_completed')
+
   const result = await advance('coaching', { coaching_context: context })
   return result ?? {}
 }
 
-// --- Step: appearance ---------------------------------------------------------
-
-const appearanceSchema = z.object({
-  theme: z.enum(['pearl', 'obsidian', 'system']),
-  coachingStyle: z.enum(['concise', 'balanced', 'detailed', 'challenging', 'supportive']),
-})
-
-export async function saveAppearance(_prev: StepState, formData: FormData): Promise<StepState> {
-  const parsed = appearanceSchema.safeParse({
-    theme: formData.get('theme') ?? 'system',
-    coachingStyle: formData.get('coachingStyle') ?? 'balanced',
-  })
-
-  if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
-  }
-
-  await track('onboarding_profile_completed')
-
-  const result = await advance('appearance', {
-    theme: parsed.data.theme,
-    coaching_style: parsed.data.coachingStyle,
-  })
-  return result ?? {}
-}
+// --- Step: appearance — retired ------------------------------------------------
+//
+// Theme and coaching style are no longer asked during onboarding. Both default
+// in the database and both are owned by Settings → Appearance & voice, which
+// has its own action; there is nothing here that screen cannot do, and it can
+// do it once the user has seen the screens they are choosing between.
 
 /** Let a user skip the assessment and enter the app; they can run it later. */
 export async function skipAssessment() {

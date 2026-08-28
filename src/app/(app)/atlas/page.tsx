@@ -7,7 +7,7 @@ import { Badge, Container, EmptyState, Eyebrow, Panel, Rule, SectionHeader } fro
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
-import { isOverdueIn, todayIn } from '@/lib/tz'
+import { isOverdueIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -49,7 +49,6 @@ export default async function AtlasPage() {
   ])
 
   const list = people ?? []
-  const today = todayIn(timeZone, now)
 
   const openByPerson = new Map<string, number>()
   const overdueByPerson = new Map<string, number>()
