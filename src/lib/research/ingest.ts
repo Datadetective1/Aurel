@@ -88,42 +88,153 @@ export interface IngestResult {
   message: string | null
 }
 
-/** Map a fetch failure onto the access status the UI renders. */
-function accessStatusFor(reason: string): { status: AccessStatus; message: string } {
-  switch (reason) {
+/**
+ * WHY A PAGE COULD NOT BE READ
+ * =============================================================================
+ * "There was not enough readable text on that page" was told to somebody who
+ * pasted a public Facebook profile. It reads as though the page were empty and
+ * Atturel merely came up short. What actually happens is that the site returns
+ * half a megabyte of markup containing no readable text at all, because the
+ * content is assembled by JavaScript that a fetch does not run.
+ *
+ * Measured against the real extractor:
+ *
+ *   facebook.com/zuck      495,061 bytes  ->      15 chars of text
+ *   instagram.com/zuck     722,450 bytes  ->     115 chars
+ *   x.com/elonmusk          26,643 bytes  ->      25 chars
+ *   example.com                559 bytes  ->     142 chars   (genuinely small)
+ *   linkedin.com/in/...    598,246 bytes  ->  32,239 chars   (reads fine)
+ *   en.wikipedia.org/...   478,752 bytes  ->  35,404 chars
+ *
+ * So the signal is the RATIO, not the domain: a substantial document that
+ * yields almost nothing readable is a client-rendered shell or an access wall.
+ * A page that is genuinely thin is small in both. That distinction separates
+ * Facebook from example.com without naming either, and LinkedIn — which reads
+ * perfectly well — is never caught by it. No host list is needed and none is
+ * used.
+ *
+ * The wording stays conservative throughout. "We couldn't read this page" is
+ * always true; "the site blocked us" would be a claim about someone else's
+ * intent that this evidence does not support.
+ * =============================================================================
+ */
+
+/**
+ * A document this big should have produced something readable.
+ *
+ * Well clear of both sides of the observed range: example.com is 559 bytes and
+ * the smallest restricted page measured is x.com at 26,643.
+ */
+const SUBSTANTIAL_DOCUMENT_BYTES = 10_000
+
+/** Below this, there is nothing worth sending to a model. */
+const MIN_USABLE_TEXT = 200
+
+/**
+ * Map a fetch failure onto the access status the UI renders.
+ *
+ * Exported for the tests that pin this classification: it is pure, and the
+ * alternative is standing up a Supabase client to assert on a string.
+ */
+export function accessStatusFor(failure: {
+  reason: string
+  status?: number
+}): { status: AccessStatus; message: string } {
+  switch (failure.reason) {
     case 'blocked_host':
     case 'blocked_scheme':
-      return { status: 'unsupported', message: 'That address cannot be fetched.' }
+      return { status: 'unsupported', message: 'Enter a valid web address.' }
     case 'http_error':
-      return {
-        status: 'limited_access',
-        message: 'The page could not be opened. It may require signing in, or it may have moved.',
-      }
+      // 401 and 403 are the site saying no in as many words. Anything else in
+      // the error range is a page that is missing or broken, which is a
+      // different thing to tell somebody.
+      return failure.status === 401 || failure.status === 403
+        ? {
+            status: 'limited_access',
+            message: RESTRICTED_MESSAGE,
+          }
+        : {
+            status: 'limited_access',
+            message:
+              'We couldn’t open this page. It may have moved, or it may not be publicly available.',
+          }
     case 'unsupported_content_type':
       return { status: 'unsupported', message: 'That file type is not supported yet.' }
     case 'too_large':
       return { status: 'content_unavailable', message: 'That page is too large to analyze.' }
     case 'timeout':
-      return { status: 'error', message: 'That page took too long to respond.' }
+      return {
+        status: 'error',
+        message: 'That page took too long to respond. Check the link and try again.',
+      }
     case 'invalid_url':
-      return { status: 'unsupported', message: 'That does not look like a valid web address.' }
+      return { status: 'unsupported', message: 'Enter a valid web address.' }
     default:
-      return { status: 'error', message: 'That page could not be reached.' }
+      return {
+        status: 'error',
+        message: 'We couldn’t reach this page. Check the link and try again.',
+      }
   }
 }
 
-/** Heuristic detection of pages that are really a login or paywall wall. */
-function detectWall(text: string, title: string | null): AccessStatus | null {
-  const sample = `${title ?? ''} ${text.slice(0, 1200)}`.toLowerCase()
+/**
+ * Said whenever the page was reachable but its content was not available to an
+ * ordinary fetch. Names no site and accuses no one: it says what happened and
+ * what the user can do instead.
+ */
+const RESTRICTED_MESSAGE =
+  'We couldn’t read this page. Some sites limit automated access to their content — you can paste the relevant public information here, or attach a document instead.'
+
+/** A page whose content really is sparse, as opposed to withheld. */
+const THIN_MESSAGE = 'There wasn’t enough readable information on this page to use.'
+
+/** Paths a site redirects to when it wants a session before showing anything. */
+const AUTH_PATH = /\/(login|signin|sign-in|sign_in|auth|authwall|checkpoint|challenge|consent)(\/|$|\?)/i
+
+/**
+ * Why the extraction came back unusable, if it did.
+ *
+ * Returns null when the page read fine. Exported for the same reason as
+ * `accessStatusFor`.
+ */
+export function classifyRead(input: {
+  text: string
+  title: string | null
+  bytes: number
+  finalUrl: string
+  submittedUrl: string
+}): { status: AccessStatus; message: string } | null {
+  const text = input.text.trim()
+  const sample = `${input.title ?? ''} ${text.slice(0, 1200)}`.toLowerCase()
+
+  // Explicit walls first: these are the site telling us in words, and they
+  // deserve a more specific answer than the generic one.
   if (/\b(sign in to continue|log ?in to view|create an account to|members only)\b/.test(sample)) {
-    return 'login_required'
+    return {
+      status: 'login_required',
+      message: `That page needs a sign-in, so ${brand.name} cannot read it. Paste the relevant text instead.`,
+    }
   }
   if (/\b(subscribe to (?:read|continue)|this article is for subscribers|paywall)\b/.test(sample)) {
-    return 'paywall'
+    return { status: 'paywall', message: 'That page is behind a paywall. Paste the relevant text instead.' }
   }
-  // Almost no extractable text usually means a JS-rendered shell.
-  if (text.trim().length < 200) return 'content_unavailable'
-  return null
+
+  if (text.length >= MIN_USABLE_TEXT) return null
+
+  // Redirected somewhere that wants a session. Compared against where we were
+  // sent rather than where we started, so a link that lands on a login page
+  // is caught even though the submitted URL looked ordinary.
+  const redirectedToAuth = input.finalUrl !== input.submittedUrl && AUTH_PATH.test(input.finalUrl)
+
+  // The ratio signal. A large document that produced no readable text is a
+  // client-rendered shell or a wall; a small one is simply a small page.
+  const substantialButEmpty = input.bytes >= SUBSTANTIAL_DOCUMENT_BYTES
+
+  if (redirectedToAuth || substantialButEmpty) {
+    return { status: 'limited_access', message: RESTRICTED_MESSAGE }
+  }
+
+  return { status: 'content_unavailable', message: THIN_MESSAGE }
 }
 
 /**
@@ -178,7 +289,9 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
   const fetched = await safeFetch(normalisedUrl)
 
   if (!fetched.ok) {
-    const { status, message } = accessStatusFor(fetched.reason)
+    // The whole failure, not just the reason: 401 and 403 need distinguishing
+    // from a 404, and only the status says which happened.
+    const { status, message } = accessStatusFor(fetched)
     const sourceId = await upsertSource(supabase, {
       existingId: existing?.id,
       workspaceId,
@@ -198,8 +311,18 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       ? extractFromHtml(fetched.body, fetched.finalUrl)
       : extractFromText(fetched.body)
 
-  const wall = detectWall(extracted.text, extracted.title)
-  if (wall) {
+  const unreadable = classifyRead({
+    text: extracted.text,
+    title: extracted.title,
+    bytes: fetched.bytes,
+    finalUrl: fetched.finalUrl,
+    submittedUrl: normalisedUrl,
+  })
+
+  if (unreadable) {
+    // The URL is still recorded, with the status that says why nothing came of
+    // it. No facts, no observations, no identity resolution — none of that runs
+    // on this path, so nothing can imply the page was analysed when it was not.
     const sourceId = await upsertSource(supabase, {
       existingId: existing?.id,
       workspaceId,
@@ -207,21 +330,11 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       url: normalisedUrl,
       sourceType,
       title: extracted.title,
-      accessStatus: wall,
+      accessStatus: unreadable.status,
       processingStatus: 'failed',
-      failureReason: wall,
+      failureReason: unreadable.status,
     })
-    return {
-      ...emptyResult(
-        wall,
-        wall === 'login_required'
-          ? `That page needs a sign-in, so ${brand.name} cannot read it. Paste the relevant text instead.`
-          : wall === 'paywall'
-            ? 'That page is behind a paywall. Paste the relevant text instead.'
-            : 'There was not enough readable text on that page.',
-      ),
-      sourceId,
-    }
+    return { ...emptyResult(unreadable.status, unreadable.message), sourceId }
   }
 
   // Unchanged content: keep the existing extraction and skip the model call.
