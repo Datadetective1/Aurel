@@ -1,27 +1,46 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
-import { ALL_SCENARIOS, TOTAL_COUNT, SCENARIO_VERSION } from '@/lib/assessment/scenarios'
+import {
+  ALL_SCENARIOS,
+  TOTAL_COUNT,
+  SCENARIO_VERSION,
+  SCENARIO_DIMENSIONS,
+  type ScenarioDimension,
+} from '@/lib/assessment/scenarios'
 import type { PromptBlock } from '@/components/app/profile-prompt'
 
 type Client = SupabaseClient<Database>
 
 /**
+ * How long after answering one before another may appear.
+ *
+ * Four hours rather than a session id: sessions are not modelled anywhere in
+ * this product, and inventing one to pace a prompt would be a lot of machinery
+ * for a question nobody is waiting on. A working day fits at most two.
+ */
+const ANSWER_SPACING_MS = 4 * 60 * 60 * 1000
+
+/**
  * The next profile question worth asking, or nothing.
  *
- * "Or nothing" is the common answer, and deliberately so. Four conditions all
- * have to hold, and each one exists to stop this becoming nagging:
+ * "Or nothing" is the common answer, and deliberately so. Every condition below
+ * exists to stop refinement becoming nagging:
  *
- *   - there is a scored profile to refine
+ *   - there is a current-instrument profile to refine
  *   - it is not already complete
- *   - the account has produced at least one brief, so the user has seen
- *     Atturel do something before being asked to invest more in it
- *   - no question was dismissed in the last week
+ *   - the account has produced a brief, so the user has seen Atturel do
+ *     something before being asked to invest more in it
+ *   - nothing was dismissed inside the cooldown window
+ *   - nothing was answered inside the spacing window, so at most one lands per
+ *     working session rather than a queue of them
  *
- * The question itself is the next unanswered round in the instrument's own
- * order. Not random, not "the most informative next item" — the blocks are
- * ordered as they are for a reason, and reordering them to optimise a UI is
- * the change this whole feature was told not to make.
+ * WHICH question is chosen by weakest evidence first: the dimension with the
+ * fewest directional answers, breaking ties in the instrument's own order.
+ * Asking about what is already known is how a refinement prompt earns its
+ * dismissal, and a dimension the user marked context-dependent is treated as
+ * still-open rather than settled — they told us it varies, which is worth
+ * confirming once, not five times.
  */
 export async function getNextProfileQuestion(
   supabase: Client,
@@ -62,15 +81,42 @@ export async function getNextProfileQuestion(
 
   const { data: responses } = await supabase
     .from('scenario_responses')
-    .select('scenario_id')
+    .select('scenario_id, is_depends, answered_at')
     .eq('user_id', userId)
     .eq('assessment_id', assessment.id)
 
   const answered = new Set((responses ?? []).map((r) => r.scenario_id))
   if (answered.size >= TOTAL_COUNT) return null
 
-  const next = ALL_SCENARIOS.find((s) => !answered.has(s.id))
-  if (!next) return null
+  // One per session. The most recent answer sets the spacing window, so a user
+  // who just answered one is not handed another on the next page load.
+  const lastAnswer = (responses ?? [])
+    .map((r) => new Date(r.answered_at).getTime())
+    .sort((a, b) => b - a)[0]
+  if (lastAnswer && Date.now() - lastAnswer < ANSWER_SPACING_MS) return null
+
+  // Weakest evidence first. A dimension the user has told us nothing about is
+  // worth more than a fourth question about one already settled.
+  const directionalByDimension = Object.fromEntries(
+    SCENARIO_DIMENSIONS.map((d) => [d, 0]),
+  ) as Record<ScenarioDimension, number>
+
+  for (const row of responses ?? []) {
+    if (row.is_depends) continue
+    const scenario = ALL_SCENARIOS.find((s) => s.id === row.scenario_id)
+    if (scenario) directionalByDimension[scenario.dimension] += 1
+  }
+
+  const candidates = ALL_SCENARIOS.filter((s) => !answered.has(s.id))
+  if (candidates.length === 0) return null
+
+  const next = [...candidates].sort((a, b) => {
+    const byEvidence = directionalByDimension[a.dimension] - directionalByDimension[b.dimension]
+    if (byEvidence !== 0) return byEvidence
+    // Stable and deterministic: instrument order decides the rest, so the
+    // same account in the same state always gets the same question.
+    return ALL_SCENARIOS.indexOf(a) - ALL_SCENARIOS.indexOf(b)
+  })[0]!
 
   return {
     assessmentId: assessment.id,

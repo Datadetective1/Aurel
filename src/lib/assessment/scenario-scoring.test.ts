@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scoreScenarios } from './scenario-scoring'
+import { describeScenarioDimension, scoreScenarios } from './scenario-scoring'
 import {
   ALL_SCENARIOS,
   CORE_SCENARIOS,
@@ -74,7 +74,9 @@ describe('the instrument itself', () => {
   })
 })
 
-describe('"it depends" is not a data point', () => {
+describe('"it depends" moves no score', () => {
+  // It is evidence -- see the skip-versus-depends block below -- but it is
+  // evidence of variability, not of a direction, so it moves nothing.
   it('produces no lean at all', () => {
     const all = CORE_SCENARIOS.map((s) => answer(s.id, dependsIndex))
     const scored = scoreScenarios(all)
@@ -192,5 +194,93 @@ describe('mixed certainty', () => {
     expect(directness.score).toBe(50)
     expect(directness.lean).toBeNull()
     expect(directness.answers).toBe(2)
+  })
+})
+
+describe('skip and "it depends" are different things', () => {
+  it('marks a declined dimension context-dependent, not unknown', () => {
+    // The user read the situation and said their behaviour varies. That is
+    // information; a skip is not.
+    const scored = scoreScenarios([answer('dir-core', dependsIndex)])
+    const directness = scored.dimensions.find((d) => d.dimension === 'directness')!
+
+    expect(directness.contextDependent).toBe(true)
+    expect(directness.certainty).toBe('context_dependent')
+    expect(directness.depends).toBe(1)
+  })
+
+  it('leaves a skipped dimension with no evidence of any kind', () => {
+    // Skipping writes no row at all, so the dimension looks exactly like one
+    // never put in front of them -- which is the truth.
+    const scored = scoreScenarios([answer('pac-core', 0)])
+    const directness = scored.dimensions.find((d) => d.dimension === 'directness')!
+
+    expect(directness.contextDependent).toBe(false)
+    expect(directness.certainty).toBe('none')
+    expect(directness.depends).toBe(0)
+    expect(directness.answers).toBe(0)
+  })
+
+  it('says so in words a brief can use', () => {
+    const scored = scoreScenarios([answer('dir-core', dependsIndex)])
+    const directness = scored.dimensions.find((d) => d.dimension === 'directness')!
+    const described = describeScenarioDimension(directness)
+
+    expect(described.pole).toBe('Context-dependent')
+    expect(described.blurb).toMatch(/varies with the situation/)
+  })
+
+  it('distinguishes "not yet known" from "it varies" in words too', () => {
+    const scored = scoreScenarios([answer('pac-core', 0)])
+    const directness = scored.dimensions.find((d) => d.dimension === 'directness')!
+    expect(describeScenarioDimension(directness).pole).toBe('Not yet known')
+  })
+
+  it('lets a later lean override an earlier "it depends"', () => {
+    // Somebody who said it varies once and then leaned twice has a lean.
+    // Reporting them as context-dependent would ignore what they went on to say.
+    const scored = scoreScenarios([
+      answer('dir-core', dependsIndex),
+      answer('dir-2', 0),
+      answer('dir-3', 0),
+    ])
+    const directness = scored.dimensions.find((d) => d.dimension === 'directness')!
+
+    expect(directness.lean).toBe('high')
+    expect(directness.contextDependent).toBe(false)
+    expect(directness.depends).toBe(1)
+  })
+
+  it('still refuses to let "it depends" buy confidence', () => {
+    const scored = scoreScenarios(ALL_SCENARIOS.map((s) => answer(s.id, dependsIndex)))
+    expect(scored.confidence).toBe('provisional')
+    expect(scored.coverage).toBe(0)
+    for (const dimension of scored.dimensions) {
+      expect(dimension.certainty).toBe('context_dependent')
+      expect(dimension.score).toBe(50)
+    }
+  })
+})
+
+describe('certainty is graded honestly', () => {
+  it('rises with the number of directional answers', () => {
+    const one = scoreScenarios([answer('dir-core', 0)])
+    const two = scoreScenarios([answer('dir-core', 0), answer('dir-2', 0)])
+    const three = scoreScenarios([answer('dir-core', 0), answer('dir-2', 0), answer('dir-3', 0)])
+
+    const of = (p: ReturnType<typeof scoreScenarios>) =>
+      p.dimensions.find((d) => d.dimension === 'directness')!.certainty
+
+    expect(of(one)).toBe('low')
+    expect(of(two)).toBe('medium')
+    expect(of(three)).toBe('high')
+  })
+
+  it('never claims high certainty for a dimension nobody answered', () => {
+    const scored = scoreScenarios(CORE_SCENARIOS.map((s) => answer(s.id, 0)))
+    for (const dimension of scored.dimensions) {
+      // One answer each after the opening six.
+      expect(dimension.certainty).toBe('low')
+    }
   })
 })

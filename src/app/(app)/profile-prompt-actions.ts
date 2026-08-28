@@ -86,6 +86,16 @@ export async function answerProfileQuestion(input: z.infer<typeof answerSchema>)
       .eq('user_id', user.id)
       .eq('id', assessmentId)
 
+    await track('interaction_profile_refinement_answered', {
+      answered: scored.answered,
+      directional: scored.directional,
+      confidence: scored.confidence,
+      declined: option.direction === 0,
+    })
+    await track('interaction_profile_updated', {
+      answered: scored.answered,
+      confidence: scored.confidence,
+    })
     await track('profile_question_answered', {
       answered: scored.answered,
       directional: scored.directional,
@@ -129,6 +139,7 @@ export async function snoozeProfilePrompt() {
     return { ok: false as const }
   }
 
+  await track('interaction_profile_refinement_dismissed', {})
   await track('profile_question_dismissed', {})
   revalidatePath('/today')
   return { ok: true as const }

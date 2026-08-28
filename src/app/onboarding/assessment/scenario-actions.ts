@@ -45,6 +45,7 @@ export async function startOrResumeScenarioAssessment() {
     }
     assessmentId = created.id
     await track('assessment_started', {})
+    await track('interaction_profile_started', {})
   }
 
   const { data: responses } = await supabase
@@ -140,6 +141,10 @@ export async function scoreScenarioAssessment(assessmentId: string) {
     return { ok: false as const }
   }
 
+  await track('interaction_profile_updated', {
+    answered: scored.answered,
+    confidence: scored.confidence,
+  })
   await track('assessment_completed', {
     answered: scored.answered,
     directional: scored.directional,
@@ -148,6 +153,14 @@ export async function scoreScenarioAssessment(assessmentId: string) {
   })
 
   if (scored.answered <= CORE_COUNT) {
+    await track('interaction_profile_initial_completed', {
+      answered: scored.answered,
+      directional: scored.directional,
+      // How many were "it depends". The share choosing it is the signal that
+      // says whether a question is ambiguous or the behaviour genuinely varies.
+      contextDependent: scored.answered - scored.directional,
+      confidence: scored.confidence,
+    })
     await track('assessment_initial_completed', {
       answered: scored.answered,
       directional: scored.directional,

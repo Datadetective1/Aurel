@@ -32,6 +32,15 @@ export type AnalyticsEvent =
   | 'profile_question_shown'
   | 'profile_question_answered'
   | 'profile_question_dismissed'
+  // The interaction-profile funnel, named for the thing it measures. The
+  // profile_question_* events above remain so existing rows stay queryable.
+  | 'interaction_profile_started'
+  | 'interaction_profile_initial_completed'
+  | 'interaction_profile_refinement_shown'
+  | 'interaction_profile_refinement_answered'
+  | 'interaction_profile_refinement_skipped'
+  | 'interaction_profile_refinement_dismissed'
+  | 'interaction_profile_updated'
   | 'person_added'
   // The research funnel. `person_research_started` and `..._completed` are a
   // pair on purpose: the gap between their counts is the failure rate, and the

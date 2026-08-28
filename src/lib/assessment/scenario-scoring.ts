@@ -12,15 +12,28 @@ import {
  * =============================================================================
  * Deterministic, and deliberately unwilling to guess.
  *
- * Each answered scenario contributes +1 or -1 to exactly one dimension.
- * "It depends" contributes NOTHING — it is recorded as seen, and it moves no
- * score. That distinction is the whole point: a dimension the user declined to
- * lean on must come out indistinguishable from one they were never asked
- * about, because in both cases we do not know.
+ * Each directional answer contributes +1 or -1 to exactly one dimension.
  *
- * The alternative — treating "depends" as a midpoint vote — would let a user
- * who answered "it depends" six times acquire a confident-looking balanced
- * profile, which is the same false precision this redesign exists to remove.
+ * SKIP AND "IT DEPENDS" ARE NOT THE SAME THING, and this is the distinction the
+ * scoring turns on.
+ *
+ *   SKIP writes no row at all. The user declined to answer, so there is no
+ *   evidence of any kind, and the dimension is indistinguishable from one never
+ *   put in front of them.
+ *
+ *   "IT DEPENDS" is an answer. The user read a real situation and said their
+ *   behaviour varies with context. That is behavioural information — it is the
+ *   difference between "we do not know" and "they told us it changes" — and
+ *   throwing it away would discard the most honest answer many people can give.
+ *
+ * So "it depends" moves no score, because there is no pole to move toward, but
+ * it does mark the dimension CONTEXT-DEPENDENT. A brief can then say "your
+ * approach here varies with the situation" instead of silently omitting the
+ * dimension, and confidence for that dimension is capped rather than inflated.
+ *
+ * What it must never do is buy confidence. Answering "it depends" to everything
+ * yields coverage 0 and a provisional profile, because saying "it varies" six
+ * times is not the same as having been measured six times.
  * =============================================================================
  */
 
@@ -48,10 +61,20 @@ export interface ScenarioDimensionScore {
   raw: number
   /** Answers that actually carried a direction. "Depends" is not one. */
   answers: number
-  /** Times the user explicitly declined to lean. */
+  /** Times the user explicitly said their behaviour varies here. */
   depends: number
+  /**
+   * The user told us this one changes with the situation.
+   *
+   * True only when they said so AND no clear lean emerged anyway — somebody
+   * who answered "it depends" once and then leaned twice has a lean, and
+   * reporting them as context-dependent would ignore what they actually said.
+   */
+  contextDependent: boolean
   lean: 'high' | 'low' | null
   distinctiveness: number
+  /** What may honestly be claimed about this dimension. */
+  certainty: 'none' | 'context_dependent' | 'low' | 'medium' | 'high'
 }
 
 export interface ScenarioProfile {
@@ -111,20 +134,40 @@ export function scoreScenarios(responses: readonly ScenarioResponse[]): Scenario
     // the midpoint, which is exactly how confident one answer deserves to be.
     const score = clamp(Math.round(50 + (total / MAX_PER_DIMENSION) * 50))
     const delta = score - 50
-    const lean = answers[dimension] === 0 || Math.abs(delta) < NEUTRAL_BAND
+    const directional = answers[dimension]
+    const declined = dependsCount[dimension]
+
+    const lean = directional === 0 || Math.abs(delta) < NEUTRAL_BAND
       ? null
       : delta > 0
         ? ('high' as const)
         : ('low' as const)
 
+    // They said it varies, and nothing they said since contradicts that.
+    const contextDependent = declined > 0 && lean === null
+
+    const certainty: ScenarioDimensionScore['certainty'] = contextDependent
+      ? 'context_dependent'
+      : directional === 0
+        ? 'none'
+        : lean === null
+          ? 'low'
+          : directional >= MAX_PER_DIMENSION
+            ? 'high'
+            : directional >= MIN_ANSWERS_FOR_COVERAGE
+              ? 'medium'
+              : 'low'
+
     return {
       dimension,
       score,
       raw: total,
-      answers: answers[dimension],
-      depends: dependsCount[dimension],
+      answers: directional,
+      depends: declined,
+      contextDependent,
       lean,
       distinctiveness: Math.abs(delta) / 50,
+      certainty,
     }
   })
 
@@ -176,11 +219,30 @@ function archetypeFrom(ranked: readonly ScenarioDimensionScore[]): string {
 export function describeScenarioDimension(score: ScenarioDimensionScore) {
   const poles = SCENARIO_POLES[score.dimension]
   const side = score.lean === 'low' ? poles.low : poles.high
-  return {
-    label: poles.label,
-    pole: score.lean === null ? 'Balanced' : side.pole,
-    blurb: score.lean === null ? 'No clear lean from what has been answered so far.' : side.blurb,
+
+  // Three distinct states, and collapsing them is what made "it depends"
+  // feel like a wasted answer:
+  //
+  //   a lean          -> we know which way
+  //   context-dependent -> they TOLD us it varies
+  //   nothing          -> we have not asked, or they skipped
+  if (score.contextDependent) {
+    return {
+      label: poles.label,
+      pole: 'Context-dependent',
+      blurb: 'Your approach here varies with the situation, so treat guidance on it as a starting point rather than a rule.',
+    }
   }
+
+  if (score.lean === null) {
+    return {
+      label: poles.label,
+      pole: 'Not yet known',
+      blurb: 'Not enough answered here yet for a read.',
+    }
+  }
+
+  return { label: poles.label, pole: side.pole, blurb: side.blurb }
 }
 
 function clamp(n: number) {

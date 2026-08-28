@@ -107,9 +107,11 @@ describe('where later questions come from', () => {
     'utf8',
   )
 
-  it('asks the next unanswered scenario in instrument order', () => {
-    // Not random, not "most informative next". The order is the instrument's.
-    expect(selector).toMatch(/ALL_SCENARIOS\.find\(\(s\) => !answered\.has\(s\.id\)\)/)
+  it('only ever considers unanswered scenarios', () => {
+    // Selection is by weakest evidence now rather than plain instrument order
+    // -- see the ranking tests below -- but it must still never re-ask
+    // something already answered.
+    expect(selector).toMatch(/ALL_SCENARIOS\.filter\(\(s\) => !answered\.has\(s\.id\)\)/)
   })
 
   it('asks nothing until the account has produced a brief', () => {
@@ -129,6 +131,27 @@ describe('where later questions come from', () => {
 
   it('does not extend a legacy profile with questions it never contained', () => {
     expect(selector).toMatch(/instrument_version', SCENARIO_VERSION/)
+  })
+
+  it('asks about the weakest evidence first', () => {
+    // A fourth question about a settled dimension is how a refinement prompt
+    // earns its dismissal.
+    expect(selector).toMatch(/directionalByDimension\[a\.dimension\] - directionalByDimension\[b\.dimension\]/)
+  })
+
+  it('breaks ties deterministically, so the same state asks the same question', () => {
+    expect(selector).toMatch(/ALL_SCENARIOS\.indexOf\(a\) - ALL_SCENARIOS\.indexOf\(b\)/)
+  })
+
+  it('spaces answers so a session gets at most one', () => {
+    expect(selector).toMatch(/ANSWER_SPACING_MS/)
+    expect(selector).toMatch(/Date\.now\(\) - lastAnswer < ANSWER_SPACING_MS\) return null/)
+  })
+
+  it('counts only directional answers as evidence when ranking', () => {
+    // "It depends" tells us the dimension varies, which is a reason to keep
+    // asking there, not a reason to stop.
+    expect(selector).toMatch(/if \(row\.is_depends\) continue/)
   })
 })
 

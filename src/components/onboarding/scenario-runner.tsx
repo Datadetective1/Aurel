@@ -69,6 +69,9 @@ export function ScenarioRunner({
   const answeredCount = scenarios.filter((s) => answers[s.id]).length
   const allAnswered = answeredCount === scenarios.length
   const isLast = index === scenarios.length - 1
+  // The opening sitting is the short one. Refinement opens the whole bank, and
+  // showing "6 quick questions" over eighteen would be a lie.
+  const isOpeningSitting = scenarios.length <= 6
 
   React.useEffect(() => {
     headingRef.current?.focus()
@@ -102,6 +105,18 @@ export function ScenarioRunner({
 
   return (
     <div className="py-4">
+      {isOpeningSitting ? (
+        <div className="border-line bg-bg-sunken mb-6 rounded-[var(--radius-md)] border px-4 py-3">
+          <p className="text-ink text-sm font-medium">
+            {scenarios.length} quick questions · about a minute
+          </p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            {brand.name} uses these to personalize its first suggestions, and refines them as you
+            use it. There is nothing to finish later unless you want to.
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <Heading
           ref={headingRef}
@@ -203,9 +218,11 @@ export function ScenarioRunner({
 
       <p className="text-ink-faint mt-10 text-xs leading-relaxed">
         <Eyebrow className="mb-1 block">About these questions</Eyebrow>
-        Skipping is fine, and so is &ldquo;it depends&rdquo; — neither is treated as an answer, and
-        {' '}
-        {brand.name} says how confident it is rather than filling in the gaps.
+        {/* These are genuinely different and the copy used to say they were the
+            same, which made the honest answer feel like a wasted one. */}
+        &ldquo;It depends&rdquo; is a real answer — {brand.name} records that your approach there
+        varies with the situation, and says so rather than guessing a side. Skipping leaves the
+        question unanswered, and nothing is inferred from it either way.
       </p>
     </div>
   )
