@@ -19,7 +19,9 @@ export const metadata: Metadata = { title: 'Quick Brief', robots: { index: false
  */
 export default async function QuickBriefPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
   const supabase = await createClient()
 
   const { data: meeting } = await supabase
@@ -59,7 +61,7 @@ export default async function QuickBriefPage({ params }: { params: Promise<{ id:
       <header className="mt-3">
         <Eyebrow>
           {meeting.scheduled_at
-            ? `${relativeDay(meeting.scheduled_at)} · ${formatTime(meeting.scheduled_at)}`
+            ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
             : 'Quick Brief'}
         </Eyebrow>
         <h1 className="mt-2 font-display text-2xl leading-tight text-ink">{meeting.title}</h1>

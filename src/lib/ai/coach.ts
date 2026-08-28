@@ -675,7 +675,7 @@ async function askWithModel(
         BRAND_VOICE,
         UNTRUSTED_CONTENT_RULES,
         styleBlock(userContext.coachingStyle),
-        dateBlock(),
+        dateBlock(userContext.timeZone),
         renderUser(userContext),
         `You are answering a question about the user's own professional relationships.
 

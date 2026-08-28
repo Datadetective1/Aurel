@@ -1,8 +1,10 @@
 import 'server-only'
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 import { DIMENSION_BY_ID, type DimensionId } from '@/lib/assessment/instrument'
 import { describeDimension, scoreResponses } from '@/lib/assessment/scoring'
+import { isOverdueIn } from '@/lib/tz'
 import type {
   CommitmentContext,
   InteractionContext,
@@ -81,9 +83,26 @@ function displayNameOf(fullName: string, preferred: string | null) {
   return preferred?.trim() || fullName
 }
 
-function isOverdue(dueOn: string | null): boolean {
-  if (!dueOn) return false
-  return dueOn < new Date().toISOString().slice(0, 10)
+/**
+ * The account holder's zone, read once per request.
+ *
+ * "Overdue" is a claim about the user's calendar, so it cannot be decided from
+ * the server's. Threading a zone through every context signature would have
+ * touched a dozen call sites for one boolean; `cache` collapses the repeated
+ * lookups within a request instead, which is the same approach billing takes
+ * for entitlements.
+ */
+const getTimeZone = cache(async (supabase: Client, userId: string): Promise<string> => {
+  const { data } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', userId)
+    .maybeSingle()
+  return data?.timezone ?? 'UTC'
+})
+
+function isOverdue(dueOn: string | null, timeZone: string): boolean {
+  return isOverdueIn(dueOn, timeZone)
 }
 
 // =============================================================================
@@ -94,7 +113,7 @@ export async function getUserContext(supabase: Client, userId: string): Promise<
   const [{ data: profile }, { data: assessment }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('full_name, preferred_name, job_title, company, coaching_style')
+      .select('full_name, preferred_name, job_title, company, coaching_style, timezone')
       .eq('id', userId)
       .maybeSingle(),
     supabase
@@ -160,6 +179,7 @@ export async function getUserContext(supabase: Client, userId: string): Promise<
     jobTitle: profile?.job_title ?? null,
     company: profile?.company ?? null,
     coachingStyle: profile?.coaching_style ?? 'balanced',
+    timeZone: profile?.timezone ?? 'UTC',
     interactionProfile,
   }
 }
@@ -180,6 +200,8 @@ export async function getPeopleContext(
 ): Promise<Map<string, PersonContext>> {
   const result = new Map<string, PersonContext>()
   if (personIds.length === 0) return result
+
+  const timeZone = await getTimeZone(supabase, userId)
 
   const [
     people,
@@ -306,7 +328,7 @@ export async function getPeopleContext(
       owner: c.owner,
       ownerName: c.owner_person_id ? (nameById.get(c.owner_person_id) ?? null) : null,
       dueOn: c.due_on,
-      isOverdue: isOverdue(c.due_on),
+      isOverdue: isOverdue(c.due_on, timeZone),
     })
     commitmentsByPerson.set(c.person_id, list)
   }
@@ -510,6 +532,8 @@ export async function getQuietRelationships(supabase: Client, userId: string, th
 }
 
 export async function getOpenCommitments(supabase: Client, userId: string) {
+  const timeZone = await getTimeZone(supabase, userId)
+
   const { data } = await supabase
     .from('commitments')
     .select(
@@ -526,7 +550,7 @@ export async function getOpenCommitments(supabase: Client, userId: string) {
     owner: c.owner,
     ownerName: null,
     dueOn: c.due_on,
-    isOverdue: isOverdue(c.due_on),
+    isOverdue: isOverdue(c.due_on, timeZone),
     personId: c.person_id,
     personName: c.people ? displayNameOf(c.people.full_name, c.people.preferred_name) : null,
   }))

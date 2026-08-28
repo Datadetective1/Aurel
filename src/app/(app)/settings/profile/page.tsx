@@ -21,7 +21,8 @@ const CALIBRATION_LABEL: Record<string, string> = {
 }
 
 export default async function InteractionProfileSettingsPage() {
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
   const supabase = await createClient()
 
   const { data: assessment } = await supabase
@@ -65,7 +66,7 @@ export default async function InteractionProfileSettingsPage() {
                 ? `Fully refined — all ${TOTAL_COUNT} answered.`
                 : `Profile refinement: ${answeredCount} of ${TOTAL_COUNT}`}
             {assessment.completed_at
-              ? ` · last scored ${formatDate(assessment.completed_at)}`
+              ? ` · last scored ${formatDate(assessment.completed_at, timeZone)}`
               : ''}
           </p>
 

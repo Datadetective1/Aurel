@@ -278,7 +278,7 @@ export const messageAdaptationPrompt: PromptModule<MessageAdaptationInput, Messa
     [
       BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
-      dateBlock(),
+      dateBlock(input.user.timeZone),
       `TASK: rewrite the user's draft ${input.format} in the mode "${input.mode}" (${ADAPTATION_MODE_HINT[input.mode]}).
 
 RULES

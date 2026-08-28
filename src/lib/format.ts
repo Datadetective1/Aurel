@@ -3,7 +3,16 @@
  *
  * All date helpers accept an ISO string or Date and are safe against invalid
  * input — a malformed timestamp renders as a dash rather than "Invalid Date".
+ *
+ * ANYTHING THAT NAMES A CALENDAR DAY TAKES A TIME ZONE, and it is required
+ * rather than defaulted. A default would be a silent wrong answer for everyone
+ * outside it: these helpers used to read the ambient clock, which on the server
+ * is UTC, so at 21:22 in Chicago the product announced tomorrow's date. Making
+ * the parameter mandatory means the type checker, not a reviewer, is what finds
+ * a call site that forgot. See lib/tz.
  */
+
+import { formatDateIn, formatDayLabelIn, formatTimeIn, relativeDayIn } from './tz'
 
 function toDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null
@@ -11,38 +20,39 @@ function toDate(value: string | Date | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-/** "Monday, 24 August" */
-export function formatDayLabel(value: string | Date): string {
-  const date = toDate(value)
-  if (!date) return '—'
-  return date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
+/** "Thursday, August 27", where the account holder is. */
+export function formatDayLabel(value: string | Date, timeZone: string): string {
+  return formatDayLabelIn(value, timeZone)
 }
 
-/** "09:30" */
-export function formatTime(value: string | Date): string {
-  const date = toDate(value)
-  if (!date) return '—'
-  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+/** "9:30 AM", where the account holder is. */
+export function formatTime(value: string | Date, timeZone: string): string {
+  return formatTimeIn(value, timeZone)
 }
 
-/** "24 Aug 2026" */
-export function formatDate(value: string | Date | null | undefined): string {
+/**
+ * "27 Aug 2026" — a date in the reader's own life.
+ *
+ * When a note was written, when a brief was prepared, when a conversation
+ * happened. These belong to the user's calendar, so they are rendered in the
+ * user's zone.
+ */
+export function formatDate(value: string | Date | null | undefined, timeZone: string): string {
+  return formatDateIn(value, timeZone)
+}
+
+/**
+ * "27 Aug 2026" — a date that belongs to a document, not to the reader.
+ *
+ * When an article was published, when a fact was true as of. These are
+ * properties of an external source and do not move with whoever is reading
+ * them, so UTC is correct and no zone is taken. Keeping the two apart is the
+ * point: rendering a publication date in the reader's zone would silently
+ * restate the publisher's claim.
+ */
+export function formatPublishedDate(value: string | Date | null | undefined): string {
   const date = toDate(value)
   if (!date) return '—'
-  // Locale and time zone are pinned, not left ambient.
-  //
-  // `undefined` means "whatever this runtime is", which is en-US/UTC on the
-  // server and the browser's own settings on the client. The two disagree, and
-  // because client components render on both sides that disagreement is a
-  // hydration mismatch -- React discards the server HTML and re-renders. It was
-  // throwing error #418 on every person page in production.
-  //
-  // UTC is right for these in particular: they date documents -- when a source
-  // was published, when it was read -- not moments in the reader's own day.
   return date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
@@ -52,32 +62,17 @@ export function formatDate(value: string | Date | null | undefined): string {
 }
 
 /**
- * "Today" / "Tomorrow" / "3 days ago" / "In 2 weeks".
- * Uses Intl.RelativeTimeFormat so the phrasing localises.
+ * "Today" / "Tomorrow" / "3 days ago" / "In 2 weeks", reckoned where the user is.
+ *
+ * `now` is threaded through rather than read inside, so a server render and the
+ * hydration that follows agree on which day is today even across midnight.
  */
-export function relativeDay(value: string | Date | null | undefined): string {
-  const date = toDate(value)
-  if (!date) return '—'
-
-  const startOfDay = (d: Date) => {
-    const copy = new Date(d)
-    copy.setHours(0, 0, 0, 0)
-    return copy
-  }
-
-  const days = Math.round(
-    (startOfDay(date).getTime() - startOfDay(new Date()).getTime()) / 86_400_000,
-  )
-
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Tomorrow'
-  if (days === -1) return 'Yesterday'
-
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-  if (Math.abs(days) < 7) return capitalise(rtf.format(days, 'day'))
-  if (Math.abs(days) < 31) return capitalise(rtf.format(Math.round(days / 7), 'week'))
-  if (Math.abs(days) < 365) return capitalise(rtf.format(Math.round(days / 30), 'month'))
-  return capitalise(rtf.format(Math.round(days / 365), 'year'))
+export function relativeDay(
+  value: string | Date | null | undefined,
+  timeZone: string,
+  now?: Date,
+): string {
+  return relativeDayIn(value, timeZone, now)
 }
 
 /**
@@ -100,9 +95,6 @@ export function daysSince(value: string | Date | null | undefined): number | nul
   return Math.floor((Date.now() - date.getTime()) / 86_400_000)
 }
 
-function capitalise(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
 
 /** Truncate on a word boundary, appending an ellipsis. */
 export function truncate(text: string, max: number): string {

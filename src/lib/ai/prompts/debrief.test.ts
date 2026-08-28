@@ -16,6 +16,7 @@ const user: UserContext = {
   jobTitle: 'Director of Engineering',
   company: 'Northwind',
   coachingStyle: 'balanced',
+  timeZone: 'America/Chicago',
   interactionProfile: null,
 }
 
@@ -43,20 +44,103 @@ function person(): PersonContext {
   }
 }
 
-function debrief(source: string) {
+function debrief(source: string, occurredAt = '2026-08-28T10:00:00Z', zone = user.timeZone) {
   return debriefPrompt.compose({
     interaction: {
       id: 'i1',
       title: 'Partnership introduction',
-      occurredAt: '2026-08-28T10:00:00Z',
+      occurredAt,
       source,
       wentWell: 4,
     },
     participants: [person()],
-    user,
+    user: { ...user, timeZone: zone },
     priorObjective: null,
   })
 }
+
+/** The due date the extractor resolved for the only commitment in `source`. */
+function dueOn(source: string, occurredAt: string, zone: string) {
+  return debrief(source, occurredAt, zone).commitments[0]?.dueOn ?? null
+}
+
+describe('a due date lands on the day the user meant', () => {
+  /**
+   * The extractor turns "tomorrow" and "by Friday" into real dates that become
+   * commitments on Today. It reckoned in UTC, so a debrief written in the
+   * evening in the Americas resolved everything a day late — and "by Friday"
+   * written on a Thursday evening skipped a whole week, because UTC had already
+   * moved to Friday and the next Friday was seven days out.
+   *
+   * 2026-08-28T02:22Z is Thursday 21:22 in Chicago and Friday 02:22 in UTC.
+   */
+  const thursdayEveningChicago = '2026-08-28T02:22:00Z'
+
+  it('resolves "tomorrow" to the user’s tomorrow', () => {
+    expect(dueOn('I will send it tomorrow.', thursdayEveningChicago, 'America/Chicago')).toBe(
+      '2026-08-28',
+    )
+    // For a user actually in UTC the same instant is already Friday, so their
+    // tomorrow is the 29th. Both answers are correct for their own reader.
+    expect(dueOn('I will send it tomorrow.', thursdayEveningChicago, 'UTC')).toBe('2026-08-29')
+  })
+
+  it('resolves "eod" to the day the user is still in', () => {
+    expect(dueOn('I will send it eod.', thursdayEveningChicago, 'America/Chicago')).toBe(
+      '2026-08-27',
+    )
+  })
+
+  it('does not skip a week on "by Friday" written on a Thursday evening', () => {
+    // Thursday the 27th in Chicago, so the next Friday is the 28th -- tomorrow.
+    expect(dueOn('I owe him the deck by Friday.', thursdayEveningChicago, 'America/Chicago')).toBe(
+      '2026-08-28',
+    )
+  })
+
+  it('still means the following week when the day has already passed', () => {
+    // Friday the 28th in Chicago; "by Friday" cannot mean today, so it is the
+    // 4th of September.
+    expect(
+      dueOn('I owe him the deck by Friday.', '2026-08-28T18:00:00Z', 'America/Chicago'),
+    ).toBe('2026-09-04')
+  })
+
+  it('resolves "end of week" from the user’s weekday', () => {
+    // Thursday in Chicago -> Friday the 28th. In UTC it is already Friday, so
+    // end of week is that same day.
+    expect(dueOn('I will have it by eow.', thursdayEveningChicago, 'America/Chicago')).toBe(
+      '2026-08-28',
+    )
+    expect(dueOn('I will have it by eow.', thursdayEveningChicago, 'UTC')).toBe('2026-08-28')
+  })
+
+  it('resolves "end of month" from the user’s month', () => {
+    // 1 Sep 00:30Z is still 31 Aug in Chicago, so end of month is August's.
+    expect(dueOn('I will send it by end of month.', '2026-09-01T00:30:00Z', 'America/Chicago')).toBe(
+      '2026-08-31',
+    )
+    expect(dueOn('I will send it by end of month.', '2026-09-01T00:30:00Z', 'UTC')).toBe(
+      '2026-09-30',
+    )
+  })
+
+  it('takes an explicit ISO date at face value in any zone', () => {
+    for (const zone of ['America/Chicago', 'Asia/Tokyo', 'UTC']) {
+      expect(dueOn('I will send it by 2026-09-15.', thursdayEveningChicago, zone)).toBe(
+        '2026-09-15',
+      )
+    }
+  })
+
+  it('crosses a DST boundary without drifting', () => {
+    // US clocks go forward on 8 March 2026. "next week" from the 6th is the
+    // 13th -- seven calendar days, not seven times twenty-four hours.
+    expect(dueOn('I will send it next week.', '2026-03-06T18:00:00Z', 'America/Chicago')).toBe(
+      '2026-03-13',
+    )
+  })
+})
 
 describe('debrief commitment extraction', () => {
   const notes =
@@ -134,8 +218,15 @@ describe('debrief prompt contract', () => {
 
   it('gives the model the weekday, without which no weekday is resolvable', () => {
     expect(system).toMatch(
-      /Today is (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{4}-\d{2}-\d{2}\./,
+      /Today is (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{4}-\d{2}-\d{2}/,
     )
+  })
+
+  it('anchors that day to the user’s zone, not the server’s', () => {
+    // Anchoring to UTC told a user in Chicago it was already tomorrow every
+    // evening, and the model then resolved "by Friday" a day early.
+    expect(system).toContain("in the user's timezone (America/Chicago)")
+    expect(system).toMatch(/Resolve every relative date against that day/)
   })
 })
 

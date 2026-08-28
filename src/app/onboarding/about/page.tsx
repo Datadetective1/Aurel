@@ -16,7 +16,13 @@ export default async function AboutPage() {
         jobFunction: profile?.job_function ?? '',
         seniority: profile?.seniority ?? '',
         pronouns: profile?.pronouns ?? '',
-        timezone: profile?.timezone ?? '',
+        // The column defaults to 'UTC', which is indistinguishable from having
+        // chosen it. During onboarding nobody has chosen anything yet, so a
+        // bare default is treated as unset and the field falls back to the zone
+        // detected from the device -- otherwise every new account is created in
+        // UTC and told the wrong day every evening. An explicit UTC is still
+        // selectable from the list, and once saved it is honoured everywhere.
+        timezone: profile?.timezone && profile.timezone !== 'UTC' ? profile.timezone : '',
       }}
     />
   )

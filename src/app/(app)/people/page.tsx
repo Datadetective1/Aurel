@@ -30,7 +30,10 @@ const RELATIONSHIP_LABEL: Record<string, string> = {
 }
 
 export default async function PeoplePage() {
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
+
   const supabase = await createClient()
 
   const { data: people } = await supabase
@@ -156,7 +159,7 @@ export default async function PeoplePage() {
                     <p className="text-ink-muted mt-1 text-xs">
                       {known > 0 ? `${pluralise(known, 'thing')} learned` : 'Nothing recorded yet'}
                       {person.last_interaction_at
-                        ? ` · last spoke ${relativeDay(person.last_interaction_at).toLowerCase()}`
+                        ? ` · last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
                         : ''}
                     </p>
                   </div>

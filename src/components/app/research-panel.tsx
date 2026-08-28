@@ -43,6 +43,7 @@ export function ResearchPanel({
   lastResearchedAt,
   sourceCount,
   storedSourceCount,
+  timeZone,
 }: {
   personId: string
   personName: string
@@ -53,6 +54,12 @@ export function ResearchPanel({
   sourceCount: number
   /** Everything stored, including sources nothing currently rests on. */
   storedSourceCount?: number
+  /**
+   * The account holder's zone. Required, not defaulted: this renders on the
+   * server and again at hydration, and a date formatted with an ambient zone
+   * differs between the two.
+   */
+  timeZone: string
 }) {
   const router = useRouter()
   const [running, setRunning] = React.useState(false)
@@ -179,7 +186,7 @@ export function ResearchPanel({
 
       {lastResearchedAt && !running ? (
         <p className="mt-4 text-xs text-ink-faint">
-          Last researched {formatDate(lastResearchedAt)}.
+          Last researched {formatDate(lastResearchedAt, timeZone)}.
         </p>
       ) : null}
     </section>

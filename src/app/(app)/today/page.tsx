@@ -28,6 +28,7 @@ import { ProfilePrompt } from '@/components/app/profile-prompt'
 import { getNextProfileQuestion } from '@/lib/assessment/next-question'
 import { dailyFocusPrompt } from '@/lib/ai/prompts/coaching'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
+import { addDays, endOfDayUtc, hourIn, isOverdueIn, startOfDayUtc, todayIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = { title: 'Today', robots: { index: false, follow: false } }
@@ -49,9 +50,17 @@ export default async function TodayPage({
   const { user, profile } = await requireOnboardedUser()
   const supabase = await createClient()
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const horizon = new Date(todayStart.getTime() + 7 * 86_400_000)
+  // Every calendar-day question on this page is answered in the account
+  // holder's zone, from one `now`, so nothing disagrees mid-render.
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
+  const today = todayIn(timeZone, now)
+
+  // Local midnight, not the server's. setHours() reads the runtime clock,
+  // which is UTC on Vercel -- so all evening it excluded meetings that had
+  // already happened in UTC terms but were still ahead of the user.
+  const todayStart = startOfDayUtc(today, timeZone)
+  const horizon = endOfDayUtc(addDays(today, 6), timeZone)
 
   const [{ data: meetings }, { data: commitments }, quiet, userContext] = await Promise.all([
     supabase
@@ -107,8 +116,7 @@ export default async function TodayPage({
     [...new Set((attendees ?? []).map((a) => a.person_id))],
   )
 
-  const today = new Date().toISOString().slice(0, 10)
-  const overdue = (commitments ?? []).filter((c) => c.due_on && c.due_on < today)
+  const overdue = (commitments ?? []).filter((c) => isOverdueIn(c.due_on, timeZone, now))
   const dueToday = (commitments ?? []).filter((c) => c.due_on === today)
 
   const displayName = (p: { full_name: string; preferred_name: string | null } | null) =>
@@ -130,6 +138,7 @@ export default async function TodayPage({
     ? await runPrompt(dailyFocusPrompt, {
     user: userContext,
     today,
+    timeZone,
     meetings: (meetings ?? []).map((m) => ({
       id: m.id,
       title: m.title,
@@ -168,14 +177,16 @@ export default async function TodayPage({
 
   // Calendar, when one is connected. Two days only: preparation is a today and
   // tomorrow activity, and a fortnight of rows would bury the focus card.
-  const calendarHorizon = new Date()
-  calendarHorizon.setDate(calendarHorizon.getDate() + 2)
+  // Through the end of the user's tomorrow. A rolling `now + 2 days` spilled
+  // into a third calendar day, which then rendered with a weekday name under
+  // a heading promising only today and tomorrow.
+  const calendarHorizon = endOfDayUtc(addDays(today, 1), timeZone)
 
   const { data: calendarRows } = await supabase
     .from('external_calendar_events')
     .select('id, title, starts_at, ends_at, is_all_day, is_private, meeting_url, status, meeting_id, attendees')
     .eq('user_id', user.id)
-    .gte('starts_at', new Date().toISOString())
+    .gte('starts_at', now.toISOString())
     .lte('starts_at', calendarHorizon.toISOString())
     .order('starts_at', { ascending: true })
     .limit(8)
@@ -220,9 +231,9 @@ export default async function TodayPage({
       {welcome ? <WelcomeBanner name={firstName} className="mb-8" /> : null}
 
       <header>
-        <Eyebrow>{formatDayLabel(new Date())}</Eyebrow>
+        <Eyebrow>{formatDayLabel(now, timeZone)}</Eyebrow>
         <h1 className="mt-3 font-display text-3xl text-ink sm:text-4xl">
-          Good {timeOfDay()}, {firstName}.
+          Good {timeOfDay(timeZone, now)}, {firstName}.
         </h1>
       </header>
 
@@ -271,7 +282,7 @@ export default async function TodayPage({
       <UpcomingMeetings
         events={upcomingEvents}
         timeZone={profile.timezone ?? 'UTC'}
-        nowIso={new Date().toISOString()}
+        nowIso={now.toISOString()}
       />
 
       {/* Only once the checklist above has gone. Before that it would say the
@@ -325,7 +336,7 @@ export default async function TodayPage({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-ink-muted">
                           {meeting.scheduled_at
-                            ? `${relativeDay(meeting.scheduled_at)} · ${formatTime(meeting.scheduled_at)}`
+                            ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
                             : 'Unscheduled'}
                         </span>
                         {meeting.importance >= 4 ? (
@@ -391,7 +402,7 @@ export default async function TodayPage({
 
           <ul className="mt-5 grid gap-2">
             {(commitments ?? []).slice(0, 6).map((c) => {
-              const isOverdue = Boolean(c.due_on && c.due_on < today)
+              const isOverdue = isOverdueIn(c.due_on, timeZone, now)
               const who = displayName(c.people)
               return (
                 <li
@@ -408,7 +419,7 @@ export default async function TodayPage({
                   {c.due_on ? (
                     <Badge tone={isOverdue ? 'critical' : 'neutral'}>
                       <Clock className="size-3" aria-hidden="true" />
-                      {relativeDay(c.due_on)}
+                      {relativeDay(c.due_on, timeZone, now)}
                     </Badge>
                   ) : (
                     <Badge tone="outline">No date</Badge>
@@ -453,8 +464,14 @@ export default async function TodayPage({
   )
 }
 
-function timeOfDay(): string {
-  const hour = new Date().getHours()
+/**
+ * Morning, afternoon or evening where the user is.
+ *
+ * `getHours()` reads the runtime clock. On Vercel that is UTC, so a user in
+ * Chicago was wished good morning at eight in the evening.
+ */
+function timeOfDay(timeZone: string, now: Date): string {
+  const hour = hourIn(timeZone, now)
   if (hour < 12) return 'morning'
   if (hour < 18) return 'afternoon'
   return 'evening'

@@ -19,6 +19,9 @@ export const metadata: Metadata = { title: 'Meetings', robots: { index: false, f
 
 export default async function MeetingsPage() {
   const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
+
   const supabase = await createClient()
 
   const { data: meetings } = await supabase
@@ -173,8 +176,8 @@ export default async function MeetingsPage() {
 
       <UpcomingMeetings
         events={upcomingEvents}
-        timeZone={profile.timezone ?? 'UTC'}
-        nowIso={new Date().toISOString()}
+        timeZone={timeZone}
+        nowIso={now.toISOString()}
       />
 
       {upcoming.length > 0 ? (
@@ -184,6 +187,8 @@ export default async function MeetingsPage() {
             meetings={upcoming}
             namesByMeeting={namesByMeeting}
             prepared={prepared}
+            timeZone={timeZone}
+            now={now}
           />
         </section>
       ) : null}
@@ -191,7 +196,14 @@ export default async function MeetingsPage() {
       {past.length > 0 ? (
         <section className="mt-12">
           <Eyebrow>Past</Eyebrow>
-          <MeetingList meetings={past} namesByMeeting={namesByMeeting} prepared={prepared} past />
+          <MeetingList
+            meetings={past}
+            namesByMeeting={namesByMeeting}
+            prepared={prepared}
+            timeZone={timeZone}
+            now={now}
+            past
+          />
         </section>
       ) : null}
     </Container>
@@ -202,6 +214,8 @@ function MeetingList({
   meetings,
   namesByMeeting,
   prepared,
+  timeZone,
+  now,
   past = false,
 }: {
   meetings: {
@@ -214,6 +228,10 @@ function MeetingList({
   }[]
   namesByMeeting: Map<string, string[]>
   prepared: Set<string | null>
+  /** The account holder's zone, so "Tomorrow" means their tomorrow. */
+  timeZone: string
+  /** One `now` from the page, so every row agrees which day is today. */
+  now: Date
   past?: boolean
 }) {
   return (
@@ -229,7 +247,7 @@ function MeetingList({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-ink-muted">
                     {meeting.scheduled_at
-                      ? `${relativeDay(meeting.scheduled_at)} · ${formatTime(meeting.scheduled_at)}`
+                      ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
                       : 'Unscheduled'}
                   </span>
                   {meeting.importance >= 4 && !past ? (

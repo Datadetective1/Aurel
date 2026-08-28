@@ -22,7 +22,8 @@ import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
-import { formatDate, isFuture, relativeDay, pluralise } from '@/lib/format'
+import { formatDate, formatPublishedDate, isFuture, relativeDay, pluralise } from '@/lib/format'
+import { isOverdueIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
 
 export async function generateMetadata({
@@ -84,7 +85,9 @@ const FACT_GROUPS: { kinds: string[]; label: string }[] = [
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
   const supabase = await createClient()
 
   const { data: person } = await supabase
@@ -288,8 +291,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             {person.last_interaction_at ? (
               <Badge tone="neutral">
                 {isFuture(person.last_interaction_at)
-                  ? `Logged for ${relativeDay(person.last_interaction_at).toLowerCase()}`
-                  : `Last spoke ${relativeDay(person.last_interaction_at).toLowerCase()}`}
+                  ? `Logged for ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
+                  : `Last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`}
               </Badge>
             ) : (
               <Badge tone="outline">No interactions yet</Badge>
@@ -354,7 +357,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <>
               {pluralise(interactions.length, 'recorded interaction')}
               {person.first_interaction_at
-                ? `, first on ${formatDate(person.first_interaction_at)}`
+                ? `, first on ${formatDate(person.first_interaction_at, timeZone)}`
                 : ''}
               . {active.length > 0 ? `${pluralise(active.length, 'thing')} learned so far.` : ''}
             </>
@@ -403,6 +406,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         canDiscover={capability.canDiscover}
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
+        timeZone={timeZone}
         lastResearchedAt={person.last_researched_at}
         // Sources actually standing behind a claim: something rests on them,
         // and they have not been marked as somebody else. A run that stores
@@ -454,7 +458,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                               and "CEO as of 2013" would simply be false. */}
                           {fact.as_of ? (
                             <span className="text-ink-faint text-[0.6875rem]">
-                              source published {formatDate(fact.as_of)}
+                              source published {formatPublishedDate(fact.as_of)}
                             </span>
                           ) : (
                             <span className="text-ink-faint text-[0.6875rem]">
@@ -507,8 +511,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               {(commitments ?? []).map((c) => {
                 const overdue =
                   c.status === 'open' &&
-                  c.due_on &&
-                  c.due_on < new Date().toISOString().slice(0, 10)
+                  isOverdueIn(c.due_on, timeZone, now)
                 return (
                   <li
                     key={c.id}
@@ -531,7 +534,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                           : 'Shared'}
                     </Badge>
                     {c.due_on ? (
-                      <Badge tone={overdue ? 'critical' : 'neutral'}>{relativeDay(c.due_on)}</Badge>
+                      <Badge tone={overdue ? 'critical' : 'neutral'}>{relativeDay(c.due_on, timeZone, now)}</Badge>
                     ) : null}
                   </li>
                 )
@@ -555,7 +558,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                     className="bg-accent-graphic ring-bg absolute top-2 -left-[1.4375rem] size-1.5 rounded-full ring-4"
                   />
                   <p className="text-ink-muted text-xs">
-                    {formatDate(interaction.occurred_at)} · {interaction.kind}
+                    {formatDate(interaction.occurred_at, timeZone)} · {interaction.kind}
                   </p>
                   <p className="text-ink mt-1 text-sm font-medium">{interaction.title}</p>
                   {interaction.summary ? (
@@ -591,7 +594,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                   <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
                     {note.body}
                   </p>
-                  <p className="text-ink-faint mt-2 text-xs">{formatDate(note.created_at)}</p>
+                  <p className="text-ink-faint mt-2 text-xs">{formatDate(note.created_at, timeZone)}</p>
                 </li>
               ))}
             </ul>

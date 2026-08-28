@@ -21,7 +21,9 @@ export const metadata: Metadata = {
 
 export default async function BriefPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
   const supabase = await createClient()
 
   const { data: meeting } = await supabase
@@ -140,7 +142,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
         <div className="flex flex-wrap items-center gap-2">
           <Eyebrow>
             {meeting.scheduled_at
-              ? `${relativeDay(meeting.scheduled_at)} · ${formatTime(meeting.scheduled_at)}`
+              ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
               : 'Unscheduled'}
           </Eyebrow>
           {meeting.importance >= 4 ? (
@@ -174,7 +176,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
               <Link href={`/meetings/${id}/debrief`}>Debrief this meeting</Link>
             </Button>
             <span className="text-ink-faint text-xs">
-              Prepared {formatDate(artifact!.created_at)}
+              Prepared {formatDate(artifact!.created_at, timeZone)}
             </span>
             <RegenerateBrief meetingId={id} stale={false} reason={null} />
           </div>

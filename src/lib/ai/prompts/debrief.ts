@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Citation, PersonContext, PromptModule, UserContext } from '../types'
 import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
+import { addDays, dayKeyIn, lastDayOfMonth, weekdayOf } from '@/lib/tz'
 
 /**
  * DEBRIEF + MEMORY PROPOSAL
@@ -152,7 +153,7 @@ function composeDebrief(input: DebriefInput): Debrief {
         description: s.replace(/\s+/g, ' ').trim(),
         owner: userOwns ? ('user' as const) : who ? ('person' as const) : ('shared' as const),
         ownerPersonId: userOwns ? null : (who?.id ?? null),
-        dueOn: extractDate(s, input.interaction.occurredAt),
+        dueOn: extractDate(s, input.interaction.occurredAt, input.user.timeZone),
       }
     })
 
@@ -229,22 +230,29 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
  * never surfaced as overdue, which is most of what a commitment is for. Real
  * meeting notes almost never contain an ISO date.
  *
- * Computed in UTC against the interaction date so the same notes always resolve
- * the same way, and only unambiguous phrasing is accepted. A wrong due date is
- * worse than none: it invents a broken promise.
+ * Computed against the calendar day the conversation happened on WHERE THE USER
+ * WAS, and only unambiguous phrasing is accepted. A wrong due date is worse than
+ * none: it invents a broken promise.
+ *
+ * This reckoned in UTC until it was found to be off by a day. A debrief written
+ * at 9pm in Chicago carries a timestamp that is already the next day in UTC, so
+ * "tomorrow" resolved two days out, and "by Friday" written on a Thursday
+ * evening skipped a whole week because the UTC weekday had already advanced.
  */
-function extractDate(sentence: string, referenceIso: string): string | null {
+function extractDate(
+  sentence: string,
+  referenceIso: string,
+  timeZone: string,
+): string | null {
   const iso = sentence.match(/\b(\d{4}-\d{2}-\d{2})\b/)
   if (iso) return iso[1]!
 
-  const reference = new Date(referenceIso)
-  if (Number.isNaN(reference.getTime())) return null
+  const referenceDay = dayKeyIn(referenceIso, timeZone)
+  if (!referenceDay) return null
 
-  const day = (offset: number) => {
-    const d = new Date(reference)
-    d.setUTCDate(d.getUTCDate() + offset)
-    return d.toISOString().slice(0, 10)
-  }
+  // Calendar arithmetic on the day key, so a DST boundary between the
+  // conversation and the due date cannot shift the answer.
+  const day = (offset: number) => addDays(referenceDay, offset)
 
   const s = sentence.toLowerCase()
 
@@ -256,7 +264,7 @@ function extractDate(sentence: string, referenceIso: string): string | null {
   )
   if (weekday?.[1]) {
     const target = WEEKDAYS.indexOf(weekday[1])
-    const current = reference.getUTCDay()
+    const current = weekdayOf(referenceDay)
     let delta = (target - current + 7) % 7
     if (delta === 0) delta = 7
     if (/\bby next\b/.test(s)) delta += 7
@@ -265,14 +273,11 @@ function extractDate(sentence: string, referenceIso: string): string | null {
 
   if (/\bnext week\b/.test(s)) return day(7)
   if (/\b(end of (the )?week|eow)\b/.test(s)) {
-    const current = reference.getUTCDay()
-    const delta = (5 - current + 7) % 7
+    const delta = (5 - weekdayOf(referenceDay) + 7) % 7
     return day(delta)
   }
   if (/\b(end of (the )?month|eom)\b/.test(s)) {
-    return new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + 1, 0))
-      .toISOString()
-      .slice(0, 10)
+    return lastDayOfMonth(referenceDay)
   }
 
   return null
@@ -319,7 +324,7 @@ export const debriefPrompt: PromptModule<DebriefInput, Debrief> = {
     [
       BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
-      dateBlock(),
+      dateBlock(input.user.timeZone),
       `TASK: extract structure from the user's notes about an interaction that has already happened, and propose what is worth remembering.`,
       `EXTRACTION RULES
 - Only extract what the notes actually say. Do not infer a decision that was not recorded.

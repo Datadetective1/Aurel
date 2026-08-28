@@ -1,5 +1,6 @@
 import type { CoachingStyle, MeetingKind, PersonContext, UserContext } from '../types'
 import { brand } from '@/lib/brand'
+import { safeZone, todayIn } from '@/lib/tz'
 
 /**
  * Shared prompt scaffolding.
@@ -220,11 +221,18 @@ export function styleBlock(style: CoachingStyle): string {
   return `OUTPUT STYLE: ${STYLE_GUIDANCE[style]}\nStyle changes tone and density only. Never omit a risk, soften a warning, or drop an uncertainty to fit a style.`
 }
 
-/** Today's date, so relative language ("last week") is anchored. */
-export function dateBlock(now = new Date()): string {
-  // The weekday is not decoration. Notes say "by Friday" far more often than
-  // they say a date, and without knowing what day it is now the model cannot
-  // turn that into one — it returns null and the due date is lost.
-  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
-  return `Today is ${weekday}, ${now.toISOString().slice(0, 10)}.`
+/**
+ * Today's date, so relative language ("last week") is anchored.
+ *
+ * Anchored to the USER'S calendar, not the server's. The weekday is not
+ * decoration: notes say "by Friday" far more often than they say a date, and
+ * without knowing what day it is now the model cannot turn that into one — it
+ * returns null and the due date is lost. Anchoring it to UTC was worse than
+ * losing it, because after about 6pm in the Americas the model was told the
+ * wrong weekday and confidently resolved "by Friday" a day early.
+ */
+export function dateBlock(timeZone: string, now = new Date()): string {
+  const zone = safeZone(timeZone)
+  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long', timeZone: zone })
+  return `Today is ${weekday}, ${todayIn(zone, now)} in the user's timezone (${zone}). Resolve every relative date against that day.`
 }

@@ -18,6 +18,7 @@ const user: UserContext = {
   jobTitle: 'Director of Engineering',
   company: 'Northwind',
   coachingStyle: 'balanced',
+  timeZone: 'America/Chicago',
   interactionProfile: null,
 }
 

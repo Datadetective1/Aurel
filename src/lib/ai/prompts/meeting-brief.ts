@@ -757,7 +757,7 @@ export const meetingBriefPrompt: PromptModule<MeetingBriefInput, MeetingBrief> =
     [
       BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
-      dateBlock(),
+      dateBlock(input.user.timeZone),
       `TASK: produce a preparation brief for one specific upcoming ${MEETING_KIND_LABEL[input.meeting.kind]}.`,
       `Every participant section must be traceable to the record you are given. Where the record is empty, say it is empty.`,
       `The "uncertainties" field is required and must be honest. List what you do not know. Do not leave it empty just because the rest of the brief reads well.`,

@@ -10,7 +10,7 @@ import {
 } from '@/app/(app)/people/research-actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/primitives'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatPublishedDate } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
 /**
@@ -109,8 +109,8 @@ export function SourceRow({ source, personId }: { source: SourceRowData; personI
           <p className="text-ink-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem]">
             {source.publisher ? <span>{source.publisher}</span> : null}
             {source.author ? <span>· {source.author}</span> : null}
-            {source.publishedAt ? <span>· published {formatDate(source.publishedAt)}</span> : null}
-            {source.retrievedAt ? <span>· read {formatDate(source.retrievedAt)}</span> : null}
+            {source.publishedAt ? <span>· published {formatPublishedDate(source.publishedAt)}</span> : null}
+            {source.retrievedAt ? <span>· read {formatPublishedDate(source.retrievedAt)}</span> : null}
           </p>
 
           <p className="text-ink-faint mt-1 text-[0.6875rem]">

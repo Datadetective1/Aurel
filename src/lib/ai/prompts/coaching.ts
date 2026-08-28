@@ -41,6 +41,8 @@ export type DailyFocus = z.infer<typeof dailyFocusSchema>
 export interface DailyFocusInput {
   user: UserContext
   today: string
+  /** The account holder's IANA zone, so relative phrasing matches their day. */
+  timeZone: string
   meetings: {
     id: string
     title: string
@@ -89,7 +91,7 @@ function composeDailyFocus(input: DailyFocusInput): DailyFocus {
       // relativeDay, not the raw date. This string is read by a person on the
       // Today page — "Overdue since 2026-08-19" is a database value wearing a
       // sentence; "6 days overdue" is the thing they need to feel.
-      why: `Overdue${c.dueOn ? ` — ${relativeDay(c.dueOn).toLowerCase()}` : ''}${c.personName ? `, and ${c.personName} is waiting on it` : ''}.`,
+      why: `Overdue${c.dueOn ? ` — ${relativeDay(c.dueOn, input.timeZone).toLowerCase()}` : ''}${c.personName ? `, and ${c.personName} is waiting on it` : ''}.`,
       meetingId: null,
       personId: null,
     })
@@ -292,7 +294,7 @@ export const relationshipSummaryPrompt: PromptModule<RelationshipSummaryInput, R
     [
       BRAND_VOICE,
       styleBlock(input.user.coachingStyle),
-      dateBlock(),
+      dateBlock(input.user.timeZone),
       `TASK: summarize what the user has actually learned about working with this one person.
 
 RULES

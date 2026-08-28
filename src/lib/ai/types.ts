@@ -121,6 +121,13 @@ export interface UserContext {
   jobTitle: string | null
   company: string | null
   coachingStyle: CoachingStyle
+  /**
+   * IANA zone. Carried into every prompt so the model is told what day it is
+   * WHERE THE USER IS -- notes say "by Friday" far more often than they give a
+   * date, and anchoring that to the server's calendar resolves it a day out for
+   * anyone west of Greenwich after their evening.
+   */
+  timeZone: string
   /** The user's own Interaction Profile, when they have completed one. */
   interactionProfile: {
     archetype: string

@@ -426,7 +426,10 @@ export const sourceExtractionPrompt: PromptModule<SourceExtractionInput, SourceE
     [
       BRAND_VOICE,
       UNTRUSTED_CONTENT_RULES,
-      dateBlock(),
+      // UTC deliberately. This prompt reads a published document and dates the
+      // facts in it against the publisher's calendar, not the reader's; there
+      // is no user day involved, and no user context here to take one from.
+      dateBlock('UTC'),
       `TASK: read ONE source and extract professional facts about ONE specific person: ${input.person.fullName}.
 
 IDENTITY FIRST

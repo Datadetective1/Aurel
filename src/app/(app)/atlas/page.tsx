@@ -7,6 +7,7 @@ import { Badge, Container, EmptyState, Eyebrow, Panel, Rule, SectionHeader } fro
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
+import { isOverdueIn, todayIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -24,7 +25,10 @@ export const metadata: Metadata = {
  * =============================================================================
  */
 export default async function AtlasPage() {
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
+  const now = new Date()
+
   const supabase = await createClient()
 
   const [{ data: people }, { data: commitments }] = await Promise.all([
@@ -45,14 +49,14 @@ export default async function AtlasPage() {
   ])
 
   const list = people ?? []
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIn(timeZone, now)
 
   const openByPerson = new Map<string, number>()
   const overdueByPerson = new Map<string, number>()
   for (const c of commitments ?? []) {
     if (!c.person_id) continue
     openByPerson.set(c.person_id, (openByPerson.get(c.person_id) ?? 0) + 1)
-    if (c.due_on && c.due_on < today) {
+    if (isOverdueIn(c.due_on, timeZone, now)) {
       overdueByPerson.set(c.person_id, (overdueByPerson.get(c.person_id) ?? 0) + 1)
     }
   }
@@ -219,7 +223,7 @@ export default async function AtlasPage() {
                             </Badge>
                           ) : person.last_interaction_at ? (
                             <span className="shrink-0 text-xs text-ink-faint">
-                              {relativeDay(person.last_interaction_at)}
+                              {relativeDay(person.last_interaction_at, timeZone, now)}
                             </span>
                           ) : null}
                         </Link>
