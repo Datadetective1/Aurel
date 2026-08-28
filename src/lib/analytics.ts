@@ -24,6 +24,13 @@ export type AnalyticsEvent =
   | 'assessment_started'
   | 'assessment_completed'
   | 'assessment_calibrated'
+  // Progressive profiling. Counts, confidence and dimension ids only -- never
+  // which statement somebody picked.
+  | 'assessment_initial_completed'
+  | 'assessment_fully_completed'
+  | 'profile_question_shown'
+  | 'profile_question_answered'
+  | 'profile_question_dismissed'
   | 'person_added'
   // The research funnel. `person_research_started` and `..._completed` are a
   // pair on purpose: the gap between their counts is the failure rate, and the

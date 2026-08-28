@@ -5,6 +5,7 @@ import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/format'
+import { BLOCK_COUNT } from '@/lib/assessment/instrument'
 import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -32,6 +33,19 @@ export default async function InteractionProfileSettingsPage() {
     .limit(1)
     .maybeSingle()
 
+  // How much of the instrument has been answered. Refinement is optional, so
+  // this is stated as progress rather than as an outstanding task.
+  const { count: answered } = assessment
+    ? await supabase
+        .from('assessment_responses')
+        .select('round_index', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('assessment_id', assessment.id)
+    : { count: 0 }
+
+  const answeredCount = answered ?? 0
+  const refined = answeredCount >= BLOCK_COUNT
+
   return (
     <div>
       <Eyebrow>{brand.assessmentName}</Eyebrow>
@@ -40,8 +54,21 @@ export default async function InteractionProfileSettingsPage() {
         <>
           <p className="mt-4 font-display text-2xl text-ink">{assessment.archetype}</p>
           <p className="mt-1 text-xs text-ink-muted">
-            Completed {formatDate(assessment.completed_at)}.
+            {refined
+              ? `Fully refined — all ${BLOCK_COUNT} rounds answered.`
+              : `Profile refinement: ${answeredCount} of ${BLOCK_COUNT}`}
+            {assessment.completed_at
+              ? ` · last scored ${formatDate(assessment.completed_at)}`
+              : ''}
           </p>
+
+          {!refined ? (
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
+              This profile is usable now and sharpens as you answer more. Each additional round
+              narrows where you actually sit on the eight tendencies, and {brand.name} says how
+              confident it is rather than presenting a partial read as a finished one.
+            </p>
+          ) : null}
 
           {assessment.calibration ? (
             <div className="mt-6">
@@ -61,20 +88,27 @@ export default async function InteractionProfileSettingsPage() {
           ) : null}
 
           <div className="mt-8 flex flex-wrap gap-2">
+            {!refined ? (
+              <Button asChild size="sm">
+                <Link href="/settings/profile/refine">
+                  Continue refining ({BLOCK_COUNT - answeredCount} left)
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild variant="secondary" size="sm">
               <Link href="/onboarding/reveal">View my full profile</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/onboarding/assessment">Retake the assessment</Link>
+              <Link href="/settings/profile/refine">Retake the assessment</Link>
             </Button>
           </div>
         </>
       ) : (
         <>
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-ink-secondary">
-            You have not completed your {brand.assessmentName.toLowerCase()} yet. It takes about five
-            minutes, and it lets guidance account for your own defaults rather than only the other
-            person&rsquo;s.
+            You have not started your {brand.assessmentName.toLowerCase()} yet. The first few
+            rounds take about a minute and are enough to personalize guidance; you can refine it
+            whenever you like.
           </p>
           <Button asChild size="sm" className="mt-5">
             <Link href="/onboarding/assessment">Take it now</Link>

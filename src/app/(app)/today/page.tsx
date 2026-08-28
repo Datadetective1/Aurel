@@ -24,6 +24,8 @@ import { getUserContext, getPeopleContext, getQuietRelationships } from '@/lib/a
 import { runPrompt } from '@/lib/ai/provider'
 import { getFirstRunState } from '@/lib/first-run'
 import { FirstRun, firstRunComplete } from '@/components/app/first-run'
+import { ProfilePrompt } from '@/components/app/profile-prompt'
+import { getNextProfileQuestion } from '@/lib/assessment/next-question'
 import { dailyFocusPrompt } from '@/lib/ai/prompts/coaching'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
 import { brand } from '@/lib/brand'
@@ -113,6 +115,10 @@ export default async function TodayPage({
     p ? p.preferred_name || p.full_name : null
 
   const firstRun = await getFirstRunState(supabase, user.id)
+
+  // At most one, only on Today, only once a brief exists, and not if dismissed
+  // in the last week. Usually null -- see lib/assessment/next-question.
+  const profileQuestion = await getNextProfileQuestion(supabase, user.id)
 
   // Nothing recorded means nothing to reason about. Sending an empty record to
   // a model costs a request and a few seconds to be told, at length, that the
@@ -428,6 +434,10 @@ export default async function TodayPage({
           </ul>
         </section>
       ) : null}
+
+      {/* Below the day's real content on purpose: refinement is never the most
+          important thing on this screen. */}
+      {profileQuestion ? <ProfilePrompt block={profileQuestion} /> : null}
 
       {/* Honest attribution of how this page was produced. Absent when nothing
           was produced -- an empty account has nothing to attribute. */}

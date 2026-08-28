@@ -7,7 +7,12 @@ import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
-import { BLOCK_BY_ID, BLOCK_COUNT, INSTRUMENT_VERSION } from '@/lib/assessment/instrument'
+import {
+  BLOCK_BY_ID,
+  BLOCK_COUNT,
+  INITIAL_BLOCK_COUNT,
+  INSTRUMENT_VERSION,
+} from '@/lib/assessment/instrument'
 import { describeDimension, scoreResponses } from '@/lib/assessment/scoring'
 import { runPrompt } from '@/lib/ai/provider'
 import { profileNarrativePrompt } from '@/lib/ai/prompts/coaching'
@@ -111,7 +116,13 @@ export async function recordResponse(input: z.infer<typeof responseSchema>) {
     .eq('id', assessmentId)
     .maybeSingle()
 
-  if (!assessment || assessment.status !== 'in_progress') {
+  // 'completed' is allowed as well as 'in_progress'.
+  //
+  // A profile is scored once the opening sitting is done, so it is usable
+  // immediately -- but the remaining blocks are still answerable. Refusing a
+  // response to a completed assessment would make progressive refinement
+  // impossible, which is the whole point of scoring early.
+  if (!assessment || (assessment.status !== 'in_progress' && assessment.status !== 'completed')) {
     return { ok: false as const, error: 'assessment_unavailable' }
   }
 
@@ -136,6 +147,15 @@ export async function recordResponse(input: z.infer<typeof responseSchema>) {
   return { ok: true as const }
 }
 
+/**
+ * Score whatever has been answered, and store it.
+ *
+ * Runs after the opening sitting and again after every refinement sitting. It
+ * has always scored the responses that exist rather than requiring all 24 --
+ * scoreResponses reports `answered`, `coverage` and a `confidence` that cannot
+ * exceed 'provisional' on a short run -- so progressive profiling needed no
+ * change to the scoring model at all.
+ */
 export async function completeAssessment(assessmentId: string) {
   const user = await requireUser()
   const supabase = await createClient()
@@ -212,6 +232,22 @@ export async function completeAssessment(assessmentId: string) {
     consistency: scored.consistency,
     confidence: scored.confidence,
   })
+
+  // Two distinct milestones, and conflating them would hide the one that
+  // matters: how many people come back to finish.
+  if (scored.answered <= INITIAL_BLOCK_COUNT) {
+    await track('assessment_initial_completed', {
+      answered: scored.answered,
+      confidence: scored.confidence,
+    })
+  }
+  if (scored.answered >= BLOCK_COUNT) {
+    await track('assessment_fully_completed', {
+      coverage: scored.coverage,
+      consistency: scored.consistency,
+      confidence: scored.confidence,
+    })
+  }
 
   revalidatePath('/onboarding', 'layout')
   return { ok: true as const, assessmentId }

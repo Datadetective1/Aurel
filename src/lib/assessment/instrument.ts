@@ -29,6 +29,22 @@ export const INSTRUMENT_VERSION = 'ip-1.0.0'
 /** Number of forced-choice blocks presented. */
 export const BLOCK_COUNT = 24
 
+/**
+ * How many blocks the first sitting asks.
+ *
+ * Six, taken from the front of the existing order rather than cherry-picked:
+ * blocks rotate their dimensions by OFFSETS = [0,1,3,5] over eight dimensions,
+ * so the first six already touch all eight. Reordering or hand-selecting them
+ * would change the instrument to suit the UI, which is the one thing this
+ * split must not do.
+ *
+ * Six blocks yield twelve keyed contributions across eight dimensions, so
+ * coverage cannot reach the threshold that confidenceFrom requires for
+ * anything above 'provisional'. The profile is honest about being provisional
+ * because the arithmetic makes it so, not because a flag says it.
+ */
+export const INITIAL_BLOCK_COUNT = 6
+
 /** Statements shown per block. */
 export const ITEMS_PER_BLOCK = 4
 

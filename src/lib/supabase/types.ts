@@ -1628,6 +1628,7 @@ export type Database = {
           intents: string[]
           job_function: string | null
           last_seen_at: string | null
+          profile_prompt_snoozed_until: string | null
           job_title: string | null
           known_frameworks: Json
           onboarding_completed_at: string | null
@@ -1653,6 +1654,7 @@ export type Database = {
           intents?: string[]
           job_function?: string | null
           last_seen_at?: string | null
+          profile_prompt_snoozed_until?: string | null
           job_title?: string | null
           known_frameworks?: Json
           onboarding_completed_at?: string | null
@@ -1678,6 +1680,7 @@ export type Database = {
           intents?: string[]
           job_function?: string | null
           last_seen_at?: string | null
+          profile_prompt_snoozed_until?: string | null
           job_title?: string | null
           known_frameworks?: Json
           onboarding_completed_at?: string | null

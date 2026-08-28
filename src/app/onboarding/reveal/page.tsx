@@ -19,7 +19,11 @@ const CONFIDENCE_COPY = {
   provisional: {
     tone: 'caution' as const,
     label: 'Provisional',
-    body: 'You answered enough for a first read, but not consistently enough to be confident. Treat this as a starting point.',
+    // The old wording blamed inconsistency, which was the only way to be
+    // provisional when everyone answered all 24. A short opening sitting is
+    // now the usual reason, and telling someone their answers contradicted
+    // each other when they simply have not finished would be false.
+    body: 'Based on your opening rounds. Enough to personalize guidance, not enough to be confident — it sharpens as you answer more.',
   },
   moderate: {
     tone: 'info' as const,

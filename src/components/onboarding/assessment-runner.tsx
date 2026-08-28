@@ -51,11 +51,28 @@ type Answer = { most: string | null; least: string | null }
 export function AssessmentRunner({
   assessmentId,
   initialResponses,
+  roundLimit,
+  finishHref = '/onboarding/reveal',
+  finishLabel,
 }: {
   assessmentId: string
   initialResponses: StoredResponse[]
+  /**
+   * How many rounds this sitting covers, counted from the first.
+   *
+   * Onboarding asks a short opening set and stops; refinement opens the whole
+   * instrument and resumes wherever the last sitting left off. The blocks
+   * themselves, their order and their scoring are identical either way -- this
+   * bounds how many of them are put in front of somebody at once, and nothing
+   * else.
+   */
+  roundLimit?: number
+  /** Where to go once this sitting is scored. */
+  finishHref?: string
+  finishLabel?: string
 }) {
   const router = useRouter()
+  const limit = Math.min(Math.max(roundLimit ?? BLOCK_COUNT, 1), BLOCK_COUNT)
 
   const [answers, setAnswers] = React.useState<Record<number, Answer>>(() => {
     const seeded: Record<number, Answer> = {}
@@ -68,8 +85,9 @@ export function AssessmentRunner({
   // Resume at the first unanswered round.
   const [round, setRound] = React.useState(() => {
     const answered = new Set(initialResponses.map((r) => r.round_index))
-    for (let i = 0; i < BLOCK_COUNT; i++) if (!answered.has(i)) return i
-    return BLOCK_COUNT - 1
+    const bound = Math.min(Math.max(roundLimit ?? BLOCK_COUNT, 1), BLOCK_COUNT)
+    for (let i = 0; i < bound; i++) if (!answered.has(i)) return i
+    return bound - 1
   })
 
   const [submitting, setSubmitting] = React.useState(false)
@@ -84,10 +102,14 @@ export function AssessmentRunner({
 
   const block = BLOCKS[round]!
   const answer = answers[round] ?? { most: null, least: null }
-  const answeredCount = Object.values(answers).filter((a) => a.most && a.least).length
+  // Counted within this sitting, so onboarding reads "4 of 6" rather than
+  // "4 of 24" -- which is the number that makes it feel long.
+  const answeredCount = Object.entries(answers).filter(
+    ([index, a]) => Number(index) < limit && a.most && a.least,
+  ).length
   const isComplete = Boolean(answer.most && answer.least)
-  const isLast = round === BLOCK_COUNT - 1
-  const allAnswered = answeredCount === BLOCK_COUNT
+  const isLast = round === limit - 1
+  const allAnswered = answeredCount === limit
 
   /**
    * The first round still missing an answer.
@@ -98,12 +120,12 @@ export function AssessmentRunner({
    * explanation of either.
    */
   const firstUnanswered = React.useMemo(() => {
-    for (let i = 0; i < BLOCK_COUNT; i += 1) {
+    for (let i = 0; i < limit; i += 1) {
       const a = answers[i]
       if (!a?.most || !a?.least) return i
     }
     return null
-  }, [answers])
+  }, [answers, limit])
 
   React.useEffect(() => {
     shownAt.current = Date.now()
@@ -162,9 +184,9 @@ export function AssessmentRunner({
     void persist(round, next)
     setDurations((d) => [...d, Date.now() - shownAt.current].slice(-8))
 
-    if (round < BLOCK_COUNT - 1) {
+    if (round < limit - 1) {
       advanceTimer.current = window.setTimeout(
-        () => setRound((r) => Math.min(r + 1, BLOCK_COUNT - 1)),
+        () => setRound((r) => Math.min(r + 1, limit - 1)),
         ADVANCE_DELAY_MS,
       )
     }
@@ -175,7 +197,7 @@ export function AssessmentRunner({
     setError(null)
     const result = await completeAssessment(assessmentId)
     if (result.ok) {
-      router.push('/onboarding/reveal')
+      router.push(finishHref)
     } else {
       setSubmitting(false)
       setError('We could not finish scoring. Try again in a moment.')
@@ -191,13 +213,13 @@ export function AssessmentRunner({
     if (durations.length < 3) return null
     const sorted = [...durations].sort((a, b) => a - b)
     const median = sorted[Math.floor(sorted.length / 2)]!
-    const minutes = Math.round(((BLOCK_COUNT - answeredCount) * median) / 60_000)
+    const minutes = Math.round(((limit - answeredCount) * median) / 60_000)
     if (minutes < 1) return 'Under a minute left'
     if (minutes > 20) return null
     return `About ${minutes} min left`
-  }, [durations, answeredCount])
+  }, [durations, answeredCount, limit])
 
-  const progress = (answeredCount / BLOCK_COUNT) * 100
+  const progress = (answeredCount / limit) * 100
 
   return (
     <div className="py-4">
@@ -209,13 +231,13 @@ export function AssessmentRunner({
           className="font-display text-3xl leading-none text-ink outline-none sm:text-4xl"
         >
           <span className="tabular-nums">{String(round + 1).padStart(2, '0')}</span>
-          <span className="text-ink-faint"> / {BLOCK_COUNT}</span>
+          <span className="text-ink-faint"> / {limit}</span>
         </h1>
 
         <div className="flex items-center gap-3 text-xs text-ink-muted">
           {remainingLabel ? <span>{remainingLabel}</span> : null}
           <span className="tabular-nums">
-            {answeredCount} of {BLOCK_COUNT} answered
+            {answeredCount} of {limit} answered
           </span>
         </div>
       </div>
@@ -228,7 +250,7 @@ export function AssessmentRunner({
           role="progressbar"
           aria-valuenow={answeredCount}
           aria-valuemin={0}
-          aria-valuemax={BLOCK_COUNT}
+          aria-valuemax={limit}
           aria-label="Assessment progress"
         >
           <div
@@ -314,7 +336,7 @@ export function AssessmentRunner({
               </>
             ) : (
               <>
-                See my {brand.assessmentName}
+                {finishLabel ?? `See my ${brand.assessmentName}`}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </>
             )}
