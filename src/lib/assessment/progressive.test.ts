@@ -143,9 +143,16 @@ describe('where later questions come from', () => {
     expect(selector).toMatch(/ALL_SCENARIOS\.indexOf\(a\) - ALL_SCENARIOS\.indexOf\(b\)/)
   })
 
-  it('spaces answers so a session gets at most one', () => {
+  it('spaces refinement answers so a session gets at most one', () => {
     expect(selector).toMatch(/ANSWER_SPACING_MS/)
-    expect(selector).toMatch(/Date\.now\(\) - lastAnswer < ANSWER_SPACING_MS\) return null/)
+    expect(selector).toMatch(/Date\.now\(\) - lastRefinement < ANSWER_SPACING_MS\) return null/)
+  })
+
+  it('does not count the opening six toward that spacing', () => {
+    // They were not an interruption. Counting them delayed the first
+    // refinement by four hours after onboarding, which is the opposite of
+    // learning gradually while somebody uses the product.
+    expect(selector).toMatch(/coreIds\.has\(r\.scenario_id\)/)
   })
 
   it('counts only directional answers as evidence when ranking', () => {

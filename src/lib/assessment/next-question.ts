@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 import {
   ALL_SCENARIOS,
+  CORE_SCENARIOS,
   TOTAL_COUNT,
   SCENARIO_VERSION,
   SCENARIO_DIMENSIONS,
@@ -88,12 +89,19 @@ export async function getNextProfileQuestion(
   const answered = new Set((responses ?? []).map((r) => r.scenario_id))
   if (answered.size >= TOTAL_COUNT) return null
 
-  // One per session. The most recent answer sets the spacing window, so a user
-  // who just answered one is not handed another on the next page load.
-  const lastAnswer = (responses ?? [])
+  // One per session, measured from the last REFINEMENT answer only.
+  //
+  // The opening six do not count. They were not an interruption -- the user
+  // came to answer them -- and counting them meant somebody who finished
+  // onboarding and generated a brief waited four hours before Atturel would
+  // ever ask a first refinement question, which is the opposite of learning
+  // gradually while they use it.
+  const coreIds = new Set(CORE_SCENARIOS.map((s) => s.id))
+  const lastRefinement = (responses ?? [])
+    .filter((r) => !coreIds.has(r.scenario_id))
     .map((r) => new Date(r.answered_at).getTime())
     .sort((a, b) => b - a)[0]
-  if (lastAnswer && Date.now() - lastAnswer < ANSWER_SPACING_MS) return null
+  if (lastRefinement && Date.now() - lastRefinement < ANSWER_SPACING_MS) return null
 
   // Weakest evidence first. A dimension the user has told us nothing about is
   // worth more than a fourth question about one already settled.
