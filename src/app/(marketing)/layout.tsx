@@ -27,7 +27,15 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Wordmark name={brand.name} className="text-lg" />
             </Link>
 
-            <nav aria-label="Main" className="hidden items-center gap-7 md:flex">
+            {/* lg, not md.
+
+                At exactly 768px the five section links appeared alongside the
+                theme toggle and both auth actions, and the row overflowed by
+                36px -- the whole page scrolled sideways. This predates the
+                sign-in change; production shows the same 804px scrollWidth.
+                Holding the links back until 1024px is the honest fix: the row
+                simply does not fit before then. */}
+            <nav aria-label="Main" className="hidden items-center gap-7 lg:flex">
               {NAV.map((item) => (
                 <Link
                   key={item.href}
@@ -39,9 +47,23 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               ))}
             </nav>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            {/* Sign in is visible at every width.
+
+                It used to be `hidden sm:inline-flex`, which meant that below
+                640px the only control on the page was "Start free" -- and the
+                section links were already gone at 768px with no menu behind
+                them. A returning user who opened the site on their phone had
+                no way back into their own account except typing the URL. They
+                would not report that; they would just not come back.
+
+                A menu was the other option and is the wrong one here: it would
+                hide the single most important returning-user action behind a
+                tap to solve a problem that fits on the row. The marketing
+                anchors stay desktop-only because someone signing in does not
+                need them. */}
+            <div className="flex items-center gap-1 sm:gap-3">
               <ThemeToggle className="hidden sm:inline-flex" />
-              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+              <Button asChild variant="ghost" size="sm">
                 <Link href="/sign-in">Sign in</Link>
               </Button>
               <Button asChild size="sm">

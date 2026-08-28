@@ -159,7 +159,14 @@ export function MobileTabBar() {
       className="sticky bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md lg:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-5">
+      {/* Columns derived from the list, not hard-coded.
+
+          This was `grid-cols-5` while MOBILE_ITEMS held four -- Atlas is
+          filtered out -- so the tabs sat in the left four fifths with a dead
+          column on the right, and every future change to the nav would have
+          silently re-introduced the same drift. `grid-flow-col auto-cols-fr`
+          gives each item an equal share of the row whatever the count. */}
+      <ul className="grid auto-cols-fr grid-flow-col">
         {MOBILE_ITEMS.map((item) => (
           <li key={item.href}>
             <Link

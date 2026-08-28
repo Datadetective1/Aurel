@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import {
@@ -6,6 +7,7 @@ import {
   CircleAlert,
   Clock,
   Handshake,
+  Loader2,
   Sparkles,
   UserPlus,
 } from 'lucide-react'
@@ -26,7 +28,7 @@ import { getFirstRunState } from '@/lib/first-run'
 import { FirstRun, firstRunComplete } from '@/components/app/first-run'
 import { ProfilePrompt } from '@/components/app/profile-prompt'
 import { getNextProfileQuestion } from '@/lib/assessment/next-question'
-import { dailyFocusPrompt } from '@/lib/ai/prompts/coaching'
+import { dailyFocusPrompt, type DailyFocus, type DailyFocusInput } from '@/lib/ai/prompts/coaching'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
 import { addDays, endOfDayUtc, hourIn, isOverdueIn, startOfDayUtc, todayIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
@@ -134,8 +136,22 @@ export default async function TodayPage({
   const hasSignals =
     (meetings ?? []).length > 0 || (commitments ?? []).length > 0 || quiet.length > 0
 
-  const focus = hasSignals
-    ? await runPrompt(dailyFocusPrompt, {
+  // NOT awaited.
+  //
+  // This is a model call with a 45s timeout and two attempts behind it, and it
+  // used to be awaited right here, in the page body. That meant every single
+  // navigation to Today -- the screen every session starts on -- held the
+  // entire response until the model answered. Nothing rendered: not the
+  // greeting, not the meetings, not the commitments, none of which need the
+  // model at all. On a slow call the user sat looking at the previous page.
+  //
+  // Handing the promise to a Suspense child instead lets the deterministic two
+  // thirds of this page stream immediately, and the focus card resolve into
+  // place when it is ready. `runPrompt` never rejects -- it falls back to
+  // deterministic composition -- so an un-awaited promise cannot become an
+  // unhandled rejection here.
+  const focusPromise = hasSignals
+    ? runPrompt(dailyFocusPrompt, {
     user: userContext,
     today,
     timeZone,
@@ -170,7 +186,7 @@ export default async function TodayPage({
     })),
     quietRelationships: quiet,
       })
-    : null
+    : Promise.resolve(null)
 
   const hasAnything = (meetings ?? []).length > 0 || (commitments ?? []).length > 0
   const firstName = profile.preferred_name || profile.full_name?.split(' ')[0] || 'there'
@@ -243,41 +259,13 @@ export default async function TodayPage({
 
       {/* Today's focus — the single most important thing, with its reasoning.
           Only rendered when there is something to reason about; the first-run
-          panel above is the better answer on an empty account. */}
-      {focus ? (
-      <section className="mt-9">
-        <Panel className="p-6 sm:p-7">
-          <div className="flex items-start gap-3">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <Eyebrow>Today&rsquo;s focus</Eyebrow>
-              <p className="mt-3 font-display text-xl leading-snug text-ink sm:text-2xl">
-                {focus.output.headline}
-              </p>
-              <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
-                {focus.output.reasoning}
-              </p>
+          panel above is the better answer on an empty account.
 
-              {focus.output.priorities.length > 1 ? (
-                <ol className="mt-6 grid gap-3 border-t border-line pt-5">
-                  {focus.output.priorities.slice(1).map((priority, i) => (
-                    <li key={i} className="flex gap-3">
-                      <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-accent-graphic" />
-                      <span className="min-w-0">
-                        <span className="block text-sm text-ink">{priority.what}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-ink-muted">
-                          {priority.why}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : null}
-            </div>
-          </div>
-        </Panel>
-      </section>
-      ) : null}
+          Streamed: everything above and below this point paints without waiting
+          for the model. */}
+      <Suspense fallback={<FocusPending />}>
+        <FocusCard focusPromise={focusPromise} />
+      </Suspense>
 
       <UpcomingMeetings
         events={upcomingEvents}
@@ -431,36 +419,144 @@ export default async function TodayPage({
         </section>
       ) : null}
 
-      {/* Relationship signals */}
-      {focus && focus.output.watchItems.length > 0 ? (
-        <section className="mt-12">
-          <Eyebrow>Worth watching</Eyebrow>
-          <ul className="mt-4 grid gap-2.5">
-            {focus.output.watchItems.map((item) => (
-              <li key={item} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
-                <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-line-strong" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {/* Relationship signals. No fallback: this is supplementary, and a
+          placeholder for content that may not exist would be noise. */}
+      <Suspense fallback={null}>
+        <WatchItems focusPromise={focusPromise} />
+      </Suspense>
 
       {/* Below the day's real content on purpose: refinement is never the most
           important thing on this screen. */}
       {profileQuestion ? <ProfilePrompt block={profileQuestion} /> : null}
 
       {/* Honest attribution of how this page was produced. Absent when nothing
-          was produced -- an empty account has nothing to attribute. */}
-      {focus ? (
-        <p className="mt-14 flex items-center gap-2 text-xs text-ink-faint">
-          <CalendarClock className="size-3.5" aria-hidden="true" />
-          {focus.provenance.groundedFallback
-            ? 'Composed directly from your records.'
-            : 'Generated from your records.'}
-        </p>
-      ) : null}
+          was produced -- an empty account has nothing to attribute. It waits
+          for the model because it describes what the model did; claiming a
+          provenance before the generation resolves would be a guess. */}
+      <Suspense fallback={null}>
+        <FocusProvenance focusPromise={focusPromise} />
+      </Suspense>
     </Container>
+  )
+}
+
+type FocusPromise = Promise<Awaited<ReturnType<typeof runPrompt<DailyFocusInput, DailyFocus>>> | null>
+
+/**
+ * The focus card, once the model has answered.
+ *
+ * Split out so the rest of Today does not wait on it. Returns null when the
+ * account has nothing to reason about -- the first-run panel is the better
+ * answer on an empty account, and it has already rendered above.
+ */
+async function FocusCard({ focusPromise }: { focusPromise: FocusPromise }) {
+  const focus = await focusPromise
+  if (!focus) return null
+
+  return (
+    <section className="mt-9">
+      <Panel className="p-6 sm:p-7">
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <Eyebrow>Today&rsquo;s focus</Eyebrow>
+            <p className="mt-3 font-display text-xl leading-snug text-ink sm:text-2xl">
+              {focus.output.headline}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
+              {focus.output.reasoning}
+            </p>
+
+            {focus.output.priorities.length > 1 ? (
+              <ol className="mt-6 grid gap-3 border-t border-line pt-5">
+                {focus.output.priorities.slice(1).map((priority, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-accent-graphic" />
+                    <span className="min-w-0">
+                      <span className="block text-sm text-ink">{priority.what}</span>
+                      <span className="mt-0.5 block text-xs leading-relaxed text-ink-muted">
+                        {priority.why}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </div>
+        </div>
+      </Panel>
+    </section>
+  )
+}
+
+/**
+ * What the focus card looks like while the model is still answering.
+ *
+ * Says what is happening in words rather than animating a shape that pretends
+ * to be text. A skeleton here would be claiming a headline exists before there
+ * is one, on the screen whose entire argument is that it does not assert things
+ * it cannot support. The one moving part is a spinner that is honestly a
+ * spinner, and it is hidden from assistive technology because the live region
+ * below already announces the state.
+ */
+function FocusPending() {
+  return (
+    <section className="mt-9">
+      <Panel className="p-6 sm:p-7">
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <Eyebrow>Today&rsquo;s focus</Eyebrow>
+            <p
+              className="mt-3 flex items-center gap-2.5 text-sm text-ink-secondary"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2
+                className="size-4 shrink-0 animate-spin text-ink-faint"
+                aria-hidden="true"
+              />
+              Reading today against your record…
+            </p>
+          </div>
+        </div>
+      </Panel>
+    </section>
+  )
+}
+
+/** Relationship signals worth a second look. Supplementary to the focus card. */
+async function WatchItems({ focusPromise }: { focusPromise: FocusPromise }) {
+  const focus = await focusPromise
+  if (!focus || focus.output.watchItems.length === 0) return null
+
+  return (
+    <section className="mt-12">
+      <Eyebrow>Worth watching</Eyebrow>
+      <ul className="mt-4 grid gap-2.5">
+        {focus.output.watchItems.map((item) => (
+          <li key={item} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
+            <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-line-strong" />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Whether the day was generated or composed. Never overstated. */
+async function FocusProvenance({ focusPromise }: { focusPromise: FocusPromise }) {
+  const focus = await focusPromise
+  if (!focus) return null
+
+  return (
+    <p className="mt-14 flex items-center gap-2 text-xs text-ink-faint">
+      <CalendarClock className="size-3.5" aria-hidden="true" />
+      {focus.provenance.groundedFallback
+        ? 'Composed directly from your records.'
+        : 'Generated from your records.'}
+    </p>
   )
 }
 

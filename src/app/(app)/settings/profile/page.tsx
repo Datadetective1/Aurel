@@ -116,8 +116,14 @@ export default async function InteractionProfileSettingsPage() {
             <Button asChild variant="secondary" size="sm">
               <Link href="/onboarding/reveal">View my full profile</Link>
             </Button>
+            {/* Was "Retake the assessment", which this does not do: the
+                destination resumes the existing run and asks the questions
+                that have not been answered yet. Nothing is discarded and no
+                answer is asked twice. Under progressive profiling, resuming is
+                the correct behaviour -- the label was the part that was
+                wrong. */}
             <Button asChild variant="ghost" size="sm">
-              <Link href="/settings/profile/refine">Retake the assessment</Link>
+              <Link href="/settings/profile/refine">Answer more questions</Link>
             </Button>
           </div>
         </>

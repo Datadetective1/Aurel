@@ -15,6 +15,42 @@ import { logger } from '@/lib/logger'
  * Events are written to the user's own `analytics_events` rows (RLS-scoped) so
  * they are included in an account export and destroyed with the account. There
  * is no third-party analytics sink.
+ *
+ * =============================================================================
+ * WHICH EVENTS TO COUNT
+ * =============================================================================
+ * Two naming generations coexist. The `assessment_*` family is older and its
+ * history is not trustworthy; the `interaction_profile_*` family is the one to
+ * build a funnel on. Both fire, deliberately — dropping the old names would
+ * orphan the rows already written, and they cost nothing.
+ *
+ * THE CANONICAL INTERACTION-PROFILE FUNNEL:
+ *
+ *   interaction_profile_started
+ *     → interaction_profile_initial_completed      (the six core scenarios)
+ *       → interaction_profile_refinement_shown     (one question rendered)
+ *         → interaction_profile_refinement_answered | _dismissed | _skipped
+ *
+ * DO NOT COUNT `assessment_started` FOR ANYTHING HISTORICAL. Before the resume
+ * query in `onboarding/assessment/actions.ts` was corrected to accept a
+ * completed run, landing on the assessment page after finishing found nothing
+ * to resume and created a fresh empty row — firing a second `assessment_started`
+ * on the way to the reveal screen. Production rows from 25–27 Aug 2026 show the
+ * signature clearly: seven starts for one 31-minute run on 25 Aug, and a start
+ * timestamped in the same second as a completion on 27 Aug. Any
+ * started-to-completed rate over that window understates completion, roughly by
+ * half.
+ *
+ * That defect is fixed and the current scenario instrument does not reproduce
+ * it — runs on 28 Aug show exactly one start per completion. The polluted rows
+ * are left in place rather than rewritten: analytics is a record of what was
+ * observed, and editing it to look better would be the same dishonesty the
+ * evidence model exists to prevent.
+ *
+ * `assessment_completed`, `assessment_initial_completed` and
+ * `interaction_profile_initial_completed` all fire at the same moment for the
+ * same event. Count ONE of them — the third — and treat the other two as
+ * legacy aliases.
  */
 
 export type AnalyticsEvent =
