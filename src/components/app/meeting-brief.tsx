@@ -477,10 +477,23 @@ export function MeetingBriefView({
 }) {
   return (
     <div>
-      {/* --- 60 second brief ------------------------------------------------- */}
+      {/* --- the lede ---------------------------------------------------------
+          The `sixtySecond` FIELD keeps its name: it is in the prompt schema and
+          in every stored artifact, and renaming it would orphan them.
+
+          The LABEL had to change. "The 60-second version" was unambiguous while
+          the brief had one depth. Adding a depth actually called "Sixty
+          seconds" turned it into a contradiction: the reader selects
+          Everything, the rail marks Everything, and then the first panel on the
+          page announces itself as the shorter view they did not choose. The
+          collision is a consequence of the depth rail, so it belongs to that
+          work even though the string predates it.
+
+          "In short" is what this paragraph is -- the lede of a long document,
+          which is where it has always earned its place. */}
       {brief.sixtySecond ? (
         <Panel className="border-accent/25 bg-accent-wash p-6 sm:p-7">
-          <h2 className="label text-accent">The 60-second version</h2>
+          <h2 className="label text-accent">In short</h2>
           <p className="font-display text-ink mt-3 text-xl leading-snug sm:text-2xl">
             {brief.sixtySecond}
           </p>
