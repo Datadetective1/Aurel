@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Panel } from '@/components/ui/primitives'
+import { AddParticipants, type PersonChoice } from './add-participants'
 import { EvidenceBadge } from './evidence'
 import { ApertureRule } from '@/components/brand/aperture'
 import type { ListeningCue, NormalizedBrief } from '@/lib/brief'
@@ -206,24 +207,33 @@ export function GlanceBriefView({
   brief,
   room,
   alert,
+  meetingId,
+  unmatchedAttendees,
+  addablePeople,
 }: {
   brief: NormalizedBrief
   /** The room, resolved by the page: brief participants, or the attendee list. */
   room: { id: string | null; name: string }[]
   /** The one warning worth interrupting for, if there is one. */
   alert: GlanceAlert | null
+  meetingId: string
+  /**
+   * Calendar invitees this meeting carries that resolve to nobody in the
+   * record. Zero is not the same as "no invitees" -- see the empty state.
+   */
+  unmatchedAttendees: number
+  addablePeople: PersonChoice[]
 }) {
   // Exactly the things this view renders. It previously counted
   // `recommendedApproach`, which the glance does not show -- so a brief
   // carrying only an approach reported itself as having content and then
   // painted an empty screen.
-  const hasAnything = Boolean(brief.objective || brief.howToOpen || room.length > 0 || alert)
-
   return (
     <div className="grid gap-6">
-      {room.length > 0 ? (
-        <section>
-          <h2 className="label">In the room</h2>
+      <section>
+        <h2 className="label">In the room</h2>
+
+        {room.length > 0 ? (
           <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2.5">
             {room.map((person, i) => (
               <li key={person.id ?? `${person.name}-${i}`} className="flex items-center gap-2">
@@ -232,8 +242,46 @@ export function GlanceBriefView({
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        ) : (
+          /* Silence used to be the answer here, on the one screen whose job is
+             to say who you are about to meet. It is now an empty state, and it
+             distinguishes the two conditions the data model can actually tell
+             apart -- because saying matching failed when nobody was ever
+             invited would be a claim about a thing that did not happen.
+
+             It never asserts that an invitee IS someone in the record. An
+             unmatched calendar attendee is an email address; turning it into a
+             person is a decision only the user can make, which is what the
+             control below is for. */
+          <div className="mt-3">
+            {unmatchedAttendees > 0 ? (
+              <>
+                <p className="text-ink text-sm leading-relaxed">
+                  No participants have been matched to this meeting yet.
+                </p>
+                {/* One sentence, not two. The reassurance that follows -- that
+                    nothing is assumed about the rest -- cost 33px and pushed the
+                    ten-second view past a 375x812 phone, which is the one
+                    measurable promise this screen makes. AddParticipants says
+                    the actionable half underneath it anyway. */}
+                <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
+                  Its invite carries{' '}
+                  {unmatchedAttendees === 1 ? 'one attendee' : `${unmatchedAttendees} attendees`}{' '}
+                  {brand.name} does not recognise.
+                </p>
+              </>
+            ) : (
+              <p className="text-ink text-sm leading-relaxed">
+                No one has been added to this meeting yet.
+              </p>
+            )}
+
+            <div className="mt-4">
+              <AddParticipants meetingId={meetingId} people={addablePeople} />
+            </div>
+          </div>
+        )}
+      </section>
 
       {brief.objective ? (
         <section>
@@ -282,12 +330,8 @@ export function GlanceBriefView({
         </p>
       ) : null}
 
-      {!hasAnything ? (
-        <p className="text-ink-secondary text-sm leading-relaxed">
-          This brief has no objective or opening recorded. Open the full brief to see what{' '}
-          {brand.name} did find.
-        </p>
-      ) : null}
+      {/* No "nothing here" fallback any more: the room section always renders,
+          so the shortest view can never come up blank. */}
     </div>
   )
 }

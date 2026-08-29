@@ -140,6 +140,24 @@ test.describe('critical flow', () => {
     await page.getByRole('button', { name: /save|create/i }).first().click()
     await page.waitForURL(/\/meetings\//, { timeout: 20_000 })
     await expect(page.locator('body')).toContainText('Quarterly planning')
+
+    // The unprepared brief, on a phone. This is a pilot's FIRST session: the
+    // meeting exists, no brief has been generated, and the participant picker
+    // is on screen. Its <select> takes its width from the longest person in the
+    // account -- "Name — Job Title · Organisation" -- and the row holding it is
+    // a grid item, so without min-w-0 it refused to shrink and took the whole
+    // page sideways. Measured at 375px: scrollWidth 515 against a 375 viewport.
+    //
+    // Checked here rather than in a signed-in sweep because this is the only
+    // place in the suite that reliably HAS an unprepared meeting.
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.waitForTimeout(250)
+      const overflows = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      )
+      expect(overflows, `the unprepared brief scrolls sideways at ${width}px`).toBe(false)
+    }
   })
 })
 

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ArrowRight } from 'lucide-react'
 import { GlanceBriefView, type GlanceAlert } from '@/components/app/meeting-brief'
+import type { PersonChoice } from '@/components/app/add-participants'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LiveCountdown } from '@/components/app/meeting-countdown'
 import { Button } from '@/components/ui/button'
@@ -79,6 +80,28 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
             : [],
         )
 
+  // --- who the invite carried that resolves to nobody ------------------------
+  // Read from the synced calendar row, where every attendee is stored with the
+  // person it matched to, or null. This is the ONLY thing that distinguishes
+  // "the invite had people in it and none of them are in your record" from
+  // "nobody was ever invited" -- and the empty state says different things for
+  // the two, because claiming matching failed when nothing was invited would
+  // describe an event that did not happen.
+  let unmatchedAttendees = 0
+  if (room.length === 0) {
+    const { data: calendarEvent } = await supabase
+      .from('external_calendar_events')
+      .select('attendees')
+      .eq('user_id', user.id)
+      .eq('meeting_id', id)
+      .maybeSingle()
+
+    const invited = (calendarEvent?.attendees ?? []) as unknown as { personId?: string | null }[]
+    unmatchedAttendees = Array.isArray(invited)
+      ? invited.filter((a) => !a?.personId).length
+      : 0
+  }
+
   // --- the one warning worth interrupting for -------------------------------
   const attendeeIds = (attendees ?? []).map((a) => a.person_id)
   const { data: commitments } = attendeeIds.length
@@ -111,6 +134,29 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
         tone: overdue ? 'critical' : 'caution',
       }
     : null
+
+  // People the user could still attach, for the empty-room control. Only
+  // fetched when the room is empty -- the glance does not otherwise need them.
+  // Excludes anyone already in the room, so the picker never offers somebody
+  // who is already there.
+  let addablePeople: PersonChoice[] = []
+  if (room.length === 0) {
+    const { data: allPeople } = await supabase
+      .from('people')
+      .select('id, full_name, preferred_name, job_title, organizations(name)')
+      .eq('user_id', user.id)
+      .is('archived_at', null)
+      .order('full_name', { ascending: true })
+      .limit(200)
+
+    addablePeople = (allPeople ?? [])
+      .filter((p) => !attendeeIds.includes(p.id))
+      .map((p) => ({
+        id: p.id,
+        name: p.preferred_name || p.full_name,
+        subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
+      }))
+  }
 
   // Bucket only. See lib/brief: a duration next to an event timestamp is a
   // reconstruction of when a named person was in a specific meeting.
@@ -146,7 +192,14 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
       <BriefDepthNav meetingId={id} current="glance" className="mt-5" />
 
       <div className="mt-7">
-        <GlanceBriefView brief={brief} room={room} alert={alert} />
+        <GlanceBriefView
+          brief={brief}
+          room={room}
+          alert={alert}
+          meetingId={id}
+          unmatchedAttendees={unmatchedAttendees}
+          addablePeople={addablePeople}
+        />
       </div>
 
       <Button asChild size="lg" className="mt-8 w-full">
