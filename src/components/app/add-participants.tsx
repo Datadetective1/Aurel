@@ -78,7 +78,23 @@ export function AddParticipants({
 
   return (
     <div className="grid gap-2">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* `min-w-0` is load-bearing and was missing.
+
+          A <select>'s intrinsic width comes from its longest <option>, and
+          these options are "Name — Job Title · Organisation". At 77 characters
+          that is ~412px. This row is a GRID ITEM, and a grid item defaults to
+          min-width:auto, which resolves to its min-content -- so the row
+          refused to shrink below 470px and both grid items stretched to that
+          track, taking the whole page sideways on a phone.
+
+          `min-w-0` on the <select> was already there and does not help: it
+          governs the select during FLEX layout, not the select's contribution
+          to this row's own min-content. The constraint that has to be released
+          is the grid item's automatic minimum, which is this element.
+
+          Measured on the unprepared brief at 375px: document scrollWidth 515
+          before, 375 after. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <label htmlFor="add-participant" className="sr-only">
           Add someone to this meeting
         </label>

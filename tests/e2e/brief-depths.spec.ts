@@ -230,6 +230,59 @@ test.describe('graduated brief', () => {
     })
   }
 
+  test('the unprepared brief does not scroll sideways on a phone', async ({ page }) => {
+    await signIn(page)
+
+    // A meeting with no brief: /glance redirects to /brief for exactly those,
+    // which is the page's own check rather than a second copy of it.
+    await page.goto('/meetings')
+    const hrefs = await page.locator('a[href^="/meetings/"]').evaluateAll((links) =>
+      links.map((l) => l.getAttribute('href') ?? ''),
+    )
+    const ids = [
+      ...new Set(
+        hrefs.flatMap((href) => href.match(/^\/meetings\/([0-9a-f-]{36})(?:\/|$)/)?.[1] ?? []),
+      ),
+    ]
+
+    let unprepared: string | null = null
+    for (const id of ids) {
+      await page.goto(`/meetings/${id}/glance`)
+      if (new URL(page.url()).pathname === `/meetings/${id}/brief`) {
+        unprepared = id
+        break
+      }
+    }
+
+    // Says so rather than passing green on nothing -- an account where every
+    // meeting is prepared cannot exercise this.
+    if (!unprepared) {
+      console.log('  no unprepared meeting on this account - overflow check not exercised')
+      test.skip()
+      return
+    }
+
+    await page.goto(`/meetings/${unprepared}/brief`)
+    const failures: string[] = []
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((t) => localStorage.setItem('theme', t), theme)
+      await page.reload()
+      await settle(page)
+      for (const width of [320, 375, 768, 1280]) {
+        await page.setViewportSize({ width, height: 900 })
+        await settle(page)
+        const measured = await page.evaluate(() => ({
+          scroll: document.documentElement.scrollWidth,
+          client: document.documentElement.clientWidth,
+        }))
+        if (measured.scroll > measured.client + 1) {
+          failures.push(`${theme} @${width}: ${measured.scroll} > ${measured.client}`)
+        }
+      }
+    }
+    expect(failures, failures.join(', ')).toEqual([])
+  })
+
   test('Today points at the shortest view when a meeting is close', async ({ page }) => {
     await signIn(page)
     await page.goto('/today')
