@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ArrowLeft, CircleCheck, Smartphone } from 'lucide-react'
+import { ArrowLeft, CircleCheck } from 'lucide-react'
 import { MeetingBriefView, type BriefCitation } from '@/components/app/meeting-brief'
+import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import type { PersonChoice } from '@/components/app/add-participants'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
@@ -11,8 +12,9 @@ import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { track } from '@/lib/analytics'
 import { formatDate, formatTime, relativeDay } from '@/lib/format'
-import type { MeetingBrief } from '@/lib/ai/prompts/meeting-brief'
+import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
 
 export const metadata: Metadata = {
   title: 'Meeting brief',
@@ -134,7 +136,35 @@ export default async function BriefPage({
     }
   }
 
-  const brief = artifact ? (artifact.content as unknown as MeetingBrief) : null
+  // Normalised once at the boundary. `content` is a Json column that is cast,
+  // never parsed, so a brief written before a field existed simply lacks it --
+  // and the three depths all read the same object.
+  const brief = artifact ? normalizeBrief(artifact.content) : null
+
+  // Promises still open with this room. Read here rather than composed into the
+  // artifact because a commitment closes between generating a brief and reading
+  // it, and a stale "still open" is worse than none.
+  const { data: openCommitments } =
+    brief && attendeeIds.length > 0
+      ? await supabase
+          .from('commitments')
+          .select('description, owner, due_on')
+          .eq('user_id', user.id)
+          .eq('status', 'open')
+          .in('person_id', attendeeIds)
+          .order('due_on', { ascending: true, nullsFirst: false })
+          .limit(4)
+      : { data: [] as { description: string; owner: string; due_on: string | null }[] }
+
+  const cues = brief ? listeningCues(brief, { openCommitments: openCommitments ?? [] }) : []
+
+  if (brief) {
+    await track('brief_deep_viewed', {
+      proximity: startProximity(meeting.scheduled_at, now),
+      participants: brief.participants.length,
+      listening_cues: cues.length,
+    })
+  }
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -192,13 +222,13 @@ export default async function BriefPage({
 
       {brief ? (
         <>
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <Button asChild variant="secondary" size="sm">
-              <Link href={`/meetings/${id}/quick`}>
-                <Smartphone className="size-3.5" aria-hidden="true" />
-                Quick Brief
-              </Link>
-            </Button>
+          {/* The depth rail replaces a lone "Quick Brief" button. That button
+              was the only way to reach the short view and it named a document
+              rather than a promise, so the two shorter depths were effectively
+              undiscoverable from here. */}
+          <BriefDepthNav meetingId={id} current="deep" className="mt-6" />
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button asChild variant="secondary" size="sm">
               <Link href={`/meetings/${id}/debrief`}>Debrief this meeting</Link>
             </Button>
@@ -227,6 +257,7 @@ export default async function BriefPage({
               citations={citations}
               grounded={artifact!.grounded_fallback}
               meetingId={id}
+              cues={cues}
             />
           </div>
 

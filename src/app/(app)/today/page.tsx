@@ -15,6 +15,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, EmptyState, Eyebrow, Panel } from '@/components/ui/primitives'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
+import { MeetingCountdownCard } from '@/components/app/meeting-countdown'
 import {
   UpcomingMeetings,
   type UpcomingAttendee,
@@ -29,6 +30,7 @@ import { FirstRun, firstRunComplete } from '@/components/app/first-run'
 import { ProfilePrompt } from '@/components/app/profile-prompt'
 import { getNextProfileQuestion } from '@/lib/assessment/next-question'
 import { dailyFocusPrompt, type DailyFocus, type DailyFocusInput } from '@/lib/ai/prompts/coaching'
+import { minutesUntil } from '@/lib/brief'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
 import { addDays, endOfDayUtc, hourIn, isOverdueIn, startOfDayUtc, todayIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
@@ -111,6 +113,28 @@ export default async function TodayPage({
   for (const a of attendees ?? []) {
     attendeesByMeeting.set(a.meeting_id, [...(attendeesByMeeting.get(a.meeting_id) ?? []), a.person_id])
   }
+
+  /**
+   * THE MEETING ABOUT TO HAPPEN.
+   *
+   * Derived from the meetings already fetched above -- no extra query, and no
+   * second model call on the screen every session starts on.
+   *
+   * The window runs from twenty minutes after a start to sixty minutes before
+   * one. The trailing edge is deliberate: somebody who opens Atturel while the
+   * meeting is already running is exactly the person who most needs the short
+   * view, and a card that vanishes at the moment the meeting begins would
+   * disappear precisely then.
+   */
+  const nearby = (meetings ?? [])
+    .map((meeting) => ({ meeting, minutes: minutesUntil(meeting.scheduled_at, now) }))
+    .filter(
+      (row): row is { meeting: (typeof row)['meeting']; minutes: number } =>
+        row.minutes !== null && row.minutes <= 60 && row.minutes >= -20,
+    )
+  // The next one to start outranks one already running; where everything has
+  // begun, the most recent is the one they are probably sitting in.
+  const imminent = nearby.find((row) => row.minutes >= 0) ?? nearby[nearby.length - 1] ?? null
 
   const peopleMap = await getPeopleContext(
     supabase,
@@ -252,6 +276,21 @@ export default async function TodayPage({
           Good {timeOfDay(timeZone, now)}, {firstName}.
         </h1>
       </header>
+
+      {/* Above everything, including the focus card, because it is the only
+          thing on this page with a deadline. It renders from data already
+          loaded and never waits on the model. */}
+      {imminent ? (
+        <MeetingCountdownCard
+          className="mt-8"
+          meetingId={imminent.meeting.id}
+          title={imminent.meeting.title}
+          startsAt={imminent.meeting.scheduled_at!}
+          nowIso={now.toISOString()}
+          timeLabel={formatTime(imminent.meeting.scheduled_at!, timeZone)}
+          hasBrief={prepared.has(imminent.meeting.id)}
+        />
+      ) : null}
 
       {/* The three things that make an empty account useful. Disappears on its
           own once they are done — see components/app/first-run. */}

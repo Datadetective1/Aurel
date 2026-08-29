@@ -117,7 +117,20 @@ export type AnalyticsEvent =
   // their timestamps is how long somebody waits at the spinner.
   | 'meeting_prepare_started'
   | 'meeting_prepared'
+  // The three depths of a brief. Each carries a `proximity` BUCKET -- imminent,
+  // soon, today, ahead, past, unscheduled -- and never a duration: minutes
+  // to start, next to the event's own timestamp, reconstructs when a named
+  // user was sitting in a specific meeting.
+  //
+  // The question these exist to answer is whether the short views are reached
+  // in the corridor and the full brief at a desk. If `brief_glance_viewed` is
+  // dominated by `ahead`, the depths are ordered wrong.
+  //
+  // `quick_brief_viewed` predates the other two and keeps its name: renaming it
+  // would orphan the rows already written.
+  | 'brief_glance_viewed'
   | 'quick_brief_viewed'
+  | 'brief_deep_viewed'
   | 'meeting_debriefed'
   // Voice debrief. Buckets, latencies and error categories only -- never a
   // word of what was said, and no audio ever reaches this file.
