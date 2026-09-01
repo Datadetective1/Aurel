@@ -79,12 +79,14 @@ export default function PricingPage() {
             </Panel>
 
             {/* --- pro -------------------------------------------------------- */}
-            {/* No promotional badge. The founding price it used to advertise had
-                no Stripe price behind it, so the number on the card was not the
-                number the card would have charged -- see FOUNDING_OFFER. */}
+            {/* "Founding price" is gone from here: no Stripe price backed it, so
+                the number on the card was not the number the card would have
+                charged -- see FOUNDING_OFFER. What replaced it is a
+                recommendation, which is ours to make. "Most popular" would not
+                have been: this has sold to nobody yet. */}
             <Panel className="relative flex flex-col border-accent/30 bg-accent-wash p-7">
               <Badge tone="accent" className="absolute -top-2.5 left-7">
-                Most popular
+                Recommended
               </Badge>
 
               <h2 className="font-display text-2xl text-ink">{pro.name}</h2>
