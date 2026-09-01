@@ -139,11 +139,17 @@ describe('what a full-access account is shown', () => {
     // "3 researched people and 3 meeting briefs a month" is not true of an
     // account those quotas do not apply to, and it sat directly above a line
     // saying no quotas apply.
-    expect(billing).toMatch(/!fullAccess \? \([\s\S]{0,200}plan\.highlights/)
+    //
+    // The gate used to be a local `fullAccess`; it is now `entitlements.billable`,
+    // which is false for exactly the same two tiers -- see isBillable in
+    // ./access -- and is additionally what suppresses every price and payment
+    // button on the page.
+    expect(billing).toMatch(/entitlements\.billable \? \([\s\S]{0,200}plan\.highlights/)
   })
 
   it('offers no upgrade prompt', () => {
-    expect(billing).toMatch(/fullAccess \? 'hidden'/)
+    expect(billing).toMatch(/features\.billing && view\.showUpgrade/)
+    expect(billing).toMatch(/features\.billing && view\.showManage/)
   })
 
   it('drops the usage bars by itself, without a special case', () => {

@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import { FOUNDING_OFFER, PLANS, formatPrice, type MeterKind } from '@/lib/billing/plans'
-import { foundingPlacesRemaining } from './actions'
+import { PLANS, type BillingInterval, type MeterKind } from '@/lib/billing/plans'
+import { billingView } from '@/lib/billing/display'
+import { formatDate } from '@/lib/format'
 import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
+import { CheckoutReturn } from '@/components/app/checkout-return'
 import { InvitationPanel } from '@/components/app/invitation-panel'
-import { hasFullAccess } from '@/lib/billing/access'
 import { features } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
@@ -23,27 +24,37 @@ const METER_LABEL: Partial<Record<MeterKind, string>> = {
   message_adaptation: 'Messages adapted',
 }
 
+function parseIntent(value: string | undefined): BillingInterval {
+  return value === 'yearly' ? 'yearly' : 'monthly'
+}
+
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ checkout?: string }>
+  searchParams: Promise<{ checkout?: string; intent?: string }>
 }) {
-  await requireOnboardedUser()
-  const { checkout } = await searchParams
+  const { profile } = await requireOnboardedUser()
+  const { checkout, intent } = await searchParams
   const entitlements = await getEntitlements()
   const plan = PLANS[entitlements.plan]
-  const founding = await foundingPlacesRemaining()
+  const timeZone = profile.timezone ?? 'UTC'
+
+  const view = billingView({
+    level: entitlements.level,
+    plan: entitlements.plan,
+    status: entitlements.billing.status,
+    interval: entitlements.billing.interval,
+    currentPeriodEnd: entitlements.billing.currentPeriodEnd,
+    cancelAtPeriodEnd: entitlements.billing.cancelAtPeriodEnd,
+    trialEndsAt: entitlements.billing.trialEndsAt,
+    hasCustomer: entitlements.billing.hasCustomer,
+  })
 
   // Only meters with an actual numeric quota are worth showing a bar for.
   const metered = (Object.keys(METER_LABEL) as MeterKind[]).filter((kind) => {
     const limit = entitlements.quotas[kind]
     return typeof limit === 'number' && limit > 0
   })
-
-  // Owner and pilot: the plan is still Free commercially, but its ceilings do
-  // not apply, so the copy that describes them would contradict the Access
-  // section a few lines below it.
-  const fullAccess = hasFullAccess(entitlements.tier)
 
   const usage = await Promise.all(
     metered.map(async (kind) => ({
@@ -53,43 +64,88 @@ export default async function BillingSettingsPage({
     })),
   )
 
+  // Someone who chose a plan on the pricing page before they had an account.
+  // The choice is honoured as a prompt, never as a charge: they still press the
+  // button, and the price is still the one the server configuration says.
+  const resumingPurchase = Boolean(intent) && view.showUpgrade && features.billing
+
   return (
     <div>
       <Eyebrow>Plan</Eyebrow>
 
       {checkout === 'success' ? (
-        <p
-          role="status"
-          className="mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border border-positive/25 bg-positive-wash px-3.5 py-3 text-xs leading-relaxed text-positive"
-        >
-          <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          Payment received. Your plan updates the moment Stripe confirms it — usually within
-          seconds. Reload if this page still shows the old plan.
-        </p>
+        <CheckoutReturn alreadyPro={entitlements.plan !== 'free'} />
       ) : null}
 
       {checkout === 'canceled' ? (
         <p className="mt-4 max-w-lg text-xs leading-relaxed text-ink-muted">
-          Checkout was canceled and nothing was charged.
+          Checkout was canceled and nothing was charged. Your plan has not changed.
         </p>
       ) : null}
 
+      {resumingPurchase ? (
+        <p
+          role="status"
+          className="mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border border-accent/25 bg-accent-wash px-3.5 py-3 text-xs leading-relaxed text-ink-secondary"
+        >
+          <CircleCheck className="mt-px size-3.5 shrink-0 text-accent" aria-hidden="true" />
+          Your account is ready. Finish upgrading to Pro below — you picked{' '}
+          {parseIntent(intent) === 'yearly' ? 'yearly' : 'monthly'} billing.
+        </p>
+      ) : null}
+
+      {/* --- what this account is ------------------------------------------ */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <span className="font-display text-2xl text-ink">{plan.name}</span>
+        <span className="font-display text-2xl text-ink">{view.planName}</span>
+        {view.statusLabel ? <Badge tone={view.statusTone}>{view.statusLabel}</Badge> : null}
         {entitlements.isFounding ? <Badge tone="accent">Founding</Badge> : null}
-        {plan.monthlyPriceCents ? (
-          <span className="text-sm text-ink-secondary">
-            {formatPrice(plan.monthlyPriceCents)} per month
-          </span>
-        ) : null}
       </div>
 
-      <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">{plan.tagline}</p>
+      <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
+        {view.priceLabel ?? plan.tagline}
+      </p>
+
+      {/* Billing facts, and only the ones we actually hold. A row whose value
+          is missing is omitted entirely rather than filled with a plausible
+          date -- a wrong renewal date on an account screen is worse than none. */}
+      {view.priceLabel || view.periodLabel ? (
+        <dl className="mt-6 grid max-w-lg gap-2.5 text-sm">
+          {view.priceLabel ? (
+            <div className="flex justify-between gap-6 border-b border-line pb-2.5">
+              <dt className="text-ink-muted">Billing</dt>
+              <dd className="text-ink">{view.priceLabel}</dd>
+            </div>
+          ) : null}
+          {view.periodLabel && entitlements.billing.currentPeriodEnd ? (
+            <div className="flex justify-between gap-6 border-b border-line pb-2.5">
+              <dt className="text-ink-muted">{view.periodLabel}</dt>
+              <dd className="text-ink">
+                {formatDate(entitlements.billing.currentPeriodEnd, timeZone)}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      {view.notice ? (
+        <p
+          className={`mt-5 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed ${
+            view.noticeTone === 'critical'
+              ? 'border-critical/25 bg-critical-wash text-critical'
+              : view.noticeTone === 'caution'
+                ? 'border-caution/25 bg-caution-wash text-caution'
+                : 'border-accent/25 bg-accent-wash text-ink-secondary'
+          }`}
+        >
+          <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+          {view.notice}
+        </p>
+      ) : null}
 
       {/* The Free highlights enumerate quotas -- "3 researched people and 3
           meeting briefs a month" -- which is not true of an account those
           quotas do not apply to. */}
-      {!fullAccess ? (
+      {entitlements.billable ? (
         <ul className="mt-6 grid gap-2.5">
           {plan.highlights.map((item) => (
             <li key={item} className="flex gap-2.5 text-sm text-ink-secondary">
@@ -140,40 +196,25 @@ export default async function BillingSettingsPage({
         </section>
       ) : null}
 
-      {/* No upgrade path is offered to an account that already has everything.
-          Nothing here is hidden from them -- Compare plans is still reachable
-          from the marketing site -- it is simply not a prompt they need. */}
-      <div className={fullAccess ? 'hidden' : 'mt-10 flex flex-wrap items-start gap-2'}>
-        {features.billing && entitlements.plan === 'free' ? (
+      {/* No payment control is offered to an account that cannot be billed.
+          Nothing is hidden from them -- Compare plans is still reachable -- it
+          is simply not a prompt an owner or a pilot needs. */}
+      <div className="mt-10 flex flex-wrap items-start gap-2">
+        {features.billing && view.showUpgrade ? (
           <UpgradeButton
+            interval={parseIntent(intent)}
             label={
-              founding !== null && founding > 0
-                ? `Upgrade at the founding price — ${formatPrice(FOUNDING_OFFER.monthlyPriceCents)}`
-                : 'Upgrade to Pro'
+              parseIntent(intent) === 'yearly' ? 'Upgrade to Pro, yearly' : 'Upgrade to Pro'
             }
           />
         ) : null}
-        {features.billing && entitlements.plan !== 'free' ? <ManageBillingButton /> : null}
+        {features.billing && view.showManage ? <ManageBillingButton /> : null}
         <Button asChild variant="secondary" size="sm">
           <Link href="/pricing">Compare plans</Link>
         </Button>
       </div>
 
-      {/* Only where someone could actually take a place. Advertising scarcity on
-          a deployment that cannot sell is a claim with nothing behind it. */}
-      {features.billing && founding !== null && founding > 0 && entitlements.plan === 'free' ? (
-        <p className="mt-3 text-xs text-ink-muted">
-          {founding} founding {founding === 1 ? 'place' : 'places'} left. {FOUNDING_OFFER.blurb}
-        </p>
-      ) : null}
-
-      {entitlements.isFounding ? (
-        <p className="mt-3 text-xs text-ink-muted">
-          You joined as a founding customer. {FOUNDING_OFFER.blurb}
-        </p>
-      ) : null}
-
-      {!features.billing ? (
+      {!features.billing && entitlements.billable ? (
         <p className="mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border border-line bg-bg-sunken px-3.5 py-3 text-xs leading-relaxed text-ink-muted">
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           Payments are not connected on this deployment, so upgrading is unavailable. Everything else

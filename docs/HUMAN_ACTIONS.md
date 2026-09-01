@@ -273,28 +273,47 @@ founding-customer offer are all implemented. Only the account is missing.
 ```
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_PRO_MONTHLY=price_...
-STRIPE_PRICE_PRO_YEARLY=price_...
+STRIPE_PRICE_PRO_MONTHLY=price_...      # $19 USD / month
+STRIPE_PRICE_PRO_YEARLY=price_...       # $190 USD / year
 SUPABASE_SERVICE_ROLE_KEY=...
+# NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is validated but unread: checkout is
+# Stripe-hosted, so no Stripe.js runs in the browser.
 ```
+
+> **The full procedure — every dashboard click, in order, including the
+> test-mode rehearsal and the switch to live keys — is
+> [STRIPE_PRODUCTION_SETUP.md](STRIPE_PRODUCTION_SETUP.md).** What follows is
+> the summary.
 
 Steps in order:
 
-1. Create the **Pro** product and its monthly and yearly prices. Prices in
+0. **Apply `supabase/migrations/0017_stripe_webhook_reliability.sql` first.** It
+   adds the webhook event ledger, the ordering watermark and the two functions
+   the webhook calls. Without it every delivery returns 500. (Stripe retries for
+   three days, so running it late still recovers — but there is no reason to.)
+1. Create the **Atturel Pro** product with two recurring prices on it:
+   **$19 USD/month** and **$190 USD/year**. Prices in
    `src/lib/billing/plans.ts` are display copy — **Stripe is the source of
-   truth for what is charged. Keep them in agreement.**
+   truth for what is charged. Keep them in agreement.** `plans.test.ts` pins
+   both numbers, so a mismatch is a failing test rather than a surprised
+   customer.
 2. Add a webhook endpoint at `https://<your-domain>/api/stripe/webhook`
    subscribed to exactly: `checkout.session.completed`,
    `customer.subscription.created`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, `invoice.payment_failed`.
+   `customer.subscription.deleted`, `customer.subscription.paused`,
+   `customer.subscription.resumed`, `invoice.paid`, `invoice.payment_failed`.
 3. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
 4. **`SUPABASE_SERVICE_ROLE_KEY` is required.** The webhook is the only thing
    allowed to grant a plan, and it writes with the service role. Without it a
    payment succeeds and nothing happens. Get it from
    Supabase → Project Settings → API → `service_role`.
-5. Decide whether the founding offer runs. `FOUNDING_OFFER` in
-   `src/lib/billing/plans.ts` sets the cap and the protection window. The copy
-   promises **12 months**, not lifetime — if you change one, change the other.
+5. **Configure the Customer Portal** (Settings → Billing → Customer portal) and
+   press Save. Until it has been saved once, Stripe refuses every portal session
+   with "No configuration provided" and *Manage subscription* shows an error.
+   Live mode has its own configuration and starts unconfigured too.
+6. The founding offer is **off**, and should stay off: it advertised a price no
+   Stripe price backed, so it displayed one number and would have charged
+   another. See the note at the foot of STRIPE_PRODUCTION_SETUP.md.
 
 **Verify after configuring**
 
@@ -302,7 +321,9 @@ Steps in order:
 2. Settings → Plan shows **Upgrade**. In test mode use card `4242 4242 4242 4242`.
 3. After checkout the plan flips to **Pro** — driven by the webhook, not the
    redirect. If it does not, the webhook secret or the service role key is wrong.
-4. `stripe listen --forward-to localhost:3000/api/stripe/webhook` to test locally.
+4. `select * from public.stripe_webhook_events order by received_at desc;` —
+   every row should carry a `processed_at`.
+5. `stripe listen --forward-to localhost:3000/api/stripe/webhook` to test locally.
 
 ---
 

@@ -1,4 +1,4 @@
-import type { Capability, MeterKind, PlanDefinition } from './plans'
+import type { Capability, MeterKind, PlanDefinition, PlanId } from './plans'
 
 /**
  * ACCESS TIERS
@@ -66,4 +66,37 @@ export function applyAccessTier(
 /** Narrow an arbitrary database value to a tier, defaulting to standard. */
 export function parseAccessTier(value: unknown): AccessTier {
   return value === 'owner' || value === 'pilot' ? value : 'standard'
+}
+
+/**
+ * ENTITLEMENT LEVEL
+ * -----------------------------------------------------------------------------
+ * `plan` and `tier` are orthogonal on purpose — a pilot account is commercially
+ * on the free plan and simply is not subject to its ceilings — but almost every
+ * screen wants one answer to "what is this account". This is that answer, and
+ * it is the only thing the UI should switch on.
+ *
+ * The two full-access tiers stay distinct here rather than collapsing into one
+ * "unlimited": what an owner is shown about their own account (internal, never
+ * billed) is not what a pilot is shown (invited, not paying yet), and a single
+ * label would force one of those two screens to lie.
+ */
+export type EntitlementLevel = 'free' | 'pro' | 'pilot' | 'owner'
+
+export function resolveLevel(plan: PlanId, tier: AccessTier): EntitlementLevel {
+  if (tier === 'owner') return 'owner'
+  if (tier === 'pilot') return 'pilot'
+  return plan === 'free' ? 'free' : 'pro'
+}
+
+/**
+ * Whether this account should ever be shown a price or a payment button.
+ *
+ * Owner and pilot accounts are not customers. Offering them checkout is not
+ * merely redundant — an owner who upgraded would start paying for their own
+ * product and, worse, would come back from Stripe with plan 'pro' and tier
+ * 'owner', a combination no screen is written for.
+ */
+export function isBillable(level: EntitlementLevel): boolean {
+  return level === 'free' || level === 'pro'
 }

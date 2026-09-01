@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { PersonForm } from '@/components/app/person-form'
+import { Button } from '@/components/ui/button'
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { researchCapability } from '@/lib/research/providers'
@@ -23,10 +25,16 @@ export default async function NewPersonPage() {
         description={`Start with who they are. ${brand.name} will help you build the rest.`}
       />
 
+      {/* The moment a free account is actually stopped by its plan is the one
+          moment upgrading is obviously worth it, and this screen used to state
+          the limit and then leave the reader to find Settings on their own. */}
       {!limit.allowed ? (
-        <p className="mt-6 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3 text-sm text-ink-secondary">
-          {limit.message}
-        </p>
+        <div className="mt-6 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3">
+          <p className="text-sm leading-relaxed text-ink-secondary">{limit.message}</p>
+          <Button asChild size="sm" className="mt-3">
+            <Link href="/settings/billing">See plans</Link>
+          </Button>
+        </div>
       ) : limit.limit !== null && limit.remaining !== null && limit.remaining <= 2 ? (
         <p className="mt-6 text-xs text-ink-muted">
           <Badge tone="outline">{limit.remaining} left on your plan</Badge>

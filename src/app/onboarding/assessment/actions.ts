@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
+import { afterOnboardingPath } from '@/lib/billing/checkout-intent'
 import { logger } from '@/lib/logger'
 import {
   BLOCK_BY_ID,
@@ -300,5 +301,7 @@ export async function calibrateAssessment(_prev: unknown, formData: FormData) {
   await track('onboarding_completed', { skippedAssessment: false })
 
   revalidatePath('/', 'layout')
-  redirect('/today?welcome=1')
+  // Somebody who came from the pricing page to buy is returned to that purchase
+  // rather than dropped on Today with no memory of why they signed up.
+  redirect(await afterOnboardingPath())
 }

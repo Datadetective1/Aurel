@@ -7,6 +7,7 @@ import { isValidTimezone } from '@/lib/timezones'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
+import { afterOnboardingPath } from '@/lib/billing/checkout-intent'
 import { logger } from '@/lib/logger'
 import {
   COACHING_CONTEXTS,
@@ -178,5 +179,7 @@ export async function skipAssessment() {
 
   await track('onboarding_completed', { skippedAssessment: true })
   revalidatePath('/', 'layout')
-  redirect('/today?welcome=1')
+  // Somebody who came from the pricing page to buy is returned to that purchase
+  // rather than dropped on Today with no memory of why they signed up.
+  redirect(await afterOnboardingPath())
 }

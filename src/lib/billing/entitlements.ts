@@ -5,8 +5,23 @@ import { track } from '@/lib/analytics'
 import { estimateCostMicros, hasKnownPrice } from './provider-cost'
 import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
-import { applyAccessTier, parseAccessTier, type AccessTier } from './access'
+import {
+  PLANS,
+  isEntitledStatus,
+  type BillingInterval,
+  type Capability,
+  type MeterKind,
+  type PlanId,
+  type SubscriptionStatus,
+} from './plans'
+import {
+  applyAccessTier,
+  isBillable,
+  parseAccessTier,
+  resolveLevel,
+  type AccessTier,
+  type EntitlementLevel,
+} from './access'
 import { brand } from '@/lib/brand'
 
 /**
@@ -23,6 +38,26 @@ import { brand } from '@/lib/brand'
  * =============================================================================
  */
 
+/**
+ * What Stripe currently says about this account, in our vocabulary.
+ *
+ * Every field is nullable and none of it is inferred. A screen that cannot
+ * find a renewal date must say nothing rather than compute a plausible one:
+ * a confidently wrong billing date is worse than an absent one.
+ */
+export interface BillingSummary {
+  status: SubscriptionStatus | null
+  /** Which of the two prices is being billed. Null when nothing is. */
+  interval: BillingInterval | null
+  /** End of the period already paid for. Renewal date, or expiry when leaving. */
+  currentPeriodEnd: string | null
+  /** Set when the customer has cancelled but the paid period has not run out. */
+  cancelAtPeriodEnd: boolean
+  trialEndsAt: string | null
+  /** Whether there is a Stripe customer to open a billing portal for. */
+  hasCustomer: boolean
+}
+
 export interface Entitlements {
   plan: PlanId
   /**
@@ -30,9 +65,17 @@ export interface Entitlements {
    * the free plan commercially, it simply is not subject to its ceilings.
    */
   tier: AccessTier
+  /**
+   * The two axes above collapsed into the one answer a screen actually wants.
+   * Switch on this rather than re-deriving it.
+   */
+  level: EntitlementLevel
+  /** Whether this account may be shown prices and payment buttons at all. */
+  billable: boolean
   isFounding: boolean
   /** Start of the current billing period, used as the quota bucket key. */
   periodStart: string
+  billing: BillingSummary
   capabilities: Record<Capability, boolean>
   quotas: Partial<Record<MeterKind, number | null>>
   limits: { people: number | null }
@@ -56,7 +99,11 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const [{ data: subscription }, { data: overrides }, { data: grant }] = await Promise.all([
     supabase
       .from('subscriptions')
-      .select('plan, status, is_founding, current_period_end')
+      // One literal: the generated types resolve the row shape from the text
+      // of this string, and a concatenation defeats that silently.
+      .select(
+        'plan, status, is_founding, current_period_end, cancel_at_period_end, billing_interval, trial_ends_at, stripe_customer_id',
+      )
       .eq('user_id', user.id)
       .maybeSingle(),
     supabase
@@ -75,11 +122,14 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   ])
 
   // A subscription that lapsed drops to free rather than staying entitled.
+  //
+  // A cancellation scheduled for the end of the period is NOT a lapse: Stripe
+  // holds the subscription at 'active' until the period actually runs out and
+  // only then sends the deleted event. Somebody who cancels on day two keeps
+  // what they paid for, which is both the law and the decent reading.
   const rawPlan = (subscription?.plan ?? 'free') as PlanId
-  const status = subscription?.status
-  const entitledStatuses = ['trialing', 'active', 'past_due']
-  const plan: PlanId =
-    rawPlan !== 'free' && status && !entitledStatuses.includes(status) ? 'free' : rawPlan
+  const status = (subscription?.status ?? null) as SubscriptionStatus | null
+  const plan: PlanId = rawPlan !== 'free' && !isEntitledStatus(status) ? 'free' : rawPlan
 
   const definition = PLANS[plan] ?? PLANS.free
   const tier = parseAccessTier(grant?.tier)
@@ -102,16 +152,36 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
     }
   }
 
+  const level = resolveLevel(plan, tier)
+
   return {
     plan,
     tier,
+    level,
+    billable: isBillable(level),
     isFounding: subscription?.is_founding ?? false,
     periodStart: currentPeriodStart(),
+    billing: {
+      status,
+      // Read from the stored interval rather than re-derived from the price id,
+      // which lives in server env and would make this unresolvable the moment
+      // a price is rotated.
+      interval: normaliseInterval(subscription?.billing_interval),
+      currentPeriodEnd: subscription?.current_period_end ?? null,
+      cancelAtPeriodEnd: subscription?.cancel_at_period_end ?? false,
+      trialEndsAt: subscription?.trial_ends_at ?? null,
+      hasCustomer: Boolean(subscription?.stripe_customer_id),
+    },
     capabilities,
     quotas,
     limits: applied.limits,
   }
 })
+
+/** `billing_interval` is a free-text column; anything unrecognised is nothing. */
+function normaliseInterval(value: string | null | undefined): BillingInterval | null {
+  return value === 'monthly' || value === 'yearly' ? value : null
+}
 
 export type CapabilityCheck =
   | { allowed: true; remaining: number | null; limit: number | null }

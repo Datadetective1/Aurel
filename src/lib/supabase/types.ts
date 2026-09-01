@@ -1998,6 +1998,7 @@ export type Database = {
           price_protected_until: string | null
           status: Database["public"]["Enums"]["subscription_status"] | null
           stripe_customer_id: string | null
+          stripe_event_at: string | null
           stripe_price_id: string | null
           stripe_subscription_id: string | null
           trial_ends_at: string | null
@@ -2015,6 +2016,7 @@ export type Database = {
           price_protected_until?: string | null
           status?: Database["public"]["Enums"]["subscription_status"] | null
           stripe_customer_id?: string | null
+          stripe_event_at?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
@@ -2032,11 +2034,39 @@ export type Database = {
           price_protected_until?: string | null
           status?: Database["public"]["Enums"]["subscription_status"] | null
           stripe_customer_id?: string | null
+          stripe_event_at?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      stripe_webhook_events: {
+        Row: {
+          event_created_at: string
+          id: string
+          outcome: string | null
+          processed_at: string | null
+          received_at: string
+          type: string
+        }
+        Insert: {
+          event_created_at: string
+          id: string
+          outcome?: string | null
+          processed_at?: string | null
+          received_at?: string
+          type: string
+        }
+        Update: {
+          event_created_at?: string
+          id?: string
+          outcome?: string | null
+          processed_at?: string | null
+          received_at?: string
+          type?: string
         }
         Relationships: []
       }
@@ -2257,6 +2287,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_stripe_subscription: {
+        Args: {
+          p_user_id: string
+          p_event_at: string
+          p_plan: Database["public"]["Enums"]["plan_tier"]
+          p_status: Database["public"]["Enums"]["subscription_status"]
+          p_stripe_customer_id: string | null
+          p_stripe_subscription_id: string | null
+          p_stripe_price_id: string | null
+          p_current_period_end: string | null
+          p_cancel_at_period_end: boolean
+          p_trial_ends_at: string | null
+          p_billing_interval: string | null
+          p_founding_max?: number
+          p_founding_protection_months?: number
+        }
+        Returns: string
+      }
+      mark_stripe_payment_failed: {
+        Args: {
+          p_stripe_customer_id: string
+          p_stripe_subscription_id?: string | null
+        }
+        Returns: string
+      }
       redeem_pilot_invitation: {
         Args: { code_hash_input: string }
         Returns: string

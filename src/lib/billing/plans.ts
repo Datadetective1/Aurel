@@ -15,6 +15,46 @@
 
 export type PlanId = 'free' | 'pro' | 'team'
 
+/** How a paid plan is billed. Two prices, two intervals, no others. */
+export type BillingInterval = 'monthly' | 'yearly'
+
+/**
+ * Subscription status, mirroring the `subscription_status` enum in the
+ * database. Stripe's vocabulary, narrowed to the values we store.
+ */
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'unpaid'
+  | 'paused'
+
+/**
+ * The statuses under which a paid plan still grants its capabilities.
+ *
+ * `past_due` is here on purpose: Stripe retries a failed card for weeks before
+ * giving up, and revoking a paying customer's access on the first decline —
+ * usually an expired card, not a decision — is how a recoverable billing
+ * problem becomes a cancellation.
+ *
+ * ONE definition. This list used to be written out separately in the
+ * entitlement resolver and in the webhook, which meant the answer to "is this
+ * account entitled" depended on which file you asked.
+ */
+export const ENTITLED_STATUSES = [
+  'trialing',
+  'active',
+  'past_due',
+] as const satisfies readonly SubscriptionStatus[]
+
+/** Whether a status keeps a paid plan alive. */
+export function isEntitledStatus(status: string | null | undefined): boolean {
+  return Boolean(status) && (ENTITLED_STATUSES as readonly string[]).includes(status as string)
+}
+
 /** Everything the app can gate on. Add here, never inline. */
 export type Capability =
   | 'researchPerson'
@@ -134,8 +174,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: 'pro',
     name: 'Pro',
     tagline: 'The full relationship record, and preparation for every room.',
-    monthlyPriceCents: 4900,
-    yearlyPriceCents: 42000,
+    monthlyPriceCents: 1900,
+    yearlyPriceCents: 19000,
     capabilities: {
       researchPerson: true,
       deepResearch: true,
@@ -214,10 +254,28 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
 
 /**
  * Founding-customer promotion. Configuration, not a promotions engine.
- * Enable by setting `enabled` and providing a Stripe price id in env.
+ *
+ * OFF, and it must stay off until a Stripe price backs it.
+ *
+ * There is no STRIPE_PRICE_PRO_FOUNDING. Checkout has only ever had two price
+ * ids to choose between — see `priceIdFor` in lib/billing/stripe — so a button
+ * reading "Upgrade at the founding price" charged the ordinary monthly price
+ * instead. Advertising one number and charging another is not a display bug;
+ * it is a claim the payment cannot honour, and it survived unnoticed because
+ * the deployment has never had Stripe keys to expose it.
+ *
+ * The 2900 below is also now ABOVE list price. Pro is 1900. Re-enabling this
+ * without changing that number would strike through $19 and offer $29 as the
+ * discount.
+ *
+ * The mechanism is kept rather than deleted: `is_founding`, `founding_number`
+ * and `price_protected_until` are live columns, the webhook still honours a
+ * grandfathered founding account, and `foundingOfferAdvertisable()` below is
+ * the single gate every surface asks before showing any of this. Two tests in
+ * plans.test.ts fail if a founding price is ever advertised at or above list.
  */
 export const FOUNDING_OFFER = {
-  enabled: true,
+  enabled: false,
   label: 'Founding',
   /** Promotion closes once this many founding subscriptions exist. */
   maxCustomers: 250,
@@ -227,7 +285,7 @@ export const FOUNDING_OFFER = {
   blurb: 'Founding price held for 12 months.',
 } as const
 
-/** Human-readable price, e.g. "$49". */
+/** Human-readable price, e.g. "$19". */
 export function formatPrice(cents: number | null, currency = 'USD'): string {
   if (cents === null) return 'Contact us'
   if (cents === 0) return 'Free'
@@ -244,4 +302,35 @@ export function annualSavingPercent(plan: PlanDefinition): number | null {
   const fullYear = plan.monthlyPriceCents * 12
   if (fullYear <= plan.yearlyPriceCents) return null
   return Math.floor(((fullYear - plan.yearlyPriceCents) / fullYear) * 100)
+}
+
+
+/**
+ * Whether the founding price may be shown to anyone.
+ *
+ * Every founding surface asks this rather than reading `enabled` directly. A
+ * promotion is advertisable only when it is switched on AND it is actually
+ * cheaper than the plan it discounts — the second half is what stops a stale
+ * number quietly becoming an upsell.
+ *
+ * It deliberately does NOT check for a Stripe price id, because this module is
+ * shared with the client bundle and must not read server env. The env-aware
+ * half of the guard lives in `foundingOfferSellable()` in lib/billing/stripe.
+ */
+export function foundingOfferAdvertisable(plan: PlanDefinition = PLANS.pro): boolean {
+  if (!FOUNDING_OFFER.enabled) return false
+  if (plan.monthlyPriceCents === null) return false
+  return FOUNDING_OFFER.monthlyPriceCents < plan.monthlyPriceCents
+}
+
+/**
+ * What an annual subscription works out to per month, in cents.
+ *
+ * Shown beside the annual price because "$190 a year" and "$19 a month" are
+ * hard to compare at a glance, and the comparison is the entire argument for
+ * paying annually.
+ */
+export function monthlyEquivalentCents(plan: PlanDefinition): number | null {
+  if (!plan.yearlyPriceCents) return null
+  return Math.round(plan.yearlyPriceCents / 12)
 }

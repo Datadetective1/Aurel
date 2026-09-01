@@ -2,7 +2,13 @@ import 'server-only'
 import Stripe from 'stripe'
 import { serverEnv, features } from '@/lib/env'
 import { brand } from '@/lib/brand'
-import type { PlanId } from './plans'
+import {
+  PLANS,
+  foundingOfferAdvertisable,
+  type BillingInterval,
+  type PlanId,
+  type SubscriptionStatus,
+} from './plans'
 
 /**
  * STRIPE
@@ -34,7 +40,9 @@ export function stripe(): Stripe {
   return client
 }
 
-export type BillingInterval = 'monthly' | 'yearly'
+// Re-exported so the many call sites that reach for it alongside a Stripe
+// helper do not have to import from two modules.
+export type { BillingInterval }
 
 /** The configured price id for an interval, or null when it is not set up. */
 export function priceIdFor(interval: BillingInterval): string | null {
@@ -44,27 +52,26 @@ export function priceIdFor(interval: BillingInterval): string | null {
 }
 
 /**
- * Map a Stripe subscription status onto our own.
+ * Every status we store, keyed by the Stripe value that produces it.
  *
- * Kept as an explicit switch rather than a cast: Stripe adds statuses, and a
- * value we have never seen must land somewhere deliberate. Anything unknown is
- * treated as not-entitled, because the failure mode of guessing "active" is
- * giving away paid capability indefinitely.
+ * An exhaustive table rather than a cast: Stripe adds statuses, and a value we
+ * have never seen must land somewhere deliberate. Anything unknown is treated
+ * as not-entitled, because the failure mode of guessing "active" is giving
+ * away paid capability indefinitely.
  */
-export function mapStatus(status: Stripe.Subscription.Status): string {
-  switch (status) {
-    case 'trialing':
-    case 'active':
-    case 'past_due':
-    case 'canceled':
-    case 'incomplete':
-    case 'incomplete_expired':
-    case 'unpaid':
-    case 'paused':
-      return status
-    default:
-      return 'canceled'
-  }
+const KNOWN_STATUSES: Record<string, SubscriptionStatus> = {
+  trialing: 'trialing',
+  active: 'active',
+  past_due: 'past_due',
+  canceled: 'canceled',
+  incomplete: 'incomplete',
+  incomplete_expired: 'incomplete_expired',
+  unpaid: 'unpaid',
+  paused: 'paused',
+}
+
+export function mapStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+  return KNOWN_STATUSES[status] ?? 'canceled'
 }
 
 /**
@@ -87,4 +94,44 @@ export function intervalForPrice(priceId: string | null | undefined): BillingInt
   if (priceId === serverEnv.STRIPE_PRICE_PRO_YEARLY) return 'yearly'
   if (priceId === serverEnv.STRIPE_PRICE_PRO_MONTHLY) return 'monthly'
   return null
+}
+
+/**
+ * The subscription an invoice was raised for, or null for a one-off charge.
+ *
+ * In this API version an invoice no longer carries a top-level `subscription`.
+ * The link moved to `parent.subscription_details.subscription`, and code
+ * written against the old shape does not fail — it silently reads undefined
+ * and treats every renewal as an unrelated charge. Kept in one place so there
+ * is one thing to change when it moves again.
+ */
+export function subscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
+  const subscription = invoice.parent?.subscription_details?.subscription
+  if (!subscription) return null
+  return typeof subscription === 'string' ? subscription : subscription.id
+}
+
+/**
+ * Whether the founding price may actually be SOLD, as opposed to merely being
+ * switched on.
+ *
+ * The env half of the guard that `foundingOfferAdvertisable` cannot perform,
+ * because plan configuration is shared with the browser bundle and must not
+ * read server env. A promotion with no price id behind it charges list price
+ * while displaying a discount, which is the failure this pair exists to make
+ * impossible: every founding surface asks this before rendering anything.
+ *
+ * There is deliberately no STRIPE_PRICE_PRO_FOUNDING today, so this is false.
+ * Adding that variable and a `priceIdFor('founding')` branch is the whole of
+ * what re-enabling the promotion would take.
+ */
+export function foundingPriceId(): string | null {
+  // There is no STRIPE_PRICE_PRO_FOUNDING, and `priceIdFor` has exactly two
+  // prices to choose between. This returning null is the thing that keeps
+  // every founding surface silent, whatever the promotion config says.
+  return null
+}
+
+export function foundingOfferSellable(): boolean {
+  return foundingOfferAdvertisable(PLANS.pro) && foundingPriceId() !== null
 }

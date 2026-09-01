@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { safeRedirectPath } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
+import { intentDestination, takeCheckoutIntent } from '@/lib/billing/checkout-intent'
 
 /**
  * OAuth / email-link callback.
@@ -68,8 +69,21 @@ export async function GET(request: NextRequest) {
       await track('signup_completed', {})
     }
 
+    // Only the default destination is overridden. A reset-password link
+    // carries next=/reset-password and must reach it even before onboarding,
+    // or an unonboarded user cannot recover their own account.
     if (!profile?.onboarding_completed_at && next === '/today') {
+      // A checkout intent is deliberately NOT consumed here: it is honoured at
+      // the end of onboarding, which is the first moment there is an account
+      // worth upgrading.
       return NextResponse.redirect(`${origin}/onboarding`)
+    }
+
+    // Already onboarded, and heading nowhere in particular -- if they picked a
+    // plan before signing up, this is the moment to deliver them to it.
+    if (profile?.onboarding_completed_at && next === '/today') {
+      const intent = await takeCheckoutIntent()
+      if (intent) return NextResponse.redirect(`${origin}${intentDestination(intent)}`)
     }
   }
 

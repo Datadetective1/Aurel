@@ -10,6 +10,7 @@ import { absoluteUrl } from '@/lib/brand'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email/send'
 import { passwordChangedEmail, welcomeEmail } from '@/lib/email/templates'
+import { intentDestination, takeCheckoutIntent } from '@/lib/billing/checkout-intent'
 
 /**
  * Auth server actions.
@@ -90,11 +91,16 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   })
 
   // No session means Supabase is holding the account for email confirmation.
+  // The destination is not carried in that link -- Supabase composes it -- so
+  // a checkout intent survives this hop in its cookie instead.
   if (!data.session) {
     redirect(`/check-email?email=${encodeURIComponent(parsed.data.email)}`)
   }
 
   revalidatePath('/', 'layout')
+  // Onboarding first, always: a brand new account has nothing to be Pro about
+  // yet. Where they go afterwards is decided by afterOnboardingPath(), which
+  // is where a remembered purchase is honoured.
   redirect('/onboarding')
 }
 
@@ -132,7 +138,12 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
     return { error: GENERIC_SIGN_IN_ERROR }
   }
 
-  const next = safeRedirectPath(formData.get('next')?.toString())
+  // An explicit destination wins. Failing that, somebody who picked a plan
+  // before signing in is returned to that purchase rather than to Today.
+  const requested = formData.get('next')?.toString()
+  const intent = requested ? null : await takeCheckoutIntent()
+  const next = safeRedirectPath(intent ? intentDestination(intent) : requested)
+
   revalidatePath('/', 'layout')
   redirect(next)
 }

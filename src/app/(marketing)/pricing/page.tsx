@@ -4,7 +4,8 @@ import { ArrowRight, CircleCheck } from 'lucide-react'
 import { ApertureRule } from '@/components/brand/aperture'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
-import { FOUNDING_OFFER, PLANS, annualSavingPercent, formatPrice } from '@/lib/billing/plans'
+import { PLANS } from '@/lib/billing/plans'
+import { PlanSelector } from '@/components/marketing/plan-selector'
 import { brand, title } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -41,7 +42,6 @@ export default function PricingPage() {
   const free = PLANS.free
   const pro = PLANS.pro
   const team = PLANS.team
-  const annualSaving = annualSavingPercent(pro)
 
   return (
     <>
@@ -79,48 +79,27 @@ export default function PricingPage() {
             </Panel>
 
             {/* --- pro -------------------------------------------------------- */}
+            {/* No promotional badge. The founding price it used to advertise had
+                no Stripe price behind it, so the number on the card was not the
+                number the card would have charged -- see FOUNDING_OFFER. */}
             <Panel className="relative flex flex-col border-accent/30 bg-accent-wash p-7">
-              {FOUNDING_OFFER.enabled ? (
-                <Badge tone="accent" className="absolute -top-2.5 left-7">
-                  {FOUNDING_OFFER.label} price
-                </Badge>
-              ) : null}
+              <Badge tone="accent" className="absolute -top-2.5 left-7">
+                Most popular
+              </Badge>
 
               <h2 className="font-display text-2xl text-ink">{pro.name}</h2>
               <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{pro.tagline}</p>
 
-              <div className="mt-6 flex items-baseline gap-3">
-                <p className="font-display text-4xl text-ink">
-                  {formatPrice(
-                    FOUNDING_OFFER.enabled ? FOUNDING_OFFER.monthlyPriceCents : pro.monthlyPriceCents,
-                  )}
-                </p>
-                <span className="text-sm text-ink-muted">per month</span>
-              </div>
-
-              {FOUNDING_OFFER.enabled ? (
-                <p className="mt-1 text-xs text-ink-secondary">
-                  <span className="line-through">{formatPrice(pro.monthlyPriceCents)}</span> for the
-                  first {FOUNDING_OFFER.maxCustomers} members. {FOUNDING_OFFER.blurb}
-                </p>
-              ) : annualSaving ? (
-                <p className="mt-1 text-xs text-ink-muted">
-                  Or {formatPrice(pro.yearlyPriceCents)} a year, saving {annualSaving}%.
-                </p>
-              ) : null}
-
-              <ul className="mt-7 grid flex-1 gap-3">
-                {pro.highlights.map((item) => (
-                  <Feature key={item}>{item}</Feature>
-                ))}
-              </ul>
-
-              <Button asChild size="lg" className="mt-8 w-full">
-                <Link href="/sign-up">
-                  Start free, upgrade later
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-              </Button>
+              {/* Price, period toggle and the button that starts checkout. The
+                  only interactive part of this page, and the only part that is
+                  a client component. */}
+              <PlanSelector>
+                <ul className="grid gap-3">
+                  {pro.highlights.map((item) => (
+                    <Feature key={item}>{item}</Feature>
+                  ))}
+                </ul>
+              </PlanSelector>
             </Panel>
 
             {/* --- teams ------------------------------------------------------ */}
