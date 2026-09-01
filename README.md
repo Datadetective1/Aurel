@@ -121,7 +121,9 @@ src/
   on every redirect rather than trusting the first hop.
 - **A client can never grant itself entitlement.** `subscriptions` and
   `entitlement_overrides` are readable by their owner and writable only by the
-  service role.
+  service role, and the two functions the Stripe webhook writes through have
+  EXECUTE revoked from `authenticated` and `anon`. Asserted, against a real
+  database, in `supabase/tests/billing-webhook.sql`.
 
 ### AI
 
@@ -212,7 +214,7 @@ Both are built. Neither blocks a pilot.
 | | |
 | --- | --- |
 | **Calendar** | Microsoft Graph and Google adapters behind one provider abstraction, encrypted tokens, 14-day idempotent sync, attendee matching, upcoming meetings on Today, Prepare from an event. Needs an Entra app registration (Microsoft) or a Cloud project plus scope verification (Google) — see HUMAN_ACTIONS §4. **Read-only: Atturel never creates, edits, accepts or declines anything.** |
-| **Billing** | Checkout, portal, webhook, entitlements, metering and the founding offer, waiting only on a Stripe account. See HUMAN_ACTIONS §5. |
+| **Billing** | Pro at $19/month or $190/year. Stripe-hosted checkout from the pricing page and from Settings, the customer portal, a signature-verified webhook that is the only writer of subscription state, entitlements and metering. Waiting only on a Stripe account: see [STRIPE_PRODUCTION_SETUP.md](docs/STRIPE_PRODUCTION_SETUP.md). The founding offer is off — it advertised a price no Stripe price backed. |
 
 ### The demo workspace
 
