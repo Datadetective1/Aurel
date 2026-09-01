@@ -42,6 +42,17 @@ create table public.stripe_webhook_events (
 create index stripe_webhook_events_received_idx
   on public.stripe_webhook_events (received_at desc);
 
+-- RETENTION. This table grows by one row per handled event forever, which at
+-- Atturel's event volume is a few rows per subscriber per month -- small, but
+-- unbounded. Nothing prunes it automatically, because a scheduled job is a
+-- piece of infrastructure and a stale ledger is not an outage.
+--
+-- Deleting rows older than Stripe's own retry window is safe: an event that
+-- old can no longer be redelivered, so its receipt can no longer prevent
+-- anything. Run it by hand or from pg_cron when the table gets large:
+--
+--   delete from public.stripe_webhook_events where received_at < now() - interval '30 days';
+
 -- Service role only. There are no policies below, and under RLS that is a
 -- refusal: no browser and no user-scoped server action can read the billing
 -- event stream or forge an entry in it.
@@ -106,6 +117,15 @@ begin
   -- path for an account that predates it or whose trigger failed -- not the
   -- normal one.
   if not found then
+    -- Asked BEFORE the insert, because the foreign key to auth.users would
+    -- otherwise raise rather than return: the caller would see an exception,
+    -- answer Stripe with a 500, and earn three days of retries for an event
+    -- naming a user who does not exist and never will. A deleted account whose
+    -- subscription outlives it in Stripe is exactly that case.
+    if not exists (select 1 from auth.users where id = p_user_id) then
+      return 'no_account';
+    end if;
+
     insert into public.subscriptions (user_id, plan) values (p_user_id, 'free')
     on conflict (user_id) do nothing;
     select * into existing from public.subscriptions where user_id = p_user_id for update;
@@ -126,6 +146,17 @@ begin
     next_number := existing.founding_number;
     protected_until := existing.price_protected_until;
   elsif p_founding_max > 0 and p_plan <> 'free' then
+    -- The row lock above covers THIS account. Counting and numbering founding
+    -- places is a question about every account, so two people subscribing at
+    -- the same instant would both read the same count, both pick the same
+    -- max()+1, and the second would hit the unique index -- a 500, and three
+    -- days of Stripe retries for a promotion nobody needed that urgently.
+    --
+    -- A transaction-scoped advisory lock serialises just this branch, and only
+    -- while the promotion is running. It is released at commit; nothing has to
+    -- remember to unlock it. The constant is arbitrary but must stay stable.
+    perform pg_advisory_xact_lock(hashtext('atturel.founding_number'));
+
     select count(*) into taken from public.subscriptions where is_founding;
     if taken < p_founding_max then
       keep_founding := true;
@@ -195,13 +226,20 @@ as $fn$
 declare
   affected integer;
 begin
+  -- The subscription must be named. This used to accept null as "any
+  -- subscription for this customer", which meant a failed ONE-OFF invoice --
+  -- a manual charge raised in the dashboard, which carries no subscription
+  -- parent -- moved a healthy Pro account to past_due. The caller now refuses
+  -- to reach here without an id; the argument stays nullable so an older
+  -- deployment calling it cannot suddenly start raising, but null now matches
+  -- nothing rather than everything.
+  if p_stripe_subscription_id is null then
+    return 'no_match';
+  end if;
+
   update public.subscriptions set status = 'past_due'
    where stripe_customer_id = p_stripe_customer_id
-     -- When the invoice names a subscription, only that subscription's row is
-     -- touched. A customer with a stale subscription id on file is not moved to
-     -- past_due by an invoice belonging to something else.
-     and (p_stripe_subscription_id is null
-          or stripe_subscription_id = p_stripe_subscription_id)
+     and stripe_subscription_id = p_stripe_subscription_id
      -- Nothing to do for an account already off the paid plans. Marking a
      -- canceled subscription past_due would be inventing a state Stripe is not
      -- reporting, and would show a dunning banner to someone who has left.

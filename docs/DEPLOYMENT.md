@@ -5,8 +5,15 @@ command.
 
 ## First deploy
 
-1. **Create the Supabase project.** Apply `supabase/migrations/*.sql` in
-   filename order — they are dependent.
+1. **Create the Supabase project.** Apply the migrations:
+
+   ```bash
+   DATABASE_URL="postgres://..." npm run db:migrate
+   ```
+
+   They are dependent and must run in filename order, which is what the runner
+   does. It records each one in `public.schema_migrations` as it goes, so
+   running it again is a no-op rather than a pile of `already exists` errors.
 
 2. **Verify the boundary before anything else:**
 
@@ -45,10 +52,27 @@ Forward-only, numbered, no down migrations. A down migration for a schema
 carrying real relationship data is a way to lose it under pressure; restore from
 a snapshot instead.
 
-Applying to an existing database: the migration table is the source of truth for
-what has run. `supabase/migrations/` is the source of truth for what *should*
-have. Those two agreeing is worth checking before a release — they diverged once
-in this project, and the repository could not recreate its own schema.
+`npm run db:migrate` applies whatever has not run yet. `public.schema_migrations`
+is the source of truth for what HAS run; `supabase/migrations/` is the source of
+truth for what should have. Those two agreeing is worth checking before a
+release — they diverged once in this project, and the repository could not
+recreate its own schema.
+
+**A database created before that ledger existed has an empty one**, and the
+runner refuses to replay `0001` over a live schema rather than guessing. Tell it
+what is already there, once, after checking the highest migration the database
+actually has:
+
+```bash
+npm run db:migrate -- --adopt-through 0016   # records 0001..0016 without running them
+npm run db:migrate                            # then applies 0017 onwards normally
+```
+
+`--dry-run` lists what would be applied and touches nothing.
+
+Every file is applied inside a single transaction together with its ledger row,
+so a migration that fails halfway leaves neither a partial schema nor a false
+record of success.
 
 ## After deploying
 

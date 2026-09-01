@@ -59,7 +59,13 @@ vi.mock('@/lib/billing/entitlements', () => ({
 
 vi.mock('@/lib/env', () => ({
   get features() {
-    return { billing: billingEnabled, billingWebhooks: billingEnabled }
+    return {
+      billing: billingEnabled,
+      billingWebhooks: billingEnabled,
+      // What the money path actually asks for: secret key, both price ids,
+      // webhook secret and service role key all present.
+      billingCheckout: billingEnabled,
+    }
   },
   serverEnv: {},
 }))

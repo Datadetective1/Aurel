@@ -16,6 +16,7 @@ import {
 } from './plans'
 import {
   applyAccessTier,
+  hasFullAccess,
   isBillable,
   parseAccessTier,
   resolveLevel,
@@ -140,15 +141,22 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const capabilities = applied.capabilities
   const quotas = applied.quotas
 
+  // Overrides are applied AFTER the tier, so a stale one -- a support grant
+  // written while the account was still standard, then left behind -- could
+  // switch a capability back off for an owner or narrow a quota the tier had
+  // set to unlimited. Full access means full access; there is nothing an
+  // override can usefully say about an account that already has everything.
   const now = Date.now()
-  for (const override of overrides ?? []) {
-    if (override.expires_at && new Date(override.expires_at).getTime() < now) continue
+  if (!hasFullAccess(tier)) {
+    for (const override of overrides ?? []) {
+      if (override.expires_at && new Date(override.expires_at).getTime() < now) continue
 
-    if (override.capability in capabilities) {
-      capabilities[override.capability as Capability] = override.enabled
-    }
-    if (override.limit_value !== null && override.capability in quotas) {
-      quotas[override.capability as MeterKind] = override.limit_value
+      if (override.capability in capabilities) {
+        capabilities[override.capability as Capability] = override.enabled
+      }
+      if (override.limit_value !== null && override.capability in quotas) {
+        quotas[override.capability as MeterKind] = override.limit_value
+      }
     }
   }
 
@@ -230,6 +238,11 @@ export async function checkCapability(
     // how often, is what tells us whether the free tier is the right shape --
     // and that is a pilot question, not a launch one.
     await track('limit_reached', { capability, meter, limit, plan: entitlements.plan })
+    // The METER is what ran out, and it is not always the capability: pasting a
+    // link is gated by `researchPerson` against the `source_ingest` budget, and
+    // naming the capability there described an action the user had not taken.
+    const label = METER_LABELS[meter] ?? CAPABILITY_LABELS[capability]
+
     return {
       allowed: false,
       reason: 'quota_exhausted',
@@ -240,7 +253,7 @@ export async function checkCapability(
             // the old frame: these labels are noun phrases sized for "X is
             // available on Pro", and no single frame can make every one of
             // them read as a countable plural.
-            `${CAPABILITY_LABELS[capability]}: you have used all ${limit} for this month. Upgrade for more, or wait until next month.`
+            `${label}: you have used all ${limit} for this month. Upgrade for more, or wait until next month.`
           : `You have reached this month's fair-use limit of ${limit}. Contact support if you need more.`,
       limit,
       used,
@@ -378,6 +391,28 @@ export async function checkPersonLimit(): Promise<CapabilityCheck> {
   }
 
   return { allowed: true, remaining: entitlements.limits.people - used, limit: entitlements.limits.people }
+}
+
+/**
+ * What a QUOTA is called, which is not always what the capability is called.
+ *
+ * `checkCapability('researchPerson', 'source_ingest')` gates pasting a link,
+ * and naming the capability there told somebody who had pasted a URL that they
+ * had "used all 15 of Researching a person" — a noun and a number matching
+ * neither the thing they did nor anything on their account screen. The meter is
+ * the thing that ran out, so the meter is what the sentence should name.
+ */
+export const METER_LABELS: Record<MeterKind, string> = {
+  person_research: 'Researching a person',
+  deep_research: 'Deep research',
+  meeting_brief: 'Meeting briefs',
+  quick_brief: 'Quick Brief',
+  transcript_analysis: 'Transcript analysis',
+  document_analysis: 'Document analysis',
+  ai_coach_message: brand.assistantName,
+  message_adaptation: 'Message adaptation',
+  source_ingest: 'Reading links and notes',
+  voice_transcription: 'Voice debrief recording',
 }
 
 /** Exported so the copy that embeds them can be tested. */

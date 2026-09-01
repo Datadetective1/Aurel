@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:migrate": "bash scripts/db-migrate.sh",
     "db:seed": "tsx scripts/seed.ts",
     "email:preview": "tsx scripts/render-emails.ts"
   },

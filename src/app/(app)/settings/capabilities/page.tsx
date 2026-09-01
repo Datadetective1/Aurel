@@ -265,16 +265,32 @@ export default async function CapabilitiesSettingsPage() {
       id: 'billing',
       label: 'Payments',
       icon: CreditCard,
-      status: features.billing ? 'configured' : 'not_connected',
-      detail: features.billing
+      // `billingCheckout`, not `billing`. Selling needs five variables, and a
+      // deployment holding only the secret key would otherwise report checkout
+      // as live while it either dead-ends on a missing price or -- worse --
+      // charges the card and records nothing. See features in lib/env.
+      status: features.billingCheckout ? 'configured' : 'not_connected',
+      detail: features.billingCheckout
         ? `Checkout and subscription management are live. You are on ${entitlements.plan === 'free' ? 'the free plan' : `the ${entitlements.plan} plan`}.`
-        : 'Payments are not connected, so upgrading is unavailable. Every non-metered feature works normally.',
-      userAction: features.billing ? { label: 'Compare plans', href: '/pricing' } : undefined,
-      deploymentAction: features.billing
+        : features.billing
+          ? 'Stripe is reachable but this deployment cannot complete a purchase yet, so upgrading stays unavailable. Everything else works normally.'
+          : 'Payments are not connected, so upgrading is unavailable. Every non-metered feature works normally.',
+      userAction: features.billingCheckout ? { label: 'Compare plans', href: '/pricing' } : undefined,
+      deploymentAction: features.billingCheckout
         ? undefined
         : {
-            summary: 'Add Stripe keys and a webhook secret, then redeploy.',
-            env: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
+            // Every one of these is required to take money AND record it. The
+            // last two are the ones whose absence is silent: checkout
+            // succeeds, the card is charged, and no subscription is ever
+            // written.
+            summary: 'Add the Stripe keys, both price ids and the service role key, then redeploy.',
+            env: [
+              'STRIPE_SECRET_KEY',
+              'STRIPE_PRICE_PRO_MONTHLY',
+              'STRIPE_PRICE_PRO_YEARLY',
+              'STRIPE_WEBHOOK_SECRET',
+              'SUPABASE_SERVICE_ROLE_KEY',
+            ],
           },
     },
   ]

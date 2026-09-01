@@ -15,6 +15,10 @@ import { features } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
 
+// Every meter with a real Free ceiling belongs here. source_ingest and
+// voice_transcription were both enforced and both invisible: somebody could be
+// stopped by a budget that appeared nowhere on the screen that exists to show
+// them their budgets.
 const METER_LABEL: Partial<Record<MeterKind, string>> = {
   person_research: 'People researched',
   meeting_brief: 'Meeting briefs',
@@ -22,6 +26,8 @@ const METER_LABEL: Partial<Record<MeterKind, string>> = {
   document_analysis: 'Documents read',
   ai_coach_message: 'Coach questions',
   message_adaptation: 'Messages adapted',
+  source_ingest: 'Links and notes read',
+  voice_transcription: 'Voice recordings',
 }
 
 function parseIntent(value: string | undefined): BillingInterval {
@@ -67,7 +73,7 @@ export default async function BillingSettingsPage({
   // Someone who chose a plan on the pricing page before they had an account.
   // The choice is honoured as a prompt, never as a charge: they still press the
   // button, and the price is still the one the server configuration says.
-  const resumingPurchase = Boolean(intent) && view.showUpgrade && features.billing
+  const resumingPurchase = Boolean(intent) && view.showUpgrade && features.billingCheckout
 
   // Monthly leads unless they arrived having already chosen yearly.
   const preferred = parseIntent(intent)
@@ -202,7 +208,7 @@ export default async function BillingSettingsPage({
           Nothing is hidden from them -- Compare plans is still reachable -- it
           is simply not a prompt an owner or a pilot needs. */}
       <div className="mt-10 flex flex-wrap items-start gap-2">
-        {features.billing && view.showUpgrade ? (
+        {features.billingCheckout && view.showUpgrade ? (
           <>
             {/* Both intervals, here. Sending somebody who wants to pay yearly
                 off to the pricing page to find the toggle is a detour on the
@@ -229,7 +235,7 @@ export default async function BillingSettingsPage({
         </Button>
       </div>
 
-      {!features.billing && entitlements.billable ? (
+      {!features.billingCheckout && entitlements.billable ? (
         <p className="border-line bg-bg-sunken text-ink-muted mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           Payments are not connected on this deployment, so upgrading is unavailable. Everything

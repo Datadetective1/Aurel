@@ -148,7 +148,10 @@ describe('what a full-access account is shown', () => {
   })
 
   it('offers no upgrade prompt', () => {
-    expect(billing).toMatch(/features\.billing && view\.showUpgrade/)
+    // billingCheckout for selling, billing for the portal: managing an
+    // existing subscription needs only a secret key, while taking money needs
+    // everything that records what was taken.
+    expect(billing).toMatch(/features\.billingCheckout && view\.showUpgrade/)
     expect(billing).toMatch(/features\.billing && view\.showManage/)
   })
 

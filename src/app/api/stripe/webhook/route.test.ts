@@ -347,15 +347,33 @@ describe('invoices', () => {
     expect(applySubscription).not.toHaveBeenCalled()
   })
 
-  it('does not revoke access on a failed payment', async () => {
+  it('ignores a failed one-off invoice rather than souring a healthy subscription', async () => {
+    // A manual invoice raised in the dashboard has no subscription parent.
+    // Passing that null through was read by the SQL as "any subscription for
+    // this customer", so a failed one-off charge moved a healthy Pro account
+    // to past_due — and invoice.paid on the same invoice correctly did nothing,
+    // so it stayed there.
     constructEvent.mockResolvedValue(
       event('invoice.payment_failed', { customer: 'cus_test', parent: null }),
     )
+    const response = await post()
+    expect(response.status).toBe(200)
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('names the subscription explicitly when it marks one past_due', async () => {
+    constructEvent.mockResolvedValue(
+      event('invoice.payment_failed', {
+        customer: 'cus_test',
+        parent: { subscription_details: { subscription: 'sub_named' } },
+      }),
+    )
     await post()
     const [, args] = rpc.mock.calls[0] as unknown as [string, Record<string, unknown>]
+    expect(args.p_stripe_subscription_id).toBe('sub_named')
     // past_due stays entitled. Stripe retries for weeks, and cutting somebody
     // off on one decline is how an expired card becomes a cancellation.
-    expect(args.p_stripe_subscription_id).toBeNull()
+    expect(args.p_stripe_customer_id).toBe('cus_test')
   })
 })
 

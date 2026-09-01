@@ -159,6 +159,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       document_analysis: 2,
       source_ingest: 15,
       deep_research: 0,
+      // Speech-to-text is the one path in the product where money leaves before
+      // anything is written down, and it ran with no ceiling at all: the meter
+      // recorded the spend and nothing enforced it, so a free account could
+      // drive unbounded paid transcription 4MB at a time.
+      //
+      // Anchored to the debrief this feeds rather than picked freely: a free
+      // account gets one transcript analysis a month, and a few attempts at
+      // recording it, because a recording can fail for reasons that are not
+      // the user's fault. Revisit with usage data — see the note in
+      // docs/STRIPE_PRODUCTION_SETUP.md.
+      voice_transcription: 5,
     },
     limits: { people: 5 },
     highlights: [
@@ -206,6 +217,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       transcript_analysis: 60,
       document_analysis: 100,
       source_ingest: 500,
+      // Well above any plausible honest use, which is what a fair-use ceiling
+      // is for: it exists to stop a runaway loop, not to ration a customer.
+      voice_transcription: 300,
     },
     limits: { people: null },
     // WHAT THIS LIST MAY SAY: a difference the code actually enforces, and

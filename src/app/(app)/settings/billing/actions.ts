@@ -44,7 +44,12 @@ export async function startCheckout(
   _prev: BillingState,
   formData: FormData,
 ): Promise<BillingState> {
-  if (!features.billing) {
+  // Not `features.billing`. A deployment with a secret key but no webhook
+  // secret, no service role key or no price ids will happily charge a card and
+  // then never write the subscription — the customer stays on Free, cannot
+  // reach the portal to cancel, and retries. Refusing to start is the only
+  // honest behaviour.
+  if (!features.billingCheckout) {
     return { error: 'Payments are not connected on this deployment.' }
   }
 
@@ -338,8 +343,17 @@ export async function openBillingPortal(): Promise<BillingState> {
 export async function foundingPlacesRemaining(): Promise<number | null> {
   if (!FOUNDING_OFFER.enabled) return null
 
-  const supabase = await createClient()
-  const { count, error } = await supabase
+  // requireUser first: this is an exported server action, which means it is an
+  // endpoint, and it was the one in this file with no auth check.
+  await requireUser()
+
+  // Counted with the privileged client. The user-scoped one is bound by
+  // `subscriptions: read own`, so it could see at most the caller's own row --
+  // the count was therefore 0 for everyone who was not themselves a founding
+  // customer, and the offer would have advertised all 250 places as available
+  // forever. Exactly the scarcity-with-nothing-behind-it this function's own
+  // comment says it exists to prevent.
+  const { count, error } = await createServiceRoleClient()
     .from('subscriptions')
     .select('user_id', { count: 'exact', head: true })
     .eq('is_founding', true)
@@ -366,7 +380,7 @@ export async function foundingPlacesRemaining(): Promise<number | null> {
 export async function reconcileSubscription(): Promise<{ plan: string; changed: boolean }> {
   const user = await requireUser()
 
-  if (!features.billing) return { plan: 'free', changed: false }
+  if (!features.billingCheckout) return { plan: 'free', changed: false }
 
   const before = await getEntitlements()
   if (!before.billable) return { plan: before.plan, changed: false }

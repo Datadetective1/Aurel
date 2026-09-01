@@ -241,8 +241,38 @@ export const features = {
   /** True when a real model is reachable; false means the grounded fallback. */
   generativeAI: aiProvider !== 'grounded',
   emailDelivery: Boolean(serverEnv.RESEND_API_KEY),
+  /**
+   * Stripe is reachable. Enough to open a billing portal for an existing
+   * customer; NOT enough to sell anything — see `billingCheckout`.
+   */
   billing: Boolean(serverEnv.STRIPE_SECRET_KEY),
   billingWebhooks: Boolean(serverEnv.STRIPE_SECRET_KEY && serverEnv.STRIPE_WEBHOOK_SECRET),
+  /**
+   * This deployment can take money AND record what it sold.
+   *
+   * Every one of these is load-bearing, and the failure without them is the
+   * worst kind — silent, and on the customer's side of the transaction:
+   *
+   *   STRIPE_SECRET_KEY         no checkout session at all
+   *   STRIPE_PRICE_PRO_*        checkout dead-ends on "not available yet"
+   *   STRIPE_WEBHOOK_SECRET     the webhook 503s every delivery
+   *   SUPABASE_SERVICE_ROLE_KEY the webhook cannot write
+   *
+   * The last two are the dangerous ones. Checkout succeeds, the card is
+   * charged, and no subscription row is ever written: the customer stays on
+   * Free, retries, and cannot even reach the portal to cancel, because the
+   * portal needs a customer id that only the webhook stores. Offering the
+   * button at all in that state is the bug.
+   *
+   * So the upgrade path asks this, and only the portal asks `billing`.
+   */
+  billingCheckout: Boolean(
+    serverEnv.STRIPE_SECRET_KEY &&
+      serverEnv.STRIPE_WEBHOOK_SECRET &&
+      serverEnv.SUPABASE_SERVICE_ROLE_KEY &&
+      serverEnv.STRIPE_PRICE_PRO_MONTHLY &&
+      serverEnv.STRIPE_PRICE_PRO_YEARLY,
+  ),
   // Calendar support is NOT a flag here. providerConfigured() in
   // lib/calendar/provider.ts is the single answer to "can this deployment
   // offer a calendar", because it is the one that agrees with lib/crypto about

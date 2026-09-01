@@ -235,6 +235,14 @@ async function handle(event: Stripe.Event): Promise<string> {
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : null
       if (!customerId) return 'unmatched'
 
+      // Mirror the invoice.paid guard. A one-off invoice raised by hand in the
+      // dashboard has no subscription parent, and passing null through was read
+      // by the SQL as "any subscription for this customer" — so a failed manual
+      // charge moved a perfectly healthy Pro account to past_due, where it sat
+      // until the next subscription event, possibly a billing period away.
+      const subscriptionId = subscriptionIdFromInvoice(invoice)
+      if (!subscriptionId) return 'not_subscription'
+
       // Status only, and only for an account currently on a paid status.
       // Access is not revoked here — Stripe moves the subscription to past_due
       // and then unpaid on its own schedule, and cutting someone off on a
@@ -242,7 +250,7 @@ async function handle(event: Stripe.Event): Promise<string> {
       const admin = createServiceRoleClient()
       const { data, error } = await admin.rpc('mark_stripe_payment_failed', {
         p_stripe_customer_id: customerId,
-        p_stripe_subscription_id: subscriptionIdFromInvoice(invoice),
+        p_stripe_subscription_id: subscriptionId,
       })
 
       if (error) throw new Error(`payment_failed update failed: ${error.code}`)

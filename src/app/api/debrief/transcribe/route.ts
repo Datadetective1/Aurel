@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { transcribeAudio } from '@/lib/ai/transcribe'
-import { recordUsage } from '@/lib/billing/entitlements'
+import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -138,6 +138,21 @@ export async function POST(request: NextRequest) {
     keywords = (data ?? [])
       .map((row) => row.people?.preferred_name || row.people?.full_name)
       .filter((name): name is string => Boolean(name))
+  }
+
+  // Checked HERE, immediately before the paid call, and not earlier: the
+  // validation above rejects a malformed or oversized upload, and burning
+  // somebody's monthly allowance on a request that was never going to reach the
+  // provider is the one way this gate could make things worse.
+  //
+  // The quota is what bites. `debrief` is on for every plan, so the capability
+  // half passes everywhere — it is here so that an account with the capability
+  // switched off by a support override is refused too.
+  const capability = await checkCapability('debrief', 'voice_transcription')
+  if (!capability.allowed) {
+    // 402, not 403: this is a limit, not a permission, and the client
+    // distinguishes them when deciding whether to offer the upgrade.
+    return NextResponse.json({ error: capability.message, upgrade: true }, { status: 402 })
   }
 
   await track('voice_debrief_transcription_started', {

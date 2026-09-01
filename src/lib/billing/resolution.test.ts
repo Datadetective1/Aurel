@@ -290,3 +290,32 @@ describe('a standard account with a support override', () => {
     expect(result.plan).toBe('free')
   })
 })
+
+describe('a support override against a full-access account', () => {
+  it('cannot switch a capability back off for an owner', async () => {
+    // Overrides are applied after the tier. A stale one — written while the
+    // account was still standard and then left behind — would otherwise take
+    // something away from an account that is supposed to have everything.
+    grantRow = { tier: 'owner', revoked_at: null }
+    overrideRows = [
+      { capability: 'deepResearch', limit_value: null, enabled: false, expires_at: null },
+    ]
+    expect((await resolve()).capabilities.deepResearch).toBe(true)
+  })
+
+  it('cannot narrow a quota the tier set to unlimited', async () => {
+    grantRow = { tier: 'pilot', revoked_at: null }
+    overrideRows = [
+      { capability: 'person_research', limit_value: 2, enabled: true, expires_at: null },
+    ]
+    expect((await resolve()).quotas.person_research).toBeNull()
+  })
+
+  it('still applies to an ordinary account', async () => {
+    grantRow = null
+    overrideRows = [
+      { capability: 'person_research', limit_value: 25, enabled: true, expires_at: null },
+    ]
+    expect((await resolve()).quotas.person_research).toBe(25)
+  })
+})

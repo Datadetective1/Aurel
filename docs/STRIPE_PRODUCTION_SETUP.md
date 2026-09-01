@@ -32,6 +32,15 @@ connection string:
 psql "$DATABASE_URL" -f supabase/migrations/0017_stripe_webhook_reliability.sql
 ```
 
+Or let the runner do it. Your database predates the migration ledger, so it
+needs telling what is already applied — once, after checking that 0016 really is
+the highest migration it has:
+
+```bash
+DATABASE_URL="postgres://..." npm run db:migrate -- --adopt-through 0016
+DATABASE_URL="postgres://..." npm run db:migrate     # applies 0017, and nothing else
+```
+
 Migrations are forward-only and applied in filename order. This one is purely
 additive: a new table, a nullable column, two functions. It touches no existing
 row and is safe to run against a live database.
