@@ -75,8 +75,8 @@ export function CheckoutReturn({ alreadyPro }: { alreadyPro: boolean }) {
   return (
     <Banner tone="positive" role="status">
       <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-      You are on {brand.name} Pro. Everything is unlocked — including calendar, deep research and
-      the Relationship Atlas.
+      You are on {brand.name} Pro. People and relationship memory are now unlimited, transcript
+      analysis is on, and every monthly limit has gone up.
     </Banner>
   )
 }

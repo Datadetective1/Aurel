@@ -208,12 +208,25 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       source_ingest: 500,
     },
     limits: { people: null },
+    // WHAT THIS LIST MAY SAY: a difference the code actually enforces, and
+    // nothing else.
+    //
+    // It used to promise "Calendar integration and the Relationship Atlas" and
+    // "Weekly relationship intelligence". The first two are built and ungated —
+    // a free account already has both, so they were being sold something they
+    // had. The third is not built at all: there is an email template and no job
+    // that sends it. Deep research is the same, a capability flag with nothing
+    // behind it.
+    //
+    // Those flags stay above, because they are the framework a future gate
+    // plugs into. Selling them is the part that had to stop. plans.test.ts
+    // fails if an unenforced capability reappears here.
     highlights: [
       'Unlimited people and relationship memory',
-      'Research a person’s public professional footprint',
-      'Meeting briefs, Quick Brief and debriefs',
-      'Calendar integration and the Relationship Atlas',
-      'Weekly relationship intelligence',
+      '60 researched people and 150 meeting briefs a month',
+      'Transcript analysis on your debriefs',
+      '600 coach questions and 100 documents a month',
+      'Export or delete everything, any time',
     ],
   },
 
@@ -303,7 +316,6 @@ export function annualSavingPercent(plan: PlanDefinition): number | null {
   if (fullYear <= plan.yearlyPriceCents) return null
   return Math.floor(((fullYear - plan.yearlyPriceCents) / fullYear) * 100)
 }
-
 
 /**
  * Whether the founding price may be shown to anyone.
