@@ -79,7 +79,10 @@ begin
     'cus_alice', 'sub_alice', 'price_monthly',
     '2026-10-01T10:00:00Z', false, null, 'monthly', 0, 0);
 
-  perform pg_temp.assert(outcome = 'applied', 'an active subscription is applied');
+  perform pg_temp.assert(
+    outcome = 'upgraded',
+    'a first paid subscription reports the transition, not just a write'
+  );
   perform pg_temp.assert(
     (select plan || '/' || status || '/' || billing_interval
        from public.subscriptions where user_id = alice) = 'pro/active/monthly',
@@ -107,6 +110,7 @@ begin
     'cus_alice', 'sub_alice', 'price_monthly',
     null, true, null, null, 0, 0);
   perform pg_temp.assert(outcome = 'applied', 'a newer event is applied');
+  -- 'applied', not 'upgraded': pro -> free is not somebody becoming a customer.
 
   outcome := public.apply_stripe_subscription(
     alice, '2026-09-01T11:00:00Z', 'free', 'canceled',
@@ -116,6 +120,23 @@ begin
     outcome = 'applied'
       and (select status from public.subscriptions where user_id = alice) = 'canceled',
     'redelivering the same event reaches the same state'
+  );
+
+  -- Resubscribing after a cancellation counts as a transition again, because
+  -- it is one -- but the update that follows it does not.
+  perform pg_temp.assert(
+    public.apply_stripe_subscription(
+      alice, '2026-09-01T11:30:00Z', 'pro', 'active',
+      'cus_alice', 'sub_alice', 'price_monthly',
+      '2026-10-01T00:00:00Z', false, null, 'monthly', 0, 0) = 'upgraded',
+    'resubscribing after a lapse reports a transition'
+  );
+  perform pg_temp.assert(
+    public.apply_stripe_subscription(
+      alice, '2026-09-01T11:40:00Z', 'pro', 'active',
+      'cus_alice', 'sub_alice', 'price_monthly',
+      '2026-10-01T00:00:00Z', false, null, 'monthly', 0, 0) = 'applied',
+    'and a later update on the same paid account does not'
   );
 
   -- --- identifiers are never nulled out --------------------------------------
@@ -166,11 +187,26 @@ begin
     public.mark_stripe_payment_failed('cus_nobody') = 'no_match',
     'an unknown customer is reported, not raised'
   );
+  perform pg_temp.assert(
+    public.mark_stripe_payment_failed('cus_alice', null) = 'no_match',
+    'a failed ONE-OFF invoice, which names no subscription, sours nothing'
+  );
 
   update public.subscriptions set status = 'canceled' where user_id = bob;
   perform pg_temp.assert(
     public.mark_stripe_payment_failed('cus_bob', 'sub_bob') = 'no_match',
     'an account that has already left is not dragged back to past_due'
+  );
+
+  -- --- an event about an account that does not exist ------------------------
+  -- The insert would otherwise hit the foreign key to auth.users and RAISE,
+  -- which the route turns into a 500 -- and Stripe retries a 500 for three
+  -- days, for an event naming a user who will never exist.
+  perform pg_temp.assert(
+    public.apply_stripe_subscription(
+      gen_random_uuid(), now(), 'pro', 'active', 'cus_ghost', 'sub_ghost',
+      'price_x', now(), false, null, 'monthly', 0, 0) = 'no_account',
+    'an event for a deleted account is reported, not raised'
   );
 
   -- --- the event ledger ------------------------------------------------------

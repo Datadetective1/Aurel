@@ -268,10 +268,10 @@ export const features = {
    */
   billingCheckout: Boolean(
     serverEnv.STRIPE_SECRET_KEY &&
-      serverEnv.STRIPE_WEBHOOK_SECRET &&
-      serverEnv.SUPABASE_SERVICE_ROLE_KEY &&
-      serverEnv.STRIPE_PRICE_PRO_MONTHLY &&
-      serverEnv.STRIPE_PRICE_PRO_YEARLY,
+    serverEnv.STRIPE_WEBHOOK_SECRET &&
+    serverEnv.SUPABASE_SERVICE_ROLE_KEY &&
+    serverEnv.STRIPE_PRICE_PRO_MONTHLY &&
+    serverEnv.STRIPE_PRICE_PRO_YEARLY,
   ),
   // Calendar support is NOT a flag here. providerConfigured() in
   // lib/calendar/provider.ts is the single answer to "can this deployment

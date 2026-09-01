@@ -85,7 +85,11 @@ export async function startCheckout(
 
   let customerId: string
   try {
-    customerId = await resolveCustomerId(user.id, user.email ?? null, subscription?.stripe_customer_id ?? null)
+    customerId = await resolveCustomerId(
+      user.id,
+      user.email ?? null,
+      subscription?.stripe_customer_id ?? null,
+    )
   } catch (error) {
     logger.error('billing.customer_resolve_failed', {
       error: error instanceof Error ? error.name : 'unknown',
@@ -158,10 +162,7 @@ export async function startCheckout(
  * The last two remember the choice in a cookie, so the intent survives the
  * confirmation email and the four minutes of onboarding in between.
  */
-export async function choosePlan(
-  _prev: BillingState,
-  formData: FormData,
-): Promise<BillingState> {
+export async function choosePlan(_prev: BillingState, formData: FormData): Promise<BillingState> {
   const interval: BillingInterval = intervalSchema.parse(formData.get('interval'))
   const user = await getOptionalUser()
 
@@ -269,6 +270,13 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
     })
   }
 }
+
+/**
+ * How recently the subscription row must have changed for a reconcile to be
+ * skipped. Long enough that a loop cannot turn into Stripe API pressure, short
+ * enough that somebody reloading after a real payment still gets an answer.
+ */
+const RECONCILE_COOLDOWN_MS = 10_000
 
 /** Minute-resolution bucket for checkout idempotency keys. */
 function minuteBucket(): number {
@@ -388,12 +396,25 @@ export async function reconcileSubscription(): Promise<{ plan: string; changed: 
   const supabase = await createClient()
   const { data: row } = await supabase
     .from('subscriptions')
-    .select('stripe_customer_id')
+    .select('stripe_customer_id, updated_at')
     .eq('user_id', user.id)
     .maybeSingle()
 
   const customerId = row?.stripe_customer_id
   if (!customerId) return { plan: before.plan, changed: false }
+
+  // A cooldown, because this is a 'use server' export and therefore a POST
+  // endpoint anybody signed in can call in a loop. Each call is a
+  // subscriptions.list against Stripe, whose read limit is account-wide — so
+  // one free account could push every other customer's webhook and checkout
+  // into 429s.
+  //
+  // `updated_at` is maintained by the subscriptions_touch trigger and is
+  // already fetched here, so this costs nothing. Ten seconds is longer than a
+  // webhook takes to arrive and shorter than anybody waits before reloading.
+  if (row.updated_at && Date.now() - new Date(row.updated_at).getTime() < RECONCILE_COOLDOWN_MS) {
+    return { plan: before.plan, changed: false }
+  }
 
   try {
     const list = await stripe().subscriptions.list({

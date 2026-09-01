@@ -176,7 +176,13 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Your Interaction Profile',
       'Up to 5 people',
       '3 researched people and 3 meeting briefs a month',
-      'Debrief and confirm what you learn',
+      // The number is stated because it is low and it bites early: debrief and
+      // transcript analysis share the same meter, so a free account gets ONE
+      // debrief a calendar month, and the second fails. A bullet reading
+      // "Debrief and confirm what you learn" beside a neighbour that quotes
+      // "3 a month" reads as unlimited. Whether one is the right number is a
+      // product decision -- see docs/STRIPE_PRODUCTION_SETUP.md.
+      'One debrief a month, transcript and all',
       'Export or delete everything, any time',
     ],
   },

@@ -420,6 +420,33 @@ describe('reconciling after a checkout redirect', () => {
     expect(result.changed).toBe(false)
   })
 
+  it('does not hammer Stripe when the row was just written', async () => {
+    // This is a 'use server' export, so it is a POST endpoint anybody signed in
+    // can call in a loop, and each call is a Stripe read against an
+    // account-wide limit.
+    subscriptionRow = {
+      stripe_customer_id: 'cus_mine',
+      plan: 'free',
+      status: null,
+      updated_at: new Date().toISOString(),
+    }
+    const { reconcileSubscription } = await load()
+    expect(await reconcileSubscription()).toEqual({ plan: 'free', changed: false })
+  })
+
+  it('does reconcile when the row is older than the cooldown', async () => {
+    subscriptionRow = {
+      stripe_customer_id: 'cus_mine',
+      plan: 'free',
+      status: null,
+      updated_at: new Date(Date.now() - 60_000).toISOString(),
+    }
+    const { reconcileSubscription } = await load()
+    // No subscriptions in the stub list, so it reports no change -- but it got
+    // past the cooldown to ask, which is the point.
+    expect(await reconcileSubscription()).toEqual({ plan: 'free', changed: false })
+  })
+
   it('does nothing for an account Stripe has never seen', async () => {
     subscriptionRow = { stripe_customer_id: null, plan: 'free', status: null }
     const { reconcileSubscription } = await load()

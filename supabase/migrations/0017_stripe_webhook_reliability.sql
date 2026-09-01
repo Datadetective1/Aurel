@@ -76,9 +76,17 @@ comment on column public.subscriptions.stripe_event_at is
 -- webhook already holds the service role key -- this function does not widen
 -- what that key can do, it narrows what the webhook has to get right.
 --
--- Returns 'stale' when the event is older than what has already been applied,
--- 'applied' otherwise. The caller logs the difference and acknowledges either
--- way: a stale event is correctly handled, not a failure to retry.
+-- Returns one of:
+--   'stale'      the event is older than what has already been applied
+--   'no_account' the user id names nobody
+--   'upgraded'   applied, AND this account was on free before
+--   'applied'    applied, no plan transition
+--
+-- The caller logs the difference and acknowledges every one of them: a stale
+-- event is correctly handled, not a failure to retry. 'upgraded' is separated
+-- from 'applied' so the one event worth counting -- somebody becoming a paying
+-- customer -- can be counted exactly once, rather than re-counted on every
+-- subsequent subscription update.
 create or replace function public.apply_stripe_subscription(
   p_user_id uuid,
   p_event_at timestamptz,
@@ -185,6 +193,10 @@ begin
     price_protected_until  = case when keep_founding then protected_until else price_protected_until end,
     stripe_event_at        = p_event_at
   where user_id = p_user_id;
+
+  if existing.plan = 'free' and p_plan <> 'free' then
+    return 'upgraded';
+  end if;
 
   return 'applied';
 end;

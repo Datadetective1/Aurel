@@ -2,6 +2,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { trackFor } from '@/lib/analytics'
 import { FOUNDING_OFFER, isEntitledStatus } from './plans'
 import { intervalForPrice, mapStatus, planForPrice } from './stripe'
 
@@ -76,5 +77,23 @@ export async function applyStripeSubscription(
   if (error) throw new Error(`subscription apply failed: ${error.code}`)
 
   logger.info('billing.subscription_synced', { plan, status, outcome: data })
+
+  // The bottom of the funnel. checkout_started was recorded and nothing
+  // recorded what came of it, so the one number the $19/$190 reprice has to be
+  // judged by -- started to subscribed -- could not be computed.
+  //
+  // Only on a transition into a paid plan. The database says which of those
+  // this was -- 'upgraded' rather than 'applied' -- because otherwise every
+  // subsequent subscription.updated on a Pro account would count as another new
+  // subscription, and a stale event the ordering guard refused would count as
+  // one too. Scalars only, consistent with the privacy contract.
+  if (data === 'upgraded') {
+    await trackFor(userId, 'subscription_created', {
+      plan,
+      status,
+      interval: intervalForPrice(priceId) ?? 'unknown',
+    })
+  }
+
   return data ?? 'applied'
 }

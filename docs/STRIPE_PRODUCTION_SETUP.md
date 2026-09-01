@@ -403,6 +403,20 @@ second look once there is usage data — `limit_reached` is already tracked, and
 `entitlement_overrides` lets support raise a ceiling for one account without a
 deploy.
 
+**Free gets one debrief a month, and that is probably too few.** `debrief` and
+`transcriptAnalysis` both meter against `transcript_analysis`, which Free sets
+to 1 — so a free account can debrief once per calendar month and the second
+attempt is refused. The debrief is the step that produces the relationship
+record the whole product is built on, so this is the ceiling most likely to stop
+somebody before they have seen why Pro is worth $19. The free highlight now
+states the limit rather than implying it is unlimited; raising it is a one-line
+change in `PLANS.free.quotas`.
+
+**Voice transcription now has a ceiling where it had none.** It called a paid
+speech-to-text provider with no check at all. Free is 5 a month and Pro 300,
+anchored to the debrief they feed rather than chosen freely. Revisit both with
+usage data; `limit_reached` is already tracked.
+
 **There is no trial.** The code handles `trialing` correctly everywhere; adding
 one is a setting on the Stripe price.
 

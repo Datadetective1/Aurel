@@ -187,6 +187,38 @@ function sanitiseProps(props: Props): Record<string, string | number | boolean> 
 }
 
 /**
+ * Record an event for a user who is not the caller.
+ *
+ * For the Stripe webhook, which is the only place that knows a subscription
+ * came into existence and the one place with no session to attribute it to.
+ * `track()` reads `getOptionalUser()` and would silently record nothing there,
+ * which is why the funnel had a top and no bottom: checkout_started was
+ * measured and the subscription that followed was not.
+ *
+ * Takes the user id the webhook already resolved from our own metadata, and
+ * writes with the service role because there is no session to write under.
+ * Never throws, for the same reason `track` does not: analytics must not fail
+ * a payment.
+ */
+export async function trackFor(
+  userId: string,
+  name: AnalyticsEvent,
+  props: Props = {},
+): Promise<void> {
+  try {
+    const { createServiceRoleClient } = await import('@/lib/supabase/server')
+    await createServiceRoleClient()
+      .from('analytics_events')
+      .insert({ user_id: userId, name, props: sanitiseProps(props) })
+  } catch (error) {
+    logger.warn('analytics.track_failed', {
+      name,
+      error: error instanceof Error ? error.name : 'unknown',
+    })
+  }
+}
+
+/**
  * Record a product event. Never throws: analytics failing must not fail the
  * user's actual action.
  */
