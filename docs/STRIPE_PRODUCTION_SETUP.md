@@ -251,8 +251,9 @@ With test keys and test price ids in Vercel:
    -- every row has a processed_at
    ```
 
-8. **Check entitlement.** Try something Free cannot do — deep research, or a
-   sixth person. It should now be allowed.
+8. **Check entitlement.** Try something Free cannot do: add a sixth person
+   (Free stops at five), or analyse a transcript in a debrief. Both should now
+   be allowed.
 9. **Test the portal.** _Manage subscription_ → Stripe portal opens, showing
    the invoice and the card.
 10. **Test cancellation.** Cancel in the portal. Back on Settings → Plan the
@@ -353,6 +354,48 @@ keep the charge.
 - **Invitation codes still work and are not required to buy.** Anyone can sign
   up and subscribe. Pilot invitations remain a separate, additional path that
   grants full access without payment.
+
+## Decisions still yours to make
+
+None of these block taking money. All of them are commercial rather than
+technical, which is why they are listed rather than decided.
+
+**Four capabilities are declared Pro-only and gated nowhere.** `plans.ts` says
+Free does not get them; no code checks:
+
+| Capability            | State today                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `relationshipAtlas`   | Built. Reachable at `/atlas` on any plan.                    |
+| `calendarIntegration` | Built. Connectable from Settings on any plan.                |
+| `weeklyIntelligence`  | Not built. An email template exists; nothing sends it.       |
+| `deepResearch`        | Not built. A capability flag and a meter kind, no call site. |
+
+The pricing page no longer advertises any of them — selling something a free
+account already has is worse than not selling it — and
+`src/lib/billing/enforcement.test.ts` fails if one reappears in a plan's
+highlights while ungated.
+
+Gating the first two is one `checkCapability` call at each entry point. It is
+left undone deliberately: it would take capability away from accounts that have
+it today, and that is a decision about what Free is for. Three options, in
+descending order of how much they change:
+
+1. **Gate them.** Pro gets a second reason to exist beyond headroom. Existing
+   free users lose two features they currently use.
+2. **Move them to Free properly** — set the flags false-to-true on Free so the
+   configuration matches reality, and lean on quotas as the whole difference.
+3. **Leave as is.** The flags stay aspirational, the copy stays quiet, and the
+   test keeps them from being sold by accident.
+
+**The Free/Pro quota ratios are inherited, not chosen.** Free gets 3 researched
+people, 3 briefs, 20 coach questions and 5 people; Pro gets 60, 150, 600 and
+unlimited. Those were set before there was a price. At $19 they are worth a
+second look once there is usage data — `limit_reached` is already tracked, and
+`entitlement_overrides` lets support raise a ceiling for one account without a
+deploy.
+
+**There is no trial.** The code handles `trialing` correctly everywhere; adding
+one is a setting on the Stripe price.
 
 ## What cannot be done from the repository
 
