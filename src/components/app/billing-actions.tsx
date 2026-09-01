@@ -22,18 +22,21 @@ import {
 export function UpgradeButton({
   interval = 'monthly',
   label = 'Upgrade to Pro',
+  variant = 'primary',
 }: {
   interval?: 'monthly' | 'yearly'
   label?: string
+  /** Secondary for the interval that is not being led with. */
+  variant?: 'primary' | 'secondary'
 }) {
   const [state, formAction] = useActionState<BillingState, FormData>(startCheckout, {})
 
   return (
     <form action={formAction}>
       <input type="hidden" name="interval" value={interval} />
-      <SubmitButton label={label} />
+      <SubmitButton label={label} variant={variant} />
       {state.error ? (
-        <p role="alert" className="mt-2 text-xs text-critical">
+        <p role="alert" className="text-critical mt-2 text-xs">
           {state.error}
         </p>
       ) : null}
@@ -51,7 +54,7 @@ export function ManageBillingButton() {
     <form action={formAction}>
       <SubmitButton label="Manage billing" variant="secondary" icon />
       {state.error ? (
-        <p role="alert" className="mt-2 text-xs text-critical">
+        <p role="alert" className="text-critical mt-2 text-xs">
           {state.error}
         </p>
       ) : null}
