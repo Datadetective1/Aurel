@@ -123,32 +123,43 @@ export async function POST(request: Request) {
  * safer than dropping.
  */
 async function claimEvent(event: Stripe.Event): Promise<'claimed' | 'duplicate'> {
-  const admin = createServiceRoleClient()
+  try {
+    const admin = createServiceRoleClient()
 
-  const { error } = await admin.from('stripe_webhook_events').insert({
-    id: event.id,
-    type: event.type,
-    event_created_at: new Date(event.created * 1000).toISOString(),
-  })
+    const { error } = await admin.from('stripe_webhook_events').insert({
+      id: event.id,
+      type: event.type,
+      event_created_at: new Date(event.created * 1000).toISOString(),
+    })
 
-  if (!error) return 'claimed'
+    if (!error) return 'claimed'
 
-  // 23505 is a unique violation: we have seen this event id before.
-  if (error.code !== '23505') {
-    // A ledger that cannot be written is not a reason to drop a payment.
-    // Process the event; the cost of a rare double-apply is nil, because
-    // applying the same subscription state twice is the same state.
-    logger.warn('billing.webhook_ledger_unavailable', { code: error.code })
+    // 23505 is a unique violation: we have seen this event id before.
+    if (error.code !== '23505') {
+      // A ledger that cannot be written is not a reason to drop a payment.
+      // Process the event; the cost of a rare double-apply is nil, because
+      // applying the same subscription state twice is the same state.
+      logger.warn('billing.webhook_ledger_unavailable', { code: error.code })
+      return 'claimed'
+    }
+
+    const { data } = await admin
+      .from('stripe_webhook_events')
+      .select('processed_at')
+      .eq('id', event.id)
+      .maybeSingle()
+
+    return data?.processed_at ? 'duplicate' : 'claimed'
+  } catch (error) {
+    // Most likely SUPABASE_SERVICE_ROLE_KEY is missing, which createServiceRoleClient
+    // throws for rather than quietly running with user-level permissions. Fall
+    // through to the handler so that failure is reported once, as a logged 500
+    // Stripe will retry, instead of as an unhandled exception here.
+    logger.warn('billing.webhook_ledger_unavailable', {
+      error: error instanceof Error ? error.name : 'unknown',
+    })
     return 'claimed'
   }
-
-  const { data } = await admin
-    .from('stripe_webhook_events')
-    .select('processed_at')
-    .eq('id', event.id)
-    .maybeSingle()
-
-  return data?.processed_at ? 'duplicate' : 'claimed'
 }
 
 async function markProcessed(id: string, outcome: string): Promise<void> {

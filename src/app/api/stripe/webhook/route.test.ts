@@ -23,6 +23,8 @@ let ledger: {
   insertError: { code: string } | null
 }
 let subscriptionRow: { user_id: string } | null
+/** Simulates a deployment with no SUPABASE_SERVICE_ROLE_KEY. */
+let serviceRoleThrows: boolean
 
 vi.mock('@/lib/env', () => ({
   serverEnv: { STRIPE_WEBHOOK_SECRET: SECRET },
@@ -48,7 +50,11 @@ vi.mock('@/lib/billing/sync', () => ({
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceRoleClient: () => ({
+  createServiceRoleClient: () => {
+    if (serviceRoleThrows) {
+      throw new Error('[atturel] SUPABASE_SERVICE_ROLE_KEY is not configured')
+    }
+    return {
     from(table: string) {
       if (table === 'stripe_webhook_events') {
         return {
@@ -78,8 +84,9 @@ vi.mock('@/lib/supabase/server', () => ({
         }),
       }
     },
-    rpc: (...args: unknown[]) => rpc(...args),
-  }),
+      rpc: (...args: unknown[]) => rpc(...args),
+    }
+  },
 }))
 
 const UUID = '11111111-2222-4333-8444-555555555555'
@@ -122,6 +129,7 @@ beforeEach(() => {
   rpc = vi.fn(async () => ({ data: 'applied', error: null }))
   ledger = { rows: new Map(), insertError: null }
   subscriptionRow = null
+  serviceRoleThrows = false
 })
 
 afterEach(() => {
@@ -371,5 +379,20 @@ describe('when something goes wrong', () => {
     const retry = await post()
     expect(retry.status).toBe(200)
     expect(ledger.rows.get('evt_test')?.processed_at).toBeTruthy()
+  })
+})
+
+describe('a deployment missing its service role key', () => {
+  it('reports it as a retryable 500, not as an unhandled exception', async () => {
+    // createServiceRoleClient throws rather than quietly running with
+    // user-level permissions, and the ledger write is the first thing to hit
+    // that -- before the handler's own error boundary. Stripe retries for
+    // three days, so setting the key replays the backlog.
+    serviceRoleThrows = true
+    applySubscription.mockRejectedValue(new Error('service role key missing'))
+    constructEvent.mockResolvedValue(event('customer.subscription.updated', subscription()))
+
+    const response = await post()
+    expect(response.status).toBe(500)
   })
 })

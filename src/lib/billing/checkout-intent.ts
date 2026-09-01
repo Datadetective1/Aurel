@@ -58,12 +58,6 @@ export async function takeCheckoutIntent(): Promise<BillingInterval | null> {
   return intent
 }
 
-/** Read without clearing. For deciding a redirect that may not happen yet. */
-export async function peekCheckoutIntent(): Promise<BillingInterval | null> {
-  const store = await cookies()
-  return parse(store.get(COOKIE)?.value)
-}
-
 /** Where a remembered intent should deliver someone once they are signed in. */
 export function intentDestination(interval: BillingInterval): string {
   return `/settings/billing?intent=${interval}`
