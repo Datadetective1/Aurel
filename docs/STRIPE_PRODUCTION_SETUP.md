@@ -36,7 +36,18 @@ Migrations are forward-only and applied in filename order. This one is purely
 additive: a new table, a nullable column, two functions. It touches no existing
 row and is safe to run against a live database.
 
-Confirm it worked:
+Confirm it worked, either with the assertion suite:
+
+```bash
+psql "$DATABASE_URL" -f supabase/tests/billing-webhook.sql
+# ... ALL BILLING WEBHOOK ASSERTIONS PASSED
+```
+
+It creates two throwaway accounts, exercises ordering, idempotency, failed
+payments and the permission boundary, and always rolls back — so it is safe to
+run against production.
+
+Or by hand:
 
 ```sql
 select column_name from information_schema.columns
