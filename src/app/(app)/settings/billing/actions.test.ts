@@ -401,3 +401,34 @@ describe('the billing portal', () => {
     expect(callArgs(createPortal)[0].return_url).toMatch(/^https?:\/\/[^/]+\/settings\/billing$/)
   })
 })
+
+describe('reconciling after a checkout redirect', () => {
+  it('reports what the database actually holds, not what it hoped for', async () => {
+    // A subscription against a price that is not one of ours resolves to free.
+    // The success banner reads this, so an optimistic 'pro' here would announce
+    // a plan the customer does not have.
+    subscriptionRow = { stripe_customer_id: 'cus_mine', plan: 'free', status: null }
+    const { reconcileSubscription } = await load()
+    const result = await reconcileSubscription()
+    expect(result.plan).toBe('free')
+    expect(result.changed).toBe(false)
+  })
+
+  it('does nothing for an account Stripe has never seen', async () => {
+    subscriptionRow = { stripe_customer_id: null, plan: 'free', status: null }
+    const { reconcileSubscription } = await load()
+    expect(await reconcileSubscription()).toEqual({ plan: 'free', changed: false })
+  })
+
+  it('does nothing for an owner, who has no subscription to find', async () => {
+    entitlements = { plan: 'free', billable: false }
+    const { reconcileSubscription } = await load()
+    expect(await reconcileSubscription()).toEqual({ plan: 'free', changed: false })
+  })
+
+  it('does nothing on a deployment with no Stripe keys', async () => {
+    billingEnabled = false
+    const { reconcileSubscription } = await load()
+    expect(await reconcileSubscription()).toEqual({ plan: 'free', changed: false })
+  })
+})

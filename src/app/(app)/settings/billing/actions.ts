@@ -404,7 +404,19 @@ export async function reconcileSubscription(): Promise<{ plan: string; changed: 
     return { plan: before.plan, changed: false }
   }
 
-  // getEntitlements is request-cached, so re-reading it here would return the
-  // value from before the write. The caller refreshes the route instead.
-  return { plan: 'pro', changed: before.plan === 'free' }
+  // Read back what was actually written, rather than assuming it said 'pro'.
+  // A subscription against a price that is not one of ours resolves to free —
+  // see planForPrice — and the success banner must not announce a plan the
+  // database does not hold.
+  //
+  // Re-read directly: getEntitlements is request-cached, so calling it again
+  // here would return the value from before the write.
+  const { data: after } = await supabase
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const plan = after?.plan ?? before.plan
+  return { plan, changed: plan !== before.plan }
 }
