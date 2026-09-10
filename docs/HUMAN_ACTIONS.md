@@ -449,3 +449,33 @@ that unchanged), and only then move screens native one at a time against the
 same Supabase database and the same route handlers. Do not build a separate
 backend; the Server Actions are the API, and the transcription route already
 takes a plain multipart POST from anywhere.
+
+## 7. Follow-through email — **built, needs one secret**
+
+The daily follow-through is implemented end to end: selection, wording,
+template, idempotent ledger, scheduled job, settings, deep links. It runs when
+two things are true on the deployment:
+
+```
+CRON_SECRET=<any long random string>      # openssl rand -base64 32
+SUPABASE_SERVICE_ROLE_KEY=<already set for Stripe and deletion>
+```
+
+`vercel.json` schedules `/api/cron/follow-through` once a day at 13:00 UTC.
+Vercel sends `Authorization: Bearer $CRON_SECRET` with the call; without the
+variable the route answers 401 to everyone, including Vercel. Settings →
+Capabilities → Email says whether the job can run.
+
+**Why once a day.** The Hobby plan runs cron jobs at daily precision. The job
+is written for both: on an hourly schedule (`0 * * * *`, Pro plan) it honours
+each user's chosen hour in their own zone; on the daily schedule it sends when
+it runs and the settings screen says so. Switching is a one-line change to
+`vercel.json`; nothing else moves.
+
+**Verify after configuring**
+
+1. Settings → Appearance → Email: _Daily follow-through_ is on, and _Send
+   today's to me now_ delivers the real email built from your real loops.
+2. `follow_through_deliveries` gains a `manual` row; the next 13:00 UTC run
+   adds a `scheduled` row, and never a second one for the same local day.
+3. Each line in the email opens `/loops?focus=<id>` with that loop outlined.

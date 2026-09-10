@@ -146,6 +146,11 @@ export type AnalyticsEvent =
   | 'decision_confirmed'
   | 'decision_rejected'
   | 'person_photo_uploaded'
+  // Follow-through email. Loop counts and the schedule mode; never a loop's
+  // words or a person's name.
+  | 'follow_through_sent'
+  | 'follow_through_manual_sent'
+  | 'follow_through_preferences_changed'
   // Voice debrief. Buckets, latencies and error categories only -- never a
   // word of what was said, and no audio ever reaches this file.
   | 'voice_debrief_started'

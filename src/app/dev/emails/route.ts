@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import {
+  followThroughEmail,
   meetingReminderEmail,
   passwordChangedEmail,
   weeklySummaryEmail,
@@ -47,6 +48,44 @@ const TEMPLATES: Record<string, () => BuiltEmail> = {
       objective: null,
       unknowns: ['You have never spoken directly', 'Nothing is recorded about her priorities'],
       unprepared: true,
+    }),
+
+  'follow-through': () =>
+    followThroughEmail({
+      firstName: 'Alex',
+      headline: '3 things worth following up on today.',
+      subject: '1 promise past due',
+      more: 0,
+      loopsUrl: 'https://example.invalid/loops',
+      items: [
+        {
+          phrase: "You said you'd confirm the pricing assumptions.",
+          timing: { label: 'Overdue by 1 day', tone: 'overdue' },
+          source: 'Promised in Budget check-in, 22 Aug',
+          person: { name: 'Ravi Menon', initials: 'RM', photoUrl: null },
+          href: 'https://example.invalid/loops?focus=1',
+          personHref: 'https://example.invalid/people/1',
+          sourceHref: 'https://example.invalid/conversations/1',
+        },
+        {
+          phrase: "You said you'd send the proposal.",
+          timing: { label: 'Due today', tone: 'today' },
+          source: 'Promised in Q2 platform review, 24 Aug',
+          person: { name: 'Jason Ortiz', initials: 'JO', photoUrl: null },
+          href: 'https://example.invalid/loops?focus=2',
+          personHref: 'https://example.invalid/people/2',
+          sourceHref: null,
+        },
+        {
+          phrase: "Columbus said they'd send the updated requirements.",
+          timing: { label: 'Waiting on them', tone: 'waiting' },
+          source: null,
+          person: { name: 'Columbus Reyes', initials: 'CR', photoUrl: null },
+          href: 'https://example.invalid/loops?focus=3',
+          personHref: 'https://example.invalid/people/3',
+          sourceHref: null,
+        },
+      ],
     }),
 
   'weekly-summary': () =>

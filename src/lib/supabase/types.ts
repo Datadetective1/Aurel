@@ -827,6 +827,42 @@ export type Database = {
           },
         ]
       }
+      follow_through_deliveries: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          local_date: string
+          loop_count: number
+          sent_at: string | null
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          local_date: string
+          loop_count?: number
+          sent_at?: string | null
+          status?: string
+          trigger?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          local_date?: string
+          loop_count?: number
+          sent_at?: string | null
+          status?: string
+          trigger?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       identity_candidates: {
         Row: {
           confidence: number | null
@@ -1822,6 +1858,8 @@ export type Database = {
           default_workspace_id: string | null
           demo_seeded_at: string | null
           email_notifications: boolean
+          follow_through_email: boolean
+          follow_through_hour: number
           full_name: string | null
           id: string
           intents: string[]
@@ -1849,6 +1887,8 @@ export type Database = {
           default_workspace_id?: string | null
           demo_seeded_at?: string | null
           email_notifications?: boolean
+          follow_through_email?: boolean
+          follow_through_hour?: number
           full_name?: string | null
           id: string
           intents?: string[]
@@ -1876,6 +1916,8 @@ export type Database = {
           default_workspace_id?: string | null
           demo_seeded_at?: string | null
           email_notifications?: boolean
+          follow_through_email?: boolean
+          follow_through_hour?: number
           full_name?: string | null
           id?: string
           intents?: string[]

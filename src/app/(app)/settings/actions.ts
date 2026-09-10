@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
-import { requireUser } from '@/lib/auth'
+import { getProfile, requireUser } from '@/lib/auth'
 import { features } from '@/lib/env'
 import { getWorkspace } from '@/lib/workspace'
 import { seedDemoData } from '@/lib/demo/seed'
@@ -79,6 +79,8 @@ const preferencesSchema = z.object({
     .enum(['concise', 'balanced', 'detailed', 'challenging', 'supportive'])
     .catch('balanced'),
   emailNotifications: z.boolean(),
+  followThroughEmail: z.boolean(),
+  followThroughHour: z.coerce.number().int().min(0).max(23).catch(8),
 })
 
 export async function updatePreferences(
@@ -89,6 +91,8 @@ export async function updatePreferences(
     theme: formData.get('theme') ?? 'system',
     coachingStyle: formData.get('coachingStyle') ?? 'balanced',
     emailNotifications: formData.get('emailNotifications') === 'on',
+    followThroughEmail: formData.get('followThroughEmail') === 'on',
+    followThroughHour: formData.get('followThroughHour') ?? 8,
   })
 
   if (!parsed.success) return { error: 'Those preferences are not valid.' }
@@ -102,13 +106,64 @@ export async function updatePreferences(
       theme: parsed.data.theme,
       coaching_style: parsed.data.coachingStyle,
       email_notifications: parsed.data.emailNotifications,
+      follow_through_email: parsed.data.followThroughEmail,
+      follow_through_hour: parsed.data.followThroughHour,
     })
     .eq('id', user.id)
 
   if (error) return { error: 'We could not save those preferences.' }
 
+  await track('follow_through_preferences_changed', {
+    enabled: parsed.data.emailNotifications && parsed.data.followThroughEmail,
+    hour: parsed.data.followThroughHour,
+  })
+
   revalidatePath('/settings')
   return { message: 'Saved.' }
+}
+
+/**
+ * Send today's follow-through to the signed-in user, now.
+ *
+ * The same composer and sender the morning job uses, through the user's own
+ * session, so what arrives is exactly what the schedule would send. Recorded
+ * as a manual delivery: it never consumes the day, and the day never blocks
+ * it. This is also the honest way to see the email before deciding to keep
+ * it on.
+ */
+export async function sendFollowThroughNow(): Promise<SettingsState> {
+  const user = await requireUser()
+  const profile = await getProfile()
+  const supabase = await createClient()
+
+  if (!user.email) return { error: 'Your account has no email address.' }
+
+  const { sendFollowThrough } = await import('@/lib/follow-through/send')
+  const outcome = await sendFollowThrough(
+    supabase,
+    {
+      id: user.id,
+      email: user.email,
+      firstName: profile?.preferred_name || profile?.full_name?.split(' ')[0] || '',
+      timeZone: profile?.timezone ?? null,
+    },
+    { trigger: 'manual' },
+  )
+
+  if (outcome.status === 'sent') {
+    await track('follow_through_manual_sent', { loops: outcome.count })
+    revalidatePath('/settings/appearance')
+    return {
+      message: `Sent to ${user.email}. ${outcome.count === 1 ? 'One loop' : `${outcome.count} loops`} in it.`,
+    }
+  }
+  if (outcome.status === 'skipped' && outcome.reason === 'nothing_open') {
+    return { message: 'Nothing is due, overdue or waiting today, so there was nothing to send.' }
+  }
+  if (outcome.status === 'skipped' && outcome.reason === 'not_configured') {
+    return { error: 'Email delivery is not configured on this deployment, so nothing was sent.' }
+  }
+  return { error: 'That could not be sent. Try again in a moment.' }
 }
 
 // =============================================================================

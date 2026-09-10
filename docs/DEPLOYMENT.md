@@ -46,7 +46,7 @@ carrying real relationship data is a way to lose it under pressure; restore from
 a snapshot instead.
 
 Applying to an existing database: the migration table is the source of truth for
-what has run. `supabase/migrations/` is the source of truth for what *should*
+what has run. `supabase/migrations/` is the source of truth for what _should_
 have. Those two agreeing is worth checking before a release — they diverged once
 in this project, and the repository could not recreate its own schema.
 
@@ -65,3 +65,10 @@ Redeploy the previous build. Migrations are forward-only, so a rollback of code
 against a newer schema must be checked: additive migrations are safe to roll
 back past, destructive ones are not. Nothing in this project has been
 destructive so far.
+
+## Scheduled jobs
+
+`vercel.json` declares the daily follow-through cron. It needs `CRON_SECRET`
+in the production environment (see HUMAN_ACTIONS §7). The route is safe to
+deploy without it — it answers 401 — so a missing secret delays the email, it
+does not break the deploy.

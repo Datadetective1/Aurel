@@ -19,6 +19,7 @@ export function LoopList({
   showPerson = true,
   showSource = true,
   grouped = true,
+  focusId = null,
   className,
 }: {
   loops: LoopRecord[]
@@ -27,6 +28,8 @@ export function LoopList({
   showPerson?: boolean
   showSource?: boolean
   grouped?: boolean
+  /** The loop an email link pointed at. */
+  focusId?: string | null
   className?: string
 }) {
   if (loops.length === 0) return null
@@ -42,6 +45,7 @@ export function LoopList({
             now={now}
             showPerson={showPerson}
             showSource={showSource}
+            highlighted={loop.id === focusId}
           />
         ))}
       </ul>
@@ -72,6 +76,7 @@ export function LoopList({
                 now={now}
                 showPerson={showPerson}
                 showSource={showSource}
+                highlighted={loop.id === focusId}
               />
             ))}
           </ul>

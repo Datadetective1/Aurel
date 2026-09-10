@@ -264,3 +264,128 @@ export function passwordChangedEmail({ firstName }: { firstName: string }): Buil
     }),
   }
 }
+
+// =============================================================================
+// FOLLOW-THROUGH
+// =============================================================================
+
+export interface FollowThroughItem {
+  /** "You said you'd send the proposal." Already worded for who owes it. */
+  phrase: string
+  timing: { label: string; tone: 'overdue' | 'today' | 'soon' | 'waiting' | 'open' }
+  /** "Promised in Budget sync, 24 Aug", or null. */
+  source: string | null
+  person: { name: string; initials: string; photoUrl: string | null } | null
+  /** Where the loop lives. Never a generic dashboard. */
+  href: string
+  personHref: string | null
+  sourceHref: string | null
+}
+
+export interface FollowThroughInput {
+  firstName: string
+  headline: string
+  subject: string
+  items: FollowThroughItem[]
+  /** Qualifying loops that did not fit. */
+  more: number
+  /** Where the whole list lives. */
+  loopsUrl: string
+}
+
+const TIMING_COLOUR: Record<FollowThroughItem['timing']['tone'], string> = {
+  overdue: palette.critical,
+  today: palette.accent,
+  soon: palette.inkSecondary,
+  waiting: palette.inkMuted,
+  open: palette.inkMuted,
+}
+
+/**
+ * A face for the inbox. A 36px circle with initials, and the photo on top
+ * when there is one. The initials are the fallback and the alt text, so a
+ * client that blocks images still shows who this is about.
+ */
+function faceCell(person: FollowThroughItem['person']): string {
+  if (!person) {
+    return `<td width="36" valign="top" style="padding:2px 12px 0 0;">
+      <div style="width:36px;height:36px;border-radius:18px;background:${palette.line};"></div>
+    </td>`
+  }
+  const initials = escapeHtml(person.initials)
+  const circle = `width:36px;height:36px;border-radius:18px;background:${palette.accentWash};color:${palette.accent};font-family:${fonts.body};font-size:12px;font-weight:600;letter-spacing:0.02em;text-align:center;line-height:36px;`
+  return `<td width="36" valign="top" style="padding:2px 12px 0 0;">
+    ${
+      person.photoUrl
+        ? `<img src="${escapeHtml(person.photoUrl)}" alt="${initials}" width="36" height="36" style="display:block;${circle}object-fit:cover;border:1px solid ${palette.line};">`
+        : `<div style="${circle}">${initials}</div>`
+    }
+  </td>`
+}
+
+/**
+ * The daily follow-through. Short enough to read in seconds: a headline, one
+ * row per loop with a face, what is owed and by whom, when, and where it came
+ * from. Each row links to its own loop.
+ */
+export function followThroughEmail(input: FollowThroughInput): BuiltEmail {
+  const rows = input.items
+    .map((item) => {
+      const person = item.person
+      const name = person
+        ? item.personHref
+          ? `<a href="${escapeHtml(item.personHref)}" style="color:${palette.ink};text-decoration:none;font-weight:500;">${escapeHtml(person.name)}</a>`
+          : `<span style="color:${palette.ink};font-weight:500;">${escapeHtml(person.name)}</span>`
+        : ''
+      const source = item.source
+        ? `<div style="margin-top:4px;font-family:${fonts.body};font-size:12px;line-height:1.5;color:${palette.inkFaint};">${
+            item.sourceHref
+              ? `<a href="${escapeHtml(item.sourceHref)}" style="color:${palette.inkFaint};text-decoration:underline;">${escapeHtml(item.source)}</a>`
+              : escapeHtml(item.source)
+          }</div>`
+        : ''
+      return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:separate;margin:0 0 10px;background:${palette.surface};border:1px solid ${palette.line};border-radius:10px;">
+        <tr><td style="padding:14px 16px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+            ${faceCell(person)}
+            <td valign="top">
+              ${name ? `<div style="font-family:${fonts.body};font-size:13px;line-height:1.4;margin-bottom:2px;">${name}</div>` : ''}
+              <div style="font-family:${fonts.body};font-size:15px;line-height:1.5;color:${palette.ink};">
+                <a href="${escapeHtml(item.href)}" style="color:${palette.ink};text-decoration:none;">${escapeHtml(item.phrase)}</a>
+              </div>
+              <div style="margin-top:5px;font-family:${fonts.body};font-size:12px;line-height:1.5;font-weight:500;color:${TIMING_COLOUR[item.timing.tone]};">${escapeHtml(item.timing.label)}</div>
+              ${source}
+            </td>
+          </tr></table>
+        </td></tr>
+      </table>`
+    })
+    .join('')
+
+  const name = input.firstName.trim() || 'there'
+
+  return {
+    subject: input.subject,
+    html: renderEmail({
+      // Counts only. A promise's wording can name a colleague and a deal, and
+      // this line shows on a locked phone.
+      preheader: input.headline,
+      unsubscribeUrl: preferencesUrl,
+      body: [
+        eyebrow('Follow through'),
+        heading(input.headline),
+        paragraph(
+          `${escapeHtml(name)}, these are the open loops that matter today. Everything here is something you confirmed.`,
+        ),
+        rows,
+        input.more > 0
+          ? paragraph(
+              `${escapeHtml(count(input.more, 'more loop'))} ${input.more === 1 ? 'is' : 'are'} open beyond these.`,
+            )
+          : '',
+        button('Open your loops', input.loopsUrl),
+      ].join(''),
+      footerNote: `${escapeHtml(brand.name)} sends this once a day, only on days something is open. Done, Later and Cancel are one tap in the app.`,
+    }),
+  }
+}

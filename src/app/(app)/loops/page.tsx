@@ -27,9 +27,9 @@ export const metadata: Metadata = { title: 'Open loops', robots: { index: false,
 export default async function LoopsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>
+  searchParams: Promise<{ show?: string; focus?: string }>
 }) {
-  const { show } = await searchParams
+  const { show, focus } = await searchParams
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
@@ -37,7 +37,9 @@ export default async function LoopsPage({
 
   const [active, all, { data: people }] = await Promise.all([
     listLoops(supabase, user.id, { timeZone, now, scope: 'active' }),
-    show === 'all' ? listLoops(supabase, user.id, { timeZone, now, scope: 'all' }) : Promise.resolve([]),
+    show === 'all'
+      ? listLoops(supabase, user.id, { timeZone, now, scope: 'all' })
+      : Promise.resolve([]),
     supabase
       .from('people')
       .select('id, full_name, preferred_name')
@@ -49,7 +51,21 @@ export default async function LoopsPage({
 
   const overdue = active.filter((l) => l.status === 'open' && isOverdueIn(l.dueOn, timeZone, now))
   const closedOrDeferred = all.filter((l) => !active.some((a) => a.id === l.id))
-  const peopleOptions = (people ?? []).map((p) => ({ id: p.id, name: p.preferred_name || p.full_name }))
+
+  // A deep link from the follow-through email. If the loop it points at is
+  // no longer active -- closed since the email went out -- it is shown on its
+  // own above the list, so the link never lands on nothing.
+  const focusId = focus && /^[0-9a-f-]{36}$/.test(focus) ? focus : null
+  const focusedElsewhere =
+    focusId && !active.some((l) => l.id === focusId)
+      ? ((await listLoops(supabase, user.id, { timeZone, now, scope: 'all' })).find(
+          (l) => l.id === focusId,
+        ) ?? null)
+      : null
+  const peopleOptions = (people ?? []).map((p) => ({
+    id: p.id,
+    name: p.preferred_name || p.full_name,
+  }))
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -66,6 +82,21 @@ export default async function LoopsPage({
         }
         action={<AddLoop people={peopleOptions} />}
       />
+
+      {focusedElsewhere ? (
+        <section className="mt-9">
+          <p className="text-ink-muted mb-3 text-xs">
+            From your email. This one has since been closed or set aside.
+          </p>
+          <LoopList
+            loops={[focusedElsewhere]}
+            timeZone={timeZone}
+            now={now}
+            grouped={false}
+            focusId={focusId}
+          />
+        </section>
+      ) : null}
 
       {active.length === 0 ? (
         <IllustratedEmpty
@@ -89,10 +120,10 @@ export default async function LoopsPage({
           }
         />
       ) : (
-        <LoopList className="mt-9" loops={active} timeZone={timeZone} now={now} />
+        <LoopList className="mt-9" loops={active} timeZone={timeZone} now={now} focusId={focusId} />
       )}
 
-      <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-line pt-5 text-xs text-ink-muted">
+      <div className="border-line text-ink-muted mt-10 flex flex-wrap items-center gap-3 border-t pt-5 text-xs">
         {show === 'all' ? (
           <>
             <span>Showing everything, including done, cancelled and set aside.</span>
@@ -101,7 +132,10 @@ export default async function LoopsPage({
             </Link>
           </>
         ) : (
-          <Link href="/loops?show=all" className="inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline">
+          <Link
+            href="/loops?show=all"
+            className="text-ink inline-flex items-center gap-1 underline-offset-4 hover:underline"
+          >
             Show closed and set-aside loops
             <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
@@ -109,7 +143,13 @@ export default async function LoopsPage({
       </div>
 
       {show === 'all' && closedOrDeferred.length > 0 ? (
-        <LoopList className="mt-6" loops={closedOrDeferred} timeZone={timeZone} now={now} grouped={false} />
+        <LoopList
+          className="mt-6"
+          loops={closedOrDeferred}
+          timeZone={timeZone}
+          now={now}
+          grouped={false}
+        />
       ) : null}
     </Container>
   )

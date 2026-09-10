@@ -131,3 +131,19 @@ expensive _actions_ are metered instead.
 The last one matters. A `SECURITY DEFINER` function that `authenticated` may
 execute is reachable at `/rest/v1/rpc/…` while it lives in `public`. Migration
 0010 exists solely to move those two helpers out of reach.
+
+## Follow-through (0019)
+
+`profiles.follow_through_email` and `profiles.follow_through_hour` sit under
+the existing `email_notifications` switch; both must be on. The
+`follow_through_deliveries` ledger holds one row per user per **local** day
+for scheduled sends, enforced by a partial unique index — that index is the
+idempotency, not any memory the job keeps. Manual sends from Settings are
+recorded with `trigger = 'manual'` and never consume the day. A failed send
+releases its reservation so the next run retries; a deployment with no mail
+provider records `skipped` and stops.
+
+Migrations `0015b` and `0015c` are drift repairs: production had two migrations
+applied on 27–28 Aug 2026 that were never committed. They were recovered
+verbatim from `supabase_migrations.schema_migrations`, are idempotent, and
+were not re-run against production.

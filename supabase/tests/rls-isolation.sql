@@ -198,6 +198,42 @@ begin
   select count(*) into visible from public.search_everything('vendor', 20);
   perform pg_temp.assert(visible = 0, 'bob''s search cannot reach alice''s decisions');
 
+  -- --- The follow-through ledger is private; scheduled rows are not client-writable ---
+  perform pg_temp.become_superuser();
+  insert into public.follow_through_deliveries (user_id, local_date, trigger, status)
+  values (alice, current_date, 'scheduled', 'sent');
+
+  perform pg_temp.become(alice);
+  select count(*) into visible from public.follow_through_deliveries;
+  perform pg_temp.assert(visible = 1, 'alice sees her own delivery ledger');
+
+  perform pg_temp.become(bob);
+  select count(*) into visible from public.follow_through_deliveries;
+  perform pg_temp.assert(visible = 0, 'bob cannot see alice''s delivery ledger');
+
+  denied := false;
+  begin
+    insert into public.follow_through_deliveries (user_id, local_date, trigger, status)
+    values (bob, current_date, 'scheduled', 'sent');
+  exception when insufficient_privilege or check_violation then
+    denied := true;
+  end;
+  perform pg_temp.assert(denied, 'a session cannot forge a scheduled delivery');
+
+  -- Two scheduled sends for the same local day cannot both be reserved.
+  perform pg_temp.become_superuser();
+  denied := false;
+  begin
+    insert into public.follow_through_deliveries (user_id, local_date, trigger, status)
+    values (alice, current_date, 'scheduled', 'reserved');
+  exception when unique_violation then
+    denied := true;
+  end;
+  perform pg_temp.assert(denied, 'a second scheduled delivery for the same day is refused');
+  -- A manual send on the same day is allowed: it never consumes the day.
+  insert into public.follow_through_deliveries (user_id, local_date, trigger, status)
+  values (alice, current_date, 'manual', 'sent');
+
   -- --- Subscriptions are not client-writable --------------------------------
   -- A client that can grant itself a plan makes the entire paywall decorative.
   perform pg_temp.become(bob);

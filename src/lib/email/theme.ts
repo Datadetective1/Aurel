@@ -26,6 +26,9 @@ export const palette = {
   accent: '#856427',
   accentGraphic: '#b5893f',
   accentWash: '#f6f0e6',
+  // The app's Pearl critical tone. Used for "overdue" and nothing else, and
+  // always beside the word, never alone.
+  critical: '#9b2c25',
   inkInverse: '#f7f4ee',
   surfaceInverse: '#16161a',
 } as const
@@ -39,7 +42,6 @@ export const palette = {
  */
 export const fonts = {
   display: "Georgia, 'Times New Roman', Times, serif",
-  body:
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-  mono: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  body: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  mono: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
 } as const

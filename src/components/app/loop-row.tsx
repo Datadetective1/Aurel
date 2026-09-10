@@ -40,6 +40,7 @@ export function LoopRow({
   now,
   showPerson = true,
   showSource = true,
+  highlighted = false,
   className,
 }: {
   loop: LoopRecord
@@ -47,6 +48,8 @@ export function LoopRow({
   now: Date
   showPerson?: boolean
   showSource?: boolean
+  /** Arrived here from an email link: draw the eye to this row once. */
+  highlighted?: boolean
   className?: string
 }) {
   const [pending, setPending] = React.useState<LoopAction | null>(null)
@@ -69,6 +72,7 @@ export function LoopRow({
   if (gone) {
     return (
       <li
+        id={`loop-${loop.id}`}
         className={cn(
           'border-line text-ink-muted flex items-center gap-3 rounded-[var(--radius-md)] border border-dashed px-4 py-2.5 text-xs',
           className,
@@ -114,10 +118,12 @@ export function LoopRow({
 
   return (
     <li
+      id={`loop-${loop.id}`}
       className={cn(
-        'bg-surface rounded-[var(--radius-md)] border px-4 py-3',
+        'bg-surface min-w-0 scroll-mt-24 rounded-[var(--radius-md)] border px-4 py-3',
         overdue ? 'border-critical/25' : 'border-line',
         closed && 'opacity-70',
+        highlighted && 'ring-accent-graphic ring-offset-bg ring-2 ring-offset-2',
         className,
       )}
     >

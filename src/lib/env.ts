@@ -65,6 +65,11 @@ const serverSchema = z.object({
   TOKEN_ENCRYPTION_KEY: optional,
   MICROSOFT_TENANT_ID: z.preprocess(blankToUndefined, z.string().trim().min(1).catch('common')),
   SENTRY_DSN: optional,
+  // Shared secret Vercel sends as `Authorization: Bearer ...` when it invokes a
+  // cron route. Without it the scheduled follow-through job refuses to run,
+  // which is the right failure: an unauthenticated URL that emails every user
+  // is not a feature.
+  CRON_SECRET: optional,
   ALLOW_DB_SEED: z.string().catch('false'),
 
   // --- research providers ---
@@ -255,6 +260,8 @@ export const features = {
    * transcription call goes to their audio endpoint directly.
    */
   transcription: Boolean(serverEnv.OPENAI_API_KEY),
+  /** The scheduled follow-through email can run. */
+  scheduledJobs: Boolean(serverEnv.CRON_SECRET && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** Automatic discovery of sources from a name alone. */
   researchDiscovery: searchProvider !== 'none',
   /** Analysing a user-supplied URL. Requires no credentials. */

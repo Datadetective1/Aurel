@@ -157,3 +157,17 @@ asserted in both directions, run against a real database.
 - **No emotional inference.** The reading extracts promises, questions,
   decisions and pushback -- things that were said. It does not score mood,
   sentiment or intent.
+
+## The follow-through email
+
+- **Only what the user confirmed.** Proposals a model made and the user has
+  not reviewed never appear. Done and cancelled loops never appear.
+- **Nothing on quiet days.** No email is sent when nothing is due, overdue or
+  waiting; the ledger records a day only when something went out.
+- **One a day, at most.** A unique index on the user's local day makes a
+  second scheduled send impossible, whatever the scheduler does.
+- **The lock-screen line carries counts only.** The preheader says "3 things
+  worth following up on today", never a loop's words or a person's name.
+- **Off is off.** Turning off "useful email" turns this off with it; the
+  digest has its own switch beneath it; both are respected by the job and
+  by the manual send.

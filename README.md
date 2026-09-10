@@ -13,7 +13,8 @@ what you promised, what they promised, what was decided and what nobody
 answered. You confirm what is real; the rest is set aside. Confirmed loops live
 on Open Loops until you close them, decisions live on the person, and the next
 brief opens with what the last conversation left open. It remembers the things
-you say you'll do.
+you say you'll do, and brings them back when they matter: one short email on
+days something confirmed is due, overdue or waiting on somebody.
 
 The product answers one question:
 
@@ -107,9 +108,11 @@ src/
     (app)/           Today · People · Meetings · Conversations · Open Loops · Atlas · Ask Atturel · Settings
     api/stripe/      the only writer of subscription state
     api/conversations/transcribe   audio in, words out, audio gone
+    api/cron/follow-through        the daily digest, behind CRON_SECRET
   lib/
     ai/              provider abstraction, prompts, untrusted-content fencing
     conversations/   processing pipeline, open-loop state, faces, read models
+    follow-through/  what to mail, when, and the idempotent send
     assessment/      the 96-item instrument and its scoring
     billing/         plans, entitlements, metering, Stripe
     email/           layout primitives and transactional templates
@@ -193,30 +196,31 @@ in production, on a real person, without being told to.
 Each line below was verified against production, not against a local build —
 the date is when it was last exercised end to end.
 
-| Subsystem                                       | Status       | Verified    |
-| ----------------------------------------------- | ------------ | ----------- |
-| Supabase Custom SMTP                            | **COMPLETE** | 26 Aug 2026 |
-| Resend transactional email                      | **COMPLETE** | 26 Aug 2026 |
-| Signup confirmation                             | **COMPLETE** | 26 Aug 2026 |
-| Password reset                                  | **COMPLETE** | 26 Aug 2026 |
-| Production auth redirects                       | **COMPLETE** | 26 Aug 2026 |
-| Atturel domain email authentication             | **COMPLETE** | 26 Aug 2026 |
-| AI reasoning (OpenAI `gpt-4.1-mini`)            | **COMPLETE** | 25 Aug 2026 |
-| Document and transcript ingestion               | **COMPLETE** | 25 Aug 2026 |
-| Reading a link you provide                      | **COMPLETE** | 25 Aug 2026 |
-| Automatic source discovery (Exa)                | **COMPLETE** | 26 Aug 2026 |
-| Identity resolution                             | **COMPLETE** | 26 Aug 2026 |
-| Public professional footprint                   | **COMPLETE** | 26 Aug 2026 |
-| Evidence and provenance                         | **COMPLETE** | 26 Aug 2026 |
-| Meeting preparation                             | **COMPLETE** | 26 Aug 2026 |
-| Debrief and relationship memory                 | **COMPLETE** | 26 Aug 2026 |
-| Ask Atturel                                     | **COMPLETE** | 26 Aug 2026 |
-| Pilot analytics and cost telemetry              | **COMPLETE** | 26 Aug 2026 |
-| Conversations: capture, reading, review gate    | **COMPLETE** | 10 Sep 2026 |
-| Open Loops: Done / Later / Cancel, faces, Today | **COMPLETE** | 10 Sep 2026 |
-| Decisions on the person and in Ask              | **COMPLETE** | 10 Sep 2026 |
-| Since last time on the brief                    | **COMPLETE** | 10 Sep 2026 |
-| Person photos, private bucket, signed at render | **COMPLETE** | 10 Sep 2026 |
+| Subsystem                                            | Status       | Verified                                            |
+| ---------------------------------------------------- | ------------ | --------------------------------------------------- |
+| Supabase Custom SMTP                                 | **COMPLETE** | 26 Aug 2026                                         |
+| Resend transactional email                           | **COMPLETE** | 26 Aug 2026                                         |
+| Signup confirmation                                  | **COMPLETE** | 26 Aug 2026                                         |
+| Password reset                                       | **COMPLETE** | 26 Aug 2026                                         |
+| Production auth redirects                            | **COMPLETE** | 26 Aug 2026                                         |
+| Atturel domain email authentication                  | **COMPLETE** | 26 Aug 2026                                         |
+| AI reasoning (OpenAI `gpt-4.1-mini`)                 | **COMPLETE** | 25 Aug 2026                                         |
+| Document and transcript ingestion                    | **COMPLETE** | 25 Aug 2026                                         |
+| Reading a link you provide                           | **COMPLETE** | 25 Aug 2026                                         |
+| Automatic source discovery (Exa)                     | **COMPLETE** | 26 Aug 2026                                         |
+| Identity resolution                                  | **COMPLETE** | 26 Aug 2026                                         |
+| Public professional footprint                        | **COMPLETE** | 26 Aug 2026                                         |
+| Evidence and provenance                              | **COMPLETE** | 26 Aug 2026                                         |
+| Meeting preparation                                  | **COMPLETE** | 26 Aug 2026                                         |
+| Debrief and relationship memory                      | **COMPLETE** | 26 Aug 2026                                         |
+| Ask Atturel                                          | **COMPLETE** | 26 Aug 2026                                         |
+| Pilot analytics and cost telemetry                   | **COMPLETE** | 26 Aug 2026                                         |
+| Conversations: capture, reading, review gate         | **COMPLETE** | 10 Sep 2026                                         |
+| Open Loops: Done / Later / Cancel, faces, Today      | **COMPLETE** | 10 Sep 2026                                         |
+| Decisions on the person and in Ask                   | **COMPLETE** | 10 Sep 2026                                         |
+| Since last time on the brief                         | **COMPLETE** | 10 Sep 2026                                         |
+| Person photos, private bucket, signed at render      | **COMPLETE** | 10 Sep 2026                                         |
+| Daily follow-through email, idempotent, per-user day | **BUILT**    | needs `CRON_SECRET` in Vercel, see HUMAN_ACTIONS §7 |
 
 | Read-only calendar (engineering) | **COMPLETE** | 26 Aug 2026 |
 

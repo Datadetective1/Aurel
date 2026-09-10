@@ -267,7 +267,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: Mail,
       status: features.emailDelivery ? 'configured' : 'not_connected',
       detail: features.emailDelivery
-        ? `Sent from ${senderAddress()}. Meeting reminders and your weekly summary only.`
+        ? `Sent from ${senderAddress()}. The daily follow-through${features.scheduledJobs ? '' : ' (once this deployment has a CRON_SECRET)'}, and nothing you did not ask for.`
         : 'Transactional email is written to the server log rather than delivered. Nothing else is affected.',
       userAction: features.emailDelivery
         ? { label: 'Email preferences', href: '/settings/appearance' }
