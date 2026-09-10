@@ -120,10 +120,7 @@ export async function createInvitation(
   }
 
   const label = formData.get('label')?.toString().trim().slice(0, 80) || null
-  const maxRedemptions = Math.min(
-    Math.max(Number(formData.get('maxRedemptions') ?? 1) || 1, 1),
-    50,
-  )
+  const maxRedemptions = Math.min(Math.max(Number(formData.get('maxRedemptions') ?? 1) || 1, 1), 50)
   const days = Number(formData.get('expiresInDays') ?? 30) || 30
   const expiresAt = new Date(Date.now() + Math.min(Math.max(days, 1), 365) * 86_400_000)
 
@@ -135,7 +132,9 @@ export async function createInvitation(
   // check cannot be exploited from a browser.
   const { error } = await supabase.rpc('create_pilot_invitation', {
     code_hash_input: hashCode(code),
-    label_input: label,
+    // The generated types mark every RPC argument required and non-null; the
+    // SQL function itself takes a nullable text. Null is the real value here.
+    label_input: label as unknown as string,
     max_redemptions_input: maxRedemptions,
     expires_at_input: expiresAt.toISOString(),
     created_by_input: user.id,

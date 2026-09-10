@@ -250,6 +250,11 @@ export const features = {
   // a looser presence check, went unused by anything, and would have drifted.
   /** Privileged server operations (webhooks, hard account deletion). */
   serviceRole: Boolean(serverEnv.SUPABASE_SERVICE_ROLE_KEY),
+  /**
+   * Speech to text. Always OpenAI, whatever the generative provider is: the
+   * transcription call goes to their audio endpoint directly.
+   */
+  transcription: Boolean(serverEnv.OPENAI_API_KEY),
   /** Automatic discovery of sources from a name alone. */
   researchDiscovery: searchProvider !== 'none',
   /** Analysing a user-supplied URL. Requires no credentials. */

@@ -17,6 +17,7 @@ union membership, immigration status and criminal history are out of scope for
 **anyone** — the user and the people they record.
 
 **Enforced by:**
+
 - Explicit prohibition in every prompt that touches a person
   (`src/lib/ai/prompts/shared.ts`)
 - No column exists to hold any of it. The `fact_kind` enum has no member that
@@ -30,11 +31,11 @@ No hiring, firing, promotion or compensation scoring. No "suitability" rating.
 No ranking of people against each other.
 
 **Enforced by:** absence, and by prompt prohibition. `relevance` on a person is
-user-declared and describes *how much this relationship matters to you* — never
+user-declared and describes _how much this relationship matters to you_ — never
 a judgement of the person. `relationship_pulse()` measures the **user's own**
-follow-through and contact cadence, and the UI says so in as many words: *"This
+follow-through and contact cadence, and the UI says so in as many words: _"This
 reflects your contact cadence and follow-through — not how the other person
-feels."*
+feels."_
 
 This is a boundary, not a missing feature. Building it would create employment
 discrimination exposure and is outside what the product is for.
@@ -45,6 +46,7 @@ Every claim carries an evidence level and a provenance, shown wherever the claim
 is shown.
 
 **Enforced by:**
+
 - `evidence_level` is `not null` on observations and professional facts
 - A fact with no rows in `fact_sources` can never be presented above `inferred`
 - The composer emits an explicit "What Atturel does not know" section rather
@@ -63,6 +65,7 @@ established memory.
 ## 5. Access controls are respected, never circumvented
 
 **Enforced by:**
+
 - No LinkedIn automation, scraping, or dataset replication. Not built, and not a
   gap to be filled.
 - Logins, paywalls and CAPTCHAs are recorded as honest outcomes —
@@ -94,10 +97,11 @@ them.
 ## 8. Logs and analytics never carry content
 
 **Enforced by:**
+
 - Analytics record counts, enum values and booleans — never names, notes,
   transcripts or message bodies
 - Email logging records subject and a redacted recipient, never the body
-- Stripe and provider errors log a status code and an error *name*, never the
+- Stripe and provider errors log a status code and an error _name_, never the
   response body, which echoes customer data back
 - Security events store a hashed IP, never the address
 - `usage_meters` carries a kind and a quantity, and is deliberately separate
@@ -129,3 +133,27 @@ asserted in both directions, run against a real database.
   The product does not claim otherwise, and marketing copy must not start to.
 - **Third-party rights.** The people in someone's record have rights in several
   jurisdictions and no account here. This needs legal input, not engineering.
+
+## Conversations and recordings
+
+- **Audio is transcribed and dropped.** It exists as a request body and a
+  variable for one provider call. It is never written to the database, never
+  put in storage, never cached, never logged. Only the words are kept, and the
+  user reads and edits them before anything is analysed.
+- **Recording other people is the user's responsibility, and the product says
+  so.** A recording of a conversation (as opposed to a voice note the user
+  speaks alone) requires the user to confirm the people in it knew. The
+  confirmation is stored on the conversation. Rules differ by jurisdiction;
+  Atturel asks, it does not police.
+- **Nothing extracted is fact until confirmed.** Loops and decisions arrive as
+  proposals with the words that support them quoted beside them. The user
+  ticks what is real. Unticked proposals are set aside, not shown as memory.
+- **Deleting a conversation deletes what it proposed.** What the user had
+  already confirmed stays, with its source link cleared, because the user
+  chose it. Deleting the account removes photos through the Storage API and
+  every row through `delete_my_data()`.
+- **Photos are private.** Owner-only storage policies, signed URLs that expire
+  in an hour, never a public bucket. Atturel never looks up a likeness.
+- **No emotional inference.** The reading extracts promises, questions,
+  decisions and pushback -- things that were said. It does not score mood,
+  sentiment or intent.

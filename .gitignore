@@ -27,3 +27,6 @@ supabase/.temp/
 # this every raster in /brand is silently dropped from the commit and the
 # folder looks complete locally while arriving empty for everyone else.
 !brand/**/*.png
+
+# Local end-to-end scratch (screenshots, throwaway scripts)
+.e2e-tmp

@@ -5,7 +5,15 @@ import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 
 export interface SearchResult {
-  entity: 'person' | 'organization' | 'meeting' | 'interaction' | 'commitment' | 'note' | 'observation'
+  entity:
+    | 'person'
+    | 'organization'
+    | 'meeting'
+    | 'interaction'
+    | 'commitment'
+    | 'decision'
+    | 'note'
+    | 'observation'
   id: string
   title: string
   subtitle: string | null

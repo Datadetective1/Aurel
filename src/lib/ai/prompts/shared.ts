@@ -124,13 +124,32 @@ export function renderPerson(person: PersonContext): string {
     }
   }
 
-  if (person.openCommitments.length > 0) {
-    lines.push('Open commitments:')
-    for (const c of person.openCommitments) {
+  const promises = person.openCommitments.filter((c) => c.kind !== 'question')
+  const questions = person.openCommitments.filter((c) => c.kind === 'question')
+
+  if (promises.length > 0) {
+    lines.push('Open commitments (confirmed by the user):')
+    for (const c of promises) {
       const who = c.owner === 'user' ? 'user owes' : c.owner === 'person' ? 'they owe' : 'shared'
       lines.push(
         `- (${who}) ${c.description}` +
           (c.dueOn ? ` — due ${c.dueOn}${c.isOverdue ? ' (OVERDUE)' : ''}` : ''),
+      )
+    }
+  }
+
+  if (questions.length > 0) {
+    lines.push('Questions left unanswered in earlier conversations:')
+    for (const q of questions) lines.push(`- ${q.description}`)
+  }
+
+  if (person.decisions.length > 0) {
+    lines.push('Decisions already made with them (confirmed by the user):')
+    for (const d of person.decisions) {
+      lines.push(
+        `- ${d.decidedOn}: ${d.description}` +
+          (d.context ? ` (because: ${d.context})` : '') +
+          (d.interactionTitle ? ` [from "${d.interactionTitle}"]` : ''),
       )
     }
   }

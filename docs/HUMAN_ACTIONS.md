@@ -15,14 +15,14 @@ are off.
 
 ## Activation at a glance
 
-| # | Capability | Blocked by | Free tier? | Code status |
-| --- | --- | --- | --- | --- |
-| 1 | **AI reasoning** | — | — | **Live — OpenAI** |
-| 2 | **Automatic research** | — | — | **Live — Exa** |
-| 3 | Document ingestion | — | — | **Live** |
-| 4 | **Calendar** | OAuth app | Yes | **Built — needs an OAuth app** |
-| 5 | Billing | Stripe account | Yes (test mode) | Complete |
-| 6 | **Email** | — | — | **Live — Resend** |
+| #   | Capability             | Blocked by     | Free tier?      | Code status                    |
+| --- | ---------------------- | -------------- | --------------- | ------------------------------ |
+| 1   | **AI reasoning**       | —              | —               | **Live — OpenAI**              |
+| 2   | **Automatic research** | —              | —               | **Live — Exa**                 |
+| 3   | Document ingestion     | —              | —               | **Live**                       |
+| 4   | **Calendar**           | OAuth app      | Yes             | **Built — needs an OAuth app** |
+| 5   | Billing                | Stripe account | Yes (test mode) | Complete                       |
+| 6   | **Email**              | —              | —               | **Live — Resend**              |
 
 Item 5 is credential-only: paste the variables, redeploy, done. Item 4 needs
 implementation as well — see §4 for why I have not written it blind.
@@ -56,16 +56,16 @@ the meeting starts. To change it, set `AI_MODEL`. To move to Anthropic, set
 `ANTHROPIC_API_KEY` instead; with both set, Anthropic wins unless `AI_PROVIDER`
 says otherwise.
 
-| | |
-| --- | --- |
-| **Console** | https://platform.openai.com/api-keys |
-| **Spend cap** | https://platform.openai.com/settings/organization/limits |
-| **Free tier** | None ongoing. New accounts may get a small trial credit; after that it is pay-as-you-go against a prepaid balance. |
-| **Cost** | Per token. A meeting brief is roughly 4–8k input and 1–2k output tokens — well under a cent each on `gpt-4.1-mini`. **Set a monthly cap before real use.** |
+|               |                                                                                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Console**   | https://platform.openai.com/api-keys                                                                                                                       |
+| **Spend cap** | https://platform.openai.com/settings/organization/limits                                                                                                   |
+| **Free tier** | None ongoing. New accounts may get a small trial credit; after that it is pay-as-you-go against a prepaid balance.                                         |
+| **Cost**      | Per token. A meeting brief is roughly 4–8k input and 1–2k output tokens — well under a cent each on `gpt-4.1-mini`. **Set a monthly cap before real use.** |
 
 **The one thing still worth doing:** set that spend cap. Nothing in the product
 can do it, and nothing in the product limits your bill — the plan quotas limit
-*users*, not spend.
+_users_, not spend.
 
 **Verify**
 
@@ -78,9 +78,9 @@ production schemas — meeting brief, debrief, source extraction — against the
 live model. It prints no key material. In the product:
 
 1. Settings → Capabilities: **AI reasoning** → **Connected**, naming the model.
-2. Any meeting brief → **Rebuild**. The evidence footer stops saying *"Composed
-   directly from the records below. No language model was involved."*
-3. Settings → Plan → *This month*: the meters accrue.
+2. Any meeting brief → **Rebuild**. The evidence footer stops saying _"Composed
+   directly from the records below. No language model was involved."_
+3. Settings → Plan → _This month_: the meters accrue.
 
 If the provider errors or times out, the brief falls back to the composer and
 logs `ai.fell_back_to_grounded`. The user still gets a brief — but a run of that
@@ -92,7 +92,7 @@ gracefully. It is the line to watch.
 ## 2. Automatic professional research — **live, nothing needed**
 
 Running on **Exa**, from `EXA_API_KEY`. Verified on production 26 Aug 2026:
-adding *Mitchell Baker, Executive Chair, Mozilla* with no URL and pressing
+adding _Mitchell Baker, Executive Chair, Mozilla_ with no URL and pressing
 Research discovered five sources — Mozilla's own blog and annual report, the
 Internet Hall of Fame, the American Academy of Arts & Sciences and Wikipedia —
 resolved identity on each, extracted cited facts, and proposed three
@@ -107,16 +107,16 @@ stay unset: the provider is inferred from whichever key is present, with Exa
 preferred when more than one is. Do not leave a stale `SEARCH_PROVIDER=none` in
 the deployment — it is the off switch and wins over any key.
 
-| | |
-| --- | --- |
-| **Service** | Exa (recommended) — or Brave / Serper, both still supported |
-| **Sign-up** | https://dashboard.exa.ai → **API Keys** → *Create API key* |
-| **Billing** | https://dashboard.exa.ai/billing |
+|               |                                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Service**   | Exa (recommended) — or Brave / Serper, both still supported                                                                                                                  |
+| **Sign-up**   | https://dashboard.exa.ai → **API Keys** → _Create API key_                                                                                                                   |
+| **Billing**   | https://dashboard.exa.ai/billing                                                                                                                                             |
 | **Free tier** | Exa gives new accounts a starting credit; after that it is pay-as-you-go per request. Brave has an ongoing free tier of 2,000 queries/month but requires a card to activate. |
-| **Cost** | Billed per search request. **One Research Person run costs at most three requests** — usually one. See below. |
+| **Cost**      | Billed per search request. **One Research Person run costs at most three requests** — usually one. See below.                                                                |
 
 **Why Exa.** Its index is embeddings-based, so `"Jordan Avery" "Meridian
-Systems"` retrieves pages *about* that person at that company rather than pages
+Systems"` retrieves pages _about_ that person at that company rather than pages
 containing those words. That difference is what makes identity resolution
 tractable when the input is a name thousands of people share.
 
@@ -143,9 +143,9 @@ rate-limited and wrong-person state.
    naming `exa`.
 2. Add a person with a name and company but **no profile URL**.
 3. Press **Research public footprint**.
-   - Before: *"paste a link instead"*.
+   - Before: _"paste a link instead"_.
    - After: sources are discovered, fetched, identity-checked and cited.
-4. Settings → Plan: *People researched* increments.
+4. Settings → Plan: _People researched_ increments.
 
 If Exa is unreachable or the key is rejected, research reports that it is
 temporarily unavailable and points at pasting a link. It never invents results.
@@ -192,14 +192,14 @@ see, so that screen is the fastest way to tell which one did not arrive.
 
 ### 4.2 Microsoft 365 / Outlook
 
-| | |
-| --- | --- |
-| **Portal** | https://entra.microsoft.com → **App registrations** → *New registration* |
-| **Name** | Atturel |
-| **Supported account types** | *Accounts in any organizational directory and personal Microsoft accounts* — this is what makes it multitenant. Choosing single-tenant restricts it to your own organization. |
-| **Redirect URI** | Platform **Web** → `https://www.atturel.com/api/calendar/microsoft/callback` |
-| **API permissions** | *Add a permission* → Microsoft Graph → **Delegated** → `Calendars.Read`. `openid`, `email` and `offline_access` are also delegated and usually listed by default; add them if not. **Do not add** `Calendars.ReadWrite`, `Mail.Read`, `Contacts.Read` or `Files.Read` — Atturel does not use them and requesting them will fail enterprise review. |
-| **Client secret** | *Certificates & secrets* → *New client secret*. Copy the **Value**, not the Secret ID. It is shown once. |
+|                             |                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Portal**                  | https://entra.microsoft.com → **App registrations** → _New registration_                                                                                                                                                                                                                                                                           |
+| **Name**                    | Atturel                                                                                                                                                                                                                                                                                                                                            |
+| **Supported account types** | _Accounts in any organizational directory and personal Microsoft accounts_ — this is what makes it multitenant. Choosing single-tenant restricts it to your own organization.                                                                                                                                                                      |
+| **Redirect URI**            | Platform **Web** → `https://www.atturel.com/api/calendar/microsoft/callback`                                                                                                                                                                                                                                                                       |
+| **API permissions**         | _Add a permission_ → Microsoft Graph → **Delegated** → `Calendars.Read`. `openid`, `email` and `offline_access` are also delegated and usually listed by default; add them if not. **Do not add** `Calendars.ReadWrite`, `Mail.Read`, `Contacts.Read` or `Files.Read` — Atturel does not use them and requesting them will fail enterprise review. |
+| **Client secret**           | _Certificates & secrets_ → _New client secret_. Copy the **Value**, not the Secret ID. It is shown once.                                                                                                                                                                                                                                           |
 
 ```
 MICROSOFT_CLIENT_ID=<Application (client) ID>
@@ -211,21 +211,21 @@ users from any organization to connect. Set it to a tenant ID only if you want
 to restrict Atturel to one organization.
 
 **Admin consent.** Many organizations disable user consent. Those users will see
-*"Your organization requires administrator approval"* rather than a failure, and
-their administrator can grant it from *Enterprise applications → Atturel →
-Permissions → Grant admin consent*. Nothing needs changing in Atturel for that
+_"Your organization requires administrator approval"_ rather than a failure, and
+their administrator can grant it from _Enterprise applications → Atturel →
+Permissions → Grant admin consent_. Nothing needs changing in Atturel for that
 to work.
 
 ### 4.3 Google Calendar
 
-| | |
-| --- | --- |
-| **Console** | https://console.cloud.google.com → create or pick a project |
-| **Enable API** | *APIs & Services → Library* → **Google Calendar API** → Enable |
-| **Consent screen** | *APIs & Services → OAuth consent screen* → **External**. App name, support email, and `atturel.com` under Authorized domains. |
-| **Scope** | `https://www.googleapis.com/auth/calendar.events.readonly` — narrower than `calendar.readonly`: events without the calendar list and settings. |
-| **Credentials** | *Create credentials → OAuth client ID → Web application* |
-| **Redirect URI** | `https://www.atturel.com/api/calendar/google/callback` |
+|                    |                                                                                                                                                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Console**        | https://console.cloud.google.com → create or pick a project                                                                                    |
+| **Enable API**     | _APIs & Services → Library_ → **Google Calendar API** → Enable                                                                                 |
+| **Consent screen** | _APIs & Services → OAuth consent screen_ → **External**. App name, support email, and `atturel.com` under Authorized domains.                  |
+| **Scope**          | `https://www.googleapis.com/auth/calendar.events.readonly` — narrower than `calendar.readonly`: events without the calendar list and settings. |
+| **Credentials**    | _Create credentials → OAuth client ID → Web application_                                                                                       |
+| **Redirect URI**   | `https://www.atturel.com/api/calendar/google/callback`                                                                                         |
 
 ```
 GOOGLE_CLIENT_ID=<client id>
@@ -234,7 +234,7 @@ GOOGLE_CLIENT_SECRET=<client secret>
 
 **Verification is the real blocker.** `calendar.events.readonly` is a sensitive
 scope, so until Google verifies the app it works only for accounts added under
-*Audience → Test users* (up to 100), and everyone else sees an unverified-app
+_Audience → Test users_ (up to 100), and everyone else sees an unverified-app
 warning. Submit from the consent screen — Google asks for a demo video, a
 scope justification and a privacy-policy URL (`https://www.atturel.com/privacy`
 exists and describes real behaviour). Review typically takes several weeks.
@@ -261,14 +261,14 @@ Microsoft has no equivalent gate, which is why it is the provider to pilot with.
 Checkout, the billing portal, the webhook, entitlements, metering and the
 founding-customer offer are all implemented. Only the account is missing.
 
-| | |
-| --- | --- |
-| **Service** | Stripe |
-| **Sign-up** | https://dashboard.stripe.com/register |
-| **Keys** | https://dashboard.stripe.com/apikeys |
-| **Webhook** | https://dashboard.stripe.com/webhooks → *Add endpoint* |
-| **Free tier** | Test mode is free and unlimited. Live mode has no monthly fee. |
-| **Cost** | Per transaction, around 2.9% + 30¢ in the US; varies by country. |
+|               |                                                                  |
+| ------------- | ---------------------------------------------------------------- |
+| **Service**   | Stripe                                                           |
+| **Sign-up**   | https://dashboard.stripe.com/register                            |
+| **Keys**      | https://dashboard.stripe.com/apikeys                             |
+| **Webhook**   | https://dashboard.stripe.com/webhooks → _Add endpoint_           |
+| **Free tier** | Test mode is free and unlimited. Live mode has no monthly fee.   |
+| **Cost**      | Per transaction, around 2.9% + 30¢ in the US; varies by country. |
 
 ```
 STRIPE_SECRET_KEY=sk_live_...
@@ -349,12 +349,12 @@ Confirmation and password-reset emails are sent by Supabase, not by the
 application, so they are configured separately from §6. Both halves are now
 done and verified end to end on production.
 
-| | |
-| --- | --- |
-| **Site URL** | `https://www.atturel.com` |
-| **Redirect URLs** | `https://www.atturel.com/**`, `https://atturel.com/**` |
-| **Custom SMTP** | Resend — `smtp.resend.com`, port `465`, username `resend` |
-| **Sender** | `Atturel <no-reply@atturel.com>` |
+|                   |                                                           |
+| ----------------- | --------------------------------------------------------- |
+| **Site URL**      | `https://www.atturel.com`                                 |
+| **Redirect URLs** | `https://www.atturel.com/**`, `https://atturel.com/**`    |
+| **Custom SMTP**   | Resend — `smtp.resend.com`, port `465`, username `resend` |
+| **Sender**        | `Atturel <no-reply@atturel.com>`                          |
 
 Verified 26 Aug 2026 with a fresh signup and a password reset:
 
@@ -427,3 +427,25 @@ Considered and rejected, not deferred:
 - **Bypassing paywalls, CAPTCHAs or robots directives.** The fetcher records
   "paywall" or "login required" as an honest outcome instead.
 - **Hiring, firing, promotion or compensation scoring.** Not a missing feature.
+
+## 6. Mobile
+
+Nothing to buy yet. The recommendation, from the code as it stands:
+
+**Stay on the web app and make it installable (PWA) first.** The manifest
+already declares `display: standalone`; the app shell already has a bottom tab
+bar sized for thumbs; recording uses the browser's MediaRecorder, which works
+in an installed PWA on Android and on iOS 16.4+; every write is a Server
+Action or a route handler behind the Supabase session, so there is no second
+backend to build. What is missing is small: real PNG icons, an install prompt
+on Today, and a service worker for the shell. Push notifications are the one
+thing a PWA does worse on iOS (they need the installed app and iOS 16.4+), and
+they are not yet a feature.
+
+**When to go native:** if background recording, reliable push reminders for
+loops, or share-sheet import of recordings become the product, wrap the same
+web app in Expo with a WebView first (auth cookies and Stripe checkout survive
+that unchanged), and only then move screens native one at a time against the
+same Supabase database and the same route handlers. Do not build a separate
+backend; the Server Actions are the API, and the transcription route already
+takes a plain multipart POST from anywhere.

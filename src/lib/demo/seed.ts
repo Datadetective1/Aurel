@@ -109,7 +109,8 @@ const PEOPLE: SeedPerson[] = [
         reinforcement: 2,
       },
       {
-        content: 'Prefers a written summary the day before rather than being walked through slides.',
+        content:
+          'Prefers a written summary the day before rather than being walked through slides.',
         category: 'preference',
         evidence: 'observed',
         status: 'active',
@@ -193,6 +194,18 @@ const PEOPLE: SeedPerson[] = [
  * Seed a demonstration relationship record.
  * Idempotent: if demo data already exists for the user, it is left alone.
  */
+const DEMO_TRANSCRIPT = [
+  'Alex: Thanks for making time. I wanted to walk through the revised ROI model before the capacity review.',
+  'Daniel: Before we get into the model — what does this actually cost us this quarter? Last time I had to dig for it.',
+  "Alex: Fair. It's two engineers for eleven weeks, so roughly the number we discussed, plus the licence uplift.",
+  "Daniel: Lead with that. I'm not going to sign off on a benefits slide that hides the bill.",
+  "Alex: Understood. I'll resubmit the case with the cost impact stated first, by Thursday.",
+  "Daniel: Fine — lead with what it costs and I'll read the rest.",
+  'Daniel: And who actually owns the migration budget once the headcount moves? Nobody had an answer.',
+  "Alex: I don't know yet. I'll find out.",
+  'Daniel: Okay. Send it Thursday and we can go into the review with something I can defend.',
+].join('\n')
+
 export async function seedDemoData(
   supabase: Client,
   userId: string,
@@ -297,15 +310,19 @@ export async function seedDemoData(
       {
         title: 'Vantage contract call',
         daysAgo: 12,
-        summary: 'Lucas led with pricing before scope was settled. Pulled the conversation back to scope.',
+        summary:
+          'Lucas led with pricing before scope was settled. Pulled the conversation back to scope.',
         outcome: 'Scope discussion scheduled separately.',
         people: ['lucas'],
         wentWell: 3,
       },
     ]
 
+    const interactionIds = new Map<string, string>()
+
     for (const interaction of interactions) {
       const occurredAt = new Date(now - interaction.daysAgo * DAY).toISOString()
+      const isTranscribed = interaction.title === 'Budget check-in'
       const { data: created } = await supabase
         .from('interactions')
         .insert({
@@ -316,11 +333,18 @@ export async function seedDemoData(
           summary: interaction.summary,
           outcome: interaction.outcome,
           went_well: interaction.wentWell,
+          // One conversation carries a transcript, so the demo shows what a
+          // kept conversation looks like rather than only a summary line.
+          source_kind: isTranscribed ? 'pasted_transcript' : 'typed_notes',
+          transcript: isTranscribed ? DEMO_TRANSCRIPT : null,
+          topics: isTranscribed ? ['ROI model', 'Cost impact', 'Migration budget'] : [],
+          reviewed_at: occurredAt,
         })
         .select('id')
         .single()
 
       if (!created) continue
+      interactionIds.set(interaction.title, created.id)
 
       for (const key of interaction.people) {
         const personId = personIds.get(key)
@@ -366,7 +390,55 @@ export async function seedDemoData(
         owner: commitment.owner,
         owner_person_id: commitment.owner === 'person' ? personId : null,
         due_on: commitment.dueOn,
+        interaction_id:
+          commitment.person === 'daniel'
+            ? (interactionIds.get('Budget check-in') ?? null)
+            : commitment.person === 'maya'
+              ? (interactionIds.get('Q2 platform review') ?? null)
+              : (interactionIds.get('Migration kickoff') ?? null),
+        review_status: 'confirmed',
       })
+    }
+
+    // An unanswered question and a decision, so the loop and decision
+    // surfaces are not empty on first sight.
+    const budgetCheckIn = interactionIds.get('Budget check-in')
+    const daniel = personIds.get('daniel')
+    if (budgetCheckIn && daniel) {
+      await supabase.from('commitments').insert({
+        ...ownVis,
+        person_id: daniel,
+        description: 'Who owns the migration budget once the headcount moves?',
+        kind: 'question',
+        owner: 'shared',
+        interaction_id: budgetCheckIn,
+        review_status: 'confirmed',
+        excerpt:
+          'Daniel: And who actually owns the migration budget once the headcount moves? Nobody had an answer.',
+      })
+
+      const { data: decision } = await supabase
+        .from('decisions')
+        .insert({
+          ...ownVis,
+          description: 'Resubmit the budget case with the cost impact stated first',
+          context:
+            'The ROI model stalled the room twice because cost was buried under the benefits.',
+          decided_on: new Date(now - 22 * DAY).toISOString().slice(0, 10),
+          interaction_id: budgetCheckIn,
+          review_status: 'confirmed',
+          excerpt: "Daniel: Fine — lead with what it costs and I'll read the rest.",
+        })
+        .select('id')
+        .single()
+      if (decision) {
+        await supabase.from('decision_people').insert({
+          workspace_id: workspaceId,
+          user_id: userId,
+          decision_id: decision.id,
+          person_id: daniel,
+        })
+      }
     }
 
     // --- an upcoming meeting worth preparing for -------------------------------

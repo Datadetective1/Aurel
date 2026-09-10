@@ -7,6 +7,7 @@ import { Badge, Container, EmptyState, Eyebrow, SectionHeader } from '@/componen
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { relativeDay, pluralise } from '@/lib/format'
+import { resolveFaces } from '@/lib/conversations/avatars'
 import { brand } from '@/lib/brand'
 import { findDuplicates } from './actions'
 import { DuplicateReview } from '@/components/app/duplicate-review'
@@ -39,7 +40,7 @@ export default async function PeoplePage() {
   const { data: people } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, relationship_type, relevance, last_interaction_at, last_researched_at, avatar_url, is_demo, organizations(name)',
+      'id, full_name, preferred_name, job_title, relationship_type, relevance, last_interaction_at, last_researched_at, avatar_url, avatar_path, is_demo, organizations(name)',
     )
     .eq('user_id', user.id)
     .is('archived_at', null)
@@ -49,6 +50,7 @@ export default async function PeoplePage() {
 
   const list = people ?? []
   const ids = list.map((p) => p.id)
+  const faces = await resolveFaces(supabase, list, (p) => p.id)
 
   // Counts that make the list scannable: what does Atturel actually know?
   const [{ data: observations }, { data: commitments }] = await Promise.all([
@@ -65,6 +67,7 @@ export default async function PeoplePage() {
           .select('person_id')
           .eq('user_id', user.id)
           .eq('status', 'open')
+          .eq('review_status', 'confirmed')
           .in('person_id', ids)
       : Promise.resolve({ data: [] as { person_id: string | null }[] }),
   ])
@@ -141,14 +144,18 @@ export default async function PeoplePage() {
                   href={`/people/${person.id}`}
                   className="hover:bg-bg-sunken flex items-center gap-4 p-4 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:p-5"
                 >
-                  <Avatar name={person.full_name} src={person.avatar_url} size="md" />
+                  <Avatar name={person.full_name} src={faces.get(person.id) ?? null} size="md" />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                       <span className="text-ink font-medium">{name}</span>
                       {person.is_demo ? <Badge tone="outline">Demo</Badge> : null}
                       {proposed > 0 ? <Badge tone="accent">{proposed} to review</Badge> : null}
-                      {open > 0 ? <Badge tone="caution">{open} open</Badge> : null}
+                      {open > 0 ? (
+                        <Badge tone="caution">
+                          {open} open {open === 1 ? 'loop' : 'loops'}
+                        </Badge>
+                      ) : null}
                     </div>
 
                     <p className="text-ink-secondary mt-0.5 truncate text-sm">

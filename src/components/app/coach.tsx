@@ -4,9 +4,18 @@ import * as React from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
-import { ArrowRight, CircleAlert, Loader2, Send, Sparkles, Wand2 } from 'lucide-react'
+import {
+  ArrowRight,
+  CircleAlert,
+  Loader2,
+  MessagesSquare,
+  Send,
+  Sparkles,
+  Wand2,
+} from 'lucide-react'
 import { adaptMessage, ask, type AdaptState, type CoachState } from '@/app/(app)/coach/actions'
 import { EvidenceBadge } from './evidence'
+import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Select, Textarea } from '@/components/ui/field'
 import { Badge, Eyebrow, Panel } from '@/components/ui/primitives'
@@ -68,7 +77,7 @@ export function AskPanel({
           }}
         />
         <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-xs text-ink-muted">{intro}</p>
+          <p className="text-ink-muted text-xs">{intro}</p>
           <AskButton disabled={question.trim().length < 2} />
         </div>
       </form>
@@ -82,7 +91,7 @@ export function AskPanel({
                 key={example}
                 type="button"
                 onClick={() => submitWith(example)}
-                className="rounded-full border border-line bg-surface px-3.5 py-2 text-xs text-ink-secondary transition-colors hover:border-line-strong hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                className="border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink rounded-full border px-3.5 py-2 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
               >
                 {example}
               </button>
@@ -94,9 +103,9 @@ export function AskPanel({
       {state.error ? (
         <p
           role="alert"
-          className="mt-6 flex items-start gap-2 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3 text-sm text-ink-secondary"
+          className="border-caution/25 bg-caution-wash text-ink-secondary mt-6 flex items-start gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-sm"
         >
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
+          <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {state.error}
         </p>
       ) : null}
@@ -104,7 +113,7 @@ export function AskPanel({
       {state.answer ? (
         <div className="mt-8">
           {state.question ? (
-            <p className="text-sm text-ink-muted">
+            <p className="text-ink-muted text-sm">
               <span className="label mr-2">You asked</span>
               {state.question}
             </p>
@@ -113,10 +122,40 @@ export function AskPanel({
           <Panel className="mt-4 p-5 sm:p-6">
             {/* Answers are plain text with newlines; rendered pre-wrap rather
                 than as HTML, since content can include user-recorded material. */}
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink">
+            <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
               {state.answer.answer}
             </p>
           </Panel>
+
+          {/* The people and conversations the answer rests on, as faces and
+              cards. Filled from the citations on the server, never by the
+              model, so a chip here is always a real row. */}
+          {(state.answer.people?.length ?? 0) > 0 ||
+          (state.answer.conversations?.length ?? 0) > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {state.answer.people?.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/people/${p.id}`}
+                  className="border-line bg-surface text-ink hover:border-line-strong inline-flex min-h-9 items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                >
+                  <Avatar name={p.name} src={p.src} size="sm" />
+                  {p.name}
+                </Link>
+              ))}
+              {state.answer.conversations?.map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/conversations/${c.id}`}
+                  className="border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-md)] border px-3 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                >
+                  <MessagesSquare className="text-accent size-3.5" aria-hidden="true" />
+                  {c.title}
+                  <span className="text-ink-faint">{c.occurredAt.slice(0, 10)}</span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
 
           {state.answer.actions.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -132,14 +171,14 @@ export function AskPanel({
           ) : null}
 
           {state.answer.citations.length > 0 ? (
-            <details className="mt-5 rounded-[var(--radius-md)] border border-line bg-surface">
-              <summary className="cursor-pointer px-4 py-3 text-xs text-ink-secondary">
+            <details className="border-line bg-surface mt-5 rounded-[var(--radius-md)] border">
+              <summary className="text-ink-secondary cursor-pointer px-4 py-3 text-xs">
                 Evidence · {state.answer.citations.length}
               </summary>
-              <ul className="grid gap-2 border-t border-line px-4 py-3">
+              <ul className="border-line grid gap-2 border-t px-4 py-3">
                 {state.answer.citations.slice(0, 20).map((citation, i) => (
                   <li key={i} className="flex flex-wrap items-start justify-between gap-3">
-                    <span className="min-w-0 flex-1 text-xs leading-relaxed text-ink-secondary">
+                    <span className="text-ink-secondary min-w-0 flex-1 text-xs leading-relaxed">
                       {citation.label}
                     </span>
                     <EvidenceBadge level={citation.evidenceLevel} />
@@ -149,7 +188,7 @@ export function AskPanel({
             </details>
           ) : null}
 
-          <p className="mt-4 text-[0.6875rem] text-ink-faint">
+          <p className="text-ink-faint mt-4 text-[0.6875rem]">
             {state.answer.grounded
               ? 'Composed directly from your records.'
               : 'Generated from your records.'}
@@ -162,7 +201,7 @@ export function AskPanel({
                   key={followUp}
                   type="button"
                   onClick={() => submitWith(followUp)}
-                  className="rounded-full border border-line bg-surface px-3.5 py-2 text-xs text-ink-secondary transition-colors hover:border-line-strong hover:text-ink"
+                  className="border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink rounded-full border px-3.5 py-2 text-xs transition-colors"
                 >
                   {followUp}
                 </button>
@@ -222,7 +261,10 @@ export function AdaptPanel({
       <form action={formAction}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
-            <label htmlFor="adapt-person" className="text-[0.8125rem] font-medium text-ink-secondary">
+            <label
+              htmlFor="adapt-person"
+              className="text-ink-secondary text-[0.8125rem] font-medium"
+            >
               Who is it for?
             </label>
             <Select id="adapt-person" name="personId" defaultValue={initialPersonId ?? ''}>
@@ -236,7 +278,7 @@ export function AdaptPanel({
           </div>
 
           <div className="grid gap-1.5">
-            <label htmlFor="adapt-mode" className="text-[0.8125rem] font-medium text-ink-secondary">
+            <label htmlFor="adapt-mode" className="text-ink-secondary text-[0.8125rem] font-medium">
               How should it change?
             </label>
             <Select
@@ -254,7 +296,7 @@ export function AdaptPanel({
           </div>
         </div>
 
-        <p className="mt-2 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-2 text-xs">
           {ADAPTATION_MODE_HINT[mode as (typeof ADAPTATION_MODES)[number]]}
         </p>
 
@@ -278,9 +320,9 @@ export function AdaptPanel({
       {state.error ? (
         <p
           role="alert"
-          className="mt-5 flex items-start gap-2 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3 text-sm text-ink-secondary"
+          className="border-caution/25 bg-caution-wash text-ink-secondary mt-5 flex items-start gap-2 rounded-[var(--radius-md)] border px-4 py-3 text-sm"
         >
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
+          <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           {state.error}
         </p>
       ) : null}
@@ -295,7 +337,7 @@ export function AdaptPanel({
           </div>
 
           <Panel className="mt-3 p-5">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink">
+            <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
               {state.result.adapted}
             </p>
           </Panel>
@@ -314,8 +356,8 @@ export function AdaptPanel({
                       )}
                     />
                     <div className="min-w-0">
-                      <p className="text-sm text-ink">{change.what}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{change.why}</p>
+                      <p className="text-ink text-sm">{change.what}</p>
+                      <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">{change.why}</p>
                       {change.fromRecord ? (
                         <Badge tone="accent" className="mt-1.5">
                           From your record
@@ -331,8 +373,11 @@ export function AdaptPanel({
           {state.result.cautions.length > 0 ? (
             <ul className="mt-6 grid gap-2">
               {state.result.cautions.map((caution, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed text-ink-muted">
-                  <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
+                <li key={i} className="text-ink-muted flex gap-2 text-xs leading-relaxed">
+                  <CircleAlert
+                    className="text-caution mt-px size-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
                   {caution}
                 </li>
               ))}
@@ -377,7 +422,7 @@ export function CoachTabs({
 
   return (
     <div>
-      <div role="tablist" aria-label="Coach mode" className="flex gap-1 border-b border-line">
+      <div role="tablist" aria-label="Coach mode" className="border-line flex gap-1 border-b">
         {(
           [
             { id: 'ask', label: `Ask ${brand.name}`, icon: Sparkles },
@@ -396,7 +441,7 @@ export function CoachTabs({
               'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]',
               tab === item.id
                 ? 'border-accent text-ink'
-                : 'border-transparent text-ink-muted hover:text-ink-secondary',
+                : 'text-ink-muted hover:text-ink-secondary border-transparent',
             )}
           >
             <item.icon className="size-3.5" aria-hidden="true" />

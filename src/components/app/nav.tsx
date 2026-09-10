@@ -7,7 +7,9 @@ import {
   CalendarClock,
   Command,
   Compass,
+  Handshake,
   MessagesSquare,
+  Mic,
   Settings,
   Sparkles,
   Sun,
@@ -31,6 +33,10 @@ export const NAV_ITEMS = [
   { href: '/today', label: 'Today', icon: Sun },
   { href: '/people', label: 'People', icon: Users },
   { href: '/meetings', label: 'Meetings', icon: CalendarClock },
+  // The loop the product now closes: prepare, meet, keep the conversation,
+  // follow through. Conversations and Open Loops are the two new halves.
+  { href: '/conversations', label: 'Conversations', icon: Mic },
+  { href: '/loops', label: 'Open Loops', icon: Handshake },
   // "Atlas" alone tells a new user nothing -- the page's own empty state says
   // as much. The page is already titled "Relationship Atlas", so pairing the
   // brand word with the explanatory one here is consistent rather than
@@ -40,8 +46,12 @@ export const NAV_ITEMS = [
   { href: '/coach', label: brand.assistantName, icon: MessagesSquare },
 ] as const
 
-/** Items that earn a slot in the mobile tab bar. Atlas is desktop-first. */
-const MOBILE_ITEMS = NAV_ITEMS.filter((i) => i.href !== '/atlas')
+/**
+ * Items that earn a slot in the mobile tab bar. Five is the limit a thumb can
+ * reach: Atlas is desktop-first, and Open Loops is reached from Today, which
+ * shows them, rather than from a sixth tab.
+ */
+const MOBILE_ITEMS = NAV_ITEMS.filter((i) => i.href !== '/atlas' && i.href !== '/loops')
 
 function useIsActive() {
   const pathname = usePathname()
@@ -61,9 +71,9 @@ export function DesktopNav({
   const isActive = useIsActive()
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-bg-sunken lg:flex">
+    <aside className="border-line bg-bg-sunken sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r lg:flex">
       <div className="px-5 py-5">
-        <Link href="/today" className="rounded-sm text-ink transition-opacity hover:opacity-70">
+        <Link href="/today" className="text-ink rounded-sm transition-opacity hover:opacity-70">
           <Wordmark name={brand.name} className="text-base" />
         </Link>
       </div>
@@ -72,11 +82,11 @@ export function DesktopNav({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] border border-line bg-surface px-3 py-2 text-left text-sm text-ink-faint transition-colors hover:border-line-strong hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          className="border-line bg-surface text-ink-faint hover:border-line-strong hover:text-ink-muted flex w-full items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
         >
           <Command className="size-3.5" aria-hidden="true" />
           <span className="flex-1">Search</span>
-          <kbd className="rounded border border-line px-1.5 py-0.5 font-sans text-[0.625rem] text-ink-faint">
+          <kbd className="border-line text-ink-faint rounded border px-1.5 py-0.5 font-sans text-[0.625rem]">
             {'⌘'}K
           </kbd>
         </button>
@@ -116,19 +126,19 @@ export function DesktopNav({
         </div>
       </nav>
 
-      <div className="border-t border-line p-3">
+      <div className="border-line border-t p-3">
         <Link
           href="/settings"
-          className="flex items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 transition-colors hover:bg-surface/60"
+          className="hover:bg-surface/60 flex items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 transition-colors"
         >
           <Avatar name={user.name} src={user.avatarUrl} size="sm" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm text-ink">{user.name}</span>
-            <span className="block truncate text-xs text-ink-faint capitalize">
+            <span className="text-ink block truncate text-sm">{user.name}</span>
+            <span className="text-ink-faint block truncate text-xs capitalize">
               {user.plan} plan
             </span>
           </span>
-          <Settings className="size-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
+          <Settings className="text-ink-faint size-3.5 shrink-0" aria-hidden="true" />
         </Link>
       </div>
     </aside>
@@ -137,8 +147,8 @@ export function DesktopNav({
 
 export function MobileTopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-bg/90 px-4 backdrop-blur-md lg:hidden">
-      <Link href="/today" className="rounded-sm text-ink">
+    <header className="border-line bg-bg/90 sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md lg:hidden">
+      <Link href="/today" className="text-ink rounded-sm">
         <Wordmark name={brand.name} className="text-base" />
       </Link>
       <div className="flex items-center gap-1">
@@ -188,7 +198,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Main"
-      className="sticky bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md lg:hidden"
+      className="border-line bg-bg/95 sticky bottom-0 z-30 border-t backdrop-blur-md lg:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Columns derived from the list, not hard-coded.
@@ -215,7 +225,11 @@ export function MobileTabBar() {
                 aria-hidden="true"
               />
               <span className="max-w-full truncate px-1">
-                {item.label === brand.assistantName ? 'Ask' : item.label}
+                {item.label === brand.assistantName
+                  ? 'Ask'
+                  : item.label === 'Conversations'
+                    ? 'Talks'
+                    : item.label}
               </span>
             </Link>
           </li>

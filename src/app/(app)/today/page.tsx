@@ -1,17 +1,10 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import {
-  ArrowRight,
-  CalendarClock,
-  CircleAlert,
-  Clock,
-  Handshake,
-  Loader2,
-  Sparkles,
-  UserPlus,
-} from 'lucide-react'
+import { ArrowRight, CalendarClock, Loader2, Mic, Sparkles, UserPlus } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
+import { ConversationCard } from '@/components/app/conversation-card'
+import { LoopList } from '@/components/app/loop-list'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, EmptyState, Eyebrow, Panel } from '@/components/ui/primitives'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
@@ -24,6 +17,8 @@ import {
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getUserContext, getPeopleContext, getQuietRelationships } from '@/lib/ai/context'
+import { resolveFaces } from '@/lib/conversations/avatars'
+import { listConversations, listLoops } from '@/lib/conversations/queries'
 import { runPrompt } from '@/lib/ai/provider'
 import { getFirstRunState } from '@/lib/first-run'
 import { FirstRun, firstRunComplete } from '@/components/app/first-run'
@@ -66,26 +61,34 @@ export default async function TodayPage({
   const todayStart = startOfDayUtc(today, timeZone)
   const horizon = endOfDayUtc(addDays(today, 6), timeZone)
 
-  const [{ data: meetings }, { data: commitments }, quiet, userContext] = await Promise.all([
-    supabase
-      .from('meetings')
-      .select('id, title, scheduled_at, kind, objective, importance, status')
-      .eq('user_id', user.id)
-      .eq('status', 'upcoming')
-      .or(`scheduled_at.is.null,scheduled_at.gte.${todayStart.toISOString()}`)
-      .lte('scheduled_at', horizon.toISOString())
-      .order('scheduled_at', { ascending: true, nullsFirst: false })
-      .limit(8),
-    supabase
-      .from('commitments')
-      .select('id, description, owner, due_on, person_id, people!commitments_person_id_fkey(full_name, preferred_name)')
-      .eq('user_id', user.id)
-      .eq('status', 'open')
-      .order('due_on', { ascending: true, nullsFirst: false })
-      .limit(10),
-    getQuietRelationships(supabase, user.id),
-    getUserContext(supabase, user.id),
-  ])
+  const [{ data: meetings }, { data: commitments }, quiet, userContext, loops, conversations] =
+    await Promise.all([
+      supabase
+        .from('meetings')
+        .select('id, title, scheduled_at, kind, objective, importance, status')
+        .eq('user_id', user.id)
+        .eq('status', 'upcoming')
+        .or(`scheduled_at.is.null,scheduled_at.gte.${todayStart.toISOString()}`)
+        .lte('scheduled_at', horizon.toISOString())
+        .order('scheduled_at', { ascending: true, nullsFirst: false })
+        .limit(8),
+      // Confirmed only. A loop the reading proposed and the user has not
+      // reviewed is not a promise the day can hold them to.
+      supabase
+        .from('commitments')
+        .select(
+          'id, description, owner, due_on, person_id, people!commitments_person_id_fkey(full_name, preferred_name)',
+        )
+        .eq('user_id', user.id)
+        .eq('status', 'open')
+        .eq('review_status', 'confirmed')
+        .order('due_on', { ascending: true, nullsFirst: false })
+        .limit(10),
+      getQuietRelationships(supabase, user.id),
+      getUserContext(supabase, user.id),
+      listLoops(supabase, user.id, { timeZone, now, scope: 'active', limit: 60 }),
+      listConversations(supabase, user.id, { limit: 3 }),
+    ])
 
   const meetingIds = (meetings ?? []).map((m) => m.id)
 
@@ -111,7 +114,10 @@ export default async function TodayPage({
   const prepared = new Set((briefs ?? []).map((b) => b.subject_id))
   const attendeesByMeeting = new Map<string, string[]>()
   for (const a of attendees ?? []) {
-    attendeesByMeeting.set(a.meeting_id, [...(attendeesByMeeting.get(a.meeting_id) ?? []), a.person_id])
+    attendeesByMeeting.set(a.meeting_id, [
+      ...(attendeesByMeeting.get(a.meeting_id) ?? []),
+      a.person_id,
+    ])
   }
 
   /**
@@ -136,10 +142,23 @@ export default async function TodayPage({
   // begun, the most recent is the one they are probably sitting in.
   const imminent = nearby.find((row) => row.minutes >= 0) ?? nearby[nearby.length - 1] ?? null
 
-  const peopleMap = await getPeopleContext(
-    supabase,
-    user.id,
-    [...new Set((attendees ?? []).map((a) => a.person_id))],
+  const peopleMap = await getPeopleContext(supabase, user.id, [
+    ...new Set((attendees ?? []).map((a) => a.person_id)),
+  ])
+
+  // Faces for the meeting rows. One signing call for the whole page.
+  const attendeeIds = [...new Set((attendees ?? []).map((a) => a.person_id))]
+  const { data: attendeeRows } = attendeeIds.length
+    ? await supabase
+        .from('people')
+        .select('id, avatar_url, avatar_path')
+        .eq('user_id', user.id)
+        .in('id', attendeeIds)
+    : { data: [] as { id: string; avatar_url: string | null; avatar_path: string | null }[] }
+  const faces = await resolveFaces(supabase, attendeeRows ?? [], (p) => p.id)
+
+  const awaitingReview = conversations.filter(
+    (c) => c.processingStatus === 'ready' && c.pendingReview > 0 && !c.reviewedAt,
   )
 
   const overdue = (commitments ?? []).filter((c) => isOverdueIn(c.due_on, timeZone, now))
@@ -176,43 +195,44 @@ export default async function TodayPage({
   // unhandled rejection here.
   const focusPromise = hasSignals
     ? runPrompt(dailyFocusPrompt, {
-    user: userContext,
-    today,
-    timeZone,
-    meetings: (meetings ?? []).map((m) => ({
-      id: m.id,
-      title: m.title,
-      scheduledAt: m.scheduled_at,
-      importance: m.importance,
-      objective: m.objective,
-      hasBrief: prepared.has(m.id),
-      participants: (attendeesByMeeting.get(m.id) ?? [])
-        .map((id) => peopleMap.get(id))
-        .filter((p): p is NonNullable<typeof p> => Boolean(p)),
-    })),
-    overdueCommitments: overdue.map((c) => ({
-      id: c.id,
-      description: c.description,
-      owner: c.owner,
-      ownerName: null,
-      dueOn: c.due_on,
-      isOverdue: true,
-      personName: displayName(c.people),
-    })),
-    dueTodayCommitments: dueToday.map((c) => ({
-      id: c.id,
-      description: c.description,
-      owner: c.owner,
-      ownerName: null,
-      dueOn: c.due_on,
-      isOverdue: false,
-      personName: displayName(c.people),
-    })),
-    quietRelationships: quiet,
+        user: userContext,
+        today,
+        timeZone,
+        meetings: (meetings ?? []).map((m) => ({
+          id: m.id,
+          title: m.title,
+          scheduledAt: m.scheduled_at,
+          importance: m.importance,
+          objective: m.objective,
+          hasBrief: prepared.has(m.id),
+          participants: (attendeesByMeeting.get(m.id) ?? [])
+            .map((id) => peopleMap.get(id))
+            .filter((p): p is NonNullable<typeof p> => Boolean(p)),
+        })),
+        overdueCommitments: overdue.map((c) => ({
+          id: c.id,
+          description: c.description,
+          owner: c.owner,
+          ownerName: null,
+          dueOn: c.due_on,
+          isOverdue: true,
+          personName: displayName(c.people),
+        })),
+        dueTodayCommitments: dueToday.map((c) => ({
+          id: c.id,
+          description: c.description,
+          owner: c.owner,
+          ownerName: null,
+          dueOn: c.due_on,
+          isOverdue: false,
+          personName: displayName(c.people),
+        })),
+        quietRelationships: quiet,
       })
     : Promise.resolve(null)
 
-  const hasAnything = (meetings ?? []).length > 0 || (commitments ?? []).length > 0
+  const hasAnything =
+    (meetings ?? []).length > 0 || (commitments ?? []).length > 0 || conversations.length > 0
   const firstName = profile.preferred_name || profile.full_name?.split(' ')[0] || 'there'
 
   // Calendar, when one is connected. Two days only: preparation is a today and
@@ -224,7 +244,9 @@ export default async function TodayPage({
 
   const { data: calendarRows } = await supabase
     .from('external_calendar_events')
-    .select('id, title, starts_at, ends_at, is_all_day, is_private, meeting_url, status, meeting_id, attendees')
+    .select(
+      'id, title, starts_at, ends_at, is_all_day, is_private, meeting_url, status, meeting_id, attendees',
+    )
     .eq('user_id', user.id)
     .gte('starts_at', now.toISOString())
     .lte('starts_at', calendarHorizon.toISOString())
@@ -272,7 +294,7 @@ export default async function TodayPage({
 
       <header>
         <Eyebrow>{formatDayLabel(now, timeZone)}</Eyebrow>
-        <h1 className="mt-3 font-display text-3xl text-ink sm:text-4xl">
+        <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">
           Good {timeOfDay(timeZone, now)}, {firstName}.
         </h1>
       </header>
@@ -339,7 +361,7 @@ export default async function TodayPage({
           <div className="flex items-end justify-between gap-4">
             <div>
               <Eyebrow>Upcoming</Eyebrow>
-              <h2 className="mt-2 font-display text-xl text-ink">Next seven days</h2>
+              <h2 className="font-display text-ink mt-2 text-xl">Next seven days</h2>
             </div>
             <Button asChild variant="ghost" size="sm">
               <Link href="/meetings">
@@ -349,7 +371,7 @@ export default async function TodayPage({
             </Button>
           </div>
 
-          <ul className="mt-5 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line">
+          <ul className="border-line bg-line mt-5 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
             {(meetings ?? []).map((meeting) => {
               const people = (attendeesByMeeting.get(meeting.id) ?? [])
                 .map((id) => peopleMap.get(id))
@@ -361,7 +383,7 @@ export default async function TodayPage({
                   <div className="flex flex-wrap items-start gap-4 p-5">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-ink-muted">
+                        <span className="text-ink-muted text-xs">
                           {meeting.scheduled_at
                             ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
                             : 'Unscheduled'}
@@ -378,29 +400,35 @@ export default async function TodayPage({
 
                       <Link
                         href={`/meetings/${meeting.id}`}
-                        className="mt-1.5 block font-display text-lg text-ink hover:text-accent"
+                        className="font-display text-ink hover:text-accent mt-1.5 block text-lg"
                       >
                         {meeting.title}
                       </Link>
 
                       {meeting.objective ? (
-                        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-secondary">
+                        <p className="text-ink-secondary mt-1.5 line-clamp-2 text-sm leading-relaxed">
                           {meeting.objective}
                         </p>
                       ) : (
-                        <p className="mt-1.5 text-sm text-ink-faint">No objective recorded yet.</p>
+                        <p className="text-ink-faint mt-1.5 text-sm">No objective recorded yet.</p>
                       )}
 
                       {people.length > 0 ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           {people.slice(0, 5).map((p) => (
                             <span key={p.id} className="flex items-center gap-1.5">
-                              <Avatar name={p.displayName} size="xs" />
-                              <span className="text-xs text-ink-muted">{p.displayName}</span>
+                              <Avatar
+                                name={p.displayName}
+                                src={faces.get(p.id) ?? null}
+                                size="xs"
+                              />
+                              <span className="text-ink-muted text-xs">{p.displayName}</span>
                             </span>
                           ))}
                           {people.length > 5 ? (
-                            <span className="text-xs text-ink-faint">+{people.length - 5} more</span>
+                            <span className="text-ink-faint text-xs">
+                              +{people.length - 5} more
+                            </span>
                           ) : null}
                         </div>
                       ) : null}
@@ -419,44 +447,96 @@ export default async function TodayPage({
         </section>
       ) : null}
 
-      {/* Open commitments */}
-      {(commitments ?? []).length > 0 ? (
+      {/* Conversations waiting on a review come first: they are the one thing
+          on this page that is blocked on the user, and a proposal that sits
+          unreviewed is a promise the product cannot yet keep. */}
+      {awaitingReview.length > 0 ? (
         <section className="mt-12">
-          <Eyebrow>Open commitments</Eyebrow>
-          <h2 className="mt-2 font-display text-xl text-ink">
-            {overdue.length > 0 ? `${overdue.length} overdue` : 'Nothing overdue'}
+          <Eyebrow className="text-accent">Waiting on you</Eyebrow>
+          <h2 className="font-display text-ink mt-2 text-xl">
+            {awaitingReview.length === 1
+              ? 'A conversation to confirm'
+              : `${awaitingReview.length} conversations to confirm`}
           </h2>
-
-          <ul className="mt-5 grid gap-2">
-            {(commitments ?? []).slice(0, 6).map((c) => {
-              const isOverdue = isOverdueIn(c.due_on, timeZone, now)
-              const who = displayName(c.people)
-              return (
-                <li
-                  key={c.id}
-                  className="flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3"
-                >
-                  {isOverdue ? (
-                    <CircleAlert className="size-4 shrink-0 text-critical" aria-hidden="true" />
-                  ) : (
-                    <Handshake className="size-4 shrink-0 text-ink-faint" aria-hidden="true" />
-                  )}
-                  <span className="min-w-0 flex-1 text-sm text-ink">{c.description}</span>
-                  {who ? <span className="text-xs text-ink-muted">{who}</span> : null}
-                  {c.due_on ? (
-                    <Badge tone={isOverdue ? 'critical' : 'neutral'}>
-                      <Clock className="size-3" aria-hidden="true" />
-                      {relativeDay(c.due_on, timeZone, now)}
-                    </Badge>
-                  ) : (
-                    <Badge tone="outline">No date</Badge>
-                  )}
-                </li>
-              )
-            })}
+          <ul className="mt-5 grid gap-3">
+            {awaitingReview.map((c) => (
+              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} compact />
+            ))}
           </ul>
         </section>
       ) : null}
+
+      {/* Open loops: what you promised, what they promised, what nobody
+          answered. Done, Later and Cancel work from here, because the moment
+          somebody remembers they sent the deck is not a moment for a detour. */}
+      {loops.length > 0 ? (
+        <section className="mt-12">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <Eyebrow>Open loops</Eyebrow>
+              <h2 className="font-display text-ink mt-2 text-xl">
+                {overdue.length > 0
+                  ? `${overdue.length} past due`
+                  : loops.length === 1
+                    ? 'One thing open'
+                    : `${loops.length} things open`}
+              </h2>
+            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/loops">
+                All loops
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          </div>
+          <LoopList
+            className="mt-5"
+            loops={loops.slice(0, 6)}
+            timeZone={timeZone}
+            now={now}
+            grouped={false}
+          />
+          {loops.length > 6 ? (
+            <p className="text-ink-muted mt-3 text-xs">
+              {loops.length - 6} more on the{' '}
+              <Link href="/loops" className="text-ink underline-offset-4 hover:underline">
+                open loops
+              </Link>{' '}
+              page.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* Recent conversations, and the way to keep the next one. */}
+      <section className="mt-12">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <Eyebrow>Remember</Eyebrow>
+            <h2 className="font-display text-ink mt-2 text-xl">
+              {conversations.length > 0 ? 'Recent conversations' : 'Just had a conversation?'}
+            </h2>
+          </div>
+          <Button asChild variant={conversations.length > 0 ? 'secondary' : 'primary'} size="sm">
+            <Link href="/conversations/new">
+              <Mic className="size-3.5" aria-hidden="true" />
+              Keep a conversation
+            </Link>
+          </Button>
+        </div>
+        {conversations.length > 0 ? (
+          <ul className="mt-5 grid gap-3 sm:grid-cols-3">
+            {conversations.map((c) => (
+              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} compact />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-ink-muted mt-3 max-w-xl text-sm leading-relaxed">
+            Speak a thirty-second note, paste the transcript, or type what happened. {brand.name}{' '}
+            pulls out what you promised and what they promised, and remembers it for you.
+          </p>
+        )}
+      </section>
 
       {/* Relationship signals. No fallback: this is supplementary, and a
           placeholder for content that may not exist would be noise. */}
@@ -479,7 +559,9 @@ export default async function TodayPage({
   )
 }
 
-type FocusPromise = Promise<Awaited<ReturnType<typeof runPrompt<DailyFocusInput, DailyFocus>>> | null>
+type FocusPromise = Promise<Awaited<
+  ReturnType<typeof runPrompt<DailyFocusInput, DailyFocus>>
+> | null>
 
 /**
  * The focus card, once the model has answered.
@@ -496,24 +578,24 @@ async function FocusCard({ focusPromise }: { focusPromise: FocusPromise }) {
     <section className="mt-9">
       <Panel className="p-6 sm:p-7">
         <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+          <Sparkles className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <Eyebrow>Today&rsquo;s focus</Eyebrow>
-            <p className="mt-3 font-display text-xl leading-snug text-ink sm:text-2xl">
+            <p className="font-display text-ink mt-3 text-xl leading-snug sm:text-2xl">
               {focus.output.headline}
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-ink-secondary">
+            <p className="text-ink-secondary mt-3 text-sm leading-relaxed">
               {focus.output.reasoning}
             </p>
 
             {focus.output.priorities.length > 1 ? (
-              <ol className="mt-6 grid gap-3 border-t border-line pt-5">
+              <ol className="border-line mt-6 grid gap-3 border-t pt-5">
                 {focus.output.priorities.slice(1).map((priority, i) => (
                   <li key={i} className="flex gap-3">
-                    <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-accent-graphic" />
+                    <span aria-hidden="true" className="bg-accent-graphic mt-2 h-px w-3 shrink-0" />
                     <span className="min-w-0">
-                      <span className="block text-sm text-ink">{priority.what}</span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-ink-muted">
+                      <span className="text-ink block text-sm">{priority.what}</span>
+                      <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">
                         {priority.why}
                       </span>
                     </span>
@@ -543,18 +625,15 @@ function FocusPending() {
     <section className="mt-9">
       <Panel className="p-6 sm:p-7">
         <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+          <Sparkles className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <Eyebrow>Today&rsquo;s focus</Eyebrow>
             <p
-              className="mt-3 flex items-center gap-2.5 text-sm text-ink-secondary"
+              className="text-ink-secondary mt-3 flex items-center gap-2.5 text-sm"
               role="status"
               aria-live="polite"
             >
-              <Loader2
-                className="size-4 shrink-0 animate-spin text-ink-faint"
-                aria-hidden="true"
-              />
+              <Loader2 className="text-ink-faint size-4 shrink-0 animate-spin" aria-hidden="true" />
               Reading today against your record…
             </p>
           </div>
@@ -574,8 +653,8 @@ async function WatchItems({ focusPromise }: { focusPromise: FocusPromise }) {
       <Eyebrow>Worth watching</Eyebrow>
       <ul className="mt-4 grid gap-2.5">
         {focus.output.watchItems.map((item) => (
-          <li key={item} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
-            <span aria-hidden="true" className="mt-2 h-px w-3 shrink-0 bg-line-strong" />
+          <li key={item} className="text-ink-secondary flex gap-3 text-sm leading-relaxed">
+            <span aria-hidden="true" className="bg-line-strong mt-2 h-px w-3 shrink-0" />
             {item}
           </li>
         ))}
@@ -590,7 +669,7 @@ async function FocusProvenance({ focusPromise }: { focusPromise: FocusPromise })
   if (!focus) return null
 
   return (
-    <p className="mt-14 flex items-center gap-2 text-xs text-ink-faint">
+    <p className="text-ink-faint mt-14 flex items-center gap-2 text-xs">
       <CalendarClock className="size-3.5" aria-hidden="true" />
       {focus.provenance.groundedFallback
         ? 'Composed directly from your records.'

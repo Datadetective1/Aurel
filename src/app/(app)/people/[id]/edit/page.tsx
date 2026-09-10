@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
+import { AvatarUpload } from '@/components/app/avatar-upload'
 import { PersonForm } from '@/components/app/person-form'
 import { Button } from '@/components/ui/button'
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
+import { resolveFace } from '@/lib/conversations/avatars'
 
 export const metadata: Metadata = { title: 'Edit person', robots: { index: false, follow: false } }
 
@@ -34,7 +36,7 @@ export default async function EditPersonPage({ params }: { params: Promise<{ id:
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, organizations(name)',
+      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, organizations(name)',
     )
     .eq('user_id', user.id)
     .eq('id', id)
@@ -45,6 +47,7 @@ export default async function EditPersonPage({ params }: { params: Promise<{ id:
 
   const name = person.preferred_name || person.full_name
   const capability = researchCapability()
+  const face = await resolveFace(supabase, person)
 
   return (
     <Container size="narrow" className="py-8 sm:py-12">
@@ -62,6 +65,10 @@ export default async function EditPersonPage({ params }: { params: Promise<{ id:
         description="Correcting the record here changes what every future brief is built on."
         className="mt-4"
       />
+
+      <div className="border-line bg-surface mt-8 rounded-[var(--radius-lg)] border p-5">
+        <AvatarUpload personId={person.id} name={person.full_name} src={face} />
+      </div>
 
       <div className="mt-8">
         <PersonForm

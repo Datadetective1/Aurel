@@ -46,6 +46,24 @@ export interface CommitmentContext {
   ownerName: string | null
   dueOn: string | null
   isOverdue: boolean
+  /**
+   * A commitment, a follow-up, or an unanswered question. Absent means
+   * commitment: the field arrived after the shape did, and every caller that
+   * builds one by hand is building a commitment.
+   */
+  kind?: Database['public']['Enums']['loop_kind']
+  /** The conversation it came out of, when it came out of one. */
+  interactionId?: string | null
+}
+
+export interface DecisionContext {
+  id: string
+  description: string
+  /** Why, when the record says why. */
+  context: string | null
+  decidedOn: string
+  interactionId: string | null
+  interactionTitle: string | null
 }
 
 export interface PersonContext {
@@ -71,7 +89,10 @@ export interface PersonContext {
     inferred: ObservationContext[]
   }
   recentInteractions: InteractionContext[]
+  /** Open, confirmed loops: commitments, follow-ups and unanswered questions. */
   openCommitments: CommitmentContext[]
+  /** Confirmed decisions this person was party to, newest first. */
+  decisions: DecisionContext[]
   /**
    * Source-backed public professional facts, from research.
    *
@@ -162,6 +183,7 @@ export interface Citation {
   observationId?: string
   interactionId?: string
   commitmentId?: string
+  decisionId?: string
   personId?: string
   /** A public source this claim rests on, so the user can open it. */
   sourceId?: string

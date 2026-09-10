@@ -132,6 +132,20 @@ export type AnalyticsEvent =
   | 'quick_brief_viewed'
   | 'brief_deep_viewed'
   | 'meeting_debriefed'
+  // Conversations. Source kind, participant counts, extraction counts and
+  // whether the composer or a model ran -- never a title, a name, or a word
+  // of what was said.
+  | 'conversation_created'
+  | 'conversation_processed'
+  | 'conversation_review_completed'
+  | 'conversation_deleted'
+  | 'loop_confirmed'
+  | 'loop_rejected'
+  | 'loop_status_changed'
+  | 'loop_added'
+  | 'decision_confirmed'
+  | 'decision_rejected'
+  | 'person_photo_uploaded'
   // Voice debrief. Buckets, latencies and error categories only -- never a
   // word of what was said, and no audio ever reaches this file.
   | 'voice_debrief_started'

@@ -2,6 +2,12 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 import { getPeopleContext, getOpenCommitments } from './context'
+import {
+  getConversation as loadConversation,
+  listConversations,
+  listDecisions,
+  listLoops,
+} from '@/lib/conversations/queries'
 import type { Citation, PersonContext } from './types'
 
 type Client = SupabaseClient<Database>
@@ -41,7 +47,9 @@ export async function searchPeople(
   supabase: Client,
   userId: string,
   query: string,
-): Promise<ToolResult<{ id: string; name: string; title: string | null; organization: string | null }[]>> {
+): Promise<
+  ToolResult<{ id: string; name: string; title: string | null; organization: string | null }[]>
+> {
   const term = query.trim().slice(0, 80)
   if (term.length < 2) return { data: [], citations: [] }
 
@@ -195,18 +203,16 @@ export async function searchRelationshipMemory(
     data: rows,
     citations: rows.map((r) => ({
       label: r.title,
-      evidenceLevel: (r.entity === 'observation' ? 'observed' : 'confirmed') as Citation['evidenceLevel'],
+      evidenceLevel: (r.entity === 'observation'
+        ? 'observed'
+        : 'confirmed') as Citation['evidenceLevel'],
       personId: r.person_id ?? undefined,
     })),
   }
 }
 
 /** Observations the user has explicitly confirmed about a person. */
-export async function getConfirmedObservations(
-  supabase: Client,
-  userId: string,
-  personId: string,
-) {
+export async function getConfirmedObservations(supabase: Client, userId: string, personId: string) {
   const { data } = await supabase
     .from('observations')
     .select('id, content, category, evidence_level, reinforcement_count')
@@ -244,6 +250,184 @@ export async function getProfessionalFacts(supabase: Client, userId: string, per
       label: `${f.value}${f.detail ? ` — ${f.detail}` : ''}`,
       evidenceLevel: f.evidence_level,
       personId,
+    })),
+  }
+}
+
+// =============================================================================
+// CONVERSATIONS, LOOPS, DECISIONS
+// =============================================================================
+
+/** Conversations kept, newest first, optionally with one person. */
+export async function getConversations(
+  supabase: Client,
+  userId: string,
+  personId?: string,
+  limit = 8,
+) {
+  const rows = await listConversations(supabase, userId, { personId, limit })
+  return {
+    data: rows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      occurredAt: c.occurredAt,
+      summary: c.summary,
+      outcome: c.outcome,
+      participants: c.participants.map((p) => ({ id: p.id, name: p.name })),
+      openLoops: c.openLoops,
+      decisions: c.decisions,
+    })),
+    citations: rows.map((c) => ({
+      label: `Conversation: "${c.title}" on ${c.occurredAt.slice(0, 10)}`,
+      evidenceLevel: 'observed' as const,
+      interactionId: c.id,
+      personId: c.participants[0]?.id,
+    })),
+  }
+}
+
+/**
+ * One conversation, with what the user confirmed from it. The transcript is
+ * deliberately not returned: this is a retrieval surface, and a full transcript
+ * is the bulk export every tool here refuses to be.
+ */
+export async function getConversationDetail(
+  supabase: Client,
+  userId: string,
+  interactionId: string,
+  timeZone: string,
+) {
+  const conversation = await loadConversation(supabase, userId, interactionId)
+  if (!conversation) return { data: null, citations: [] as Citation[] }
+
+  const [loops, decisions] = await Promise.all([
+    listLoops(supabase, userId, { interactionId, scope: 'all', timeZone }),
+    listDecisions(supabase, userId, { interactionId, scope: 'confirmed' }),
+  ])
+  const confirmed = loops.filter((l) => l.reviewStatus === 'confirmed')
+
+  const citations: Citation[] = [
+    {
+      label: `Conversation: "${conversation.title}" on ${conversation.occurredAt.slice(0, 10)}`,
+      evidenceLevel: 'observed',
+      interactionId: conversation.id,
+    },
+    ...confirmed.map((l) => ({
+      label: `${l.owner === 'user' ? 'You promised' : l.owner === 'person' ? `${l.person?.name ?? 'They'} promised` : 'Open'}: ${l.description}`,
+      evidenceLevel: 'confirmed' as const,
+      commitmentId: l.id,
+      personId: l.personId ?? undefined,
+    })),
+    ...decisions.map((d) => ({
+      label: `Decided: ${d.description}`,
+      evidenceLevel: 'confirmed' as const,
+      decisionId: d.id,
+    })),
+  ]
+
+  return {
+    data: {
+      id: conversation.id,
+      title: conversation.title,
+      occurredAt: conversation.occurredAt,
+      participants: conversation.participants.map((p) => ({ id: p.id, name: p.name })),
+      summary: conversation.summary,
+      outcome: conversation.outcome,
+      topics: conversation.topics,
+      loops: confirmed.map((l) => ({
+        id: l.id,
+        description: l.description,
+        kind: l.kind,
+        owner: l.owner,
+        ownerName:
+          l.owner === 'person' ? (l.person?.name ?? null) : l.owner === 'user' ? 'you' : null,
+        dueOn: l.dueOn,
+        status: l.status,
+      })),
+      decisions: decisions.map((d) => ({
+        id: d.id,
+        description: d.description,
+        context: d.context,
+        decidedOn: d.decidedOn,
+      })),
+      stillProposed: loops.filter((l) => l.reviewStatus === 'proposed').length,
+    },
+    citations,
+  }
+}
+
+/** Confirmed decisions, newest first, optionally with one person. */
+export async function getDecisions(
+  supabase: Client,
+  userId: string,
+  personId?: string,
+  limit = 12,
+) {
+  const rows = await listDecisions(supabase, userId, { personId, limit })
+  return {
+    data: rows.map((d) => ({
+      id: d.id,
+      description: d.description,
+      context: d.context,
+      decidedOn: d.decidedOn,
+      conversation: d.interactionTitle,
+      interactionId: d.interactionId,
+      people: d.people.map((p) => p.name),
+    })),
+    citations: rows.map((d) => ({
+      label: `Decided ${d.decidedOn}: ${d.description}`,
+      evidenceLevel: 'confirmed' as const,
+      decisionId: d.id,
+      interactionId: d.interactionId ?? undefined,
+      personId: d.people[0]?.id,
+    })),
+  }
+}
+
+/**
+ * Open loops, optionally narrowed to one person, one owner, or one kind.
+ * Confirmed only, and only what is active right now.
+ */
+export async function getLoops(
+  supabase: Client,
+  userId: string,
+  options: {
+    personId?: string
+    owner?: 'user' | 'person' | 'shared'
+    kind?: 'commitment' | 'question' | 'follow_up'
+    timeZone: string
+  },
+) {
+  const rows = (
+    await listLoops(supabase, userId, {
+      personId: options.personId,
+      scope: 'active',
+      timeZone: options.timeZone,
+    })
+  )
+    .filter((l) => (options.owner ? l.owner === options.owner : true))
+    .filter((l) => (options.kind ? l.kind === options.kind : true))
+    .slice(0, 25)
+
+  return {
+    data: rows.map((l) => ({
+      id: l.id,
+      description: l.description,
+      kind: l.kind,
+      owner: l.owner,
+      person: l.person?.name ?? null,
+      personId: l.personId,
+      dueOn: l.dueOn,
+      status: l.status,
+      conversation: l.interactionTitle,
+      interactionId: l.interactionId,
+    })),
+    citations: rows.map((l) => ({
+      label: `${l.owner === 'user' ? 'You promised' : l.owner === 'person' ? `${l.person?.name ?? 'They'} promised` : 'Open'}: ${l.description}${l.dueOn ? ` (due ${l.dueOn})` : ''}`,
+      evidenceLevel: 'confirmed' as const,
+      commitmentId: l.id,
+      interactionId: l.interactionId ?? undefined,
+      personId: l.personId ?? undefined,
     })),
   }
 }

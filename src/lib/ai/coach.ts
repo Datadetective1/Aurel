@@ -6,6 +6,10 @@ import { logger } from '@/lib/logger'
 import { getUserContext } from './context'
 import {
   getCommitments,
+  getConversationDetail,
+  getConversations,
+  getDecisions,
+  getLoops,
   getPerson,
   getProfessionalFacts,
   getRelationshipHistory,
@@ -13,6 +17,7 @@ import {
   searchPeople,
   searchRelationshipMemory,
 } from './tools'
+import { resolveFaces } from '@/lib/conversations/avatars'
 import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './prompts/shared'
 import { fenceUntrusted, UNTRUSTED_CONTENT_RULES } from './untrusted'
 import { safeFetch } from '@/lib/sources/fetch'
@@ -60,10 +65,24 @@ export interface CoachAnswer {
     inputTokens: number
     outputTokens: number
   } | null
+  /**
+   * Visual grounding. The people and conversations an answer rests on, so the
+   * UI can show a face and a card rather than a list of labels. Filled from
+   * the citations after the answer is composed; never from the model.
+   */
+  people?: { id: string; name: string; src: string | null }[]
+  conversations?: { id: string; title: string; occurredAt: string }[]
 }
 
 type Intent =
   | { kind: 'commitments' }
+  // Person-scoped follow-through: "what did I promise Jason", "open loops
+  // with Ravi", "what decisions did we make with Priya".
+  | { kind: 'promised_to'; query: string }
+  | { kind: 'loops_with'; query: string }
+  | { kind: 'decisions_with'; query: string | null }
+  | { kind: 'questions'; query: string | null }
+  | { kind: 'last_conversation'; query: string | null }
   | { kind: 'upcoming' }
   | { kind: 'about_person'; query: string }
   | { kind: 'history_with'; query: string }
@@ -88,6 +107,48 @@ export function classifyIntent(question: string): Intent {
   const link = question.match(/https?:\/\/[^\s<>"')]+/i)
   if (link?.[0]) {
     return { kind: 'review_url', url: link[0], personHint: extractPersonHint(question) }
+  }
+
+  // Person-scoped follow-through, before the generic commitment intents so
+  // "what did I promise Jason" does not collapse into "everything I owe".
+  const promised = q.match(
+    /\b(?:what (?:did|have) i (?:promise|owe|commit(?:ted)? to)|what do i owe|what am i (?:supposed|meant) to (?:send|do|give))\s+(?:to\s+)?(.+)/,
+  )
+  if (promised?.[1] && !/^(people|anyone|everyone|them)\b/.test(promised[1])) {
+    return { kind: 'promised_to', query: cleanTarget(promised[1]) }
+  }
+
+  const loopsWith = q.match(
+    /\b(?:open loops?|loops? (?:still )?open|still open|outstanding|waiting on|what(?:'s| is) (?:still )?open)\s+(?:do i (?:still )?have\s+)?(?:with|from|for|on)\s+(.+)/,
+  )
+  if (loopsWith?.[1]) return { kind: 'loops_with', query: cleanTarget(loopsWith[1]) }
+
+  const decided = q.match(
+    /\b(?:decisions?|decided|agreed on|settled)\b.*?(?:with|in my (?:last )?(?:meeting|conversation|call) with)\s+(.+)/,
+  )
+  if (decided?.[1]) return { kind: 'decisions_with', query: cleanTarget(decided[1]) }
+  if (
+    /\b(what (?:was|got|did we|have we) decided|what decisions|recent decisions|decisions? (?:were|was) made)\b/.test(
+      q,
+    )
+  ) {
+    return { kind: 'decisions_with', query: null }
+  }
+
+  const questions = q.match(
+    /\b(?:unanswered|unresolved|open) questions?\b(?:.*?\b(?:with|from|for)\s+(.+))?/,
+  )
+  if (questions)
+    return { kind: 'questions', query: questions[1] ? cleanTarget(questions[1]) : null }
+
+  const lastConversation = q.match(
+    /\b(?:last (?:conversation|call|chat|talk)|what did we (?:talk|speak) about|what came (?:up|out of)(?: the)? last (?:conversation|call))\b(?:.*?\b(?:with)\s+(.+))?/,
+  )
+  if (lastConversation) {
+    return {
+      kind: 'last_conversation',
+      query: lastConversation[1] ? cleanTarget(lastConversation[1]) : null,
+    }
   }
 
   if (/\b(what|which)\b.*\b(owe|commitments?|promised|outstanding|due)\b/.test(q)) {
@@ -285,11 +346,75 @@ export async function askCoach(
   userId: string,
   question: string,
 ): Promise<CoachAnswer> {
-  if (features.generativeAI) {
-    const generated = await askWithModel(supabase, userId, question)
-    if (generated) return generated
+  const answer = features.generativeAI
+    ? ((await askWithModel(supabase, userId, question)) ??
+      (await askDeterministically(supabase, userId, question)))
+    : await askDeterministically(supabase, userId, question)
+  return groundAnswer(supabase, userId, answer)
+}
+
+/**
+ * Attach faces and conversation cards to an answer, from its citations.
+ *
+ * The citations are the evidence; this only turns ids in them into things
+ * the screen can show. A model cannot put a person here, because a model
+ * never sees this step.
+ */
+async function groundAnswer(
+  supabase: Client,
+  userId: string,
+  answer: CoachAnswer,
+): Promise<CoachAnswer> {
+  const personIds = [
+    ...new Set(answer.citations.map((c) => c.personId).filter((id): id is string => Boolean(id))),
+  ].slice(0, 6)
+  const interactionIds = [
+    ...new Set(
+      answer.citations.map((c) => c.interactionId).filter((id): id is string => Boolean(id)),
+    ),
+  ].slice(0, 4)
+
+  const [{ data: people }, { data: conversations }] = await Promise.all([
+    personIds.length
+      ? supabase
+          .from('people')
+          .select('id, full_name, preferred_name, avatar_url, avatar_path')
+          .eq('user_id', userId)
+          .in('id', personIds)
+      : Promise.resolve({
+          data: [] as {
+            id: string
+            full_name: string
+            preferred_name: string | null
+            avatar_url: string | null
+            avatar_path: string | null
+          }[],
+        }),
+    interactionIds.length
+      ? supabase
+          .from('interactions')
+          .select('id, title, occurred_at')
+          .eq('user_id', userId)
+          .in('id', interactionIds)
+          .order('occurred_at', { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; title: string; occurred_at: string }[] }),
+  ])
+
+  const faces = await resolveFaces(supabase, people ?? [], (p) => p.id)
+
+  return {
+    ...answer,
+    people: (people ?? []).map((p) => ({
+      id: p.id,
+      name: p.preferred_name || p.full_name,
+      src: faces.get(p.id) ?? null,
+    })),
+    conversations: (conversations ?? []).map((c) => ({
+      id: c.id,
+      title: c.title,
+      occurredAt: c.occurred_at,
+    })),
   }
-  return askDeterministically(supabase, userId, question)
 }
 
 // =============================================================================
@@ -304,6 +429,14 @@ async function askDeterministically(
   const intent = classifyIntent(question)
 
   switch (intent.kind) {
+    case 'promised_to':
+    case 'loops_with':
+    case 'decisions_with':
+    case 'questions':
+    case 'last_conversation': {
+      return answerFollowThrough(supabase, userId, intent)
+    }
+
     case 'commitments': {
       const { data, citations } = await getCommitments(supabase, userId)
       if (data.length === 0) {
@@ -453,6 +586,240 @@ async function askDeterministically(
         grounded: true,
         actions: [],
       }
+  }
+}
+
+/**
+ * Follow-through questions: what did I promise, what is open, what was
+ * decided, what came out of the last conversation. Every line is something
+ * the user confirmed, and the answer says so.
+ */
+async function answerFollowThrough(
+  supabase: Client,
+  userId: string,
+  intent: Extract<
+    Intent,
+    { kind: 'promised_to' | 'loops_with' | 'decisions_with' | 'questions' | 'last_conversation' }
+  >,
+): Promise<CoachAnswer> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', userId)
+    .maybeSingle()
+  const timeZone = profile?.timezone ?? 'UTC'
+
+  let target: { id: string; name: string } | null = null
+  if (intent.query) {
+    const matches = await searchPeople(supabase, userId, intent.query)
+    if (matches.data.length === 0) {
+      return {
+        answer: `I have no record of anyone called "${intent.query}".`,
+        citations: [],
+        followUps: ['What do I owe people?', 'What is still open?'],
+        grounded: true,
+        actions: [{ label: 'Add a person', href: '/people/new' }],
+      }
+    }
+    if (matches.data.length > 1) {
+      return {
+        answer:
+          `More than one person matches "${intent.query}":\n\n` +
+          matches.data.map((p) => `- ${p.name}${p.title ? `, ${p.title}` : ''}`).join('\n') +
+          '\n\nWhich one did you mean?',
+        citations: [],
+        followUps: matches.data.slice(0, 3).map((p) => `What did I promise ${p.name}?`),
+        grounded: true,
+        actions: matches.data.slice(0, 4).map((p) => ({ label: p.name, href: `/people/${p.id}` })),
+      }
+    }
+    target = matches.data[0]!
+  }
+
+  const first = target?.name.split(' ')[0] ?? null
+
+  if (intent.kind === 'promised_to' || intent.kind === 'loops_with') {
+    const owner = intent.kind === 'promised_to' ? ('user' as const) : undefined
+    const { data, citations } = await getLoops(supabase, userId, {
+      personId: target?.id,
+      owner,
+      timeZone,
+    })
+    const loops = data.filter((l) => l.kind !== 'question' || intent.kind === 'loops_with')
+
+    if (loops.length === 0) {
+      return {
+        answer: target
+          ? intent.kind === 'promised_to'
+            ? `Nothing open that you promised ${first}. Every commitment to them on record is closed, or none was ever kept.`
+            : `Nothing is open with ${first}.`
+          : 'Nothing open.',
+        citations: [],
+        followUps: target
+          ? [
+              `What did we decide with ${first}?`,
+              `What was my last conversation with ${first} about?`,
+            ]
+          : ['What is coming up?'],
+        grounded: true,
+        actions: target
+          ? [{ label: `Open ${target.name}`, href: `/people/${target.id}` }]
+          : [{ label: 'Open loops', href: '/loops' }],
+      }
+    }
+
+    const line = (l: (typeof loops)[number]) =>
+      `- ${l.owner === 'user' ? 'You' : l.owner === 'person' ? (l.person ?? 'They') : 'Shared'}: ${l.description}` +
+      (l.dueOn ? ` — due ${l.dueOn}` : '') +
+      (l.conversation ? ` (from "${l.conversation}")` : '')
+
+    const yours = loops.filter((l) => l.owner === 'user' && l.kind !== 'question')
+    const theirs = loops.filter((l) => l.owner === 'person' && l.kind !== 'question')
+    const questions = loops.filter((l) => l.kind === 'question')
+    const shared = loops.filter((l) => l.owner === 'shared' && l.kind !== 'question')
+
+    const sections: string[] = []
+    if (yours.length)
+      sections.push(`YOU PROMISED — confirmed by you\n${yours.map(line).join('\n')}`)
+    if (theirs.length)
+      sections.push(`WAITING ON THEM — confirmed by you\n${theirs.map(line).join('\n')}`)
+    if (questions.length)
+      sections.push(`UNANSWERED\n${questions.map((q) => `- ${q.description}`).join('\n')}`)
+    if (shared.length) sections.push(`BETWEEN YOU\n${shared.map(line).join('\n')}`)
+
+    return {
+      answer:
+        (target
+          ? `${loops.length} open ${loops.length === 1 ? 'loop' : 'loops'} with ${target.name}.`
+          : `${loops.length} open ${loops.length === 1 ? 'loop' : 'loops'}.`) +
+        '\n\n' +
+        sections.join('\n\n'),
+      citations,
+      followUps: target
+        ? [`What did we decide with ${first}?`, `Prepare me for ${first}`]
+        : ['What did we decide recently?'],
+      grounded: true,
+      actions: [
+        { label: 'Open loops', href: '/loops' },
+        ...(target ? [{ label: `Open ${target.name}`, href: `/people/${target.id}` }] : []),
+      ],
+    }
+  }
+
+  if (intent.kind === 'decisions_with') {
+    const { data, citations } = await getDecisions(supabase, userId, target?.id)
+    if (data.length === 0) {
+      return {
+        answer: target
+          ? `No confirmed decisions with ${first} on record. Decisions come from conversations you keep and confirm.`
+          : 'No confirmed decisions on record yet.',
+        citations: [],
+        followUps: ['What is still open?'],
+        grounded: true,
+        actions: [{ label: 'Keep a conversation', href: '/conversations/new' }],
+      }
+    }
+    return {
+      answer:
+        (target
+          ? `Decisions with ${target.name}, confirmed by you:`
+          : 'Decisions on record, confirmed by you:') +
+        '\n\n' +
+        data
+          .map(
+            (d) =>
+              `- ${d.decidedOn}: ${d.description}` +
+              (d.context ? ` — because ${d.context}` : '') +
+              (d.conversation ? ` (from "${d.conversation}")` : ''),
+          )
+          .join('\n'),
+      citations,
+      followUps: target ? [`What did I promise ${first}?`] : ['What do I owe people?'],
+      grounded: true,
+      actions: target
+        ? [{ label: `Open ${target.name}`, href: `/people/${target.id}` }]
+        : [{ label: 'Conversations', href: '/conversations' }],
+    }
+  }
+
+  if (intent.kind === 'questions') {
+    const { data, citations } = await getLoops(supabase, userId, {
+      personId: target?.id,
+      kind: 'question',
+      timeZone,
+    })
+    if (data.length === 0) {
+      return {
+        answer: target
+          ? `No unanswered questions on record with ${first}.`
+          : 'No unanswered questions on record.',
+        citations: [],
+        followUps: ['What do I owe people?'],
+        grounded: true,
+        actions: [{ label: 'Open loops', href: '/loops' }],
+      }
+    }
+    return {
+      answer:
+        `${data.length} unanswered ${data.length === 1 ? 'question' : 'questions'}${target ? ` with ${target.name}` : ''}:\n\n` +
+        data
+          .map((q) => `- ${q.description}${q.conversation ? ` (from "${q.conversation}")` : ''}`)
+          .join('\n'),
+      citations,
+      followUps: target ? [`Prepare me for ${first}`] : [],
+      grounded: true,
+      actions: [{ label: 'Open loops', href: '/loops' }],
+    }
+  }
+
+  // last_conversation
+  const { data: conversations } = await getConversations(supabase, userId, target?.id, 1)
+  const latest = conversations[0]
+  if (!latest) {
+    return {
+      answer: target
+        ? `No conversation with ${first} has been kept yet.`
+        : 'No conversation has been kept yet.',
+      citations: [],
+      followUps: [],
+      grounded: true,
+      actions: [
+        {
+          label: 'Keep a conversation',
+          href: target ? `/conversations/new?person=${target.id}` : '/conversations/new',
+        },
+      ],
+    }
+  }
+  const detail = await getConversationDetail(supabase, userId, latest.id, timeZone)
+  const d = detail.data
+  const lines: string[] = [
+    `"${latest.title}", ${latest.occurredAt.slice(0, 10)}${latest.participants.length ? `, with ${latest.participants.map((p) => p.name).join(', ')}` : ''}.`,
+  ]
+  if (d?.summary) lines.push(d.summary)
+  if (d?.outcome) lines.push(`Upshot: ${d.outcome}`)
+  if (d && d.loops.length) {
+    lines.push(
+      `LEFT OPEN — confirmed by you\n${d.loops.map((l) => `- ${l.owner === 'user' ? 'You' : (l.ownerName ?? 'Shared')}: ${l.description}${l.dueOn ? ` — due ${l.dueOn}` : ''}`).join('\n')}`,
+    )
+  }
+  if (d && d.decisions.length) {
+    lines.push(
+      `DECIDED — confirmed by you\n${d.decisions.map((x) => `- ${x.description}`).join('\n')}`,
+    )
+  }
+  if (d && d.stillProposed > 0) {
+    lines.push(
+      `WHAT I DON'T KNOW\n- ${d.stillProposed} suggested ${d.stillProposed === 1 ? 'item is' : 'items are'} still waiting for your review on that conversation, so ${d.stillProposed === 1 ? 'it is' : 'they are'} not counted here.`,
+    )
+  }
+
+  return {
+    answer: lines.join('\n\n'),
+    citations: detail.citations,
+    followUps: target ? [`What did I promise ${first}?`, `Prepare me for ${first}`] : [],
+    grounded: true,
+    actions: [{ label: 'Open the conversation', href: `/conversations/${latest.id}` }],
   }
 }
 
@@ -669,6 +1036,60 @@ async function askWithModel(
             return result.data
           },
         }),
+        getConversations: tool({
+          description:
+            'Conversations the user has kept, newest first, with a summary each. Pass personId to narrow to one person.',
+          inputSchema: z.object({ personId: z.string().optional() }),
+          execute: async ({ personId }) => {
+            const result = await getConversations(supabase, userId, personId)
+            collected.push(...result.citations)
+            return result.data
+          },
+        }),
+        getConversation: tool({
+          description:
+            'One conversation in detail: summary, the loops and decisions the user CONFIRMED from it, and how many suggestions are still unreviewed. Use an id from getConversations.',
+          inputSchema: z.object({ conversationId: z.string() }),
+          execute: async ({ conversationId }) => {
+            const result = await getConversationDetail(
+              supabase,
+              userId,
+              conversationId,
+              userContext.timeZone,
+            )
+            collected.push(...result.citations)
+            return result.data ?? 'No such conversation.'
+          },
+        }),
+        getOpenLoops: tool({
+          description:
+            'Open loops the user has confirmed: commitments they made (owner "user"), commitments others made (owner "person"), and unanswered questions (kind "question"). Narrow by personId, owner or kind.',
+          inputSchema: z.object({
+            personId: z.string().optional(),
+            owner: z.enum(['user', 'person', 'shared']).optional(),
+            kind: z.enum(['commitment', 'question', 'follow_up']).optional(),
+          }),
+          execute: async ({ personId, owner, kind }) => {
+            const result = await getLoops(supabase, userId, {
+              personId,
+              owner,
+              kind,
+              timeZone: userContext.timeZone,
+            })
+            collected.push(...result.citations)
+            return result.data
+          },
+        }),
+        getDecisions: tool({
+          description:
+            'Decisions the user has confirmed, newest first, with the reason when one was recorded. Pass personId to narrow.',
+          inputSchema: z.object({ personId: z.string().optional() }),
+          execute: async ({ personId }) => {
+            const result = await getDecisions(supabase, userId, personId)
+            collected.push(...result.citations)
+            return result.data
+          },
+        }),
       },
       stopWhen: stepCountIs(6),
       system: [
@@ -682,6 +1103,8 @@ async function askWithModel(
 - ALWAYS use the tools to look things up. Never answer from memory or assumption.
 - If the tools return nothing, say so plainly. "I don't have enough recorded about them yet" is the correct answer.
 - Separate what is CONFIRMED, what is OBSERVED across interactions, and what is INFERRED. Never blur them.
+- Loops and decisions returned by the tools were CONFIRMED by the user. Say so. A conversation's "stillProposed" count is things the user has NOT reviewed: mention that they exist, never state their contents as fact.
+- For "what did I promise X", use getOpenLoops with owner "user" and the person's id. For "what did we decide", use getDecisions. For "what came out of the last conversation", use getConversations then getConversation.
 - Never invent an interaction, a quote, a date or a commitment.
 - Keep it short. Answer the question that was asked.`,
       ].join('\n\n'),
@@ -716,10 +1139,11 @@ async function askWithModel(
 
 /** Example prompts shown on the empty coach screen. */
 export const COACH_EXAMPLES = [
-  'What commitments do I owe people?',
+  'What did I promise…?',
+  'What decisions did we make with…?',
+  'What is still open?',
   'What is coming up this week?',
   `What have I learned about working with…?`,
-  'Prepare me for my next meeting',
 ] as const
 
 /**

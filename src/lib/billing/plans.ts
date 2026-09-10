@@ -115,7 +115,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       quick_brief: 10,
       ai_coach_message: 20,
       message_adaptation: 5,
-      transcript_analysis: 1,
+      // Conversations are the loop the product now closes -- keep one, see
+      // what it left open, confirm, follow through. One a month cannot show
+      // that; ten can, and the reading costs about the same as a brief.
+      transcript_analysis: 10,
       document_analysis: 2,
       source_ingest: 15,
       deep_research: 0,
@@ -125,7 +128,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Your Interaction Profile',
       'Up to 5 people',
       '3 researched people and 3 meeting briefs a month',
-      'Debrief and confirm what you learn',
+      'Keep 10 conversations a month and confirm what they left open',
       'Export or delete everything, any time',
     ],
   },

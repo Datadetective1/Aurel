@@ -6,11 +6,13 @@ Next.js App Router, Server Components for reads, Server Actions for writes.
 There is no REST layer for the app's own use — three route handlers exist and
 each has a reason it cannot be an action:
 
-| Route | Why it is a route |
-| --- | --- |
-| `/auth/callback` | Supabase redirects a browser here with a code |
-| `/api/stripe/webhook` | Stripe posts a signed body from outside |
-| `/dev/emails` | Renders raw HTML, and 404s in production |
+| Route                                                      | Why it is a route                                                            |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `/auth/callback`                                           | Supabase redirects a browser here with a code                                |
+| `/api/stripe/webhook`                                      | Stripe posts a signed body from outside                                      |
+| `/api/calendar/[provider]/…`                               | OAuth round trips                                                            |
+| `/api/debrief/transcribe`, `/api/conversations/transcribe` | A multipart audio body, transcribed and dropped; the words go back to a form |
+| `/dev/emails`                                              | Renders raw HTML, and 404s in production                                     |
 
 Everything else is a Server Component reading through the request-scoped
 Supabase client, or a Server Action writing through it.
@@ -98,3 +100,38 @@ optimistic state, the theme switch. Anything that needs a value only knowable
 after hydration derives it from `useHasMounted()` rather than writing it back
 through an effect, which keeps the React Compiler's rules satisfiable without
 suppressions.
+
+## The conversation pipeline
+
+One function, `processConversation()` in `lib/conversations/process.ts`, is
+called from every capture path: a meeting debrief, a voice note, a recording,
+a pasted transcript, an uploaded file. The caller writes the `interactions`
+row first, so the words survive whatever the model does with them. The
+pipeline then runs the `conversation` prompt module -- a model with structured
+output when a key is present, the deterministic composer otherwise -- and
+writes the residue:
+
+```
+summary / outcome / topics   ->  the interaction row
+loops                        ->  commitments, review_status = proposed
+decisions                    ->  decisions (+ decision_people), proposed
+memory proposals             ->  observations, status = proposed
+the generation               ->  ai_artifacts, linked from the interaction
+```
+
+Nothing reaches Today, a brief or Ask until the user confirms it on the
+conversation page. Rejected proposals are kept as rejected, not deleted, so a
+re-read does not resurface them.
+
+The composer is the honest floor: it only surfaces lines the source literally
+contains, reads speaker labels so a first-person promise lands on the right
+person, drops hedged language ("maybe we should look at that sometime") and
+anything already done or called off, and never proposes a question or a
+decision above the confidence that starts it unticked. A model does better;
+the composer never does worse than nothing.
+
+## Faces
+
+Photos are the user's to supply. `resolveFaces()` signs every path a page
+needs in one storage call; the initials fallback is the honest face when there
+is no photo, and the product never fetches a likeness from anywhere.

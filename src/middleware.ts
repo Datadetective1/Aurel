@@ -37,6 +37,8 @@ const PRIVATE_PREFIXES = [
   '/today',
   '/people',
   '/meetings',
+  '/conversations',
+  '/loops',
   '/prepare',
   '/coach',
   '/atlas',

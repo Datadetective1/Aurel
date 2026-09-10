@@ -45,8 +45,14 @@ const RATINGS = [
   { value: 5, label: 'Very well' },
 ] as const
 
-/** Local date in the yyyy-MM-ddThh:mm the datetime-local input requires. */
-function localNow(): string {
+/**
+ * Local date in the yyyy-MM-ddThh:mm the datetime-local input requires.
+ *
+ * Exported for the conversation capture form, which needs the same default.
+ * This is the one place the browser's own clock is the right clock: the input
+ * is local by definition, and the server never sees this value unconverted.
+ */
+export function localNow(): string {
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60_000
   return new Date(now.getTime() - offset).toISOString().slice(0, 16)
@@ -123,8 +129,8 @@ export function InteractionForm({
       </FormField>
 
       <fieldset className="grid gap-2.5">
-        <legend className="text-sm font-medium text-ink">How did it go?</legend>
-        <p className="text-xs leading-relaxed text-ink-muted">
+        <legend className="text-ink text-sm font-medium">How did it go?</legend>
+        <p className="text-ink-muted text-xs leading-relaxed">
           Optional. Your read of it, not a score of the other person.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -137,7 +143,9 @@ export function InteractionForm({
               aria-pressed={wentWell === rating.value}
               // A second press clears it, so an optional field stays optional
               // once it has been touched.
-              onClick={() => setWentWell((current) => (current === rating.value ? null : rating.value))}
+              onClick={() =>
+                setWentWell((current) => (current === rating.value ? null : rating.value))
+              }
             >
               {rating.label}
             </Button>
@@ -148,9 +156,9 @@ export function InteractionForm({
       {state.error ? (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-3.5 py-3 text-xs leading-relaxed text-ink-secondary"
+          className="border-caution/25 bg-caution-wash text-ink-secondary flex items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
         >
-          <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
+          <CircleAlert className="text-caution mt-px size-3.5 shrink-0" aria-hidden="true" />
           {state.error}
         </p>
       ) : null}
@@ -158,9 +166,9 @@ export function InteractionForm({
       {state.message ? (
         <p
           role="status"
-          className="flex items-start gap-2 rounded-[var(--radius-md)] border border-positive/25 bg-positive-wash px-3.5 py-3 text-xs leading-relaxed text-ink-secondary"
+          className="border-positive/25 bg-positive-wash text-ink-secondary flex items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
         >
-          <CircleCheck className="mt-px size-3.5 shrink-0 text-positive" aria-hidden="true" />
+          <CircleCheck className="text-positive mt-px size-3.5 shrink-0" aria-hidden="true" />
           {state.message}
         </p>
       ) : null}

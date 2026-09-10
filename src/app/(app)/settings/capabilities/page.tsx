@@ -8,6 +8,7 @@ import {
   FileText,
   Link2,
   Mail,
+  Mic,
   Search,
   Sparkles,
   Terminal,
@@ -147,7 +148,9 @@ export default async function CapabilitiesSettingsPage() {
    * both Microsoft keys and forgotten the encryption key should be told about
    * the encryption key, not handed the same list of three they just filled in.
    */
-  const closestProvider = [...providers].sort((a, b) => a.missingEnv.length - b.missingEnv.length)[0]
+  const closestProvider = [...providers].sort(
+    (a, b) => a.missingEnv.length - b.missingEnv.length,
+  )[0]
   const anyCalendarConnected = connections.some((c) => c.status === 'connected')
 
   const capabilities: Capability[] = [
@@ -199,11 +202,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: CalendarDays,
       // Connected means a working user grant, never a client secret in the
       // environment. Anything else would promise meetings that never arrive.
-      status: anyCalendarConnected
-        ? 'configured'
-        : anyCalendarConfigured
-          ? 'setup'
-          : 'unavailable',
+      status: anyCalendarConnected ? 'configured' : anyCalendarConfigured ? 'setup' : 'unavailable',
       detail: anyCalendarConnected
         ? 'Your upcoming meetings are read so preparation follows your real day. Read-only — nothing is created, edited or answered on your behalf.'
         : anyCalendarConfigured
@@ -226,6 +225,22 @@ export default async function CapabilitiesSettingsPage() {
           },
       // Rendered under the card: per-provider connect, sync and disconnect.
       calendarConnections: anyCalendarConfigured ? connections : undefined,
+    },
+    {
+      id: 'conversations',
+      label: 'Conversations and voice',
+      icon: Mic,
+      status: features.transcription ? 'configured' : ai.generative ? 'available' : 'available',
+      detail: features.transcription
+        ? 'Record a voice note or the conversation itself, upload audio, or paste a transcript. Audio is transcribed and dropped; what you promised, what they promised, what was decided and what was left open are proposed for you to confirm.'
+        : 'Paste or upload a transcript, or type what happened. Recording needs a transcription provider; without one the microphone controls stay hidden and everything else works.',
+      userAction: { label: 'Keep a conversation', href: '/conversations/new' },
+      deploymentAction: features.transcription
+        ? undefined
+        : {
+            summary: 'Add an OpenAI key and redeploy to enable recording.',
+            env: ['OPENAI_API_KEY'],
+          },
     },
     {
       id: 'documents',

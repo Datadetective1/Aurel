@@ -40,6 +40,7 @@ function person(overrides: Partial<PersonContext> = {}): PersonContext {
     observations: { confirmed: [], observed: [], inferred: [] },
     recentInteractions: [],
     openCommitments: [],
+    decisions: [],
     professionalFacts: [],
     publicSources: [],
     lastResearchedAt: null,

@@ -2,15 +2,21 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import {
+  ArrowRight,
   CalendarClock,
-  Handshake,
   MessageSquare,
   MessagesSquare,
+  Mic,
+  Scale,
   Settings2,
   Sparkles,
 } from 'lucide-react'
 import { AddContext } from '@/components/app/add-context'
 import { AddDocument } from '@/components/app/add-document'
+import { AddLoop } from '@/components/app/add-loop'
+import { ConversationCard } from '@/components/app/conversation-card'
+import { EmptyVisual } from '@/components/app/empty-visual'
+import { LoopList } from '@/components/app/loop-list'
 import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
@@ -22,8 +28,9 @@ import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
+import { resolveFace } from '@/lib/conversations/avatars'
+import { listConversations, listDecisions, listLoops } from '@/lib/conversations/queries'
 import { formatDate, formatPublishedDate, isFuture, relativeDay, pluralise } from '@/lib/format'
-import { isOverdueIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
 
 export async function generateMetadata({
@@ -93,7 +100,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, first_interaction_at, last_interaction_at, last_researched_at, is_demo, organizations(name)',
+      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, first_interaction_at, last_interaction_at, last_researched_at, is_demo, organizations(name)',
     )
     .eq('user_id', user.id)
     .eq('id', id)
@@ -112,6 +119,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     { data: participations },
     { data: notes },
     { data: pulse },
+    face,
+    loops,
+    conversations,
+    decisions,
+    { data: upcoming },
   ] = await Promise.all([
     supabase
       .from('observations')
@@ -143,6 +155,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       .select('id, description, owner, due_on, status')
       .eq('user_id', user.id)
       .eq('person_id', id)
+      .eq('review_status', 'confirmed')
       .order('status', { ascending: true })
       .order('due_on', { ascending: true, nullsFirst: false }),
     supabase
@@ -158,7 +171,22 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       .order('created_at', { ascending: false })
       .limit(10),
     supabase.rpc('relationship_pulse', { target_person: id }).maybeSingle(),
+    resolveFace(supabase, person),
+    listLoops(supabase, user.id, { personId: id, scope: 'active', timeZone, now }),
+    listConversations(supabase, user.id, { personId: id, limit: 6 }),
+    listDecisions(supabase, user.id, { personId: id, limit: 8 }),
+    supabase
+      .from('meeting_attendees')
+      .select('meetings!inner(id, title, scheduled_at, status)')
+      .eq('user_id', user.id)
+      .eq('person_id', id)
+      .eq('meetings.status', 'upcoming')
+      .gte('meetings.scheduled_at', now.toISOString())
+      .order('scheduled_at', { referencedTable: 'meetings', ascending: true })
+      .limit(1),
   ])
+
+  const nextMeeting = upcoming?.[0]?.meetings ?? null
 
   // --- sources, with what each one is actually holding up --------------------
   const sourceRows = (sourceLinks ?? [])
@@ -259,6 +287,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
 
   const openCommitments = (commitments ?? []).filter((c) => c.status === 'open')
+  const closedLoops = (commitments ?? []).filter(
+    (c) => c.status === 'done' || c.status === 'cancelled' || c.status === 'dropped',
+  )
   const capability = researchCapability()
   const currentFacts = (facts ?? []).filter((f) => f.is_current)
   const hasFootprint = currentFacts.length > 0
@@ -267,7 +298,21 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     <Container size="default" className="py-8 sm:py-12">
       {/* --- header ----------------------------------------------------------- */}
       <header className="flex flex-wrap items-start gap-5">
-        <Avatar name={person.full_name} src={person.avatar_url} size="xl" />
+        <Link
+          href={`/people/${id}/edit`}
+          className="group relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          aria-label={face ? `Change ${name}'s photo` : `Add a photo of ${name}`}
+        >
+          <Avatar name={person.full_name} src={face} size="xl" />
+          {!face ? (
+            <span
+              aria-hidden="true"
+              className="border-line bg-surface text-ink-faint absolute -right-0.5 -bottom-0.5 inline-flex size-6 items-center justify-center rounded-full border opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            >
+              +
+            </span>
+          ) : null}
+        </Link>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -328,12 +373,73 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           </Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href={`/people/${id}/log`}>
-            <CalendarClock className="size-4" aria-hidden="true" />
-            Log an interaction
+          <Link href={`/conversations/new?person=${id}`}>
+            <Mic className="size-4" aria-hidden="true" />
+            Keep a conversation
           </Link>
         </Button>
       </div>
+
+      {/* --- what is between you right now ------------------------------------ */}
+      {nextMeeting || loops.length > 0 ? (
+        <div className="mt-8 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          {nextMeeting ? (
+            <Link
+              href={`/meetings/${nextMeeting.id}/brief`}
+              className="group border-line bg-surface hover:border-line-strong rounded-[var(--radius-lg)] border p-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+            >
+              <Eyebrow>Next up</Eyebrow>
+              <p className="font-display text-ink group-hover:text-accent mt-2 text-lg">
+                {nextMeeting.title}
+              </p>
+              <p className="text-ink-muted mt-1 flex items-center gap-1.5 text-xs">
+                <CalendarClock className="size-3.5" aria-hidden="true" />
+                {nextMeeting.scheduled_at
+                  ? relativeDay(nextMeeting.scheduled_at, timeZone, now)
+                  : 'Unscheduled'}
+              </p>
+            </Link>
+          ) : null}
+          {loops.length > 0 ? (
+            <div className="border-line bg-surface rounded-[var(--radius-lg)] border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Eyebrow>Open between you</Eyebrow>
+                <Link
+                  href="/loops"
+                  className="text-ink-muted hover:text-ink text-xs underline-offset-4 hover:underline"
+                >
+                  All loops
+                </Link>
+              </div>
+              <ul className="mt-2.5 grid gap-1.5">
+                {loops.slice(0, 3).map((l) => (
+                  <li key={l.id} className="text-ink flex items-start gap-2 text-sm leading-snug">
+                    <span
+                      aria-hidden="true"
+                      className={`mt-2 h-px w-3 shrink-0 ${l.owner === 'user' ? 'bg-accent-graphic' : 'bg-line-strong'}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="text-ink-muted">
+                        {l.kind === 'question'
+                          ? 'Unanswered: '
+                          : l.owner === 'user'
+                            ? 'You: '
+                            : l.owner === 'person'
+                              ? `${name.split(' ')[0]}: `
+                              : ''}
+                      </span>
+                      {l.description}
+                    </span>
+                  </li>
+                ))}
+                {loops.length > 3 ? (
+                  <li className="text-ink-muted text-xs">and {loops.length - 3} more below</li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* --- memory review gate ----------------------------------------------- */}
       {/* Anchored so the research panel's "N to review" can point at it. The
@@ -420,9 +526,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         // rejected keeps its citations on facts that other sources corroborate,
         // which is right, but it must not still be counted as evidence.
         sourceCount={
-          sources.filter(
-            (source) => source.factCount > 0 && source.identityStatus !== 'no_match',
-          ).length
+          sources.filter((source) => source.factCount > 0 && source.identityStatus !== 'no_match')
+            .length
         }
         storedSourceCount={sources.length}
       />
@@ -505,83 +610,136 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <AddDocument personId={id} />
       </div>
 
-      {/* --- commitments --------------------------------------------------------- */}
-      {(commitments ?? []).length > 0 ? (
+      {/* --- open loops ---------------------------------------------------------- */}
+      <Rule />
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <Eyebrow>Open loops</Eyebrow>
+            <h2 className="font-display text-ink mt-2 text-xl">
+              {loops.length === 0
+                ? `Nothing open with ${name.split(' ')[0]}`
+                : `${loops.length} open with ${name.split(' ')[0]}`}
+            </h2>
+          </div>
+          <AddLoop people={[{ id, name }]} defaultPersonId={id} />
+        </div>
+        {loops.length > 0 ? (
+          <LoopList
+            className="mt-5"
+            loops={loops}
+            timeZone={timeZone}
+            now={now}
+            showPerson={false}
+          />
+        ) : (
+          <p className="text-ink-muted mt-3 max-w-lg text-sm leading-relaxed">
+            Promises, follow-ups and unanswered questions from your conversations with {name} will
+            collect here, and {brand.name} will raise them before you next speak.
+          </p>
+        )}
+        {closedLoops.length > 0 ? (
+          <p className="text-ink-muted mt-3 text-xs">
+            {pluralise(closedLoops.length, 'loop')} closed with {name.split(' ')[0]}.
+          </p>
+        ) : null}
+      </section>
+
+      {/* --- decisions ------------------------------------------------------------ */}
+      {decisions.length > 0 ? (
         <>
           <Rule />
           <section>
-            <Eyebrow>Commitments</Eyebrow>
-            <ul className="mt-4 grid gap-2">
-              {(commitments ?? []).map((c) => {
-                const overdue =
-                  c.status === 'open' &&
-                  isOverdueIn(c.due_on, timeZone, now)
-                return (
-                  <li
-                    key={c.id}
-                    className="border-line bg-surface flex flex-wrap items-center gap-3 rounded-[var(--radius-md)] border px-4 py-3"
-                  >
-                    <Handshake
-                      className={`size-4 shrink-0 ${overdue ? 'text-critical' : 'text-ink-faint'}`}
-                      aria-hidden="true"
-                    />
-                    <span
-                      className={`min-w-0 flex-1 text-sm ${c.status === 'done' ? 'text-ink-muted line-through' : 'text-ink'}`}
-                    >
-                      {c.description}
-                    </span>
-                    <Badge tone="outline">
-                      {c.owner === 'user'
-                        ? 'You owe'
-                        : c.owner === 'person'
-                          ? 'They owe'
-                          : 'Shared'}
-                    </Badge>
-                    {c.due_on ? (
-                      <Badge tone={overdue ? 'critical' : 'neutral'}>{relativeDay(c.due_on, timeZone, now)}</Badge>
+            <Eyebrow>Decided together</Eyebrow>
+            <ul className="mt-4 grid gap-3">
+              {decisions.map((d) => (
+                <li
+                  key={d.id}
+                  className="border-line bg-surface flex gap-3 rounded-[var(--radius-md)] border p-4"
+                >
+                  <Scale className="text-positive mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-ink text-sm leading-relaxed">{d.description}</p>
+                    {d.context ? (
+                      <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+                        <span className="text-ink-muted">Because — </span>
+                        {d.context}
+                      </p>
                     ) : null}
-                  </li>
-                )
-              })}
+                    <p className="text-ink-muted mt-2 text-xs">
+                      {formatDate(d.decidedOn, timeZone)}
+                      {d.interactionId ? (
+                        <>
+                          {' · '}
+                          <Link
+                            href={`/conversations/${d.interactionId}`}
+                            className="hover:text-ink underline-offset-4 hover:underline"
+                          >
+                            {d.interactionTitle ?? 'the conversation'}
+                          </Link>
+                        </>
+                      ) : null}
+                    </p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </section>
         </>
       ) : null}
 
-      {/* --- interaction timeline ------------------------------------------------ */}
-      {interactions.length > 0 ? (
-        <>
-          <Rule />
-          <section>
-            <Eyebrow>Interaction timeline</Eyebrow>
-            <ol className="border-line mt-5 grid gap-6 border-l pl-5">
-              {interactions.map((interaction) => (
-                <li key={interaction.id} className="relative">
-                  <span
-                    aria-hidden="true"
-                    className="bg-accent-graphic ring-bg absolute top-2 -left-[1.4375rem] size-1.5 rounded-full ring-4"
-                  />
-                  <p className="text-ink-muted text-xs">
-                    {formatDate(interaction.occurred_at, timeZone)} · {interaction.kind}
-                  </p>
-                  <p className="text-ink mt-1 text-sm font-medium">{interaction.title}</p>
-                  {interaction.summary ? (
-                    <p className="text-ink-secondary mt-1.5 text-sm leading-relaxed">
-                      {interaction.summary}
-                    </p>
-                  ) : null}
-                  {interaction.outcome ? (
-                    <p className="text-ink-secondary mt-1.5 text-sm leading-relaxed">
-                      <span className="text-ink-muted">Outcome — </span>
-                      {interaction.outcome}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
-          </section>
-        </>
-      ) : null}
+      {/* --- conversations --------------------------------------------------------- */}
+      <Rule />
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <Eyebrow>Conversations</Eyebrow>
+            <h2 className="font-display text-ink mt-2 text-xl">
+              {interactions.length === 0
+                ? 'None kept yet'
+                : pluralise(interactions.length, 'conversation')}
+            </h2>
+          </div>
+          {interactions.length > 0 ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/conversations/new?person=${id}`}>
+                Keep another
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+
+        {conversations.length > 0 ? (
+          <ul className="mt-5 grid gap-3">
+            {conversations.map((c) => (
+              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} />
+            ))}
+          </ul>
+        ) : (
+          <div className="border-line mt-4 flex flex-col items-center gap-4 rounded-[var(--radius-lg)] border border-dashed px-5 py-8 text-center sm:flex-row sm:text-left">
+            <EmptyVisual subject="conversation" className="h-16 w-28" />
+            <div className="min-w-0 flex-1">
+              <p className="text-ink-secondary text-sm leading-relaxed">
+                After you next speak with {name.split(' ')[0]}, keep the conversation: a voice note,
+                a pasted transcript, or a few typed lines. That is where this record starts
+                compounding.
+              </p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href={`/conversations/new?person=${id}`}>
+                  <Mic className="size-3.5" aria-hidden="true" />
+                  Keep a conversation
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
+        {interactions.length > conversations.length ? (
+          <p className="text-ink-muted mt-3 text-xs">
+            Showing the most recent {conversations.length}.
+          </p>
+        ) : null}
+      </section>
 
       {/* --- notes ---------------------------------------------------------------- */}
       {(notes ?? []).length > 0 ? (
@@ -598,7 +756,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                   <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
                     {note.body}
                   </p>
-                  <p className="text-ink-faint mt-2 text-xs">{formatDate(note.created_at, timeZone)}</p>
+                  <p className="text-ink-faint mt-2 text-xs">
+                    {formatDate(note.created_at, timeZone)}
+                  </p>
                 </li>
               ))}
             </ul>

@@ -7,6 +7,7 @@ import { describeDimension, scoreResponses } from '@/lib/assessment/scoring'
 import { isOverdueIn } from '@/lib/tz'
 import type {
   CommitmentContext,
+  DecisionContext,
   InteractionContext,
   MeetingContext,
   ObservationContext,
@@ -38,6 +39,7 @@ type Client = SupabaseClient<Database>
 const RECENT_INTERACTION_LIMIT = 6
 const OBSERVATION_LIMIT = 40
 const PROFESSIONAL_FACT_LIMIT = 24
+const DECISION_LIMIT = 12
 
 /**
  * Order facts so identity comes first and speculation last.
@@ -93,11 +95,7 @@ function displayNameOf(fullName: string, preferred: string | null) {
  * for entitlements.
  */
 const getTimeZone = cache(async (supabase: Client, userId: string): Promise<string> => {
-  const { data } = await supabase
-    .from('profiles')
-    .select('timezone')
-    .eq('id', userId)
-    .maybeSingle()
+  const { data } = await supabase.from('profiles').select('timezone').eq('id', userId).maybeSingle()
   return data?.timezone ?? 'UTC'
 })
 
@@ -213,6 +211,7 @@ export async function getPeopleContext(
     professionalFacts,
     factSources,
     publicSources,
+    decisionLinks,
   ] = await Promise.all([
     supabase
       .from('people')
@@ -240,11 +239,14 @@ export async function getPeopleContext(
       .select('person_id, interactions(id, title, occurred_at, kind, summary, outcome, went_well)')
       .eq('user_id', userId)
       .in('person_id', personIds),
+    // Confirmed only. A loop the model proposed and the user has not looked
+    // at is not something a brief may tell the user they owe.
     supabase
       .from('commitments')
-      .select('id, person_id, description, owner, owner_person_id, due_on')
+      .select('id, person_id, description, owner, owner_person_id, due_on, kind, interaction_id')
       .eq('user_id', userId)
       .eq('status', 'open')
+      .eq('review_status', 'confirmed')
       .in('person_id', personIds),
     supabase
       .from('person_topics')
@@ -270,6 +272,14 @@ export async function getPeopleContext(
       )
       .eq('user_id', userId)
       .in('person_id', personIds),
+    supabase
+      .from('decision_people')
+      .select(
+        'person_id, decisions!inner(id, description, context, decided_on, review_status, interaction_id, interactions(title))',
+      )
+      .eq('user_id', userId)
+      .in('person_id', personIds)
+      .limit(DECISION_LIMIT * personIds.length),
   ])
 
   const sourcesByObservation = new Map<
@@ -329,8 +339,26 @@ export async function getPeopleContext(
       ownerName: c.owner_person_id ? (nameById.get(c.owner_person_id) ?? null) : null,
       dueOn: c.due_on,
       isOverdue: isOverdue(c.due_on, timeZone),
+      kind: c.kind,
+      interactionId: c.interaction_id,
     })
     commitmentsByPerson.set(c.person_id, list)
+  }
+
+  const decisionsByPerson = new Map<string, DecisionContext[]>()
+  for (const row of decisionLinks.data ?? []) {
+    const d = row.decisions
+    if (!d || d.review_status !== 'confirmed') continue
+    const list = decisionsByPerson.get(row.person_id) ?? []
+    list.push({
+      id: d.id,
+      description: d.description,
+      context: d.context,
+      decidedOn: d.decided_on,
+      interactionId: d.interaction_id,
+      interactionTitle: d.interactions?.title ?? null,
+    })
+    decisionsByPerson.set(row.person_id, list)
   }
 
   // A fact cites the sources that support it. A fact with none can never be
@@ -415,6 +443,9 @@ export async function getPeopleContext(
       },
       recentInteractions: interactions.slice(0, RECENT_INTERACTION_LIMIT),
       openCommitments: commitmentsByPerson.get(p.id) ?? [],
+      decisions: (decisionsByPerson.get(p.id) ?? [])
+        .sort((a, b) => b.decidedOn.localeCompare(a.decidedOn))
+        .slice(0, DECISION_LIMIT),
       professionalFacts: sortFacts(factsByPerson.get(p.id) ?? []),
       publicSources: (publicSourcesByPerson.get(p.id) ?? []).sort((a, b) =>
         (b.retrievedAt ?? '').localeCompare(a.retrievedAt ?? ''),
@@ -537,10 +568,11 @@ export async function getOpenCommitments(supabase: Client, userId: string) {
   const { data } = await supabase
     .from('commitments')
     .select(
-      'id, description, owner, due_on, person_id, people!commitments_person_id_fkey(full_name, preferred_name)',
+      'id, description, owner, due_on, person_id, kind, interaction_id, people!commitments_person_id_fkey(full_name, preferred_name)',
     )
     .eq('user_id', userId)
     .eq('status', 'open')
+    .eq('review_status', 'confirmed')
     .order('due_on', { ascending: true, nullsFirst: false })
     .limit(50)
 
@@ -551,6 +583,8 @@ export async function getOpenCommitments(supabase: Client, userId: string) {
     ownerName: null,
     dueOn: c.due_on,
     isOverdue: isOverdue(c.due_on, timeZone),
+    kind: c.kind,
+    interactionId: c.interaction_id,
     personId: c.person_id,
     personName: c.people ? displayNameOf(c.people.full_name, c.people.preferred_name) : null,
   }))

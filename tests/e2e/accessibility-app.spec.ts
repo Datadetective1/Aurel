@@ -37,6 +37,9 @@ const APP_PAGES = [
   '/settings/billing',
   '/settings/data',
   '/people/new',
+  '/conversations',
+  '/conversations/new',
+  '/loops',
 ]
 
 /**
@@ -80,9 +83,13 @@ async function signIn(page: Page) {
 
 async function settle(page: Page) {
   await page
-    .waitForFunction(() => document.getAnimations().every((a) => a.playState === 'finished'), null, {
-      timeout: 5_000,
-    })
+    .waitForFunction(
+      () => document.getAnimations().every((a) => a.playState === 'finished'),
+      null,
+      {
+        timeout: 5_000,
+      },
+    )
     .catch(() => {})
 }
 

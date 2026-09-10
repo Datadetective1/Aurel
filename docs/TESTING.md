@@ -12,34 +12,37 @@ psql "$DATABASE_URL" -f supabase/tests/rls-isolation.sql
 
 The suite is not aiming at a coverage number. Each test exists because
 something was got wrong, or because getting it wrong would be expensive and
-silent. Several were written *after* a bug, and the comment above them says so.
+silent. Several were written _after_ a bug, and the comment above them says so.
 
 ### Correctness that would be invisible if broken
 
-| Area | The failure it prevents |
-| --- | --- |
-| `assessment/instrument` | Block construction must place each dimension in exactly 12 of 24 blocks. An unbalanced ipsative instrument produces confidently wrong profiles and nobody notices. |
-| `assessment/scoring` | Normalisation constant derived from the instrument, not guessed. Items are rejected if they do not belong to their claimed block. |
-| `source-extraction` | *"Satya Nadella Once Gave Up His Green Card For Love"* became `current_role: "Once Gave Up His Green Card" at "Love"`. Title vocabulary gates, prose validation and connector restrictions all date from that. |
-| `sources/url` | Prepending `https://` to input that already has a scheme turns `file:///etc/passwd` into a fetchable URL. |
-| `brief grammar` | "leave today having get approval". A nine-phrasing matrix, because generated prose reads fine until it does not. |
-| `brand-centralisation` | The name must not be hard-coded outside the registry, and the former codename must not survive in copy. |
-| `email` | Hostile display names must not inject markup; security mail must have no unsubscribe link; preheaders must not carry note content. |
-| `email/send` | Sender resolution. Production set `ATTUREL_EMAIL_FROM` while the code read only `EMAIL_FROM_ADDRESS`, fell back to a hardcoded address on an unregistered domain, and Settings reported Email as connected while every send would have been refused. Also pins that a rejected message and a dead request resolve rather than throw, and that the provider's error body — which echoes the request — stays out of the log. |
-| `internal-links` | Two links shipped to routes that were never written, each with a finished server action behind it and no page. Next prefetches links, so both 404s landed in the browser console rather than under a cursor. Every internal target is now checked against the route tree. |
-| `env` | Provider resolution. `OPENAI_API_KEY` alone activated nothing, because `AI_PROVIDER` still said `grounded` and `AI_MODEL` still named a Claude id — a 404 the retry loop would have swallowed as a fallback. |
-| `debrief/normaliseCommitment` | A model answered with a display name where a uuid belongs, every insert failed the cast, and the unchecked result meant both commitments vanished while the UI reported the debrief saved. |
-| `calendar/normalize` | Graph returns wall-clock time rather than an instant, Google splits all-day events into a different field, and the two express "cancelled" differently. Each is a way a real meeting silently goes missing or lands an hour out. |
-| `calendar/privacy` | A private event must keep its time and its people and store nothing about what it says, and no calendar event content may reach analytics or logs. Enforced by reading the call sites, because a unit test only checks the paths it thinks to call. |
-| `crypto` | The token columns were named `_encrypted` from the beginning and nothing encrypted them. Round-trip, tamper detection, wrong-key, and refusing to store a secret at all when no key is configured. |
-| `format` | A person header read *"Last spoke tomorrow"* — a past-tense claim about a conversation that had not happened, from a debrief dated by its meeting's `scheduled_at`. |
+| Area                          | The failure it prevents                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assessment/instrument`       | Block construction must place each dimension in exactly 12 of 24 blocks. An unbalanced ipsative instrument produces confidently wrong profiles and nobody notices.                                                                                                                                                                                                                                                         |
+| `assessment/scoring`          | Normalisation constant derived from the instrument, not guessed. Items are rejected if they do not belong to their claimed block.                                                                                                                                                                                                                                                                                          |
+| `source-extraction`           | _"Satya Nadella Once Gave Up His Green Card For Love"_ became `current_role: "Once Gave Up His Green Card" at "Love"`. Title vocabulary gates, prose validation and connector restrictions all date from that.                                                                                                                                                                                                             |
+| `sources/url`                 | Prepending `https://` to input that already has a scheme turns `file:///etc/passwd` into a fetchable URL.                                                                                                                                                                                                                                                                                                                  |
+| `brief grammar`               | "leave today having get approval". A nine-phrasing matrix, because generated prose reads fine until it does not.                                                                                                                                                                                                                                                                                                           |
+| `brand-centralisation`        | The name must not be hard-coded outside the registry, and the former codename must not survive in copy.                                                                                                                                                                                                                                                                                                                    |
+| `email`                       | Hostile display names must not inject markup; security mail must have no unsubscribe link; preheaders must not carry note content.                                                                                                                                                                                                                                                                                         |
+| `email/send`                  | Sender resolution. Production set `ATTUREL_EMAIL_FROM` while the code read only `EMAIL_FROM_ADDRESS`, fell back to a hardcoded address on an unregistered domain, and Settings reported Email as connected while every send would have been refused. Also pins that a rejected message and a dead request resolve rather than throw, and that the provider's error body — which echoes the request — stays out of the log. |
+| `internal-links`              | Two links shipped to routes that were never written, each with a finished server action behind it and no page. Next prefetches links, so both 404s landed in the browser console rather than under a cursor. Every internal target is now checked against the route tree.                                                                                                                                                  |
+| `env`                         | Provider resolution. `OPENAI_API_KEY` alone activated nothing, because `AI_PROVIDER` still said `grounded` and `AI_MODEL` still named a Claude id — a 404 the retry loop would have swallowed as a fallback.                                                                                                                                                                                                               |
+| `debrief/normaliseCommitment` | A model answered with a display name where a uuid belongs, every insert failed the cast, and the unchecked result meant both commitments vanished while the UI reported the debrief saved.                                                                                                                                                                                                                                 |
+| `prompts/conversation`        | The composer against the cases the brief names: explicit commitment, vague suggestion, dated and undated, another person's promise, decision, unanswered question, corrected extraction, cancelled and completed. Also: a speaker label carried across every sentence of a turn, because splitting into sentences first filed Ravi's promise as the user's.                                                                |
+| `conversations/loops`         | Done / Later / Cancel / Reopen as data, deferral reckoned in the user's zone and coming back on its own, grouping by who owes what.                                                                                                                                                                                                                                                                                        |
+| `conversations/transcript`    | WebVTT and SRT to labelled dialogue, cues from the same speaker joined.                                                                                                                                                                                                                                                                                                                                                    |
+| `calendar/normalize`          | Graph returns wall-clock time rather than an instant, Google splits all-day events into a different field, and the two express "cancelled" differently. Each is a way a real meeting silently goes missing or lands an hour out.                                                                                                                                                                                           |
+| `calendar/privacy`            | A private event must keep its time and its people and store nothing about what it says, and no calendar event content may reach analytics or logs. Enforced by reading the call sites, because a unit test only checks the paths it thinks to call.                                                                                                                                                                        |
+| `crypto`                      | The token columns were named `_encrypted` from the beginning and nothing encrypted them. Round-trip, tamper detection, wrong-key, and refusing to store a secret at all when no key is configured.                                                                                                                                                                                                                         |
+| `format`                      | A person header read _"Last spoke tomorrow"_ — a past-tense claim about a conversation that had not happened, from a debrief dated by its meeting's `scheduled_at`.                                                                                                                                                                                                                                                        |
 
 ### A note on that last guard
 
 The codename check was **silently disarmed for a while**:
 
 ```ts
-const FORMER_CODENAME = new RegExp('\bAurel', 'i')  // backspace, not \b
+const FORMER_CODENAME = new RegExp('\bAurel', 'i') // backspace, not \b
 ```
 
 In a normal string literal `'\b'` is U+0008. The regex compiled, the test
@@ -155,7 +158,7 @@ away is not.
 
 - **The Stripe webhook has no automated test.** Signature verification needs a
   real signing secret. Use `stripe listen --forward-to
-  localhost:3000/api/stripe/webhook` before going live, and exercise a full
+localhost:3000/api/stripe/webhook` before going live, and exercise a full
   subscribe → cancel → resubscribe cycle.
 - **No visual regression baseline.** Screens were reviewed by hand in both
   themes at desktop and phone width. That catches what a human notices and
@@ -170,3 +173,26 @@ away is not.
 - **Email rendering is verified in a browser, not in Outlook.** The layout uses
   tables and inline styles precisely because Outlook is unforgiving; a real
   client test is still a real client test.
+
+### The conversation loop, end to end
+
+Walked on 10 September 2026 against a local production build and the live
+database, on a throwaway account, with Playwright (`.e2e-tmp/` is not
+committed): sign in, add a person, upload a photo, paste a transcript, review
+six proposals, confirm five loops and a decision, see them on the conversation
+page, the person page, Today and Open Loops; ask "What did I promise Ravi?",
+"What decisions did we make with Ravi?" and "What unanswered questions came out
+of the last conversation?"; create a meeting and see "Since last time" on the
+brief; press Done and Later; check six pages at Pixel 7 width for horizontal
+overflow; delete the conversation and confirm the confirmed loops survive
+unlinked. 46 of 46 assertions passed on the final run.
+
+Three real defects were found and fixed by that walk, all invisible to unit
+tests: a textarea submits CRLF and the carriage return stopped the speaker
+label matching, so every promise became the user's; a scrolling tab strip
+widened the capture form past a phone's viewport; and `storage.objects`
+refuses direct SQL deletes, so the first `delete_my_data()` would have failed
+on its last line and rolled the whole deletion back.
+
+The RLS isolation file gained conversations, loops, decisions and
+`search_everything`, and was run against production (it rolls back).

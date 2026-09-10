@@ -771,3 +771,107 @@ export async function mergePeople(mergeId: string, keepId: string): Promise<Acti
   revalidatePath(`/people/${keepId}`)
   return { message: 'Merged. The other record has been archived.' }
 }
+
+// =============================================================================
+// PHOTOS
+// =============================================================================
+
+/**
+ * Attach a photo to a person.
+ *
+ * Stored in the private avatars bucket under the user's own folder, at a
+ * deterministic path so a second upload replaces the first. The row keeps the
+ * path, never a URL: URLs are signed at render time and expire.
+ *
+ * The image is the user's to supply. Nothing here fetches a likeness from
+ * anywhere; when there is no photo, the initials fallback is the honest face.
+ */
+export async function uploadPersonPhoto(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const personId = formData.get('personId')?.toString()
+  const file = formData.get('photo')
+  if (!personId || !(file instanceof File) || file.size === 0) {
+    return { error: 'Choose an image first.' }
+  }
+
+  const { imageExtension, MAX_AVATAR_BYTES, personAvatarPath, AVATAR_BUCKET } =
+    await import('@/lib/conversations/avatars')
+
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { error: 'That image is larger than 2 MB. Choose a smaller one.' }
+  }
+  const extension = imageExtension(file.type)
+  if (!extension) return { error: 'Use a JPEG, PNG or WebP image.' }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+
+  const { data: person } = await supabase
+    .from('people')
+    .select('id, avatar_path')
+    .eq('id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!person) return { error: 'That person could not be found.' }
+
+  const path = personAvatarPath(user.id, personId, extension)
+  const { error: uploadError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' })
+
+  if (uploadError) {
+    logger.warn('person.photo_upload_failed', { message: uploadError.message })
+    return { error: 'The photo could not be uploaded. Try again.' }
+  }
+
+  // A previous photo with a different extension is orphaned otherwise.
+  if (person.avatar_path && person.avatar_path !== path) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
+  }
+
+  const { error } = await supabase
+    .from('people')
+    .update({ avatar_path: path })
+    .eq('id', personId)
+    .eq('user_id', user.id)
+  if (error) return { error: 'The photo was uploaded but could not be attached.' }
+
+  await track('person_photo_uploaded', {
+    bytesBucket: file.size < 300_000 ? '<300kb' : '300kb-2mb',
+  })
+
+  revalidatePath(`/people/${personId}`)
+  revalidatePath(`/people/${personId}/edit`)
+  revalidatePath('/people')
+  return { message: 'Photo saved.' }
+}
+
+export async function removePersonPhoto(personId: string): Promise<ActionState> {
+  const { AVATAR_BUCKET } = await import('@/lib/conversations/avatars')
+  const user = await requireUser()
+  const supabase = await createClient()
+
+  const { data: person } = await supabase
+    .from('people')
+    .select('id, avatar_path')
+    .eq('id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!person) return { error: 'That person could not be found.' }
+
+  if (person.avatar_path) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
+  }
+  await supabase
+    .from('people')
+    .update({ avatar_path: null, avatar_url: null })
+    .eq('id', personId)
+    .eq('user_id', user.id)
+
+  revalidatePath(`/people/${personId}`)
+  revalidatePath(`/people/${personId}/edit`)
+  revalidatePath('/people')
+  return { message: 'Photo removed.' }
+}

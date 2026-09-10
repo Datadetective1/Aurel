@@ -90,7 +90,7 @@ export interface DebriefInput {
  * never asserts anything the source does not literally contain — an honest,
  * lower-recall floor is the right failure mode for a memory product.
  */
-function splitSentences(source: string): string[] {
+export function splitSentences(source: string): string[] {
   return source
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
@@ -116,7 +116,7 @@ function firstName(p: PersonContext) {
 }
 
 /** Which participant, if any, a sentence is about. */
-function attribute(sentence: string, participants: PersonContext[]): PersonContext | null {
+export function attribute(sentence: string, participants: PersonContext[]): PersonContext | null {
   for (const p of participants) {
     const names = [p.displayName, p.preferredName, p.displayName.split(' ')[0]].filter(
       Boolean,
@@ -239,7 +239,7 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
  * "tomorrow" resolved two days out, and "by Friday" written on a Thursday
  * evening skipped a whole week because the UTC weekday had already advanced.
  */
-function extractDate(
+export function extractDate(
   sentence: string,
   referenceIso: string,
   timeZone: string,
@@ -388,14 +388,20 @@ MEMORY PROPOSAL RULES - THESE MATTER MOST
 export function normaliseCommitment(
   commitment: Debrief['commitments'][number],
   validPersonIds: ReadonlySet<string>,
-): { description: string; owner: 'user' | 'person' | 'shared'; ownerPersonId: string | null; dueOn: string | null } {
+): {
+  description: string
+  owner: 'user' | 'person' | 'shared'
+  ownerPersonId: string | null
+  dueOn: string | null
+} {
   const ownerPersonId =
     commitment.ownerPersonId && validPersonIds.has(commitment.ownerPersonId)
       ? commitment.ownerPersonId
       : null
 
   const dueOn =
-    commitment.dueOn && /^\d{4}-\d{2}-\d{2}$/.test(commitment.dueOn.trim()) &&
+    commitment.dueOn &&
+    /^\d{4}-\d{2}-\d{2}$/.test(commitment.dueOn.trim()) &&
     !Number.isNaN(Date.parse(commitment.dueOn.trim()))
       ? commitment.dueOn.trim()
       : null

@@ -2,10 +2,18 @@
 
 **Walk into every room prepared.**
 
-Atturel is a professional relationship intelligence system. It records what you
-learn about the people you work with, keeps that memory honest by separating
-what is confirmed from what is inferred, and turns it into preparation for your
-next important conversation.
+Atturel is a professional relationship and conversation intelligence system. It
+records what you learn about the people you work with, keeps that memory honest
+by separating what is confirmed from what is inferred, and turns it into
+preparation for your next important conversation.
+
+**Prepare. Remember. Follow through.** Keep a conversation -- a voice note, a
+recording, a pasted transcript, a few typed lines -- and Atturel reads it for
+what you promised, what they promised, what was decided and what nobody
+answered. You confirm what is real; the rest is set aside. Confirmed loops live
+on Open Loops until you close them, decisions live on the person, and the next
+brief opens with what the last conversation left open. It remembers the things
+you say you'll do.
 
 The product answers one question:
 
@@ -22,23 +30,23 @@ The product answers one question:
 Every claim carries an evidence level and a provenance, and the two are separate
 axes:
 
-| Evidence level | Means |
-| --- | --- |
-| `confirmed` | The user stated it, or it is corroborated |
-| `observed` | Seen directly in a source or interaction |
-| `inferred` | Atturel's reasoning, labelled as such |
-| `unknown` | Deliberately surfaced. The product says what it does not know. |
+| Evidence level | Means                                                          |
+| -------------- | -------------------------------------------------------------- |
+| `confirmed`    | The user stated it, or it is corroborated                      |
+| `observed`     | Seen directly in a source or interaction                       |
+| `inferred`     | Atturel's reasoning, labelled as such                          |
+| `unknown`      | Deliberately surfaced. The product says what it does not know. |
 
-| Provenance | Means |
-| --- | --- |
-| `records` | From your records |
-| `interactions` | From previous interactions |
+| Provenance        | Means                             |
+| ----------------- | --------------------------------- |
+| `records`         | From your records                 |
+| `interactions`    | From previous interactions        |
 | `public_research` | From public research, with a link |
-| `assessment` | From the Interaction Profile |
-| `inference` | Atturel's inference |
+| `assessment`      | From the Interaction Profile      |
+| `inference`       | Atturel's inference               |
 
 Collapsing these into one label would lose the thing that makes a record
-trustworthy: *how sure* and *where from* are different questions.
+trustworthy: _how sure_ and _where from_ are different questions.
 
 **2. Memory belongs to the user.**
 
@@ -96,10 +104,12 @@ src/
     (marketing)/     public pages
     (auth)/          sign in, sign up, recovery
     onboarding/      profile, Interaction Profile, calibration
-    (app)/           Today · People · Meetings · Atlas · Ask Atturel · Settings
+    (app)/           Today · People · Meetings · Conversations · Open Loops · Atlas · Ask Atturel · Settings
     api/stripe/      the only writer of subscription state
+    api/conversations/transcribe   audio in, words out, audio gone
   lib/
     ai/              provider abstraction, prompts, untrusted-content fencing
+    conversations/   processing pipeline, open-loop state, faces, read models
     assessment/      the 96-item instrument and its scoring
     billing/         plans, entitlements, metering, Stripe
     email/           layout primitives and transactional templates
@@ -131,7 +141,7 @@ not a fallback bolted on — it is why the product is honest about what it knows
 and why it works at all without a key.
 
 Extraction is heavily guarded. A headline like
-*"Satya Nadella Once Gave Up His Green Card For Love"* must not become
+_"Satya Nadella Once Gave Up His Green Card For Love"_ must not become
 `current_role: "Once Gave Up His Green Card"`. Title vocabulary gates, prose
 validation, and connector restrictions exist because that exact failure happened
 during development, and a confidently wrong claim about a real person is the
@@ -183,25 +193,30 @@ in production, on a real person, without being told to.
 Each line below was verified against production, not against a local build —
 the date is when it was last exercised end to end.
 
-| Subsystem | Status | Verified |
-| --- | --- | --- |
-| Supabase Custom SMTP | **COMPLETE** | 26 Aug 2026 |
-| Resend transactional email | **COMPLETE** | 26 Aug 2026 |
-| Signup confirmation | **COMPLETE** | 26 Aug 2026 |
-| Password reset | **COMPLETE** | 26 Aug 2026 |
-| Production auth redirects | **COMPLETE** | 26 Aug 2026 |
-| Atturel domain email authentication | **COMPLETE** | 26 Aug 2026 |
-| AI reasoning (OpenAI `gpt-4.1-mini`) | **COMPLETE** | 25 Aug 2026 |
-| Document and transcript ingestion | **COMPLETE** | 25 Aug 2026 |
-| Reading a link you provide | **COMPLETE** | 25 Aug 2026 |
-| Automatic source discovery (Exa) | **COMPLETE** | 26 Aug 2026 |
-| Identity resolution | **COMPLETE** | 26 Aug 2026 |
-| Public professional footprint | **COMPLETE** | 26 Aug 2026 |
-| Evidence and provenance | **COMPLETE** | 26 Aug 2026 |
-| Meeting preparation | **COMPLETE** | 26 Aug 2026 |
-| Debrief and relationship memory | **COMPLETE** | 26 Aug 2026 |
-| Ask Atturel | **COMPLETE** | 26 Aug 2026 |
-| Pilot analytics and cost telemetry | **COMPLETE** | 26 Aug 2026 |
+| Subsystem                                       | Status       | Verified    |
+| ----------------------------------------------- | ------------ | ----------- |
+| Supabase Custom SMTP                            | **COMPLETE** | 26 Aug 2026 |
+| Resend transactional email                      | **COMPLETE** | 26 Aug 2026 |
+| Signup confirmation                             | **COMPLETE** | 26 Aug 2026 |
+| Password reset                                  | **COMPLETE** | 26 Aug 2026 |
+| Production auth redirects                       | **COMPLETE** | 26 Aug 2026 |
+| Atturel domain email authentication             | **COMPLETE** | 26 Aug 2026 |
+| AI reasoning (OpenAI `gpt-4.1-mini`)            | **COMPLETE** | 25 Aug 2026 |
+| Document and transcript ingestion               | **COMPLETE** | 25 Aug 2026 |
+| Reading a link you provide                      | **COMPLETE** | 25 Aug 2026 |
+| Automatic source discovery (Exa)                | **COMPLETE** | 26 Aug 2026 |
+| Identity resolution                             | **COMPLETE** | 26 Aug 2026 |
+| Public professional footprint                   | **COMPLETE** | 26 Aug 2026 |
+| Evidence and provenance                         | **COMPLETE** | 26 Aug 2026 |
+| Meeting preparation                             | **COMPLETE** | 26 Aug 2026 |
+| Debrief and relationship memory                 | **COMPLETE** | 26 Aug 2026 |
+| Ask Atturel                                     | **COMPLETE** | 26 Aug 2026 |
+| Pilot analytics and cost telemetry              | **COMPLETE** | 26 Aug 2026 |
+| Conversations: capture, reading, review gate    | **COMPLETE** | 10 Sep 2026 |
+| Open Loops: Done / Later / Cancel, faces, Today | **COMPLETE** | 10 Sep 2026 |
+| Decisions on the person and in Ask              | **COMPLETE** | 10 Sep 2026 |
+| Since last time on the brief                    | **COMPLETE** | 10 Sep 2026 |
+| Person photos, private bucket, signed at render | **COMPLETE** | 10 Sep 2026 |
 
 | Read-only calendar (engineering) | **COMPLETE** | 26 Aug 2026 |
 
@@ -209,10 +224,10 @@ the date is when it was last exercised end to end.
 
 Both are built. Neither blocks a pilot.
 
-| | |
-| --- | --- |
+|              |                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Calendar** | Microsoft Graph and Google adapters behind one provider abstraction, encrypted tokens, 14-day idempotent sync, attendee matching, upcoming meetings on Today, Prepare from an event. Needs an Entra app registration (Microsoft) or a Cloud project plus scope verification (Google) — see HUMAN_ACTIONS §4. **Read-only: Atturel never creates, edits, accepts or declines anything.** |
-| **Billing** | Checkout, portal, webhook, entitlements, metering and the founding offer, waiting only on a Stripe account. See HUMAN_ACTIONS §5. |
+| **Billing**  | Checkout, portal, webhook, entitlements, metering and the founding offer, waiting only on a Stripe account. See HUMAN_ACTIONS §5.                                                                                                                                                                                                                                                       |
 
 ### The demo workspace
 
@@ -252,19 +267,19 @@ Supabase auth mail.
 
 ## Documentation
 
-| | |
-| --- | --- |
-| [HUMAN_ACTIONS.md](docs/HUMAN_ACTIONS.md) | Everything that needs a person: credentials, legal, purchases, DNS |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces fit and why |
-| [DATA_MODEL.md](docs/DATA_MODEL.md) | Schema, the evidence model, workspace ownership |
-| [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md) | Providers, prompts, the grounded composer, injection defence |
-| [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | Tokens, themes, typography, the Aperture |
-| [PRIVACY_AND_SAFETY.md](docs/PRIVACY_AND_SAFETY.md) | Commitments and how each is enforced |
-| [TESTING.md](docs/TESTING.md) | What is covered, and what is not |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Getting it live |
+|                                                     |                                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------ |
+| [HUMAN_ACTIONS.md](docs/HUMAN_ACTIONS.md)           | Everything that needs a person: credentials, legal, purchases, DNS |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)             | How the pieces fit and why                                         |
+| [DATA_MODEL.md](docs/DATA_MODEL.md)                 | Schema, the evidence model, workspace ownership                    |
+| [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md)       | Providers, prompts, the grounded composer, injection defence       |
+| [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)           | Tokens, themes, typography, the Aperture                           |
+| [PRIVACY_AND_SAFETY.md](docs/PRIVACY_AND_SAFETY.md) | Commitments and how each is enforced                               |
+| [TESTING.md](docs/TESTING.md)                       | What is covered, and what is not                                   |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)                 | Getting it live                                                    |
 
 ---
 
-**Atturel** — AT-uh-rel, from *attune* + *relational*. The name is configuration:
+**Atturel** — AT-uh-rel, from _attune_ + _relational_. The name is configuration:
 `src/lib/brand/index.ts` holds every user-visible brand string, and a test fails
 the build if the name is hard-coded anywhere else.

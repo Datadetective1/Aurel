@@ -53,6 +53,8 @@ declare
   bob_ws uuid;
   alice_person uuid;
   bob_person uuid;
+  alice_interaction uuid;
+  alice_decision uuid;
   visible int;
   denied boolean;
 begin
@@ -148,6 +150,53 @@ begin
     exists (select 1 from public.people where id = alice_person),
     'alice''s row survives bob''s delete'
   );
+
+  -- --- Conversations, loops and decisions are isolated too -------------------
+  -- The 0017 tables and columns. A decision names people and quotes what they
+  -- said; it is the most sensitive row the product now holds.
+  perform pg_temp.become_superuser();
+  insert into public.interactions (user_id, workspace_id, title, transcript, source_kind, visibility)
+  values (alice, alice_ws, 'Alice private call', 'Alice: I will send it Friday.', 'pasted_transcript', 'private')
+  returning id into alice_interaction;
+
+  insert into public.commitments (user_id, workspace_id, person_id, interaction_id, description, review_status, visibility)
+  values (alice, alice_ws, alice_person, alice_interaction, 'Send it Friday', 'proposed', 'private');
+
+  insert into public.decisions (user_id, workspace_id, interaction_id, description, review_status, visibility)
+  values (alice, alice_ws, alice_interaction, 'Go with vendor B', 'confirmed', 'private')
+  returning id into alice_decision;
+
+  insert into public.decision_people (user_id, workspace_id, decision_id, person_id)
+  values (alice, alice_ws, alice_decision, alice_person);
+
+  perform pg_temp.become(alice);
+  select count(*) into visible from public.decisions;
+  perform pg_temp.assert(visible = 1, 'alice sees her own decision');
+  select count(*) into visible from public.commitments where review_status = 'proposed';
+  perform pg_temp.assert(visible = 1, 'alice sees her own proposed loop');
+
+  perform pg_temp.become(bob);
+  select count(*) into visible from public.interactions;
+  perform pg_temp.assert(visible = 0, 'bob cannot see alice''s conversation');
+  select count(*) into visible from public.commitments;
+  perform pg_temp.assert(visible = 0, 'bob cannot see alice''s loops');
+  select count(*) into visible from public.decisions;
+  perform pg_temp.assert(visible = 0, 'bob cannot see alice''s decisions');
+  select count(*) into visible from public.decision_people;
+  perform pg_temp.assert(visible = 0, 'bob cannot see who alice''s decisions concern');
+
+  denied := false;
+  begin
+    insert into public.decisions (user_id, workspace_id, description, visibility)
+    values (alice, alice_ws, 'Planted decision', 'private');
+  exception when insufficient_privilege or check_violation then
+    denied := true;
+  end;
+  perform pg_temp.assert(denied, 'bob cannot plant a decision in alice''s record');
+
+  -- search_everything is SECURITY INVOKER, so it must find nothing of alice's.
+  select count(*) into visible from public.search_everything('vendor', 20);
+  perform pg_temp.assert(visible = 0, 'bob''s search cannot reach alice''s decisions');
 
   -- --- Subscriptions are not client-writable --------------------------------
   -- A client that can grant itself a plan makes the entire paywall decorative.

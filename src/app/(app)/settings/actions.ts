@@ -75,7 +75,9 @@ export async function updateProfile(
 
 const preferencesSchema = z.object({
   theme: z.enum(['pearl', 'obsidian', 'system']).catch('system'),
-  coachingStyle: z.enum(['concise', 'balanced', 'detailed', 'challenging', 'supportive']).catch('balanced'),
+  coachingStyle: z
+    .enum(['concise', 'balanced', 'detailed', 'challenging', 'supportive'])
+    .catch('balanced'),
   emailNotifications: z.boolean(),
 })
 
@@ -120,7 +122,9 @@ export async function updatePreferences(
  * record belongs to the user, so this has to be complete rather than a summary —
  * every table they own is included.
  */
-export async function exportMyData(): Promise<{ ok: true; json: string } | { ok: false; error: string }> {
+export async function exportMyData(): Promise<
+  { ok: true; json: string } | { ok: false; error: string }
+> {
   const user = await requireUser()
   const supabase = await createClient()
 
@@ -141,6 +145,8 @@ export async function exportMyData(): Promise<{ ok: true; json: string } | { ok:
       facts,
       artifacts,
       reflections,
+      decisions,
+      decisionPeople,
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('assessments').select('*').eq('user_id', user.id),
@@ -157,6 +163,8 @@ export async function exportMyData(): Promise<{ ok: true; json: string } | { ok:
       supabase.from('professional_facts').select('*').eq('user_id', user.id),
       supabase.from('ai_artifacts').select('*').eq('user_id', user.id),
       supabase.from('daily_reflections').select('*').eq('user_id', user.id),
+      supabase.from('decisions').select('*').eq('user_id', user.id),
+      supabase.from('decision_people').select('*').eq('user_id', user.id),
     ])
 
     const payload = {
@@ -172,6 +180,8 @@ export async function exportMyData(): Promise<{ ok: true; json: string } | { ok:
         interactions: interactions.data,
         meetings: meetings.data,
         commitments: commitments.data,
+        decisions: decisions.data,
+        decisionPeople: decisionPeople.data,
         notes: notes.data,
       },
       sources: { sources: sources.data, professionalFacts: facts.data },
@@ -227,6 +237,25 @@ export async function deleteAccount(
 
   const user = await requireUser()
   const supabase = await createClient()
+
+  // Photos first, through the Storage API. storage.objects refuses direct
+  // SQL deletes, so the database function cannot take the folder with it.
+  // Best effort: an orphaned image is a lesser failure than a record that
+  // would not delete.
+  try {
+    const { AVATAR_BUCKET } = await import('@/lib/conversations/avatars')
+    const bucket = supabase.storage.from(AVATAR_BUCKET)
+    const folders = [`${user.id}/people`, user.id]
+    for (const folder of folders) {
+      const { data: objects } = await bucket.list(folder, { limit: 1000 })
+      const paths = (objects ?? []).filter((o) => o.id).map((o) => `${folder}/${o.name}`)
+      if (paths.length > 0) await bucket.remove(paths)
+    }
+  } catch (storageError) {
+    logger.warn('account.delete_photos_failed', {
+      error: storageError instanceof Error ? storageError.name : 'unknown',
+    })
+  }
 
   const { error } = await supabase.rpc('delete_my_data')
   if (error) {

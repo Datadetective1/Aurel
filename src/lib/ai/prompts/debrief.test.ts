@@ -38,6 +38,7 @@ function person(): PersonContext {
     observations: { confirmed: [], observed: [], inferred: [] },
     recentInteractions: [],
     openCommitments: [],
+    decisions: [],
     professionalFacts: [],
     publicSources: [],
     lastResearchedAt: null,
@@ -101,9 +102,9 @@ describe('a due date lands on the day the user meant', () => {
   it('still means the following week when the day has already passed', () => {
     // Friday the 28th in Chicago; "by Friday" cannot mean today, so it is the
     // 4th of September.
-    expect(
-      dueOn('I owe him the deck by Friday.', '2026-08-28T18:00:00Z', 'America/Chicago'),
-    ).toBe('2026-09-04')
+    expect(dueOn('I owe him the deck by Friday.', '2026-08-28T18:00:00Z', 'America/Chicago')).toBe(
+      '2026-09-04',
+    )
   })
 
   it('resolves "end of week" from the user’s weekday', () => {
@@ -117,9 +118,9 @@ describe('a due date lands on the day the user meant', () => {
 
   it('resolves "end of month" from the user’s month', () => {
     // 1 Sep 00:30Z is still 31 Aug in Chicago, so end of month is August's.
-    expect(dueOn('I will send it by end of month.', '2026-09-01T00:30:00Z', 'America/Chicago')).toBe(
-      '2026-08-31',
-    )
+    expect(
+      dueOn('I will send it by end of month.', '2026-09-01T00:30:00Z', 'America/Chicago'),
+    ).toBe('2026-08-31')
     expect(dueOn('I will send it by end of month.', '2026-09-01T00:30:00Z', 'UTC')).toBe(
       '2026-09-30',
     )
@@ -232,7 +233,12 @@ describe('debrief prompt contract', () => {
 
 describe('normaliseCommitment', () => {
   const room = new Set(['p1', 'p2'])
-  const base = { description: 'Send the utilisation breakdown', owner: 'user' as const, ownerPersonId: null, dueOn: null }
+  const base = {
+    description: 'Send the utilisation breakdown',
+    owner: 'user' as const,
+    ownerPersonId: null,
+    dueOn: null,
+  }
 
   it('discards an ownerPersonId that is not a uuid in the room', () => {
     // The exact production failure: the model answered with a display name.

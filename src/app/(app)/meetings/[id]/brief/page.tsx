@@ -8,11 +8,15 @@ import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import type { PersonChoice } from '@/components/app/add-participants'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
 import { RegenerateBrief } from '@/components/app/regenerate-brief'
+import { FaceStack } from '@/components/app/face-stack'
+import { SinceLastTime } from '@/components/app/since-last-time'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
+import { resolveFaces } from '@/lib/conversations/avatars'
+import { listConversations, listDecisions, listLoops } from '@/lib/conversations/queries'
 import { formatDate, formatTime, relativeDay } from '@/lib/format'
 import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
 
@@ -57,9 +61,22 @@ export default async function BriefPage({
 
   const { data: attendees } = await supabase
     .from('meeting_attendees')
-    .select('person_id, role, people(full_name, preferred_name)')
+    .select('person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path)')
     .eq('user_id', user.id)
     .eq('meeting_id', id)
+
+  const attendeeFaces = await resolveFaces(
+    supabase,
+    (attendees ?? []).map((a) => a.people).filter((p): p is NonNullable<typeof p> => Boolean(p)),
+    (p) => p.id,
+  )
+  const room = (attendees ?? [])
+    .filter((a) => a.people)
+    .map((a) => ({
+      id: a.person_id,
+      name: a.people!.preferred_name || a.people!.full_name,
+      src: attendeeFaces.get(a.person_id) ?? null,
+    }))
 
   const citations: BriefCitation[] = artifact
     ? ((
@@ -97,8 +114,7 @@ export default async function BriefPage({
     .map((p) => ({
       id: p.id,
       name: p.preferred_name || p.full_name,
-      subtitle:
-        [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
+      subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
     }))
   let staleReason: string | null = null
 
@@ -151,12 +167,27 @@ export default async function BriefPage({
           .select('description, owner, due_on')
           .eq('user_id', user.id)
           .eq('status', 'open')
+          .eq('review_status', 'confirmed')
           .in('person_id', attendeeIds)
           .order('due_on', { ascending: true, nullsFirst: false })
           .limit(4)
       : { data: [] as { description: string; owner: string; due_on: string | null }[] }
 
   const cues = brief ? listeningCues(brief, { openCommitments: openCommitments ?? [] }) : []
+
+  // What the last conversation with this room left behind. Built from the
+  // record, never from the model, and read fresh on every visit: a loop
+  // closed this morning must not still show as open at two o'clock.
+  const [roomLoops, roomDecisions, roomConversations] =
+    attendeeIds.length > 0
+      ? await Promise.all([
+          listLoops(supabase, user.id, { timeZone, now, scope: 'active' }),
+          listDecisions(supabase, user.id, { personId: attendeeIds[0], limit: 6 }),
+          listConversations(supabase, user.id, { personId: attendeeIds[0], limit: 1 }),
+        ])
+      : [[], [], []]
+  const loopsForRoom = roomLoops.filter((l) => l.personId && attendeeIds.includes(l.personId))
+  const lastConversation = roomConversations[0] ?? null
 
   if (brief) {
     await track('brief_deep_viewed', {
@@ -209,16 +240,24 @@ export default async function BriefPage({
 
         <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">{meeting.title}</h1>
 
-        {(attendees ?? []).length > 0 ? (
-          <p className="text-ink-secondary mt-2 text-sm">
-            With{' '}
-            {(attendees ?? [])
-              .map((a) => a.people?.preferred_name || a.people?.full_name)
-              .filter(Boolean)
-              .join(', ')}
-          </p>
+        {room.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <FaceStack people={room} size="sm" max={5} />
+            <p className="text-ink-secondary text-sm">With {room.map((p) => p.name).join(', ')}</p>
+          </div>
         ) : null}
       </header>
+
+      {lastConversation || loopsForRoom.length > 0 || roomDecisions.length > 0 ? (
+        <SinceLastTime
+          className="mt-8"
+          lastConversation={lastConversation}
+          loops={loopsForRoom}
+          decisions={roomDecisions}
+          timeZone={timeZone}
+          now={now}
+        />
+      ) : null}
 
       {brief ? (
         <>
@@ -230,7 +269,7 @@ export default async function BriefPage({
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button asChild variant="secondary" size="sm">
-              <Link href={`/meetings/${id}/debrief`}>Debrief this meeting</Link>
+              <Link href={`/conversations/new?meeting=${id}`}>Debrief this meeting</Link>
             </Button>
             <span className="text-ink-faint text-xs">
               Prepared {formatDate(artifact!.created_at, timeZone)}

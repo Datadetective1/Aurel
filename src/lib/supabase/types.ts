@@ -1,22 +1,49 @@
 // AUTO-GENERATED from the Supabase schema. Do not edit by hand.
 // Regenerate after every migration.
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: '14.5'
   }
   public: {
     Tables: {
+      access_grants: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          invitation_id: string | null
+          note: string | null
+          revoked_at: string | null
+          source: string
+          tier: Database['public']['Enums']['access_tier']
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          invitation_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          source?: string
+          tier: Database['public']['Enums']['access_tier']
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          invitation_id?: string | null
+          note?: string | null
+          revoked_at?: string | null
+          source?: string
+          tier?: Database['public']['Enums']['access_tier']
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_artifacts: {
         Row: {
           content: Json
@@ -24,16 +51,16 @@ export type Database = {
           grounded_fallback: boolean
           id: string
           is_demo: boolean
-          kind: Database["public"]["Enums"]["artifact_kind"]
+          kind: Database['public']['Enums']['artifact_kind']
           latency_ms: number | null
           model: string
           prompt_version: string
           provider: string
           subject_id: string | null
-          subject_kind: Database["public"]["Enums"]["artifact_subject"]
+          subject_kind: Database['public']['Enums']['artifact_subject']
           token_usage: Json | null
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -42,16 +69,16 @@ export type Database = {
           grounded_fallback?: boolean
           id?: string
           is_demo?: boolean
-          kind: Database["public"]["Enums"]["artifact_kind"]
+          kind: Database['public']['Enums']['artifact_kind']
           latency_ms?: number | null
           model: string
           prompt_version: string
           provider: string
           subject_id?: string | null
-          subject_kind?: Database["public"]["Enums"]["artifact_subject"]
+          subject_kind?: Database['public']['Enums']['artifact_subject']
           token_usage?: Json | null
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -60,25 +87,25 @@ export type Database = {
           grounded_fallback?: boolean
           id?: string
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["artifact_kind"]
+          kind?: Database['public']['Enums']['artifact_kind']
           latency_ms?: number | null
           model?: string
           prompt_version?: string
           provider?: string
           subject_id?: string | null
-          subject_kind?: Database["public"]["Enums"]["artifact_subject"]
+          subject_kind?: Database['public']['Enums']['artifact_subject']
           token_usage?: Json | null
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "ai_artifacts_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'ai_artifacts_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -88,9 +115,9 @@ export type Database = {
           created_at: string
           id: string
           note: string | null
-          rating: Database["public"]["Enums"]["feedback_rating"]
+          rating: Database['public']['Enums']['feedback_rating']
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -98,9 +125,9 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
-          rating: Database["public"]["Enums"]["feedback_rating"]
+          rating: Database['public']['Enums']['feedback_rating']
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -108,25 +135,25 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
-          rating?: Database["public"]["Enums"]["feedback_rating"]
+          rating?: Database['public']['Enums']['feedback_rating']
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "ai_feedback_artifact_id_fkey"
-            columns: ["artifact_id"]
+            foreignKeyName: 'ai_feedback_artifact_id_fkey'
+            columns: ['artifact_id']
             isOneToOne: false
-            referencedRelation: "ai_artifacts"
-            referencedColumns: ["id"]
+            referencedRelation: 'ai_artifacts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "ai_feedback_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'ai_feedback_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -159,86 +186,96 @@ export type Database = {
           artifact_id: string
           commitment_id: string | null
           created_at: string
-          evidence_level: Database["public"]["Enums"]["evidence_level"]
+          decision_id: string | null
+          evidence_level: Database['public']['Enums']['evidence_level']
           id: string
           interaction_id: string | null
           label: string
           observation_id: string | null
           person_id: string | null
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
           artifact_id: string
           commitment_id?: string | null
           created_at?: string
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          decision_id?: string | null
+          evidence_level?: Database['public']['Enums']['evidence_level']
           id?: string
           interaction_id?: string | null
           label: string
           observation_id?: string | null
           person_id?: string | null
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
           artifact_id?: string
           commitment_id?: string | null
           created_at?: string
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          decision_id?: string | null
+          evidence_level?: Database['public']['Enums']['evidence_level']
           id?: string
           interaction_id?: string | null
           label?: string
           observation_id?: string | null
           person_id?: string | null
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "artifact_sources_artifact_id_fkey"
-            columns: ["artifact_id"]
+            foreignKeyName: 'artifact_sources_artifact_id_fkey'
+            columns: ['artifact_id']
             isOneToOne: false
-            referencedRelation: "ai_artifacts"
-            referencedColumns: ["id"]
+            referencedRelation: 'ai_artifacts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "artifact_sources_commitment_id_fkey"
-            columns: ["commitment_id"]
+            foreignKeyName: 'artifact_sources_commitment_id_fkey'
+            columns: ['commitment_id']
             isOneToOne: false
-            referencedRelation: "commitments"
-            referencedColumns: ["id"]
+            referencedRelation: 'commitments'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "artifact_sources_interaction_id_fkey"
-            columns: ["interaction_id"]
+            foreignKeyName: 'artifact_sources_decision_id_fkey'
+            columns: ['decision_id']
             isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            referencedRelation: 'decisions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "artifact_sources_observation_id_fkey"
-            columns: ["observation_id"]
+            foreignKeyName: 'artifact_sources_interaction_id_fkey'
+            columns: ['interaction_id']
             isOneToOne: false
-            referencedRelation: "observations"
-            referencedColumns: ["id"]
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "artifact_sources_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'artifact_sources_observation_id_fkey'
+            columns: ['observation_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'observations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "artifact_sources_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'artifact_sources_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'artifact_sources_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -278,65 +315,66 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "assessment_responses_assessment_id_fkey"
-            columns: ["assessment_id"]
+            foreignKeyName: 'assessment_responses_assessment_id_fkey'
+            columns: ['assessment_id']
             isOneToOne: false
-            referencedRelation: "assessments"
-            referencedColumns: ["id"]
+            referencedRelation: 'assessments'
+            referencedColumns: ['id']
           },
         ]
       }
       assessments: {
         Row: {
           archetype: string | null
-          calibration: Database["public"]["Enums"]["calibration_rating"] | null
+          calibration: Database['public']['Enums']['calibration_rating'] | null
           calibration_note: string | null
           completed_at: string | null
           consistency: number | null
           coverage: number | null
           created_at: string
+          directional_count: number | null
           id: string
           instrument_version: string
-          directional_count: number | null
           narrative: Json | null
           scores: Json
           started_at: string
-          status: Database["public"]["Enums"]["assessment_status"]
+          status: Database['public']['Enums']['assessment_status']
           updated_at: string
           user_id: string
         }
         Insert: {
           archetype?: string | null
-          calibration?: Database["public"]["Enums"]["calibration_rating"] | null
+          calibration?: Database['public']['Enums']['calibration_rating'] | null
           calibration_note?: string | null
           completed_at?: string | null
           consistency?: number | null
           coverage?: number | null
           created_at?: string
+          directional_count?: number | null
           id?: string
           instrument_version: string
           narrative?: Json | null
           scores?: Json
           started_at?: string
-          status?: Database["public"]["Enums"]["assessment_status"]
+          status?: Database['public']['Enums']['assessment_status']
           updated_at?: string
           user_id: string
         }
         Update: {
           archetype?: string | null
-          calibration?: Database["public"]["Enums"]["calibration_rating"] | null
+          calibration?: Database['public']['Enums']['calibration_rating'] | null
           calibration_note?: string | null
           completed_at?: string | null
           consistency?: number | null
           coverage?: number | null
           created_at?: string
+          directional_count?: number | null
           id?: string
           instrument_version?: string
-          directional_count?: number | null
           narrative?: Json | null
           scores?: Json
           started_at?: string
-          status?: Database["public"]["Enums"]["assessment_status"]
+          status?: Database['public']['Enums']['assessment_status']
           updated_at?: string
           user_id?: string
         }
@@ -344,94 +382,115 @@ export type Database = {
       }
       commitments: {
         Row: {
+          cancelled_at: string | null
           completed_at: string | null
+          confidence: number | null
           created_at: string
+          deferred_until: string | null
           description: string
           due_on: string | null
+          excerpt: string | null
           id: string
           interaction_id: string | null
           is_demo: boolean
+          kind: Database['public']['Enums']['loop_kind']
           meeting_id: string | null
-          owner: Database["public"]["Enums"]["commitment_owner"]
+          owner: Database['public']['Enums']['commitment_owner']
           owner_person_id: string | null
           person_id: string | null
-          status: Database["public"]["Enums"]["commitment_status"]
+          review_status: Database['public']['Enums']['review_status']
+          reviewed_at: string | null
+          status: Database['public']['Enums']['commitment_status']
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
+          cancelled_at?: string | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string
+          deferred_until?: string | null
           description: string
           due_on?: string | null
+          excerpt?: string | null
           id?: string
           interaction_id?: string | null
           is_demo?: boolean
+          kind?: Database['public']['Enums']['loop_kind']
           meeting_id?: string | null
-          owner?: Database["public"]["Enums"]["commitment_owner"]
+          owner?: Database['public']['Enums']['commitment_owner']
           owner_person_id?: string | null
           person_id?: string | null
-          status?: Database["public"]["Enums"]["commitment_status"]
+          review_status?: Database['public']['Enums']['review_status']
+          reviewed_at?: string | null
+          status?: Database['public']['Enums']['commitment_status']
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
+          cancelled_at?: string | null
           completed_at?: string | null
+          confidence?: number | null
           created_at?: string
+          deferred_until?: string | null
           description?: string
           due_on?: string | null
+          excerpt?: string | null
           id?: string
           interaction_id?: string | null
           is_demo?: boolean
+          kind?: Database['public']['Enums']['loop_kind']
           meeting_id?: string | null
-          owner?: Database["public"]["Enums"]["commitment_owner"]
+          owner?: Database['public']['Enums']['commitment_owner']
           owner_person_id?: string | null
           person_id?: string | null
-          status?: Database["public"]["Enums"]["commitment_status"]
+          review_status?: Database['public']['Enums']['review_status']
+          reviewed_at?: string | null
+          status?: Database['public']['Enums']['commitment_status']
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "commitments_interaction_id_fkey"
-            columns: ["interaction_id"]
+            foreignKeyName: 'commitments_interaction_id_fkey'
+            columns: ['interaction_id']
             isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "commitments_meeting_id_fkey"
-            columns: ["meeting_id"]
+            foreignKeyName: 'commitments_meeting_id_fkey'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "commitments_owner_person_id_fkey"
-            columns: ["owner_person_id"]
+            foreignKeyName: 'commitments_owner_person_id_fkey'
+            columns: ['owner_person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "commitments_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'commitments_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "commitments_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'commitments_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -462,125 +521,133 @@ export type Database = {
         }
         Relationships: []
       }
-      access_grants: {
+      decision_people: {
         Row: {
-          granted_at: string
-          granted_by: string | null
-          invitation_id: string | null
-          note: string | null
-          revoked_at: string | null
-          source: string
-          tier: Database["public"]["Enums"]["access_tier"]
-          user_id: string
-        }
-        Insert: {
-          granted_at?: string
-          granted_by?: string | null
-          invitation_id?: string | null
-          note?: string | null
-          revoked_at?: string | null
-          source?: string
-          tier: Database["public"]["Enums"]["access_tier"]
-          user_id: string
-        }
-        Update: {
-          granted_at?: string
-          granted_by?: string | null
-          invitation_id?: string | null
-          note?: string | null
-          revoked_at?: string | null
-          source?: string
-          tier?: Database["public"]["Enums"]["access_tier"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      pilot_invitations: {
-        Row: {
-          code_hash: string
           created_at: string
-          created_by: string | null
-          expires_at: string | null
-          id: string
-          label: string | null
-          max_redemptions: number
-          redemption_count: number
-          revoked_at: string | null
+          decision_id: string
+          person_id: string
+          user_id: string
+          visibility: Database['public']['Enums']['record_visibility']
+          workspace_id: string
         }
         Insert: {
-          code_hash: string
           created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
-          id?: string
-          label?: string | null
-          max_redemptions?: number
-          redemption_count?: number
-          revoked_at?: string | null
+          decision_id: string
+          person_id: string
+          user_id: string
+          visibility?: Database['public']['Enums']['record_visibility']
+          workspace_id: string
         }
         Update: {
-          code_hash?: string
           created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
-          id?: string
-          label?: string | null
-          max_redemptions?: number
-          redemption_count?: number
-          revoked_at?: string | null
+          decision_id?: string
+          person_id?: string
+          user_id?: string
+          visibility?: Database['public']['Enums']['record_visibility']
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'decision_people_decision_id_fkey'
+            columns: ['decision_id']
+            isOneToOne: false
+            referencedRelation: 'decisions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'decision_people_person_id_fkey'
+            columns: ['person_id']
+            isOneToOne: false
+            referencedRelation: 'people'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'decision_people_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      invitation_redemptions: {
+      decisions: {
         Row: {
+          confidence: number | null
+          context: string | null
+          created_at: string
+          decided_on: string
+          description: string
+          excerpt: string | null
           id: string
-          invitation_id: string
-          redeemed_at: string
+          interaction_id: string | null
+          is_demo: boolean
+          meeting_id: string | null
+          review_status: Database['public']['Enums']['review_status']
+          reviewed_at: string | null
+          updated_at: string
           user_id: string
+          visibility: Database['public']['Enums']['record_visibility']
+          workspace_id: string
         }
         Insert: {
+          confidence?: number | null
+          context?: string | null
+          created_at?: string
+          decided_on?: string
+          description: string
+          excerpt?: string | null
           id?: string
-          invitation_id: string
-          redeemed_at?: string
+          interaction_id?: string | null
+          is_demo?: boolean
+          meeting_id?: string | null
+          review_status?: Database['public']['Enums']['review_status']
+          reviewed_at?: string | null
+          updated_at?: string
           user_id: string
+          visibility?: Database['public']['Enums']['record_visibility']
+          workspace_id: string
         }
         Update: {
+          confidence?: number | null
+          context?: string | null
+          created_at?: string
+          decided_on?: string
+          description?: string
+          excerpt?: string | null
           id?: string
-          invitation_id?: string
-          redeemed_at?: string
+          interaction_id?: string | null
+          is_demo?: boolean
+          meeting_id?: string | null
+          review_status?: Database['public']['Enums']['review_status']
+          reviewed_at?: string | null
+          updated_at?: string
           user_id?: string
+          visibility?: Database['public']['Enums']['record_visibility']
+          workspace_id?: string
         }
-        Relationships: []
-      }
-      scenario_responses: {
-        Row: {
-          answered_at: string
-          assessment_id: string
-          id: string
-          is_depends: boolean
-          option_id: string
-          scenario_id: string
-          user_id: string
-        }
-        Insert: {
-          answered_at?: string
-          assessment_id: string
-          id?: string
-          is_depends?: boolean
-          option_id: string
-          scenario_id: string
-          user_id: string
-        }
-        Update: {
-          answered_at?: string
-          assessment_id?: string
-          id?: string
-          is_depends?: boolean
-          option_id?: string
-          scenario_id?: string
-          user_id?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'decisions_interaction_id_fkey'
+            columns: ['interaction_id']
+            isOneToOne: false
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'decisions_meeting_id_fkey'
+            columns: ['meeting_id']
+            isOneToOne: false
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'decisions_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+        ]
       }
       entitlement_overrides: {
         Row: {
@@ -618,93 +685,93 @@ export type Database = {
       external_calendar_events: {
         Row: {
           attendees: Json
-          ends_at: string | null
-          external_id: string
           calendar_id: string | null
           description: string | null
-          time_zone: string | null
-          meeting_url: string | null
-          recurrence_id: string | null
-          is_recurring?: boolean
-          is_all_day?: boolean
-          is_private?: boolean
-          status?: string
-          provider_updated_at: string | null
+          ends_at: string | null
+          external_id: string
           id: string
           integration_id: string
+          is_all_day: boolean
+          is_private: boolean
+          is_recurring: boolean
           location: string | null
           meeting_id: string | null
+          meeting_url: string | null
           organizer_email: string | null
-          provider: Database["public"]["Enums"]["integration_provider"]
+          provider: Database['public']['Enums']['integration_provider']
+          provider_updated_at: string | null
+          recurrence_id: string | null
           starts_at: string
+          status: string
           synced_at: string
+          time_zone: string | null
           title: string | null
           user_id: string
         }
         Insert: {
           attendees?: Json
+          calendar_id?: string | null
+          description?: string | null
           ends_at?: string | null
           external_id: string
-          calendar_id: string | null
-          description: string | null
-          time_zone: string | null
-          meeting_url: string | null
-          recurrence_id: string | null
-          is_recurring?: boolean
-          is_all_day?: boolean
-          is_private?: boolean
-          status?: string
-          provider_updated_at: string | null
           id?: string
           integration_id: string
+          is_all_day?: boolean
+          is_private?: boolean
+          is_recurring?: boolean
           location?: string | null
           meeting_id?: string | null
+          meeting_url?: string | null
           organizer_email?: string | null
-          provider: Database["public"]["Enums"]["integration_provider"]
+          provider: Database['public']['Enums']['integration_provider']
+          provider_updated_at?: string | null
+          recurrence_id?: string | null
           starts_at: string
+          status?: string
           synced_at?: string
+          time_zone?: string | null
           title?: string | null
           user_id: string
         }
         Update: {
           attendees?: Json
-          ends_at?: string | null
-          external_id?: string
           calendar_id?: string | null
           description?: string | null
-          time_zone?: string | null
-          meeting_url?: string | null
-          recurrence_id?: string | null
-          is_recurring?: boolean
-          is_all_day?: boolean
-          is_private?: boolean
-          status?: string
-          provider_updated_at?: string | null
+          ends_at?: string | null
+          external_id?: string
           id?: string
           integration_id?: string
+          is_all_day?: boolean
+          is_private?: boolean
+          is_recurring?: boolean
           location?: string | null
           meeting_id?: string | null
+          meeting_url?: string | null
           organizer_email?: string | null
-          provider?: Database["public"]["Enums"]["integration_provider"]
+          provider?: Database['public']['Enums']['integration_provider']
+          provider_updated_at?: string | null
+          recurrence_id?: string | null
           starts_at?: string
+          status?: string
           synced_at?: string
+          time_zone?: string | null
           title?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "external_calendar_events_integration_id_fkey"
-            columns: ["integration_id"]
+            foreignKeyName: 'external_calendar_events_integration_id_fkey'
+            columns: ['integration_id']
             isOneToOne: false
-            referencedRelation: "integration_accounts"
-            referencedColumns: ["id"]
+            referencedRelation: 'integration_accounts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "external_calendar_events_meeting_id_fkey"
-            columns: ["meeting_id"]
+            foreignKeyName: 'external_calendar_events_meeting_id_fkey'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -738,25 +805,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fact_sources_fact_id_fkey"
-            columns: ["fact_id"]
+            foreignKeyName: 'fact_sources_fact_id_fkey'
+            columns: ['fact_id']
             isOneToOne: false
-            referencedRelation: "professional_facts"
-            referencedColumns: ["id"]
+            referencedRelation: 'professional_facts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "fact_sources_source_id_fkey"
-            columns: ["source_id"]
+            foreignKeyName: 'fact_sources_source_id_fkey'
+            columns: ['source_id']
             isOneToOne: false
-            referencedRelation: "sources"
-            referencedColumns: ["id"]
+            referencedRelation: 'sources'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "fact_sources_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'fact_sources_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -811,79 +878,79 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "identity_candidates_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'identity_candidates_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "identity_candidates_research_job_id_fkey"
-            columns: ["research_job_id"]
+            foreignKeyName: 'identity_candidates_research_job_id_fkey'
+            columns: ['research_job_id']
             isOneToOne: false
-            referencedRelation: "research_jobs"
-            referencedColumns: ["id"]
+            referencedRelation: 'research_jobs'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "identity_candidates_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'identity_candidates_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       integration_accounts: {
         Row: {
           access_token_encrypted: string | null
+          calendar_id: string | null
           created_at: string
           external_account_email: string | null
           id: string
           last_error: string | null
+          last_sync_attempt_at: string | null
           last_synced_at: string | null
-          sync_cursor?: string | null
-          calendar_id?: string | null
-          last_sync_attempt_at?: string | null
-          provider: Database["public"]["Enums"]["integration_provider"]
+          provider: Database['public']['Enums']['integration_provider']
           refresh_token_encrypted: string | null
           scopes: string[]
-          status: Database["public"]["Enums"]["integration_status"]
+          status: Database['public']['Enums']['integration_status']
+          sync_cursor: string | null
           token_expires_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           access_token_encrypted?: string | null
+          calendar_id?: string | null
           created_at?: string
           external_account_email?: string | null
           id?: string
           last_error?: string | null
-          last_synced_at?: string | null
-          sync_cursor?: string | null
-          calendar_id?: string | null
           last_sync_attempt_at?: string | null
-          provider: Database["public"]["Enums"]["integration_provider"]
+          last_synced_at?: string | null
+          provider: Database['public']['Enums']['integration_provider']
           refresh_token_encrypted?: string | null
           scopes?: string[]
-          status?: Database["public"]["Enums"]["integration_status"]
+          status?: Database['public']['Enums']['integration_status']
+          sync_cursor?: string | null
           token_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           access_token_encrypted?: string | null
+          calendar_id?: string | null
           created_at?: string
           external_account_email?: string | null
           id?: string
           last_error?: string | null
-          last_synced_at?: string | null
-          sync_cursor?: string | null
-          calendar_id?: string | null
           last_sync_attempt_at?: string | null
-          provider?: Database["public"]["Enums"]["integration_provider"]
+          last_synced_at?: string | null
+          provider?: Database['public']['Enums']['integration_provider']
           refresh_token_encrypted?: string | null
           scopes?: string[]
-          status?: Database["public"]["Enums"]["integration_status"]
+          status?: Database['public']['Enums']['integration_status']
+          sync_cursor?: string | null
           token_expires_at?: string | null
           updated_at?: string
           user_id?: string
@@ -896,7 +963,7 @@ export type Database = {
           interaction_id: string
           person_id: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -904,7 +971,7 @@ export type Database = {
           interaction_id: string
           person_id: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -912,102 +979,162 @@ export type Database = {
           interaction_id?: string
           person_id?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "interaction_participants_interaction_id_fkey"
-            columns: ["interaction_id"]
+            foreignKeyName: 'interaction_participants_interaction_id_fkey'
+            columns: ['interaction_id']
             isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "interaction_participants_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'interaction_participants_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "interaction_participants_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'interaction_participants_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       interactions: {
         Row: {
+          artifact_id: string | null
+          consent_confirmed: boolean
           created_at: string
+          duration_seconds: number | null
           id: string
           is_demo: boolean
-          kind: Database["public"]["Enums"]["interaction_kind"]
+          kind: Database['public']['Enums']['interaction_kind']
           meeting_id: string | null
           occurred_at: string
           outcome: string | null
+          processing_error: string | null
+          processing_status: Database['public']['Enums']['conversation_processing_status']
           raw_notes: string | null
+          reviewed_at: string | null
+          source_kind: Database['public']['Enums']['conversation_source']
           summary: string | null
           title: string
+          topics: string[]
           transcript: string | null
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           went_well: number | null
           workspace_id: string
         }
         Insert: {
+          artifact_id?: string | null
+          consent_confirmed?: boolean
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["interaction_kind"]
+          kind?: Database['public']['Enums']['interaction_kind']
           meeting_id?: string | null
           occurred_at?: string
           outcome?: string | null
+          processing_error?: string | null
+          processing_status?: Database['public']['Enums']['conversation_processing_status']
           raw_notes?: string | null
+          reviewed_at?: string | null
+          source_kind?: Database['public']['Enums']['conversation_source']
           summary?: string | null
           title: string
+          topics?: string[]
           transcript?: string | null
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           went_well?: number | null
           workspace_id: string
         }
         Update: {
+          artifact_id?: string | null
+          consent_confirmed?: boolean
           created_at?: string
+          duration_seconds?: number | null
           id?: string
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["interaction_kind"]
+          kind?: Database['public']['Enums']['interaction_kind']
           meeting_id?: string | null
           occurred_at?: string
           outcome?: string | null
+          processing_error?: string | null
+          processing_status?: Database['public']['Enums']['conversation_processing_status']
           raw_notes?: string | null
+          reviewed_at?: string | null
+          source_kind?: Database['public']['Enums']['conversation_source']
           summary?: string | null
           title?: string
+          topics?: string[]
           transcript?: string | null
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           went_well?: number | null
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "interactions_meeting_fk"
-            columns: ["meeting_id"]
+            foreignKeyName: 'interactions_artifact_id_fkey'
+            columns: ['artifact_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'ai_artifacts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "interactions_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'interactions_meeting_fk'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'interactions_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      invitation_redemptions: {
+        Row: {
+          id: string
+          invitation_id: string
+          redeemed_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invitation_id: string
+          redeemed_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invitation_id?: string
+          redeemed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'invitation_redemptions_invitation_id_fkey'
+            columns: ['invitation_id']
+            isOneToOne: false
+            referencedRelation: 'pilot_invitations'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1016,50 +1143,50 @@ export type Database = {
           created_at: string
           meeting_id: string
           person_id: string
-          role: Database["public"]["Enums"]["attendee_role"]
+          role: Database['public']['Enums']['attendee_role']
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
           created_at?: string
           meeting_id: string
           person_id: string
-          role?: Database["public"]["Enums"]["attendee_role"]
+          role?: Database['public']['Enums']['attendee_role']
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
           created_at?: string
           meeting_id?: string
           person_id?: string
-          role?: Database["public"]["Enums"]["attendee_role"]
+          role?: Database['public']['Enums']['attendee_role']
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "meeting_attendees_meeting_id_fkey"
-            columns: ["meeting_id"]
+            foreignKeyName: 'meeting_attendees_meeting_id_fkey'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "meeting_attendees_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'meeting_attendees_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "meeting_attendees_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'meeting_attendees_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1073,15 +1200,15 @@ export type Database = {
           id: string
           importance: number
           is_demo: boolean
-          kind: Database["public"]["Enums"]["meeting_kind"]
+          kind: Database['public']['Enums']['meeting_kind']
           objective: string | null
           scheduled_at: string | null
           stakes: string | null
-          status: Database["public"]["Enums"]["meeting_status"]
+          status: Database['public']['Enums']['meeting_status']
           title: string
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -1093,15 +1220,15 @@ export type Database = {
           id?: string
           importance?: number
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["meeting_kind"]
+          kind?: Database['public']['Enums']['meeting_kind']
           objective?: string | null
           scheduled_at?: string | null
           stakes?: string | null
-          status?: Database["public"]["Enums"]["meeting_status"]
+          status?: Database['public']['Enums']['meeting_status']
           title: string
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -1113,24 +1240,24 @@ export type Database = {
           id?: string
           importance?: number
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["meeting_kind"]
+          kind?: Database['public']['Enums']['meeting_kind']
           objective?: string | null
           scheduled_at?: string | null
           stakes?: string | null
-          status?: Database["public"]["Enums"]["meeting_status"]
+          status?: Database['public']['Enums']['meeting_status']
           title?: string
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "meetings_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'meetings_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1145,7 +1272,7 @@ export type Database = {
           person_id: string | null
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -1158,7 +1285,7 @@ export type Database = {
           person_id?: string | null
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -1171,37 +1298,37 @@ export type Database = {
           person_id?: string | null
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "notes_interaction_id_fkey"
-            columns: ["interaction_id"]
+            foreignKeyName: 'notes_interaction_id_fkey'
+            columns: ['interaction_id']
             isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "notes_meeting_id_fkey"
-            columns: ["meeting_id"]
+            foreignKeyName: 'notes_meeting_id_fkey'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "notes_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'notes_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "notes_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'notes_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1215,7 +1342,7 @@ export type Database = {
           observation_id: string
           source_id: string | null
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -1227,7 +1354,7 @@ export type Database = {
           observation_id: string
           source_id?: string | null
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -1239,53 +1366,53 @@ export type Database = {
           observation_id?: string
           source_id?: string | null
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "observation_sources_interaction_id_fkey"
-            columns: ["interaction_id"]
+            foreignKeyName: 'observation_sources_interaction_id_fkey'
+            columns: ['interaction_id']
             isOneToOne: false
-            referencedRelation: "interactions"
-            referencedColumns: ["id"]
+            referencedRelation: 'interactions'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observation_sources_meeting_id_fkey"
-            columns: ["meeting_id"]
+            foreignKeyName: 'observation_sources_meeting_id_fkey'
+            columns: ['meeting_id']
             isOneToOne: false
-            referencedRelation: "meetings"
-            referencedColumns: ["id"]
+            referencedRelation: 'meetings'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observation_sources_observation_id_fkey"
-            columns: ["observation_id"]
+            foreignKeyName: 'observation_sources_observation_id_fkey'
+            columns: ['observation_id']
             isOneToOne: false
-            referencedRelation: "observations"
-            referencedColumns: ["id"]
+            referencedRelation: 'observations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observation_sources_source_id_fkey"
-            columns: ["source_id"]
+            foreignKeyName: 'observation_sources_source_id_fkey'
+            columns: ['source_id']
             isOneToOne: false
-            referencedRelation: "sources"
-            referencedColumns: ["id"]
+            referencedRelation: 'sources'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observation_sources_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'observation_sources_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       observations: {
         Row: {
-          category: Database["public"]["Enums"]["observation_category"]
+          category: Database['public']['Enums']['observation_category']
           content: string
           created_at: string
-          evidence_level: Database["public"]["Enums"]["evidence_level"]
+          evidence_level: Database['public']['Enums']['evidence_level']
           first_seen_at: string
           id: string
           is_demo: boolean
@@ -1293,18 +1420,18 @@ export type Database = {
           origin_artifact_id: string | null
           person_id: string
           reinforcement_count: number
-          source_kind: Database["public"]["Enums"]["observation_source_kind"]
-          status: Database["public"]["Enums"]["observation_status"]
+          source_kind: Database['public']['Enums']['observation_source_kind']
+          status: Database['public']['Enums']['observation_status']
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
-          category?: Database["public"]["Enums"]["observation_category"]
+          category?: Database['public']['Enums']['observation_category']
           content: string
           created_at?: string
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          evidence_level?: Database['public']['Enums']['evidence_level']
           first_seen_at?: string
           id?: string
           is_demo?: boolean
@@ -1312,18 +1439,18 @@ export type Database = {
           origin_artifact_id?: string | null
           person_id: string
           reinforcement_count?: number
-          source_kind?: Database["public"]["Enums"]["observation_source_kind"]
-          status?: Database["public"]["Enums"]["observation_status"]
+          source_kind?: Database['public']['Enums']['observation_source_kind']
+          status?: Database['public']['Enums']['observation_status']
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
-          category?: Database["public"]["Enums"]["observation_category"]
+          category?: Database['public']['Enums']['observation_category']
           content?: string
           created_at?: string
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          evidence_level?: Database['public']['Enums']['evidence_level']
           first_seen_at?: string
           id?: string
           is_demo?: boolean
@@ -1331,34 +1458,34 @@ export type Database = {
           origin_artifact_id?: string | null
           person_id?: string
           reinforcement_count?: number
-          source_kind?: Database["public"]["Enums"]["observation_source_kind"]
-          status?: Database["public"]["Enums"]["observation_status"]
+          source_kind?: Database['public']['Enums']['observation_source_kind']
+          status?: Database['public']['Enums']['observation_status']
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "observations_origin_artifact_fk"
-            columns: ["origin_artifact_id"]
+            foreignKeyName: 'observations_origin_artifact_fk'
+            columns: ['origin_artifact_id']
             isOneToOne: false
-            referencedRelation: "ai_artifacts"
-            referencedColumns: ["id"]
+            referencedRelation: 'ai_artifacts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observations_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'observations_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "observations_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'observations_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1372,7 +1499,7 @@ export type Database = {
           notes: string | null
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -1384,7 +1511,7 @@ export type Database = {
           notes?: string | null
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -1396,22 +1523,23 @@ export type Database = {
           notes?: string | null
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "organizations_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'organizations_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       people: {
         Row: {
           archived_at: string | null
+          avatar_path: string | null
           avatar_url: string | null
           created_at: string
           email: string | null
@@ -1429,17 +1557,18 @@ export type Database = {
           preferred_name: string | null
           profile_url: string | null
           pronouns: string | null
-          relationship_type: Database["public"]["Enums"]["relationship_type"]
+          relationship_type: Database['public']['Enums']['relationship_type']
           relevance: number
           research_status: string | null
           timezone: string | null
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
           archived_at?: string | null
+          avatar_path?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -1457,17 +1586,18 @@ export type Database = {
           preferred_name?: string | null
           profile_url?: string | null
           pronouns?: string | null
-          relationship_type?: Database["public"]["Enums"]["relationship_type"]
+          relationship_type?: Database['public']['Enums']['relationship_type']
           relevance?: number
           research_status?: string | null
           timezone?: string | null
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
           archived_at?: string | null
+          avatar_path?: string | null
           avatar_url?: string | null
           created_at?: string
           email?: string | null
@@ -1485,29 +1615,29 @@ export type Database = {
           preferred_name?: string | null
           profile_url?: string | null
           pronouns?: string | null
-          relationship_type?: Database["public"]["Enums"]["relationship_type"]
+          relationship_type?: Database['public']['Enums']['relationship_type']
           relevance?: number
           research_status?: string | null
           timezone?: string | null
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "people_organization_id_fkey"
-            columns: ["organization_id"]
+            foreignKeyName: 'people_organization_id_fkey'
+            columns: ['organization_id']
             isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
+            referencedRelation: 'organizations'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "people_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'people_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1517,7 +1647,7 @@ export type Database = {
           person_id: string
           topic_id: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -1525,7 +1655,7 @@ export type Database = {
           person_id: string
           topic_id: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -1533,123 +1663,160 @@ export type Database = {
           person_id?: string
           topic_id?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "person_topics_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'person_topics_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "person_topics_topic_id_fkey"
-            columns: ["topic_id"]
+            foreignKeyName: 'person_topics_topic_id_fkey'
+            columns: ['topic_id']
             isOneToOne: false
-            referencedRelation: "topics"
-            referencedColumns: ["id"]
+            referencedRelation: 'topics'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "person_topics_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'person_topics_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
+      }
+      pilot_invitations: {
+        Row: {
+          code_hash: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          label: string | null
+          max_redemptions: number
+          redemption_count: number
+          revoked_at: string | null
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          max_redemptions?: number
+          redemption_count?: number
+          revoked_at?: string | null
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          max_redemptions?: number
+          redemption_count?: number
+          revoked_at?: string | null
+        }
+        Relationships: []
       }
       professional_facts: {
         Row: {
           as_of: string | null
           created_at: string
           detail: string | null
-          evidence_level: Database["public"]["Enums"]["evidence_level"]
+          evidence_level: Database['public']['Enums']['evidence_level']
           first_seen_at: string
           has_conflict: boolean
           id: string
           is_current: boolean
           is_demo: boolean
-          kind: Database["public"]["Enums"]["fact_kind"]
+          kind: Database['public']['Enums']['fact_kind']
           last_confirmed_at: string | null
           person_id: string
           superseded_by: string | null
           updated_at: string
           user_id: string
           value: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
           as_of?: string | null
           created_at?: string
           detail?: string | null
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          evidence_level?: Database['public']['Enums']['evidence_level']
           first_seen_at?: string
           has_conflict?: boolean
           id?: string
           is_current?: boolean
           is_demo?: boolean
-          kind: Database["public"]["Enums"]["fact_kind"]
+          kind: Database['public']['Enums']['fact_kind']
           last_confirmed_at?: string | null
           person_id: string
           superseded_by?: string | null
           updated_at?: string
           user_id: string
           value: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
           as_of?: string | null
           created_at?: string
           detail?: string | null
-          evidence_level?: Database["public"]["Enums"]["evidence_level"]
+          evidence_level?: Database['public']['Enums']['evidence_level']
           first_seen_at?: string
           has_conflict?: boolean
           id?: string
           is_current?: boolean
           is_demo?: boolean
-          kind?: Database["public"]["Enums"]["fact_kind"]
+          kind?: Database['public']['Enums']['fact_kind']
           last_confirmed_at?: string | null
           person_id?: string
           superseded_by?: string | null
           updated_at?: string
           user_id?: string
           value?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "professional_facts_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'professional_facts_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "professional_facts_superseded_by_fkey"
-            columns: ["superseded_by"]
+            foreignKeyName: 'professional_facts_superseded_by_fkey'
+            columns: ['superseded_by']
             isOneToOne: false
-            referencedRelation: "professional_facts"
-            referencedColumns: ["id"]
+            referencedRelation: 'professional_facts'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "professional_facts_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'professional_facts_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           avatar_url: string | null
           coaching_context: string[]
-          coaching_style: Database["public"]["Enums"]["coaching_style"]
+          coaching_style: Database['public']['Enums']['coaching_style']
           company: string | null
           created_at: string
           default_workspace_id: string | null
@@ -1659,23 +1826,24 @@ export type Database = {
           id: string
           intents: string[]
           job_function: string | null
-          last_seen_at: string | null
-          profile_prompt_snoozed_until: string | null
           job_title: string | null
           known_frameworks: Json
+          last_seen_at: string | null
           onboarding_completed_at: string | null
           onboarding_stage: string
           preferred_name: string | null
+          profile_prompt_snoozed_until: string | null
           pronouns: string | null
           seniority: string | null
-          theme: Database["public"]["Enums"]["theme_preference"]
+          theme: Database['public']['Enums']['theme_preference']
           timezone: string
           updated_at: string
         }
         Insert: {
+          avatar_path?: string | null
           avatar_url?: string | null
           coaching_context?: string[]
-          coaching_style?: Database["public"]["Enums"]["coaching_style"]
+          coaching_style?: Database['public']['Enums']['coaching_style']
           company?: string | null
           created_at?: string
           default_workspace_id?: string | null
@@ -1685,23 +1853,24 @@ export type Database = {
           id: string
           intents?: string[]
           job_function?: string | null
-          last_seen_at?: string | null
-          profile_prompt_snoozed_until?: string | null
           job_title?: string | null
           known_frameworks?: Json
+          last_seen_at?: string | null
           onboarding_completed_at?: string | null
           onboarding_stage?: string
           preferred_name?: string | null
+          profile_prompt_snoozed_until?: string | null
           pronouns?: string | null
           seniority?: string | null
-          theme?: Database["public"]["Enums"]["theme_preference"]
+          theme?: Database['public']['Enums']['theme_preference']
           timezone?: string
           updated_at?: string
         }
         Update: {
+          avatar_path?: string | null
           avatar_url?: string | null
           coaching_context?: string[]
-          coaching_style?: Database["public"]["Enums"]["coaching_style"]
+          coaching_style?: Database['public']['Enums']['coaching_style']
           company?: string | null
           created_at?: string
           default_workspace_id?: string | null
@@ -1711,26 +1880,26 @@ export type Database = {
           id?: string
           intents?: string[]
           job_function?: string | null
-          last_seen_at?: string | null
-          profile_prompt_snoozed_until?: string | null
           job_title?: string | null
           known_frameworks?: Json
+          last_seen_at?: string | null
           onboarding_completed_at?: string | null
           onboarding_stage?: string
           preferred_name?: string | null
+          profile_prompt_snoozed_until?: string | null
           pronouns?: string | null
           seniority?: string | null
-          theme?: Database["public"]["Enums"]["theme_preference"]
+          theme?: Database['public']['Enums']['theme_preference']
           timezone?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_default_workspace_id_fkey"
-            columns: ["default_workspace_id"]
+            foreignKeyName: 'profiles_default_workspace_id_fkey'
+            columns: ['default_workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1750,7 +1919,7 @@ export type Database = {
           sources_considered: number
           stage: string | null
           started_at: string
-          status: Database["public"]["Enums"]["research_job_status"]
+          status: Database['public']['Enums']['research_job_status']
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1770,7 +1939,7 @@ export type Database = {
           sources_considered?: number
           stage?: string | null
           started_at?: string
-          status?: Database["public"]["Enums"]["research_job_status"]
+          status?: Database['public']['Enums']['research_job_status']
           updated_at?: string
           user_id: string
           workspace_id: string
@@ -1790,25 +1959,63 @@ export type Database = {
           sources_considered?: number
           stage?: string | null
           started_at?: string
-          status?: Database["public"]["Enums"]["research_job_status"]
+          status?: Database['public']['Enums']['research_job_status']
           updated_at?: string
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "research_jobs_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'research_jobs_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "research_jobs_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'research_jobs_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      scenario_responses: {
+        Row: {
+          answered_at: string
+          assessment_id: string
+          id: string
+          is_depends: boolean
+          option_id: string
+          scenario_id: string
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          assessment_id: string
+          id?: string
+          is_depends?: boolean
+          option_id: string
+          scenario_id: string
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          assessment_id?: string
+          id?: string
+          is_depends?: boolean
+          option_id?: string
+          scenario_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'scenario_responses_assessment_id_fkey'
+            columns: ['assessment_id']
+            isOneToOne: false
+            referencedRelation: 'assessments'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1847,7 +2054,7 @@ export type Database = {
           created_at: string
           id: string
           identity_match_confidence: number | null
-          identity_match_status: Database["public"]["Enums"]["identity_match_status"]
+          identity_match_status: Database['public']['Enums']['identity_match_status']
           match_signals: Json
           person_id: string
           reviewed_by_user: boolean
@@ -1860,7 +2067,7 @@ export type Database = {
           created_at?: string
           id?: string
           identity_match_confidence?: number | null
-          identity_match_status?: Database["public"]["Enums"]["identity_match_status"]
+          identity_match_status?: Database['public']['Enums']['identity_match_status']
           match_signals?: Json
           person_id: string
           reviewed_by_user?: boolean
@@ -1873,7 +2080,7 @@ export type Database = {
           created_at?: string
           id?: string
           identity_match_confidence?: number | null
-          identity_match_status?: Database["public"]["Enums"]["identity_match_status"]
+          identity_match_status?: Database['public']['Enums']['identity_match_status']
           match_signals?: Json
           person_id?: string
           reviewed_by_user?: boolean
@@ -1884,31 +2091,31 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "source_person_links_person_id_fkey"
-            columns: ["person_id"]
+            foreignKeyName: 'source_person_links_person_id_fkey'
+            columns: ['person_id']
             isOneToOne: false
-            referencedRelation: "people"
-            referencedColumns: ["id"]
+            referencedRelation: 'people'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "source_person_links_source_id_fkey"
-            columns: ["source_id"]
+            foreignKeyName: 'source_person_links_source_id_fkey'
+            columns: ['source_id']
             isOneToOne: false
-            referencedRelation: "sources"
-            referencedColumns: ["id"]
+            referencedRelation: 'sources'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "source_person_links_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'source_person_links_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       sources: {
         Row: {
-          access_status: Database["public"]["Enums"]["source_access_status"]
+          access_status: Database['public']['Enums']['source_access_status']
           author: string | null
           content_hash: string | null
           created_at: string
@@ -1918,20 +2125,20 @@ export type Database = {
           id: string
           is_demo: boolean
           metadata: Json
-          processing_status: Database["public"]["Enums"]["source_processing_status"]
+          processing_status: Database['public']['Enums']['source_processing_status']
           published_at: string | null
           publisher: string | null
           retrieved_at: string | null
           source_title: string | null
-          source_type: Database["public"]["Enums"]["source_type"]
+          source_type: Database['public']['Enums']['source_type']
           source_url: string | null
           updated_at: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
-          access_status?: Database["public"]["Enums"]["source_access_status"]
+          access_status?: Database['public']['Enums']['source_access_status']
           author?: string | null
           content_hash?: string | null
           created_at?: string
@@ -1941,20 +2148,20 @@ export type Database = {
           id?: string
           is_demo?: boolean
           metadata?: Json
-          processing_status?: Database["public"]["Enums"]["source_processing_status"]
+          processing_status?: Database['public']['Enums']['source_processing_status']
           published_at?: string | null
           publisher?: string | null
           retrieved_at?: string | null
           source_title?: string | null
-          source_type?: Database["public"]["Enums"]["source_type"]
+          source_type?: Database['public']['Enums']['source_type']
           source_url?: string | null
           updated_at?: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
-          access_status?: Database["public"]["Enums"]["source_access_status"]
+          access_status?: Database['public']['Enums']['source_access_status']
           author?: string | null
           content_hash?: string | null
           created_at?: string
@@ -1964,25 +2171,25 @@ export type Database = {
           id?: string
           is_demo?: boolean
           metadata?: Json
-          processing_status?: Database["public"]["Enums"]["source_processing_status"]
+          processing_status?: Database['public']['Enums']['source_processing_status']
           published_at?: string | null
           publisher?: string | null
           retrieved_at?: string | null
           source_title?: string | null
-          source_type?: Database["public"]["Enums"]["source_type"]
+          source_type?: Database['public']['Enums']['source_type']
           source_url?: string | null
           updated_at?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "sources_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'sources_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1994,9 +2201,9 @@ export type Database = {
           current_period_end: string | null
           founding_number: number | null
           is_founding: boolean
-          plan: Database["public"]["Enums"]["plan_tier"]
+          plan: Database['public']['Enums']['plan_tier']
           price_protected_until: string | null
-          status: Database["public"]["Enums"]["subscription_status"] | null
+          status: Database['public']['Enums']['subscription_status'] | null
           stripe_customer_id: string | null
           stripe_price_id: string | null
           stripe_subscription_id: string | null
@@ -2011,9 +2218,9 @@ export type Database = {
           current_period_end?: string | null
           founding_number?: number | null
           is_founding?: boolean
-          plan?: Database["public"]["Enums"]["plan_tier"]
+          plan?: Database['public']['Enums']['plan_tier']
           price_protected_until?: string | null
-          status?: Database["public"]["Enums"]["subscription_status"] | null
+          status?: Database['public']['Enums']['subscription_status'] | null
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
@@ -2028,9 +2235,9 @@ export type Database = {
           current_period_end?: string | null
           founding_number?: number | null
           is_founding?: boolean
-          plan?: Database["public"]["Enums"]["plan_tier"]
+          plan?: Database['public']['Enums']['plan_tier']
           price_protected_until?: string | null
-          status?: Database["public"]["Enums"]["subscription_status"] | null
+          status?: Database['public']['Enums']['subscription_status'] | null
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
@@ -2047,7 +2254,7 @@ export type Database = {
           is_demo: boolean
           label: string
           user_id: string
-          visibility: Database["public"]["Enums"]["record_visibility"]
+          visibility: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Insert: {
@@ -2056,7 +2263,7 @@ export type Database = {
           is_demo?: boolean
           label: string
           user_id: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id: string
         }
         Update: {
@@ -2065,35 +2272,35 @@ export type Database = {
           is_demo?: boolean
           label?: string
           user_id?: string
-          visibility?: Database["public"]["Enums"]["record_visibility"]
+          visibility?: Database['public']['Enums']['record_visibility']
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "topics_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'topics_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
       usage_events: {
         Row: {
           id: string
-          kind: Database["public"]["Enums"]["usage_kind"]
+          kind: Database['public']['Enums']['usage_kind']
           occurred_at: string
           user_id: string
         }
         Insert: {
           id?: string
-          kind: Database["public"]["Enums"]["usage_kind"]
+          kind: Database['public']['Enums']['usage_kind']
           occurred_at?: string
           user_id: string
         }
         Update: {
           id?: string
-          kind?: Database["public"]["Enums"]["usage_kind"]
+          kind?: Database['public']['Enums']['usage_kind']
           occurred_at?: string
           user_id?: string
         }
@@ -2102,17 +2309,17 @@ export type Database = {
       usage_meters: {
         Row: {
           cost_units: number
+          estimated_cost_micros: number
           id: string
           input_tokens: number | null
-          estimated_cost_micros?: number
-          search_requests?: number
-          kind: Database["public"]["Enums"]["meter_kind"]
+          kind: Database['public']['Enums']['meter_kind']
           model: string | null
           occurred_at: string
           output_tokens: number | null
           period_start: string
           provider: string | null
           quantity: number
+          search_requests: number
           subject_id: string | null
           subject_kind: string | null
           user_id: string
@@ -2120,17 +2327,17 @@ export type Database = {
         }
         Insert: {
           cost_units?: number
+          estimated_cost_micros?: number
           id?: string
           input_tokens?: number | null
-          estimated_cost_micros?: number
-          search_requests?: number
-          kind: Database["public"]["Enums"]["meter_kind"]
+          kind: Database['public']['Enums']['meter_kind']
           model?: string | null
           occurred_at?: string
           output_tokens?: number | null
           period_start: string
           provider?: string | null
           quantity?: number
+          search_requests?: number
           subject_id?: string | null
           subject_kind?: string | null
           user_id: string
@@ -2138,17 +2345,17 @@ export type Database = {
         }
         Update: {
           cost_units?: number
+          estimated_cost_micros?: number
           id?: string
           input_tokens?: number | null
-          estimated_cost_micros?: number
-          search_requests?: number
-          kind?: Database["public"]["Enums"]["meter_kind"]
+          kind?: Database['public']['Enums']['meter_kind']
           model?: string | null
           occurred_at?: string
           output_tokens?: number | null
           period_start?: string
           provider?: string | null
           quantity?: number
+          search_requests?: number
           subject_id?: string | null
           subject_kind?: string | null
           user_id?: string
@@ -2156,11 +2363,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "usage_meters_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'usage_meters_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2188,40 +2395,40 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "weekly_reflections_artifact_id_fkey"
-            columns: ["artifact_id"]
+            foreignKeyName: 'weekly_reflections_artifact_id_fkey'
+            columns: ['artifact_id']
             isOneToOne: false
-            referencedRelation: "ai_artifacts"
-            referencedColumns: ["id"]
+            referencedRelation: 'ai_artifacts'
+            referencedColumns: ['id']
           },
         ]
       }
       workspace_members: {
         Row: {
           created_at: string
-          role: Database["public"]["Enums"]["workspace_role"]
+          role: Database['public']['Enums']['workspace_role']
           user_id: string
           workspace_id: string
         }
         Insert: {
           created_at?: string
-          role?: Database["public"]["Enums"]["workspace_role"]
+          role?: Database['public']['Enums']['workspace_role']
           user_id: string
           workspace_id: string
         }
         Update: {
           created_at?: string
-          role?: Database["public"]["Enums"]["workspace_role"]
+          role?: Database['public']['Enums']['workspace_role']
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "workspace_members_workspace_id_fkey"
-            columns: ["workspace_id"]
+            foreignKeyName: 'workspace_members_workspace_id_fkey'
+            columns: ['workspace_id']
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -2229,7 +2436,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          kind: Database["public"]["Enums"]["workspace_kind"]
+          kind: Database['public']['Enums']['workspace_kind']
           name: string
           owner_id: string
           updated_at: string
@@ -2237,7 +2444,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          kind?: Database["public"]["Enums"]["workspace_kind"]
+          kind?: Database['public']['Enums']['workspace_kind']
           name: string
           owner_id: string
           updated_at?: string
@@ -2245,7 +2452,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          kind?: Database["public"]["Enums"]["workspace_kind"]
+          kind?: Database['public']['Enums']['workspace_kind']
           name?: string
           owner_id?: string
           updated_at?: string
@@ -2254,27 +2461,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      usage_cost_summary: {
+        Row: {
+          cost_micros: number | null
+          cost_usd: number | null
+          cost_usd_per_run: number | null
+          input_tokens: number | null
+          kind: Database['public']['Enums']['meter_kind'] | null
+          output_tokens: number | null
+          period_start: string | null
+          quantity: number | null
+          runs: number | null
+          search_requests: number | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'usage_meters_workspace_id_fkey'
+            columns: ['workspace_id']
+            isOneToOne: false
+            referencedRelation: 'workspaces'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Functions: {
-      redeem_pilot_invitation: {
-        Args: { code_hash_input: string }
-        Returns: string
-      }
+      clear_demo_data: { Args: never; Returns: undefined }
       create_pilot_invitation: {
         Args: {
           code_hash_input: string
-          label_input: string | null
-          max_redemptions_input: number
-          expires_at_input: string
           created_by_input: string
+          expires_at_input: string
+          label_input: string
+          max_redemptions_input: number
         }
         Returns: string
       }
-      clear_demo_data: { Args: never; Returns: undefined }
       delete_my_data: { Args: never; Returns: undefined }
       ensure_personal_workspace: {
         Args: { display_name: string; target_user: string }
+        Returns: string
+      }
+      redeem_pilot_invitation: {
+        Args: { code_hash_input: string }
         Returns: string
       }
       relationship_pulse: {
@@ -2300,206 +2531,175 @@ export type Database = {
           title: string
         }[]
       }
+      set_access_tier: {
+        Args: {
+          new_tier: Database['public']['Enums']['access_tier']
+          note_text?: string
+          target_email: string
+        }
+        Returns: string
+      }
       usage_in_period: {
         Args: {
           period: string
-          target_kind: Database["public"]["Enums"]["meter_kind"]
+          target_kind: Database['public']['Enums']['meter_kind']
         }
         Returns: number
       }
     }
     Enums: {
+      access_tier: 'standard' | 'pilot' | 'owner'
       artifact_kind:
-        | "meeting_brief"
-        | "quick_brief"
-        | "debrief"
-        | "relationship_summary"
-        | "message_adaptation"
-        | "daily_focus"
-        | "weekly_reflection"
-        | "coach_message"
-        | "memory_proposal"
-        | "profile_narrative"
-      artifact_subject: "person" | "meeting" | "interaction" | "user" | "none"
-      assessment_status: "in_progress" | "completed" | "abandoned"
+        | 'meeting_brief'
+        | 'quick_brief'
+        | 'debrief'
+        | 'relationship_summary'
+        | 'message_adaptation'
+        | 'daily_focus'
+        | 'weekly_reflection'
+        | 'coach_message'
+        | 'memory_proposal'
+        | 'profile_narrative'
+      artifact_subject: 'person' | 'meeting' | 'interaction' | 'user' | 'none'
+      assessment_status: 'in_progress' | 'completed' | 'abandoned'
       attendee_role:
-        | "decision_maker"
-        | "influencer"
-        | "contributor"
-        | "informed"
-        | "presenter"
-        | "other"
-      calibration_rating:
-        | "very_accurate"
-        | "mostly_accurate"
-        | "partly_accurate"
-        | "not_accurate"
-      coaching_style:
-        | "concise"
-        | "balanced"
-        | "detailed"
-        | "challenging"
-        | "supportive"
-      commitment_owner: "user" | "person" | "shared"
-      commitment_status: "open" | "done" | "dropped"
-      evidence_level: "confirmed" | "observed" | "inferred" | "unknown"
+        'decision_maker' | 'influencer' | 'contributor' | 'informed' | 'presenter' | 'other'
+      calibration_rating: 'very_accurate' | 'mostly_accurate' | 'partly_accurate' | 'not_accurate'
+      coaching_style: 'concise' | 'balanced' | 'detailed' | 'challenging' | 'supportive'
+      commitment_owner: 'user' | 'person' | 'shared'
+      commitment_status: 'open' | 'done' | 'dropped' | 'later' | 'cancelled'
+      conversation_processing_status: 'pending' | 'processing' | 'ready' | 'failed'
+      conversation_source:
+        | 'typed_notes'
+        | 'voice_note'
+        | 'uploaded_audio'
+        | 'pasted_transcript'
+        | 'uploaded_transcript'
+        | 'meeting_recording'
+        | 'imported'
+      evidence_level: 'confirmed' | 'observed' | 'inferred' | 'unknown'
       fact_kind:
-        | "current_role"
-        | "current_organization"
-        | "prior_role"
-        | "education"
-        | "expertise"
-        | "theme"
-        | "publication"
-        | "appearance"
-        | "location"
-        | "communication_signal"
-        | "other"
-      feedback_rating: "yes" | "partly" | "no"
+        | 'current_role'
+        | 'current_organization'
+        | 'prior_role'
+        | 'education'
+        | 'expertise'
+        | 'theme'
+        | 'publication'
+        | 'appearance'
+        | 'location'
+        | 'communication_signal'
+        | 'other'
+      feedback_rating: 'yes' | 'partly' | 'no'
       identity_match_status:
-        | "confirmed"
-        | "probable"
-        | "ambiguous"
-        | "no_match"
-        | "conflicting"
-        | "unreviewed"
-      integration_provider: "google" | "microsoft"
-      integration_status:
-        | "connected"
-        | "expired"
-        | "revoked"
-        | "error"
-        | "admin_consent_required"
-      interaction_kind:
-        | "meeting"
-        | "call"
-        | "email"
-        | "message"
-        | "informal"
-        | "other"
+        'confirmed' | 'probable' | 'ambiguous' | 'no_match' | 'conflicting' | 'unreviewed'
+      integration_provider: 'google' | 'microsoft'
+      integration_status: 'connected' | 'expired' | 'revoked' | 'error' | 'admin_consent_required'
+      interaction_kind: 'meeting' | 'call' | 'email' | 'message' | 'informal' | 'other'
+      loop_kind: 'commitment' | 'question' | 'follow_up'
       meeting_kind:
-        | "one_on_one"
-        | "executive_review"
-        | "project_review"
-        | "customer_meeting"
-        | "sales_conversation"
-        | "negotiation"
-        | "difficult_conversation"
-        | "feedback_conversation"
-        | "performance_conversation"
-        | "interview"
-        | "networking"
-        | "presentation"
-        | "vendor_discussion"
-        | "team_meeting"
-        | "other"
-      meeting_status: "upcoming" | "completed" | "cancelled"
-      access_tier: "standard" | "pilot" | "owner"
+        | 'one_on_one'
+        | 'executive_review'
+        | 'project_review'
+        | 'customer_meeting'
+        | 'sales_conversation'
+        | 'negotiation'
+        | 'difficult_conversation'
+        | 'feedback_conversation'
+        | 'performance_conversation'
+        | 'interview'
+        | 'networking'
+        | 'presentation'
+        | 'vendor_discussion'
+        | 'team_meeting'
+        | 'other'
+      meeting_status: 'upcoming' | 'completed' | 'cancelled'
       meter_kind:
-        | "person_research"
-        | "deep_research"
-        | "meeting_brief"
-        | "quick_brief"
-        | "transcript_analysis"
-        | "document_analysis"
-        | "ai_coach_message"
-        | "message_adaptation"
-        | "source_ingest"
-        | "voice_transcription"
+        | 'person_research'
+        | 'deep_research'
+        | 'meeting_brief'
+        | 'quick_brief'
+        | 'transcript_analysis'
+        | 'document_analysis'
+        | 'ai_coach_message'
+        | 'message_adaptation'
+        | 'source_ingest'
+        | 'voice_transcription'
       observation_category:
-        | "communication"
-        | "decision"
-        | "trust"
-        | "friction"
-        | "priority"
-        | "preference"
-        | "context"
-        | "other"
-      observation_source_kind:
-        | "user"
-        | "debrief"
-        | "interaction"
-        | "ai_inference"
-        | "import"
-      observation_status: "proposed" | "active" | "dismissed"
-      plan_tier: "free" | "pro" | "team"
-      record_visibility: "private" | "shared"
+        | 'communication'
+        | 'decision'
+        | 'trust'
+        | 'friction'
+        | 'priority'
+        | 'preference'
+        | 'context'
+        | 'other'
+      observation_source_kind: 'user' | 'debrief' | 'interaction' | 'ai_inference' | 'import'
+      observation_status: 'proposed' | 'active' | 'dismissed'
+      plan_tier: 'free' | 'pro' | 'team'
+      record_visibility: 'private' | 'shared'
       relationship_type:
-        | "manager"
-        | "report"
-        | "skip_level"
-        | "peer"
-        | "cross_functional"
-        | "customer"
-        | "prospect"
-        | "vendor"
-        | "partner"
-        | "candidate"
-        | "mentor"
-        | "external"
-        | "other"
-      research_job_status:
-        | "queued"
-        | "running"
-        | "complete"
-        | "failed"
-        | "cancelled"
-        | "no_results"
+        | 'manager'
+        | 'report'
+        | 'skip_level'
+        | 'peer'
+        | 'cross_functional'
+        | 'customer'
+        | 'prospect'
+        | 'vendor'
+        | 'partner'
+        | 'candidate'
+        | 'mentor'
+        | 'external'
+        | 'other'
+      research_job_status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled' | 'no_results'
+      review_status: 'proposed' | 'confirmed' | 'rejected'
       source_access_status:
-        | "analyzed"
-        | "limited_access"
-        | "login_required"
-        | "paywall"
-        | "content_unavailable"
-        | "identity_uncertain"
-        | "unsupported"
-        | "error"
-        | "pending"
-      source_processing_status:
-        | "pending"
-        | "fetching"
-        | "extracting"
-        | "complete"
-        | "failed"
+        | 'analyzed'
+        | 'limited_access'
+        | 'login_required'
+        | 'paywall'
+        | 'content_unavailable'
+        | 'identity_uncertain'
+        | 'unsupported'
+        | 'error'
+        | 'pending'
+      source_processing_status: 'pending' | 'fetching' | 'extracting' | 'complete' | 'failed'
       source_type:
-        | "public_web"
-        | "user_url"
-        | "user_note"
-        | "user_pasted_text"
-        | "document"
-        | "pdf"
-        | "transcript"
-        | "calendar"
-        | "email"
-        | "contact"
-        | "crm"
-        | "company_bio"
-        | "conference"
-        | "article"
-        | "podcast"
-        | "video"
-        | "github"
-        | "social_public"
-        | "licensed_enrichment"
-        | "other"
+        | 'public_web'
+        | 'user_url'
+        | 'user_note'
+        | 'user_pasted_text'
+        | 'document'
+        | 'pdf'
+        | 'transcript'
+        | 'calendar'
+        | 'email'
+        | 'contact'
+        | 'crm'
+        | 'company_bio'
+        | 'conference'
+        | 'article'
+        | 'podcast'
+        | 'video'
+        | 'github'
+        | 'social_public'
+        | 'licensed_enrichment'
+        | 'other'
       subscription_status:
-        | "trialing"
-        | "active"
-        | "past_due"
-        | "canceled"
-        | "incomplete"
-        | "incomplete_expired"
-        | "unpaid"
-        | "paused"
-      theme_preference: "pearl" | "obsidian" | "system"
+        | 'trialing'
+        | 'active'
+        | 'past_due'
+        | 'canceled'
+        | 'incomplete'
+        | 'incomplete_expired'
+        | 'unpaid'
+        | 'paused'
+      theme_preference: 'pearl' | 'obsidian' | 'system'
       usage_kind:
-        | "meeting_brief"
-        | "coach_message"
-        | "message_adaptation"
-        | "debrief"
-        | "person_created"
-      workspace_kind: "personal" | "team" | "enterprise"
-      workspace_role: "owner" | "admin" | "member"
+        'meeting_brief' | 'coach_message' | 'message_adaptation' | 'debrief' | 'person_created'
+      workspace_kind: 'personal' | 'team' | 'enterprise'
+      workspace_role: 'owner' | 'admin' | 'member'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2507,33 +2707,31 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -2542,23 +2740,22 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -2567,23 +2764,22 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -2592,249 +2788,218 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    keyof DefaultSchema['CompositeTypes'] | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
+      access_tier: ['standard', 'pilot', 'owner'],
       artifact_kind: [
-        "meeting_brief",
-        "quick_brief",
-        "debrief",
-        "relationship_summary",
-        "message_adaptation",
-        "daily_focus",
-        "weekly_reflection",
-        "coach_message",
-        "memory_proposal",
-        "profile_narrative",
+        'meeting_brief',
+        'quick_brief',
+        'debrief',
+        'relationship_summary',
+        'message_adaptation',
+        'daily_focus',
+        'weekly_reflection',
+        'coach_message',
+        'memory_proposal',
+        'profile_narrative',
       ],
-      artifact_subject: ["person", "meeting", "interaction", "user", "none"],
-      assessment_status: ["in_progress", "completed", "abandoned"],
+      artifact_subject: ['person', 'meeting', 'interaction', 'user', 'none'],
+      assessment_status: ['in_progress', 'completed', 'abandoned'],
       attendee_role: [
-        "decision_maker",
-        "influencer",
-        "contributor",
-        "informed",
-        "presenter",
-        "other",
+        'decision_maker',
+        'influencer',
+        'contributor',
+        'informed',
+        'presenter',
+        'other',
       ],
-      calibration_rating: [
-        "very_accurate",
-        "mostly_accurate",
-        "partly_accurate",
-        "not_accurate",
+      calibration_rating: ['very_accurate', 'mostly_accurate', 'partly_accurate', 'not_accurate'],
+      coaching_style: ['concise', 'balanced', 'detailed', 'challenging', 'supportive'],
+      commitment_owner: ['user', 'person', 'shared'],
+      commitment_status: ['open', 'done', 'dropped', 'later', 'cancelled'],
+      conversation_processing_status: ['pending', 'processing', 'ready', 'failed'],
+      conversation_source: [
+        'typed_notes',
+        'voice_note',
+        'uploaded_audio',
+        'pasted_transcript',
+        'uploaded_transcript',
+        'meeting_recording',
+        'imported',
       ],
-      coaching_style: [
-        "concise",
-        "balanced",
-        "detailed",
-        "challenging",
-        "supportive",
-      ],
-      commitment_owner: ["user", "person", "shared"],
-      commitment_status: ["open", "done", "dropped"],
-      evidence_level: ["confirmed", "observed", "inferred", "unknown"],
+      evidence_level: ['confirmed', 'observed', 'inferred', 'unknown'],
       fact_kind: [
-        "current_role",
-        "current_organization",
-        "prior_role",
-        "education",
-        "expertise",
-        "theme",
-        "publication",
-        "appearance",
-        "location",
-        "communication_signal",
-        "other",
+        'current_role',
+        'current_organization',
+        'prior_role',
+        'education',
+        'expertise',
+        'theme',
+        'publication',
+        'appearance',
+        'location',
+        'communication_signal',
+        'other',
       ],
-      feedback_rating: ["yes", "partly", "no"],
+      feedback_rating: ['yes', 'partly', 'no'],
       identity_match_status: [
-        "confirmed",
-        "probable",
-        "ambiguous",
-        "no_match",
-        "conflicting",
-        "unreviewed",
+        'confirmed',
+        'probable',
+        'ambiguous',
+        'no_match',
+        'conflicting',
+        'unreviewed',
       ],
-      integration_provider: ["google", "microsoft"],
-      integration_status: [
-        "connected",
-        "expired",
-        "revoked",
-        "error",
-        "admin_consent_required",
-      ],
-      interaction_kind: [
-        "meeting",
-        "call",
-        "email",
-        "message",
-        "informal",
-        "other",
-      ],
+      integration_provider: ['google', 'microsoft'],
+      integration_status: ['connected', 'expired', 'revoked', 'error', 'admin_consent_required'],
+      interaction_kind: ['meeting', 'call', 'email', 'message', 'informal', 'other'],
+      loop_kind: ['commitment', 'question', 'follow_up'],
       meeting_kind: [
-        "one_on_one",
-        "executive_review",
-        "project_review",
-        "customer_meeting",
-        "sales_conversation",
-        "negotiation",
-        "difficult_conversation",
-        "feedback_conversation",
-        "performance_conversation",
-        "interview",
-        "networking",
-        "presentation",
-        "vendor_discussion",
-        "team_meeting",
-        "other",
+        'one_on_one',
+        'executive_review',
+        'project_review',
+        'customer_meeting',
+        'sales_conversation',
+        'negotiation',
+        'difficult_conversation',
+        'feedback_conversation',
+        'performance_conversation',
+        'interview',
+        'networking',
+        'presentation',
+        'vendor_discussion',
+        'team_meeting',
+        'other',
       ],
-      meeting_status: ["upcoming", "completed", "cancelled"],
+      meeting_status: ['upcoming', 'completed', 'cancelled'],
       meter_kind: [
-        "person_research",
-        "deep_research",
-        "meeting_brief",
-        "quick_brief",
-        "transcript_analysis",
-        "document_analysis",
-        "ai_coach_message",
-        "message_adaptation",
-        "source_ingest",
+        'person_research',
+        'deep_research',
+        'meeting_brief',
+        'quick_brief',
+        'transcript_analysis',
+        'document_analysis',
+        'ai_coach_message',
+        'message_adaptation',
+        'source_ingest',
+        'voice_transcription',
       ],
       observation_category: [
-        "communication",
-        "decision",
-        "trust",
-        "friction",
-        "priority",
-        "preference",
-        "context",
-        "other",
+        'communication',
+        'decision',
+        'trust',
+        'friction',
+        'priority',
+        'preference',
+        'context',
+        'other',
       ],
-      observation_source_kind: [
-        "user",
-        "debrief",
-        "interaction",
-        "ai_inference",
-        "import",
-      ],
-      observation_status: ["proposed", "active", "dismissed"],
-      plan_tier: ["free", "pro", "team"],
-      record_visibility: ["private", "shared"],
+      observation_source_kind: ['user', 'debrief', 'interaction', 'ai_inference', 'import'],
+      observation_status: ['proposed', 'active', 'dismissed'],
+      plan_tier: ['free', 'pro', 'team'],
+      record_visibility: ['private', 'shared'],
       relationship_type: [
-        "manager",
-        "report",
-        "skip_level",
-        "peer",
-        "cross_functional",
-        "customer",
-        "prospect",
-        "vendor",
-        "partner",
-        "candidate",
-        "mentor",
-        "external",
-        "other",
+        'manager',
+        'report',
+        'skip_level',
+        'peer',
+        'cross_functional',
+        'customer',
+        'prospect',
+        'vendor',
+        'partner',
+        'candidate',
+        'mentor',
+        'external',
+        'other',
       ],
-      research_job_status: [
-        "queued",
-        "running",
-        "complete",
-        "failed",
-        "cancelled",
-        "no_results",
-      ],
+      research_job_status: ['queued', 'running', 'complete', 'failed', 'cancelled', 'no_results'],
+      review_status: ['proposed', 'confirmed', 'rejected'],
       source_access_status: [
-        "analyzed",
-        "limited_access",
-        "login_required",
-        "paywall",
-        "content_unavailable",
-        "identity_uncertain",
-        "unsupported",
-        "error",
-        "pending",
+        'analyzed',
+        'limited_access',
+        'login_required',
+        'paywall',
+        'content_unavailable',
+        'identity_uncertain',
+        'unsupported',
+        'error',
+        'pending',
       ],
-      source_processing_status: [
-        "pending",
-        "fetching",
-        "extracting",
-        "complete",
-        "failed",
-      ],
+      source_processing_status: ['pending', 'fetching', 'extracting', 'complete', 'failed'],
       source_type: [
-        "public_web",
-        "user_url",
-        "user_note",
-        "user_pasted_text",
-        "document",
-        "pdf",
-        "transcript",
-        "calendar",
-        "email",
-        "contact",
-        "crm",
-        "company_bio",
-        "conference",
-        "article",
-        "podcast",
-        "video",
-        "github",
-        "social_public",
-        "licensed_enrichment",
-        "other",
+        'public_web',
+        'user_url',
+        'user_note',
+        'user_pasted_text',
+        'document',
+        'pdf',
+        'transcript',
+        'calendar',
+        'email',
+        'contact',
+        'crm',
+        'company_bio',
+        'conference',
+        'article',
+        'podcast',
+        'video',
+        'github',
+        'social_public',
+        'licensed_enrichment',
+        'other',
       ],
       subscription_status: [
-        "trialing",
-        "active",
-        "past_due",
-        "canceled",
-        "incomplete",
-        "incomplete_expired",
-        "unpaid",
-        "paused",
+        'trialing',
+        'active',
+        'past_due',
+        'canceled',
+        'incomplete',
+        'incomplete_expired',
+        'unpaid',
+        'paused',
       ],
-      theme_preference: ["pearl", "obsidian", "system"],
+      theme_preference: ['pearl', 'obsidian', 'system'],
       usage_kind: [
-        "meeting_brief",
-        "coach_message",
-        "message_adaptation",
-        "debrief",
-        "person_created",
+        'meeting_brief',
+        'coach_message',
+        'message_adaptation',
+        'debrief',
+        'person_created',
       ],
-      workspace_kind: ["personal", "team", "enterprise"],
-      workspace_role: ["owner", "admin", "member"],
+      workspace_kind: ['personal', 'team', 'enterprise'],
+      workspace_role: ['owner', 'admin', 'member'],
     },
   },
 } as const

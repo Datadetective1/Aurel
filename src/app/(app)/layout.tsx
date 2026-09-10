@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app/app-shell'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
+import { resolveFace } from '@/lib/conversations/avatars'
 
 /**
  * Belt and braces: the signed-in surface is never indexable.
@@ -29,13 +30,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .maybeSingle()
 
   await recordSession(supabase, user.id, profile.last_seen_at)
+  const face = await resolveFace(supabase, profile)
 
   return (
     <AppShell
       user={{
         name: profile.preferred_name || profile.full_name || 'You',
         email: user.email ?? '',
-        avatarUrl: profile.avatar_url,
+        avatarUrl: face,
         plan: subscription?.plan ?? 'free',
       }}
     >

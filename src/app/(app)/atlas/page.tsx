@@ -3,12 +3,21 @@ import type { Metadata } from 'next'
 import { Building2, Compass, TrendingDown, UserPlus } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, EmptyState, Eyebrow, Panel, Rule, SectionHeader } from '@/components/ui/primitives'
+import {
+  Badge,
+  Container,
+  EmptyState,
+  Eyebrow,
+  Panel,
+  Rule,
+  SectionHeader,
+} from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
 import { isOverdueIn } from '@/lib/tz'
 import { brand } from '@/lib/brand'
+import { resolveFaces } from '@/lib/conversations/avatars'
 
 export const metadata: Metadata = {
   title: 'Relationship Atlas',
@@ -35,7 +44,7 @@ export default async function AtlasPage() {
     supabase
       .from('people')
       .select(
-        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, organizations(id, name)',
+        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, avatar_path, organizations(id, name)',
       )
       .eq('user_id', user.id)
       .is('archived_at', null)
@@ -45,8 +54,11 @@ export default async function AtlasPage() {
       .from('commitments')
       .select('person_id, due_on')
       .eq('user_id', user.id)
-      .eq('status', 'open'),
+      .eq('status', 'open')
+      .eq('review_status', 'confirmed'),
   ])
+
+  const faces = await resolveFaces(supabase, people ?? [], (p) => p.id)
 
   const list = people ?? []
 
@@ -126,10 +138,10 @@ export default async function AtlasPage() {
                 {goingQuiet.length > 0 ? (
                   <Panel className="p-5">
                     <div className="flex items-center gap-2">
-                      <TrendingDown className="size-4 text-caution" aria-hidden="true" />
-                      <p className="text-sm font-medium text-ink">Going quiet</p>
+                      <TrendingDown className="text-caution size-4" aria-hidden="true" />
+                      <p className="text-ink text-sm font-medium">Going quiet</p>
                     </div>
-                    <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                    <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
                       Relationships you marked important with no recent contact.
                     </p>
                     <ul className="mt-4 grid gap-2.5">
@@ -137,13 +149,17 @@ export default async function AtlasPage() {
                         <li key={person.id}>
                           <Link
                             href={`/people/${person.id}`}
-                            className="flex items-center gap-2.5 text-sm text-ink-secondary hover:text-ink"
+                            className="text-ink-secondary hover:text-ink flex items-center gap-2.5 text-sm"
                           >
-                            <Avatar name={person.full_name} size="xs" />
+                            <Avatar
+                              name={person.full_name}
+                              src={faces.get(person.id) ?? null}
+                              size="xs"
+                            />
                             <span className="min-w-0 flex-1 truncate">
                               {person.preferred_name || person.full_name}
                             </span>
-                            <span className="shrink-0 text-xs text-ink-faint">
+                            <span className="text-ink-faint shrink-0 text-xs">
                               {days === null ? 'never' : `${days}d`}
                             </span>
                           </Link>
@@ -156,10 +172,10 @@ export default async function AtlasPage() {
                 {withOverdue.length > 0 ? (
                   <Panel className="p-5">
                     <div className="flex items-center gap-2">
-                      <TrendingDown className="size-4 text-critical" aria-hidden="true" />
-                      <p className="text-sm font-medium text-ink">Overdue promises</p>
+                      <TrendingDown className="text-critical size-4" aria-hidden="true" />
+                      <p className="text-ink text-sm font-medium">Overdue promises</p>
                     </div>
-                    <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                    <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
                       Something is past its date with these people.
                     </p>
                     <ul className="mt-4 grid gap-2.5">
@@ -167,9 +183,13 @@ export default async function AtlasPage() {
                         <li key={person.id}>
                           <Link
                             href={`/people/${person.id}`}
-                            className="flex items-center gap-2.5 text-sm text-ink-secondary hover:text-ink"
+                            className="text-ink-secondary hover:text-ink flex items-center gap-2.5 text-sm"
                           >
-                            <Avatar name={person.full_name} size="xs" />
+                            <Avatar
+                              name={person.full_name}
+                              src={faces.get(person.id) ?? null}
+                              size="xs"
+                            />
                             <span className="min-w-0 flex-1 truncate">
                               {person.preferred_name || person.full_name}
                             </span>
@@ -193,26 +213,30 @@ export default async function AtlasPage() {
               {organisations.map((org) => (
                 <div key={org.name}>
                   <div className="flex items-center gap-2">
-                    <Building2 className="size-4 text-ink-faint" aria-hidden="true" />
-                    <h2 className="font-display text-lg text-ink">{org.name}</h2>
-                    <span className="text-xs text-ink-muted">
+                    <Building2 className="text-ink-faint size-4" aria-hidden="true" />
+                    <h2 className="font-display text-ink text-lg">{org.name}</h2>
+                    <span className="text-ink-muted text-xs">
                       {pluralise(org.people.length, 'person', 'people')}
                     </span>
                   </div>
 
-                  <ul className="mt-3 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line sm:grid-cols-2">
+                  <ul className="border-line bg-line mt-3 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border sm:grid-cols-2">
                     {org.people.map((person) => (
                       <li key={person.id} className="bg-bg">
                         <Link
                           href={`/people/${person.id}`}
-                          className="flex items-center gap-3 p-4 transition-colors hover:bg-bg-sunken"
+                          className="hover:bg-bg-sunken flex items-center gap-3 p-4 transition-colors"
                         >
-                          <Avatar name={person.full_name} src={person.avatar_url} size="sm" />
+                          <Avatar
+                            name={person.full_name}
+                            src={faces.get(person.id) ?? null}
+                            size="sm"
+                          />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm text-ink">
+                            <span className="text-ink block truncate text-sm">
                               {person.preferred_name || person.full_name}
                             </span>
-                            <span className="block truncate text-xs text-ink-muted">
+                            <span className="text-ink-muted block truncate text-xs">
                               {person.job_title ?? person.relationship_type.replace(/_/g, ' ')}
                             </span>
                           </span>
@@ -221,7 +245,7 @@ export default async function AtlasPage() {
                               {openByPerson.get(person.id)} open
                             </Badge>
                           ) : person.last_interaction_at ? (
-                            <span className="shrink-0 text-xs text-ink-faint">
+                            <span className="text-ink-faint shrink-0 text-xs">
                               {relativeDay(person.last_interaction_at, timeZone, now)}
                             </span>
                           ) : null}
@@ -234,15 +258,19 @@ export default async function AtlasPage() {
 
               {unaffiliated.length > 0 ? (
                 <div>
-                  <h2 className="font-display text-lg text-ink">No organization recorded</h2>
+                  <h2 className="font-display text-ink text-lg">No organization recorded</h2>
                   <ul className="mt-3 flex flex-wrap gap-2">
                     {unaffiliated.map((person) => (
                       <li key={person.id}>
                         <Link
                           href={`/people/${person.id}`}
-                          className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-ink-secondary hover:border-line-strong hover:text-ink"
+                          className="border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
                         >
-                          <Avatar name={person.full_name} size="xs" />
+                          <Avatar
+                            name={person.full_name}
+                            src={faces.get(person.id) ?? null}
+                            size="xs"
+                          />
                           {person.preferred_name || person.full_name}
                         </Link>
                       </li>
