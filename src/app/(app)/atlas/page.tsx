@@ -1,17 +1,11 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Building2, Compass, TrendingDown, UserPlus } from 'lucide-react'
+import { Building2, TrendingDown, UserPlus } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
+import { IllustratedEmpty } from '@/components/app/empty-visual'
+import { PersonNode, type PersonNodeData } from '@/components/app/person-node'
 import { Button } from '@/components/ui/button'
-import {
-  Badge,
-  Container,
-  EmptyState,
-  Eyebrow,
-  Panel,
-  Rule,
-  SectionHeader,
-} from '@/components/ui/primitives'
+import { Badge, Container, Eyebrow, Panel, Rule, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
@@ -100,6 +94,29 @@ export default async function AtlasPage() {
 
   const withOverdue = list.filter((p) => (overdueByPerson.get(p.id) ?? 0) > 0)
 
+  // A face on the map, with the one fact that says how the relationship is
+  // doing: what is overdue, what is open, or when you last spoke.
+  const node = (person: (typeof list)[number]): PersonNodeData => {
+    const open = openByPerson.get(person.id) ?? 0
+    const overdue = overdueByPerson.get(person.id) ?? 0
+    return {
+      id: person.id,
+      name: person.preferred_name || person.full_name,
+      fullName: person.full_name,
+      src: faces.get(person.id) ?? null,
+      title: person.job_title,
+      company: person.organizations?.name ?? null,
+      status: overdue
+        ? `${overdue} overdue`
+        : open
+          ? `${open} open`
+          : person.last_interaction_at
+            ? `Last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
+            : 'No contact recorded',
+      statusTone: overdue ? 'critical' : open ? 'caution' : 'neutral',
+    }
+  }
+
   return (
     <Container size="default" className="py-8 sm:py-12">
       <SectionHeader
@@ -110,9 +127,10 @@ export default async function AtlasPage() {
       />
 
       {list.length === 0 ? (
-        <EmptyState
+        <IllustratedEmpty
           className="mt-10"
-          icon={<Compass className="size-6" />}
+          subject="atlas"
+          tone="wash"
           title="Nothing to map yet"
           // "Atlas" tells a new user nothing, and neither did the old copy.
           // What it is for is the part worth saying: this is the view that
@@ -154,7 +172,7 @@ export default async function AtlasPage() {
                             <Avatar
                               name={person.full_name}
                               src={faces.get(person.id) ?? null}
-                              size="xs"
+                              size="sm"
                             />
                             <span className="min-w-0 flex-1 truncate">
                               {person.preferred_name || person.full_name}
@@ -188,7 +206,7 @@ export default async function AtlasPage() {
                             <Avatar
                               name={person.full_name}
                               src={faces.get(person.id) ?? null}
-                              size="xs"
+                              size="sm"
                             />
                             <span className="min-w-0 flex-1 truncate">
                               {person.preferred_name || person.full_name}
@@ -220,36 +238,10 @@ export default async function AtlasPage() {
                     </span>
                   </div>
 
-                  <ul className="border-line bg-line mt-3 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border sm:grid-cols-2">
+                  <ul className="mt-3 flex flex-wrap gap-1">
                     {org.people.map((person) => (
-                      <li key={person.id} className="bg-bg">
-                        <Link
-                          href={`/people/${person.id}`}
-                          className="hover:bg-bg-sunken flex items-center gap-3 p-4 transition-colors"
-                        >
-                          <Avatar
-                            name={person.full_name}
-                            src={faces.get(person.id) ?? null}
-                            size="sm"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="text-ink block truncate text-sm">
-                              {person.preferred_name || person.full_name}
-                            </span>
-                            <span className="text-ink-muted block truncate text-xs">
-                              {person.job_title ?? person.relationship_type.replace(/_/g, ' ')}
-                            </span>
-                          </span>
-                          {(openByPerson.get(person.id) ?? 0) > 0 ? (
-                            <Badge tone={overdueByPerson.get(person.id) ? 'critical' : 'neutral'}>
-                              {openByPerson.get(person.id)} open
-                            </Badge>
-                          ) : person.last_interaction_at ? (
-                            <span className="text-ink-faint shrink-0 text-xs">
-                              {relativeDay(person.last_interaction_at, timeZone, now)}
-                            </span>
-                          ) : null}
-                        </Link>
+                      <li key={person.id}>
+                        <PersonNode person={node(person)} />
                       </li>
                     ))}
                   </ul>
@@ -259,20 +251,10 @@ export default async function AtlasPage() {
               {unaffiliated.length > 0 ? (
                 <div>
                   <h2 className="font-display text-ink text-lg">No organization recorded</h2>
-                  <ul className="mt-3 flex flex-wrap gap-2">
+                  <ul className="mt-3 flex flex-wrap gap-1">
                     {unaffiliated.map((person) => (
                       <li key={person.id}>
-                        <Link
-                          href={`/people/${person.id}`}
-                          className="border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
-                        >
-                          <Avatar
-                            name={person.full_name}
-                            src={faces.get(person.id) ?? null}
-                            size="xs"
-                          />
-                          {person.preferred_name || person.full_name}
-                        </Link>
+                        <PersonNode person={node(person)} />
                       </li>
                     ))}
                   </ul>

@@ -21,8 +21,8 @@ import {
 } from '@/components/app/conversation-controls'
 import { ConversationParticipants } from '@/components/app/conversation-participants'
 import { ConversationReview } from '@/components/app/conversation-review'
-import { EmptyVisual } from '@/components/app/empty-visual'
-import { FaceStack } from '@/components/app/face-stack'
+import { Illustration } from '@/components/brand/illustrations'
+import { RoomStrip } from '@/components/app/room-strip'
 import { LoopList } from '@/components/app/loop-list'
 import { AddLoop } from '@/components/app/add-loop'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
@@ -34,6 +34,7 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { resolveFaces } from '@/lib/conversations/avatars'
 import { getConversation, listDecisions, listLoops } from '@/lib/conversations/queries'
+import { loadConversationRoom } from '@/lib/conversations/room'
 import { unknownSpeakers } from '@/lib/conversations/speakers'
 import { formatDate, formatTime, pluralise } from '@/lib/format'
 import { brand } from '@/lib/brand'
@@ -128,6 +129,7 @@ export default async function ConversationPage({
   ])
 
   const text = (row?.transcript ?? row?.raw_notes ?? '').trim()
+  const roomPeople = await loadConversationRoom(supabase, user.id, id)
   const kept = confirmedLoops.filter((l) => l.reviewStatus === 'confirmed')
   const openKept = kept.filter((l) => l.status === 'open' || l.status === 'later')
   const closedKept = kept.filter((l) => l.status !== 'open' && l.status !== 'later')
@@ -205,31 +207,48 @@ export default async function ConversationPage({
       ) : null}
 
       {/* --- header --------------------------------------------------------------- */}
-      <header className="mt-5 flex flex-wrap items-start gap-5">
-        {conversation.participants.length > 0 ? (
-          <FaceStack people={conversation.participants} size="lg" max={4} className="shrink-0" />
-        ) : (
-          <EmptyVisual subject="faces" className="h-16 w-24" />
-        )}
-        <div className="min-w-0 flex-1">
-          <Eyebrow>
-            {formatDate(conversation.occurredAt, timeZone)} ·{' '}
-            {formatTime(conversation.occurredAt, timeZone)}
-            {conversation.durationSeconds
-              ? ` · ${Math.max(1, Math.round(conversation.durationSeconds / 60))} min`
-              : ''}
-          </Eyebrow>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-ink text-3xl sm:text-4xl">{conversation.title}</h1>
-            <RetitleForm interactionId={id} title={conversation.title} />
-          </div>
+      <header className="mt-5">
+        <Eyebrow>
+          {formatDate(conversation.occurredAt, timeZone)} ·{' '}
+          {formatTime(conversation.occurredAt, timeZone)}
+          {conversation.durationSeconds
+            ? ` · ${Math.max(1, Math.round(conversation.durationSeconds / 60))} min`
+            : ''}
+        </Eyebrow>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h1 className="font-display text-ink text-3xl sm:text-4xl">{conversation.title}</h1>
+          <RetitleForm interactionId={id} title={conversation.title} />
+        </div>
+
+        {/* Who this was with, as faces. A one-to-one gets a portrait with the
+            person's role and company; a few people get cards; a crowd gets a
+            stack. A conversation nobody is attached to yet says so with a
+            drawing, not a blank. */}
+        <div className="border-line bg-surface mt-5 rounded-[var(--radius-lg)] border p-4 sm:p-5">
+          {roomPeople.length > 0 ? (
+            <RoomStrip
+              people={roomPeople}
+              hero={roomPeople.length === 1}
+              eyebrow={roomPeople.length === 1 ? 'With' : undefined}
+            />
+          ) : (
+            <div className="flex items-center gap-4">
+              <Illustration subject="faces" className="w-28 shrink-0" />
+              <p className="text-ink-muted text-sm leading-relaxed">
+                Nobody is attached to this conversation yet. Add who it was with and the promises
+                and questions below will follow them.
+              </p>
+            </div>
+          )}
           <ConversationParticipants
-            className="mt-3"
+            className="mt-4"
             interactionId={id}
             participants={participantPeople}
             people={pickable}
             suggestions={speakerSuggestions}
           />
+        </div>
+        <div className="min-w-0 flex-1">
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">{SOURCE_LABEL[conversation.sourceKind]}</Badge>
             {row?.meetings ? (

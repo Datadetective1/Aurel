@@ -15,14 +15,14 @@ import { AddContext } from '@/components/app/add-context'
 import { AddDocument } from '@/components/app/add-document'
 import { AddLoop } from '@/components/app/add-loop'
 import { ConversationCard } from '@/components/app/conversation-card'
-import { EmptyVisual } from '@/components/app/empty-visual'
+import { Illustration } from '@/components/brand/illustrations'
+import { PersonHero, type HeroFact } from '@/components/app/person-hero'
 import { LoopList } from '@/components/app/loop-list'
 import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
 import { ResearchPanel } from '@/components/app/research-panel'
 import { SourceRow, type SourceRowData } from '@/components/app/source-controls'
-import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
@@ -294,91 +294,82 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const currentFacts = (facts ?? []).filter((f) => f.is_current)
   const hasFootprint = currentFacts.length > 0
 
+  // The facts beside the portrait: what they are to you, how much they
+  // matter, when you last spoke. Both write paths now refuse a future date,
+  // but rows created before they did still carry one, and "Last spoke
+  // tomorrow" is a past-tense claim about something that has not happened.
+  const heroFacts: HeroFact[] = [
+    ...(person.is_demo ? [{ label: 'Demo', tone: 'outline' as const }] : []),
+    { label: RELATIONSHIP_LABEL[person.relationship_type] ?? 'Colleague' },
+    { label: `Importance ${person.relevance}/5`, tone: 'outline' },
+    person.last_interaction_at
+      ? {
+          label: isFuture(person.last_interaction_at)
+            ? `Logged for ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
+            : `Last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`,
+        }
+      : { label: 'No interactions yet', tone: 'outline' },
+    ...(nextMeeting
+      ? [
+          {
+            label: nextMeeting.scheduled_at
+              ? `Next ${relativeDay(nextMeeting.scheduled_at, timeZone, now).toLowerCase()}`
+              : 'Meeting planned',
+            tone: 'info' as const,
+            href: `/meetings/${nextMeeting.id}/brief`,
+          },
+        ]
+      : []),
+  ]
+
   return (
     <Container size="default" className="py-8 sm:py-12">
       {/* --- header ----------------------------------------------------------- */}
-      <header className="flex flex-wrap items-start gap-5">
-        <Link
-          href={`/people/${id}/edit`}
-          className="group relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
-          aria-label={face ? `Change ${name}'s photo` : `Add a photo of ${name}`}
-        >
-          <Avatar name={person.full_name} src={face} size="xl" />
-          {!face ? (
-            <span
-              aria-hidden="true"
-              className="border-line bg-surface text-ink-faint absolute -right-0.5 -bottom-0.5 inline-flex size-6 items-center justify-center rounded-full border opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-            >
-              +
-            </span>
-          ) : null}
-        </Link>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-ink text-3xl sm:text-4xl">{name}</h1>
-            {person.is_demo ? <Badge tone="outline">Demo</Badge> : null}
-          </div>
-
-          <p className="text-ink-secondary mt-1.5 text-sm">
-            {[person.job_title, person.organizations?.name].filter(Boolean).join(' · ') ||
-              'No role recorded'}
-          </p>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">{RELATIONSHIP_LABEL[person.relationship_type]}</Badge>
-            <Badge tone="outline">Importance {person.relevance}/5</Badge>
-            {/* Both write paths now refuse a future date, but rows created
-                before they did still carry one, and "Last spoke tomorrow" is a
-                past-tense claim about something that has not happened. Where
-                the record is dated ahead, say what is actually true: it is
-                logged for then. */}
-            {person.last_interaction_at ? (
-              <Badge tone="neutral">
-                {isFuture(person.last_interaction_at)
-                  ? `Logged for ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
-                  : `Last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`}
-              </Badge>
-            ) : (
-              <Badge tone="outline">No interactions yet</Badge>
-            )}
-          </div>
-        </div>
-
-        <Button asChild variant="ghost" size="icon" aria-label={`Edit ${name}`}>
-          <Link href={`/people/${id}/edit`}>
-            <Settings2 className="size-4" aria-hidden="true" />
-          </Link>
-        </Button>
-      </header>
-
-      {/* --- quick actions ---------------------------------------------------- */}
-      <div className="mt-7 flex flex-wrap gap-2">
-        <Button asChild>
-          <Link href={`/prepare?person=${id}`}>
-            <Sparkles className="size-4" aria-hidden="true" />
-            Prepare
-          </Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={`/coach?person=${id}`}>
-            <MessagesSquare className="size-4" aria-hidden="true" />
-            Ask about {name.split(' ')[0]}
-          </Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={`/coach?person=${id}&mode=adapt`}>
-            <MessageSquare className="size-4" aria-hidden="true" />
-            Draft a message
-          </Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href={`/conversations/new?person=${id}`}>
-            <Mic className="size-4" aria-hidden="true" />
-            Keep a conversation
-          </Link>
-        </Button>
-      </div>
+      {/* "This is Jonathan." before anything about Jonathan. The portrait is
+          the anchor of the page; the facts that place the relationship sit
+          beside it and the actions sit beneath the name. */}
+      <PersonHero
+        personId={id}
+        name={name}
+        fullName={person.full_name}
+        src={face}
+        title={person.job_title}
+        company={person.organizations?.name ?? null}
+        facts={heroFacts}
+        actions={
+          <>
+            <Button asChild>
+              <Link href={`/prepare?person=${id}`}>
+                <Sparkles className="size-4" aria-hidden="true" />
+                Prepare
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/coach?person=${id}`}>
+                <MessagesSquare className="size-4" aria-hidden="true" />
+                Ask about {name.split(' ')[0]}
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/coach?person=${id}&mode=adapt`}>
+                <MessageSquare className="size-4" aria-hidden="true" />
+                Draft a message
+              </Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/conversations/new?person=${id}`}>
+                <Mic className="size-4" aria-hidden="true" />
+                Keep a conversation
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="icon" aria-label={`Edit ${name}`}>
+              <Link href={`/people/${id}/edit`}>
+                <Settings2 className="size-4" aria-hidden="true" />
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       {/* --- what is between you right now ------------------------------------ */}
       {nextMeeting || loops.length > 0 ? (
@@ -717,8 +708,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             ))}
           </ul>
         ) : (
-          <div className="border-line mt-4 flex flex-col items-center gap-4 rounded-[var(--radius-lg)] border border-dashed px-5 py-8 text-center sm:flex-row sm:text-left">
-            <EmptyVisual subject="conversation" className="h-16 w-28" />
+          <div className="border-line bg-accent-wash/40 mt-4 flex flex-col items-center gap-5 rounded-[var(--radius-lg)] border border-dashed px-5 py-8 text-center sm:flex-row sm:text-left">
+            <Illustration subject="history" className="w-40 shrink-0 sm:w-44" />
             <div className="min-w-0 flex-1">
               <p className="text-ink-secondary text-sm leading-relaxed">
                 After you next speak with {name.split(' ')[0]}, keep the conversation: a voice note,

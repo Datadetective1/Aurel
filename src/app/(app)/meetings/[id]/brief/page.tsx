@@ -8,7 +8,7 @@ import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import type { PersonChoice } from '@/components/app/add-participants'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
 import { RegenerateBrief } from '@/components/app/regenerate-brief'
-import { FaceStack } from '@/components/app/face-stack'
+import { RoomStrip, roleLabel, type RoomPerson } from '@/components/app/room-strip'
 import { SinceLastTime } from '@/components/app/since-last-time'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
@@ -16,6 +16,7 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
 import { resolveFaces } from '@/lib/conversations/avatars'
+import { relationshipLabel } from '@/lib/conversations/room'
 import { listConversations, listDecisions, listLoops } from '@/lib/conversations/queries'
 import { formatDate, formatTime, relativeDay } from '@/lib/format'
 import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
@@ -61,7 +62,9 @@ export default async function BriefPage({
 
   const { data: attendees } = await supabase
     .from('meeting_attendees')
-    .select('person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path)')
+    .select(
+      'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, organizations(name))',
+    )
     .eq('user_id', user.id)
     .eq('meeting_id', id)
 
@@ -70,12 +73,21 @@ export default async function BriefPage({
     (attendees ?? []).map((a) => a.people).filter((p): p is NonNullable<typeof p> => Boolean(p)),
     (p) => p.id,
   )
-  const room = (attendees ?? [])
+  // The room, with what places each person in it. Decision makers first,
+  // because that is the order the room is worked in.
+  const roleWeight = (role: string | null) =>
+    role === 'decision_maker' ? 4 : role === 'influencer' ? 3 : role === 'presenter' ? 2 : 0
+  const roomPeople: RoomPerson[] = (attendees ?? [])
     .filter((a) => a.people)
+    .sort((a, b) => roleWeight(b.role) - roleWeight(a.role))
     .map((a) => ({
       id: a.person_id,
       name: a.people!.preferred_name || a.people!.full_name,
+      fullName: a.people!.full_name,
       src: attendeeFaces.get(a.person_id) ?? null,
+      title: a.people!.job_title,
+      company: a.people!.organizations?.name ?? null,
+      context: roleLabel(a.role) || relationshipLabel(a.people!.relationship_type),
     }))
 
   const citations: BriefCitation[] = artifact
@@ -240,12 +252,10 @@ export default async function BriefPage({
 
         <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">{meeting.title}</h1>
 
-        {room.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <FaceStack people={room} size="sm" max={5} />
-            <p className="text-ink-secondary text-sm">With {room.map((p) => p.name).join(', ')}</p>
-          </div>
-        ) : null}
+        {/* The room, as faces. One person gets a portrait with their role and
+            company; a few get cards; many get a stack. Preparing for Jonathan
+            should look like preparing for Jonathan. */}
+        <RoomStrip people={roomPeople} hero={roomPeople.length === 1} className="mt-6" />
       </header>
 
       {lastConversation || loopsForRoom.length > 0 || roomDecisions.length > 0 ? (
@@ -297,6 +307,7 @@ export default async function BriefPage({
               grounded={artifact!.grounded_fallback}
               meetingId={id}
               cues={cues}
+              faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
             />
           </div>
 

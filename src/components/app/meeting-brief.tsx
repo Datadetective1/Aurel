@@ -161,7 +161,12 @@ function ListeningSection({ cues, level }: { cues: ListeningCue[]; level: Sectio
     <BriefSection
       level={level}
       title="What to listen for"
-      icon={<Ear className={level === 'primary' ? 'text-accent size-4' : 'text-accent size-3'} aria-hidden="true" />}
+      icon={
+        <Ear
+          className={level === 'primary' ? 'text-accent size-4' : 'text-accent size-3'}
+          aria-hidden="true"
+        />
+      }
     >
       <p className="text-ink-muted mt-2 text-xs leading-relaxed">
         Open in your record. {brand.name} is not predicting what anyone will say.
@@ -210,10 +215,13 @@ export function GlanceBriefView({
   meetingId,
   unmatchedAttendees,
   addablePeople,
+  faces = {},
 }: {
   brief: NormalizedBrief
   /** The room, resolved by the page: brief participants, or the attendee list. */
   room: { id: string | null; name: string }[]
+  /** Signed photo URLs by person id, resolved by the page. */
+  faces?: Record<string, string | null>
   /** The one warning worth interrupting for, if there is one. */
   alert: GlanceAlert | null
   meetingId: string
@@ -237,7 +245,7 @@ export function GlanceBriefView({
           <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2.5">
             {room.map((person, i) => (
               <li key={person.id ?? `${person.name}-${i}`} className="flex items-center gap-2">
-                <Avatar name={person.name} size="xs" />
+                <Avatar name={person.name} src={person.id ? faces[person.id] : null} size="sm" />
                 <span className="text-ink text-sm">{person.name}</span>
               </li>
             ))}
@@ -350,9 +358,12 @@ export function GlanceBriefView({
 export function QuickBriefView({
   brief,
   cues,
+  faces = {},
 }: {
   brief: NormalizedBrief
   cues: ListeningCue[]
+  /** Signed photo URLs by person id, resolved by the page. */
+  faces?: Record<string, string | null>
 }) {
   return (
     <div className="grid gap-7">
@@ -394,7 +405,11 @@ export function QuickBriefView({
           <ul className="mt-3 grid gap-3.5">
             {brief.participants.map((participant, i) => (
               <li key={participant.personId ?? i} className="flex gap-3">
-                <Avatar name={participant.name} size="xs" className="mt-0.5" />
+                <Avatar
+                  name={participant.name}
+                  src={participant.personId ? faces[participant.personId] : null}
+                  size="md"
+                />
                 <div className="min-w-0">
                   <h3 className="text-ink text-sm font-medium">{participant.name}</h3>
                   {/* Guidance first: it is the actionable half. Where there is
@@ -442,9 +457,7 @@ export function QuickBriefView({
                     difference between a guess and a citation, so it is legible
                     here. */}
                 {objection.basis ? (
-                  <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
-                    {objection.basis}
-                  </p>
+                  <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">{objection.basis}</p>
                 ) : null}
               </div>
             ))}
@@ -490,7 +503,10 @@ export function QuickBriefView({
           </h2>
           <ul className="mt-3 grid gap-2">
             {brief.uncertainties.slice(0, 2).map((item, i) => (
-              <li key={i} className="text-ink-secondary flex gap-2.5 text-[0.8125rem] leading-relaxed">
+              <li
+                key={i}
+                className="text-ink-secondary flex gap-2.5 text-[0.8125rem] leading-relaxed"
+              >
                 <span aria-hidden="true" className="bg-caution/50 mt-2 h-px w-3 shrink-0" />
                 {item}
               </li>
@@ -512,12 +528,15 @@ export function MeetingBriefView({
   grounded,
   meetingId,
   cues,
+  faces = {},
 }: {
   brief: NormalizedBrief
   citations: BriefCitation[]
   grounded: boolean
   meetingId: string
   cues: ListeningCue[]
+  /** Signed photo URLs by person id, resolved by the page. */
+  faces?: Record<string, string | null>
 }) {
   return (
     <div>
@@ -595,7 +614,11 @@ export function MeetingBriefView({
             {brief.participants.map((participant, index) => (
               <Panel key={participant.personId ?? index} className="p-5">
                 <div className="flex flex-wrap items-start gap-3">
-                  <Avatar name={participant.name} size="sm" />
+                  <Avatar
+                    name={participant.name}
+                    src={participant.personId ? faces[participant.personId] : null}
+                    size="lg"
+                  />
                   <div className="min-w-0 flex-1">
                     <h3 className="text-ink font-medium">
                       {participant.personId ? (
@@ -778,9 +801,7 @@ export function MeetingBriefView({
                   {objection.response}
                 </p>
                 {objection.basis ? (
-                  <p className="text-ink-muted mt-2.5 text-xs leading-relaxed">
-                    {objection.basis}
-                  </p>
+                  <p className="text-ink-muted mt-2.5 text-xs leading-relaxed">{objection.basis}</p>
                 ) : null}
               </Panel>
             ))}

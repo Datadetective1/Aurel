@@ -70,7 +70,13 @@ export interface CoachAnswer {
    * UI can show a face and a card rather than a list of labels. Filled from
    * the citations after the answer is composed; never from the model.
    */
-  people?: { id: string; name: string; src: string | null }[]
+  people?: {
+    id: string
+    name: string
+    src: string | null
+    title?: string | null
+    company?: string | null
+  }[]
   conversations?: { id: string; title: string; occurredAt: string }[]
 }
 
@@ -378,7 +384,9 @@ async function groundAnswer(
     personIds.length
       ? supabase
           .from('people')
-          .select('id, full_name, preferred_name, avatar_url, avatar_path')
+          .select(
+            'id, full_name, preferred_name, avatar_url, avatar_path, job_title, organizations(name)',
+          )
           .eq('user_id', userId)
           .in('id', personIds)
       : Promise.resolve({
@@ -388,6 +396,8 @@ async function groundAnswer(
             preferred_name: string | null
             avatar_url: string | null
             avatar_path: string | null
+            job_title: string | null
+            organizations: { name: string } | null
           }[],
         }),
     interactionIds.length
@@ -408,6 +418,8 @@ async function groundAnswer(
       id: p.id,
       name: p.preferred_name || p.full_name,
       src: faces.get(p.id) ?? null,
+      title: p.job_title,
+      company: p.organizations?.name ?? null,
     })),
     conversations: (conversations ?? []).map((c) => ({
       id: c.id,

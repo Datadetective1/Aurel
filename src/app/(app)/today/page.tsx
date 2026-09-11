@@ -1,12 +1,14 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowRight, CalendarClock, Loader2, Mic, Sparkles, UserPlus } from 'lucide-react'
+import { ArrowRight, CalendarClock, Loader2, Mic, Sparkles } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { ConversationCard } from '@/components/app/conversation-card'
+import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { LoopList } from '@/components/app/loop-list'
+import { RelationshipCard } from '@/components/app/relationship-card'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, EmptyState, Eyebrow, Panel } from '@/components/ui/primitives'
+import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { MeetingCountdownCard } from '@/components/app/meeting-countdown'
 import {
@@ -161,6 +163,38 @@ export default async function TodayPage({
     (c) => c.processingStatus === 'ready' && c.pendingReview > 0 && !c.reviewedAt,
   )
 
+  /**
+   * THE NEXT CONVERSATION, AS A PERSON.
+   *
+   * The first meeting ahead that has somebody in it gets a card with their
+   * face, their role, what they last asked for and what is still open. The
+   * one about to start already has the countdown card, so the spotlight goes
+   * to the next one after it.
+   */
+  const spotlight =
+    (meetings ?? []).find(
+      (m) => (attendeesByMeeting.get(m.id) ?? []).length > 0 && m.id !== imminent?.meeting.id,
+    ) ?? null
+  const spotlightPeople = spotlight
+    ? (attendeesByMeeting.get(spotlight.id) ?? [])
+        .map((pid) => peopleMap.get(pid))
+        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+        .sort((a, b) => b.relevance - a.relevance)
+        .map((p) => ({
+          id: p.id,
+          name: p.displayName,
+          fullName: p.fullName,
+          src: faces.get(p.id) ?? null,
+          title: p.jobTitle,
+          company: p.organization,
+        }))
+    : []
+  const spotlightLast = spotlightPeople[0]
+    ? (await listConversations(supabase, user.id, { personId: spotlightPeople[0].id, limit: 1 }))[0]
+    : undefined
+  const spotlightIds = new Set(spotlightPeople.map((p) => p.id))
+  const spotlightLoops = loops.filter((l) => l.personId && spotlightIds.has(l.personId)).length
+
   const overdue = (commitments ?? []).filter((c) => isOverdueIn(c.due_on, timeZone, now))
   const dueToday = (commitments ?? []).filter((c) => c.due_on === today)
 
@@ -314,6 +348,30 @@ export default async function TodayPage({
         />
       ) : null}
 
+      {spotlight && spotlightPeople.length > 0 ? (
+        <RelationshipCard
+          className="mt-8"
+          meetingId={spotlight.id}
+          title={spotlight.title}
+          whenLabel={
+            spotlight.scheduled_at
+              ? `${relativeDay(spotlight.scheduled_at, timeZone, now)}, ${formatTime(spotlight.scheduled_at, timeZone)}`
+              : 'Unscheduled'
+          }
+          people={spotlightPeople}
+          lastTime={
+            spotlightLast
+              ? {
+                  text: spotlightLast.summary ?? spotlightLast.title,
+                  href: `/conversations/${spotlightLast.id}`,
+                }
+              : null
+          }
+          openLoops={spotlightLoops}
+          prepared={prepared.has(spotlight.id)}
+        />
+      ) : null}
+
       {/* The three things that make an empty account useful. Disappears on its
           own once they are done — see components/app/first-run. */}
       <FirstRun state={firstRun} className="mt-9" />
@@ -337,9 +395,10 @@ export default async function TodayPage({
       {/* Only once the checklist above has gone. Before that it would say the
           same thing twice, in two different shapes, on the same screen. */}
       {!hasAnything && firstRunComplete(firstRun) ? (
-        <EmptyState
+        <IllustratedEmpty
           className="mt-8"
-          icon={<UserPlus className="size-6" />}
+          subject="quiet"
+          tone="wash"
           title="A quiet day"
           description={`Nothing is scheduled and nothing is overdue. When you add a person or connect a meeting, ${brand.name} will have something to say here.`}
           action={
@@ -417,11 +476,7 @@ export default async function TodayPage({
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           {people.slice(0, 5).map((p) => (
                             <span key={p.id} className="flex items-center gap-1.5">
-                              <Avatar
-                                name={p.displayName}
-                                src={faces.get(p.id) ?? null}
-                                size="xs"
-                              />
+                              <Avatar name={p.fullName} src={faces.get(p.id) ?? null} size="sm" />
                               <span className="text-ink-muted text-xs">{p.displayName}</span>
                             </span>
                           ))}

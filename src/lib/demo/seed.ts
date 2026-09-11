@@ -256,6 +256,9 @@ export async function seedDemoData(
           relationship_type: person.relationshipType,
           relevance: person.relevance,
           notes: person.notes,
+          // An illustrated portrait, shipped with the product and plainly a
+          // drawing. Demo people are invented; nothing here is a likeness.
+          avatar_url: `/demo/faces/${person.key}.svg`,
           first_interaction_at: new Date(now - 180 * DAY).toISOString(),
           last_interaction_at: lastInteraction,
         })

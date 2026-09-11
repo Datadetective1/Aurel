@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowRight, Search, UserPlus } from 'lucide-react'
-import { Avatar } from '@/components/ui/avatar'
+import { Search, UserPlus } from 'lucide-react'
+import { IllustratedEmpty } from '@/components/app/empty-visual'
+import { PeopleCards, type PersonCardData } from '@/components/app/people-cards'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, EmptyState, Eyebrow, SectionHeader } from '@/components/ui/primitives'
+import { Container, Eyebrow, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { relativeDay, pluralise } from '@/lib/format'
@@ -53,24 +54,46 @@ export default async function PeoplePage() {
   const faces = await resolveFaces(supabase, list, (p) => p.id)
 
   // Counts that make the list scannable: what does Atturel actually know?
-  const [{ data: observations }, { data: commitments }] = await Promise.all([
-    ids.length
-      ? supabase
-          .from('observations')
-          .select('person_id, status')
-          .eq('user_id', user.id)
-          .in('person_id', ids)
-      : Promise.resolve({ data: [] as { person_id: string; status: string }[] }),
-    ids.length
-      ? supabase
-          .from('commitments')
-          .select('person_id')
-          .eq('user_id', user.id)
-          .eq('status', 'open')
-          .eq('review_status', 'confirmed')
-          .in('person_id', ids)
-      : Promise.resolve({ data: [] as { person_id: string | null }[] }),
-  ])
+  const [{ data: observations }, { data: commitments }, { data: nextMeetings }] = await Promise.all(
+    [
+      ids.length
+        ? supabase
+            .from('observations')
+            .select('person_id, status')
+            .eq('user_id', user.id)
+            .in('person_id', ids)
+        : Promise.resolve({ data: [] as { person_id: string; status: string }[] }),
+      ids.length
+        ? supabase
+            .from('commitments')
+            .select('person_id')
+            .eq('user_id', user.id)
+            .eq('status', 'open')
+            .eq('review_status', 'confirmed')
+            .in('person_id', ids)
+        : Promise.resolve({ data: [] as { person_id: string | null }[] }),
+      // The next time you will see each of them, if a meeting is on the books.
+      ids.length
+        ? supabase
+            .from('meeting_attendees')
+            .select('person_id, meetings!inner(scheduled_at, status)')
+            .eq('user_id', user.id)
+            .eq('meetings.status', 'upcoming')
+            .gte('meetings.scheduled_at', now.toISOString())
+            .in('person_id', ids)
+        : Promise.resolve({
+            data: [] as { person_id: string; meetings: { scheduled_at: string | null } | null }[],
+          }),
+    ],
+  )
+
+  const nextByPerson = new Map<string, string>()
+  for (const row of nextMeetings ?? []) {
+    const at = row.meetings?.scheduled_at
+    if (!at) continue
+    const current = nextByPerson.get(row.person_id)
+    if (!current || at < current) nextByPerson.set(row.person_id, at)
+  }
 
   const activeByPerson = new Map<string, number>()
   const proposedByPerson = new Map<string, number>()
@@ -87,6 +110,27 @@ export default async function PeoplePage() {
 
   // Only worth computing once there is enough to collide.
   const duplicates = list.length > 1 ? await findDuplicates() : []
+
+  const cards: PersonCardData[] = list.map((person) => {
+    const next = nextByPerson.get(person.id)
+    return {
+      id: person.id,
+      name: person.preferred_name || person.full_name,
+      fullName: person.full_name,
+      src: faces.get(person.id) ?? null,
+      title: person.job_title,
+      company: person.organizations?.name ?? null,
+      relationship: RELATIONSHIP_LABEL[person.relationship_type] ?? 'Other',
+      lastSpokeLabel: person.last_interaction_at
+        ? relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()
+        : null,
+      nextLabel: next ? `Next ${relativeDay(next, timeZone, now).toLowerCase()}` : null,
+      openLoops: openByPerson.get(person.id) ?? 0,
+      toReview: proposedByPerson.get(person.id) ?? 0,
+      learned: activeByPerson.get(person.id) ?? 0,
+      isDemo: person.is_demo,
+    }
+  })
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -116,9 +160,10 @@ export default async function PeoplePage() {
       ) : null}
 
       {list.length === 0 ? (
-        <EmptyState
+        <IllustratedEmpty
           className="mt-10"
-          icon={<UserPlus className="size-6" />}
+          subject="people"
+          tone="wash"
           title="Start with someone you work with often"
           // The old copy said research was something you could do; it did not
           // say Atturel does it for you, from three fields, which is the part
@@ -131,55 +176,7 @@ export default async function PeoplePage() {
           }
         />
       ) : (
-        <ul className="border-line bg-line mt-8 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
-          {list.map((person) => {
-            const name = person.preferred_name || person.full_name
-            const known = activeByPerson.get(person.id) ?? 0
-            const proposed = proposedByPerson.get(person.id) ?? 0
-            const open = openByPerson.get(person.id) ?? 0
-
-            return (
-              <li key={person.id} className="bg-bg">
-                <Link
-                  href={`/people/${person.id}`}
-                  className="hover:bg-bg-sunken flex items-center gap-4 p-4 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:p-5"
-                >
-                  <Avatar name={person.full_name} src={faces.get(person.id) ?? null} size="md" />
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                      <span className="text-ink font-medium">{name}</span>
-                      {person.is_demo ? <Badge tone="outline">Demo</Badge> : null}
-                      {proposed > 0 ? <Badge tone="accent">{proposed} to review</Badge> : null}
-                      {open > 0 ? (
-                        <Badge tone="caution">
-                          {open} open {open === 1 ? 'loop' : 'loops'}
-                        </Badge>
-                      ) : null}
-                    </div>
-
-                    <p className="text-ink-secondary mt-0.5 truncate text-sm">
-                      {[person.job_title, person.organizations?.name].filter(Boolean).join(' · ') ||
-                        RELATIONSHIP_LABEL[person.relationship_type]}
-                    </p>
-
-                    <p className="text-ink-muted mt-1 text-xs">
-                      {known > 0 ? `${pluralise(known, 'thing')} learned` : 'Nothing recorded yet'}
-                      {person.last_interaction_at
-                        ? ` · last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
-                        : ''}
-                    </p>
-                  </div>
-
-                  <div className="hidden shrink-0 items-center gap-3 sm:flex">
-                    <Badge tone="neutral">{RELATIONSHIP_LABEL[person.relationship_type]}</Badge>
-                    <ArrowRight className="text-ink-faint size-4" aria-hidden="true" />
-                  </div>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+        <PeopleCards people={cards} className="mt-8" />
       )}
 
       {list.length > 8 ? (

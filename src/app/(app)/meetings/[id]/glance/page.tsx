@@ -6,12 +6,14 @@ import { GlanceBriefView, type GlanceAlert } from '@/components/app/meeting-brie
 import type { PersonChoice } from '@/components/app/add-participants'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LiveCountdown } from '@/components/app/meeting-countdown'
+import { RoomStrip } from '@/components/app/room-strip'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
 import { formatTime, relativeDay } from '@/lib/format'
+import { loadMeetingRoom } from '@/lib/conversations/room'
 import { isOverdueIn } from '@/lib/tz'
 import { normalizeBrief, startProximity } from '@/lib/brief'
 
@@ -62,11 +64,14 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
 
   const brief = normalizeBrief(artifact.content)
 
-  const { data: attendees } = await supabase
-    .from('meeting_attendees')
-    .select('person_id, people(full_name, preferred_name)')
-    .eq('user_id', user.id)
-    .eq('meeting_id', id)
+  const [{ data: attendees }, roomPeople] = await Promise.all([
+    supabase
+      .from('meeting_attendees')
+      .select('person_id, people(full_name, preferred_name)')
+      .eq('user_id', user.id)
+      .eq('meeting_id', id),
+    loadMeetingRoom(supabase, user.id, id),
+  ])
 
   // The brief's own participant list is the better room: it is ordered by the
   // composer and carries the names as briefed. The attendee table is the
@@ -97,9 +102,7 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
       .maybeSingle()
 
     const invited = (calendarEvent?.attendees ?? []) as unknown as { personId?: string | null }[]
-    unmatchedAttendees = Array.isArray(invited)
-      ? invited.filter((a) => !a?.personId).length
-      : 0
+    unmatchedAttendees = Array.isArray(invited) ? invited.filter((a) => !a?.personId).length : 0
   }
 
   // --- the one warning worth interrupting for -------------------------------
@@ -126,7 +129,11 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
         text: chosen.description,
         note: [
           overdue ? 'Overdue' : 'Still open',
-          chosen.owner === 'user' ? 'you owe this' : chosen.owner === 'person' ? 'they owe this' : 'between you',
+          chosen.owner === 'user'
+            ? 'you owe this'
+            : chosen.owner === 'person'
+              ? 'they owe this'
+              : 'between you',
           chosen.due_on ? relativeDay(chosen.due_on, timeZone, now).toLowerCase() : null,
         ]
           .filter(Boolean)
@@ -187,6 +194,7 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
         <h1 className="font-display text-ink mt-2 text-2xl leading-tight sm:text-3xl">
           {meeting.title}
         </h1>
+        <RoomStrip people={roomPeople} className="mt-5" />
       </header>
 
       <BriefDepthNav meetingId={id} current="glance" className="mt-5" />
@@ -199,6 +207,7 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
           meetingId={id}
           unmatchedAttendees={unmatchedAttendees}
           addablePeople={addablePeople}
+          faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
         />
       </div>
 

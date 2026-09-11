@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { CalendarClock, CalendarPlus, CircleCheck } from 'lucide-react'
-import { Avatar } from '@/components/ui/avatar'
+import { CalendarPlus, CircleCheck } from 'lucide-react'
+import { IllustratedEmpty } from '@/components/app/empty-visual'
+import { FaceStack, type FaceStackPerson } from '@/components/app/face-stack'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, EmptyState, Eyebrow, SectionHeader } from '@/components/ui/primitives'
+import { Badge, Container, Eyebrow, SectionHeader } from '@/components/ui/primitives'
 import {
   UpcomingMeetings,
   type UpcomingAttendee,
@@ -12,6 +13,7 @@ import {
 import { requireOnboardedUser } from '@/lib/auth'
 import { getFirstRunState } from '@/lib/first-run'
 import { createClient } from '@/lib/supabase/server'
+import { resolveFaces } from '@/lib/conversations/avatars'
 import { formatTime, relativeDay } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
@@ -39,13 +41,19 @@ export default async function MeetingsPage() {
     ids.length
       ? supabase
           .from('meeting_attendees')
-          .select('meeting_id, people(full_name, preferred_name)')
+          .select('meeting_id, people(id, full_name, preferred_name, avatar_url, avatar_path)')
           .eq('user_id', user.id)
           .in('meeting_id', ids)
       : Promise.resolve({
           data: [] as {
             meeting_id: string
-            people: { full_name: string; preferred_name: string | null } | null
+            people: {
+              id: string
+              full_name: string
+              preferred_name: string | null
+              avatar_url: string | null
+              avatar_path: string | null
+            } | null
           }[],
         }),
     ids.length
@@ -58,11 +66,23 @@ export default async function MeetingsPage() {
       : Promise.resolve({ data: [] as { subject_id: string | null }[] }),
   ])
 
-  const namesByMeeting = new Map<string, string[]>()
+  // Faces for every row, signed once for the whole page.
+  const faces = await resolveFaces(
+    supabase,
+    (attendees ?? []).map((a) => a.people).filter((p): p is NonNullable<typeof p> => Boolean(p)),
+    (p) => p.id,
+  )
+  const peopleByMeeting = new Map<string, FaceStackPerson[]>()
   for (const a of attendees ?? []) {
-    const name = a.people?.preferred_name || a.people?.full_name
-    if (!name) continue
-    namesByMeeting.set(a.meeting_id, [...(namesByMeeting.get(a.meeting_id) ?? []), name])
+    if (!a.people) continue
+    peopleByMeeting.set(a.meeting_id, [
+      ...(peopleByMeeting.get(a.meeting_id) ?? []),
+      {
+        id: a.people.id,
+        name: a.people.preferred_name || a.people.full_name,
+        src: faces.get(a.people.id) ?? null,
+      },
+    ])
   }
 
   /**
@@ -132,9 +152,10 @@ export default async function MeetingsPage() {
       />
 
       {list.length === 0 ? (
-        <EmptyState
+        <IllustratedEmpty
           className="mt-10"
-          icon={<CalendarClock className="size-6" />}
+          subject="meetings"
+          tone="wash"
           title={
             firstRun.calendarConnected
               ? 'Nothing scheduled in the next two weeks'
@@ -174,18 +195,14 @@ export default async function MeetingsPage() {
         />
       ) : null}
 
-      <UpcomingMeetings
-        events={upcomingEvents}
-        timeZone={timeZone}
-        nowIso={now.toISOString()}
-      />
+      <UpcomingMeetings events={upcomingEvents} timeZone={timeZone} nowIso={now.toISOString()} />
 
       {upcoming.length > 0 ? (
         <section className="mt-10">
           <Eyebrow>Upcoming</Eyebrow>
           <MeetingList
             meetings={upcoming}
-            namesByMeeting={namesByMeeting}
+            peopleByMeeting={peopleByMeeting}
             prepared={prepared}
             timeZone={timeZone}
             now={now}
@@ -198,7 +215,7 @@ export default async function MeetingsPage() {
           <Eyebrow>Past</Eyebrow>
           <MeetingList
             meetings={past}
-            namesByMeeting={namesByMeeting}
+            peopleByMeeting={peopleByMeeting}
             prepared={prepared}
             timeZone={timeZone}
             now={now}
@@ -212,7 +229,7 @@ export default async function MeetingsPage() {
 
 function MeetingList({
   meetings,
-  namesByMeeting,
+  peopleByMeeting,
   prepared,
   timeZone,
   now,
@@ -226,7 +243,7 @@ function MeetingList({
     importance: number
     status: string
   }[]
-  namesByMeeting: Map<string, string[]>
+  peopleByMeeting: Map<string, FaceStackPerson[]>
   prepared: Set<string | null>
   /** The account holder's zone, so "Tomorrow" means their tomorrow. */
   timeZone: string
@@ -235,9 +252,9 @@ function MeetingList({
   past?: boolean
 }) {
   return (
-    <ul className="mt-4 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border border-line bg-line">
+    <ul className="border-line bg-line mt-4 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
       {meetings.map((meeting) => {
-        const names = namesByMeeting.get(meeting.id) ?? []
+        const people = peopleByMeeting.get(meeting.id) ?? []
         const isPrepared = prepared.has(meeting.id)
 
         return (
@@ -245,7 +262,7 @@ function MeetingList({
             <div className="flex flex-wrap items-start gap-4 p-5">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-ink-muted">
+                  <span className="text-ink-muted text-xs">
                     {meeting.scheduled_at
                       ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
                       : 'Unscheduled'}
@@ -267,28 +284,27 @@ function MeetingList({
 
                 <Link
                   href={`/meetings/${meeting.id}/brief`}
-                  className="mt-1.5 block font-display text-lg text-ink hover:text-accent"
+                  className="font-display text-ink hover:text-accent mt-1.5 block text-lg"
                 >
                   {meeting.title}
                 </Link>
 
                 {meeting.objective ? (
-                  <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-secondary">
+                  <p className="text-ink-secondary mt-1.5 line-clamp-2 text-sm leading-relaxed">
                     {meeting.objective}
                   </p>
                 ) : null}
 
-                {names.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {names.slice(0, 5).map((name) => (
-                      <span key={name} className="flex items-center gap-1.5">
-                        <Avatar name={name} size="xs" />
-                        <span className="text-xs text-ink-muted">{name}</span>
-                      </span>
-                    ))}
-                    {names.length > 5 ? (
-                      <span className="text-xs text-ink-faint">+{names.length - 5}</span>
-                    ) : null}
+                {people.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <FaceStack people={people} size="md" max={4} />
+                    <span className="text-ink-muted text-xs">
+                      {people
+                        .slice(0, 3)
+                        .map((p) => p.name)
+                        .join(', ')}
+                      {people.length > 3 ? ` and ${people.length - 3} more` : ''}
+                    </span>
                   </div>
                 ) : null}
               </div>

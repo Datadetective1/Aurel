@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
+import { resolveFaces } from '@/lib/conversations/avatars'
 
 export interface SearchResult {
   entity:
@@ -19,6 +20,8 @@ export interface SearchResult {
   subtitle: string | null
   person_id: string | null
   occurred_at: string | null
+  /** A signed photo URL for person results, so the palette can show a face. */
+  image?: string | null
 }
 
 /**
@@ -45,5 +48,18 @@ export async function searchEverything(query: string): Promise<SearchResult[]> {
     return []
   }
 
-  return (data ?? []) as SearchResult[]
+  const results = (data ?? []) as SearchResult[]
+
+  // Faces for the people in the results. One query, one signing call; the
+  // signed URLs are short-lived and never leave this response.
+  const personIds = results.filter((r) => r.entity === 'person').map((r) => r.id)
+  if (personIds.length === 0) return results
+
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, avatar_url, avatar_path')
+    .in('id', personIds)
+  const faces = await resolveFaces(supabase, people ?? [], (p) => p.id)
+
+  return results.map((r) => (r.entity === 'person' ? { ...r, image: faces.get(r.id) ?? null } : r))
 }

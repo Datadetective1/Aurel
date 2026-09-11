@@ -5,15 +5,20 @@ import { ArrowRight } from 'lucide-react'
 import { QuickBriefView } from '@/components/app/meeting-brief'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LiveCountdown } from '@/components/app/meeting-countdown'
+import { RoomStrip } from '@/components/app/room-strip'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
 import { formatTime } from '@/lib/format'
+import { loadMeetingRoom } from '@/lib/conversations/room'
 import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
 
-export const metadata: Metadata = { title: 'Sixty seconds', robots: { index: false, follow: false } }
+export const metadata: Metadata = {
+  title: 'Sixty seconds',
+  robots: { index: false, follow: false },
+}
 
 /**
  * SIXTY SECONDS — the middle depth.
@@ -62,6 +67,7 @@ export default async function QuickBriefPage({ params }: { params: Promise<{ id:
     .eq('meeting_id', id)
 
   const attendeeIds = (attendees ?? []).map((a) => a.person_id)
+  const roomPeople = attendeeIds.length ? await loadMeetingRoom(supabase, user.id, id) : []
   const { data: commitments } = attendeeIds.length
     ? await supabase
         .from('commitments')
@@ -102,12 +108,17 @@ export default async function QuickBriefPage({ params }: { params: Promise<{ id:
         <h1 className="font-display text-ink mt-2 text-2xl leading-tight sm:text-3xl">
           {meeting.title}
         </h1>
+        <RoomStrip people={roomPeople} className="mt-5" />
       </header>
 
       <BriefDepthNav meetingId={id} current="quick" className="mt-5" />
 
       <div className="mt-7">
-        <QuickBriefView brief={brief} cues={cues} />
+        <QuickBriefView
+          brief={brief}
+          cues={cues}
+          faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
+        />
       </div>
 
       <Button asChild variant="secondary" size="lg" className="mt-8 w-full">

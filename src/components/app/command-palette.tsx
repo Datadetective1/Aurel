@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { searchEverything, type SearchResult } from '@/app/(app)/search-action'
 import { brand } from '@/lib/brand'
+import { Avatar } from '@/components/ui/avatar'
 
 /**
  * Global command palette (Cmd/Ctrl + K).
@@ -202,7 +203,14 @@ export function CommandPalette({
                         key={`${result.entity}-${result.id}`}
                         onSelect={() => go(meta.href(result))}
                       >
-                        <meta.icon className="text-ink-faint size-4 shrink-0" aria-hidden="true" />
+                        {result.entity === 'person' ? (
+                          <Avatar name={result.title} src={result.image ?? null} size="sm" />
+                        ) : (
+                          <meta.icon
+                            className="text-ink-faint size-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                        )}
                         <span className="min-w-0 flex-1 truncate">{result.title}</span>
                         {result.subtitle ? (
                           <span className="text-ink-faint shrink-0 truncate text-xs">

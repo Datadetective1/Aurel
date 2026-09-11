@@ -132,17 +132,25 @@ export function AskPanel({
               model, so a chip here is always a real row. */}
           {(state.answer.people?.length ?? 0) > 0 ||
           (state.answer.conversations?.length ?? 0) > 0 ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {state.answer.people?.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/people/${p.id}`}
-                  className="border-line bg-surface text-ink hover:border-line-strong inline-flex min-h-9 items-center gap-2 rounded-full border py-0.5 pr-3 pl-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
-                >
-                  <Avatar name={p.name} src={p.src} size="sm" />
-                  {p.name}
-                </Link>
-              ))}
+            <div className="mt-4 flex flex-wrap items-stretch gap-2">
+              {state.answer.people?.map((p) => {
+                const subtitle = [p.title, p.company].filter(Boolean).join(' · ')
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/people/${p.id}`}
+                    className="border-line bg-surface hover:border-line-strong flex min-w-44 items-center gap-3 rounded-[var(--radius-lg)] border p-2.5 pr-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+                  >
+                    <Avatar name={p.name} src={p.src} size="md" />
+                    <span className="min-w-0">
+                      <span className="text-ink block truncate text-sm font-medium">{p.name}</span>
+                      {subtitle ? (
+                        <span className="text-ink-muted block truncate text-xs">{subtitle}</span>
+                      ) : null}
+                    </span>
+                  </Link>
+                )
+              })}
               {state.answer.conversations?.map((c) => (
                 <Link
                   key={c.id}

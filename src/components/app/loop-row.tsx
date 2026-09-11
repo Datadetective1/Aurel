@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/primitives'
 import { displayStatus, type LoopAction } from '@/lib/conversations/loops'
 import type { LoopRecord } from '@/lib/conversations/queries'
+import { phraseFor } from '@/lib/follow-through/select'
 import { relativeDay } from '@/lib/format'
 import { isOverdueIn } from '@/lib/tz'
 import { cn } from '@/lib/utils'
@@ -107,14 +108,31 @@ export function LoopRow({
       <Handshake className="text-ink-faint size-4 shrink-0" aria-hidden="true" />
     )
 
+  // The row says who owes what, in the same words the email uses:
+  // "You said you'd send Jonathan the proposal", "Ravi said they'd send the
+  // pricing model", "Still unanswered: ...". The status line beneath then
+  // only carries what the sentence does not -- "Waiting on Ravi".
+  const phrase = phraseFor({
+    id: loop.id,
+    description: loop.description,
+    kind: loop.kind,
+    owner: loop.owner,
+    status: loop.status,
+    reviewStatus: loop.reviewStatus,
+    dueOn: loop.dueOn,
+    deferredUntil: loop.deferredUntil,
+    createdAt: loop.createdAt,
+    personId: loop.personId,
+    personName: loop.person?.name ?? null,
+    interactionId: loop.interactionId,
+    interactionTitle: loop.interactionTitle,
+    interactionDay: null,
+  })
+
   const ownerLabel =
-    loop.kind === 'question'
-      ? 'Unanswered'
-      : loop.owner === 'user'
-        ? 'You promised'
-        : loop.owner === 'person'
-          ? `Waiting on ${loop.person?.name.split(' ')[0] ?? 'them'}`
-          : 'Between you'
+    loop.kind !== 'question' && loop.owner === 'person'
+      ? `Waiting on ${loop.person?.name.split(' ')[0] ?? 'them'}`
+      : null
 
   return (
     <li
@@ -127,14 +145,16 @@ export function LoopRow({
         className,
       )}
     >
-      <div className="flex items-start gap-3">
+      {/* On a phone the actions drop to their own line, so the sentence keeps
+          the width beside the face instead of wrapping one word at a time. */}
+      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         {showPerson && loop.person ? (
           <Link
             href={`/people/${loop.person.id}`}
             className="mt-0.5 shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
             aria-label={loop.person.name}
           >
-            <Avatar name={loop.person.name} src={loop.person.src} size="sm" />
+            <Avatar name={loop.person.name} src={loop.person.src} size="lg" />
           </Link>
         ) : (
           <span className="mt-1.5">{kindIcon}</span>
@@ -148,14 +168,16 @@ export function LoopRow({
               status === 'cancelled' && 'text-ink-muted',
             )}
           >
-            {loop.description}
+            {phrase}
           </p>
 
           <div className="text-ink-muted mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            <span className="inline-flex items-center gap-1">
-              {showPerson && loop.person ? kindIcon : null}
-              {ownerLabel}
-            </span>
+            {ownerLabel || (showPerson && loop.person) ? (
+              <span className="inline-flex items-center gap-1">
+                {showPerson && loop.person ? kindIcon : null}
+                {ownerLabel}
+              </span>
+            ) : null}
             {loop.dueOn ? (
               <Badge tone={overdue ? 'critical' : 'neutral'}>
                 <Clock className="size-3" aria-hidden="true" />
@@ -186,7 +208,7 @@ export function LoopRow({
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 basis-full items-center justify-end gap-1 sm:basis-auto">
           {closed ? (
             <Button
               type="button"
