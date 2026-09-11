@@ -5,11 +5,12 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { CircleAlert, FileText, Loader2, Mic, Paperclip, PenLine, Upload } from 'lucide-react'
 import { createConversation, type ConversationState } from '@/app/(app)/conversations/actions'
-import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { FormField, Input, Select, Textarea } from '@/components/ui/field'
 import { Eyebrow } from '@/components/ui/primitives'
 import { VoiceRecorder } from './voice-recorder'
+import { AddSomeoneButton, ParticipantPicker, PersonChip } from './participant-picker'
+import { unknownSpeakers } from '@/lib/conversations/speakers'
 import { localNow } from './interaction-form'
 import { useHasMounted } from '@/lib/use-has-mounted'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,8 @@ import { cn } from '@/lib/utils'
 export interface CapturePerson {
   id: string
   name: string
+  fullName: string
+  preferredName: string | null
   src: string | null
   subtitle: string | null
 }
@@ -73,6 +76,7 @@ export function ConversationCapture({
   initialPersonIds = [],
   initialMeetingId = null,
   initialMode = 'voice',
+  userNames = [],
   className,
 }: {
   people: CapturePerson[]
@@ -80,11 +84,19 @@ export function ConversationCapture({
   initialPersonIds?: string[]
   initialMeetingId?: string | null
   initialMode?: Mode
+  /** The account holder's names, so their own lines are never suggested as a new person. */
+  userNames?: (string | null | undefined)[]
   className?: string
 }) {
   const [state, formAction] = useActionState<ConversationState, FormData>(createConversation, {})
   const [mode, setMode] = React.useState<Mode>(initialMode)
   const [selected, setSelected] = React.useState<Set<string>>(() => new Set(initialPersonIds))
+  // People who were there but are not on record yet. Created on submit, by
+  // name only, and attached with everything extracted under their label.
+  const [newNames, setNewNames] = React.useState<string[]>([])
+  const [pickerOpen, setPickerOpen] = React.useState(false)
+  const [sourceText, setSourceText] = React.useState('')
+  const [dismissedSpeakers, setDismissedSpeakers] = React.useState<Set<string>>(() => new Set())
   const [meetingId, setMeetingId] = React.useState(initialMeetingId ?? '')
   const [sourceKind, setSourceKind] = React.useState<string>(
     initialMode === 'paste' ? 'pasted_transcript' : 'typed_notes',
@@ -107,6 +119,19 @@ export function ConversationCapture({
       return next
     })
 
+  const addNewName = (name: string) => {
+    const trimmed = name.trim()
+    if (trimmed.length < 2) return
+    setNewNames((prev) =>
+      prev.some((n) => n.toLowerCase() === trimmed.toLowerCase()) ? prev : [...prev, trimmed],
+    )
+    setPickerOpen(false)
+  }
+  const pickExisting = (id: string) => {
+    setSelected((prev) => new Set(prev).add(id))
+    setPickerOpen(false)
+  }
+
   const chooseMeeting = (id: string) => {
     setMeetingId(id)
     const meeting = meetings.find((m) => m.id === id)
@@ -126,6 +151,7 @@ export function ConversationCapture({
     const existing = field.value.trimEnd()
     field.value = existing.length > 0 ? `${existing}\n\n${text}` : text
     field.dispatchEvent(new Event('input', { bubbles: true }))
+    setSourceText(field.value)
     if (seconds > 0) setDurationSeconds(seconds)
     setSourceKind(
       mode === 'voice' && origin === 'recorded'
@@ -141,6 +167,23 @@ export function ConversationCapture({
   const isRecordingOfOthers = sourceKind === 'meeting_recording' || sourceKind === 'uploaded_audio'
   const selectedPeople = people.filter((p) => selected.has(p.id))
 
+  // Speakers the words name who are neither the user nor already chosen.
+  // A suggestion, never an action: nothing is created until a button says so.
+  const known = people.map((p) => ({
+    id: p.id,
+    fullName: p.fullName,
+    preferredName: p.preferredName,
+  }))
+  const chosen = [
+    ...known.filter((p) => selected.has(p.id)),
+    ...newNames.map((n) => ({ id: `new:${n}`, fullName: n, preferredName: null })),
+  ]
+  const speakerSuggestions = unknownSpeakers(sourceText, {
+    userNames,
+    participants: chosen,
+    people: known,
+  }).filter((s) => !dismissedSpeakers.has(s.label))
+
   return (
     <form action={formAction} noValidate className={cn('grid min-w-0 gap-8', className)}>
       <input type="hidden" name="sourceKind" value={sourceKind} />
@@ -151,6 +194,9 @@ export function ConversationCapture({
       {wentWell ? <input type="hidden" name="wentWell" value={wentWell} /> : null}
       {[...selected].map((id) => (
         <input key={id} type="hidden" name="participant" value={id} />
+      ))}
+      {newNames.map((name) => (
+        <input key={name} type="hidden" name="newParticipant" value={name} />
       ))}
 
       {/* --- how ------------------------------------------------------------------ */}
@@ -259,6 +305,7 @@ export function ConversationCapture({
             name="source"
             rows={mode === 'paste' ? 14 : 9}
             maxLength={400_000}
+            onChange={(e) => setSourceText(e.currentTarget.value)}
             placeholder={
               mode === 'paste'
                 ? 'Ravi: I can get you the revised numbers by Thursday.\nYou: Great — and we agreed the launch moves to March?\nRavi: Yes, March.'
@@ -270,50 +317,105 @@ export function ConversationCapture({
       </FormField>
 
       {/* --- who ------------------------------------------------------------------- */}
-      <section>
+      <section className="min-w-0">
         <Eyebrow>Who was in it?</Eyebrow>
-        {people.length === 0 ? (
-          <p className="text-ink-muted mt-2 text-sm">
-            Nobody in your record yet. You can add people afterwards; the conversation is kept
-            either way.
-          </p>
-        ) : (
-          <>
-            <p className="text-ink-muted mt-1.5 text-xs">
-              Tap the people who were there. Promises get attached to them.
+        <p className="text-ink-muted mt-1.5 text-xs">
+          {people.length === 0
+            ? 'Nobody on record yet. Add whoever was there by name; the rest can wait.'
+            : 'Tap the people who were there, or add someone new. Promises get attached to them.'}
+        </p>
+
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {people.map((p) => (
+            <li key={p.id}>
+              <PersonChip person={p} pressed={selected.has(p.id)} onClick={() => toggle(p.id)} />
+            </li>
+          ))}
+          {newNames.map((name) => (
+            <li key={name}>
+              <PersonChip
+                person={{
+                  id: `new:${name}`,
+                  fullName: name,
+                  preferredName: null,
+                  subtitle: 'New person',
+                }}
+                pressed
+                onRemove={() => setNewNames((prev) => prev.filter((n) => n !== name))}
+              />
+            </li>
+          ))}
+          <li>
+            {!pickerOpen ? (
+              <AddSomeoneButton
+                className="min-h-11"
+                label={people.length === 0 ? 'Add someone by name' : 'Add someone'}
+                onClick={() => setPickerOpen(true)}
+              />
+            ) : null}
+          </li>
+        </ul>
+
+        {pickerOpen ? (
+          <ParticipantPicker
+            className="mt-3 max-w-md"
+            people={people}
+            excludeIds={[...selected]}
+            onPickExisting={(p) => pickExisting(p.id)}
+            onCreate={addNewName}
+            onCancel={() => setPickerOpen(false)}
+          />
+        ) : null}
+
+        {speakerSuggestions.length > 0 ? (
+          <div className="border-accent/25 bg-accent-wash mt-3 rounded-[var(--radius-md)] border p-4">
+            <p className="text-ink text-sm">
+              {speakerSuggestions.length === 1
+                ? `${speakerSuggestions[0]!.label} appears in this conversation.`
+                : `${speakerSuggestions.map((s) => s.label).join(', ')} appear in this conversation.`}{' '}
+              <span className="text-ink-muted">Add or link them?</span>
             </p>
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {people.map((p) => {
-                const on = selected.has(p.id)
+            <ul className="mt-2.5 grid gap-2">
+              {speakerSuggestions.map((s) => {
+                const matched = s.match
+                const probable =
+                  matched.kind === 'none' ? null : people.find((p) => p.id === matched.person.id)
                 return (
-                  <li key={p.id}>
-                    <button
+                  <li key={s.label} className="flex flex-wrap items-center gap-2">
+                    {probable ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-h-10"
+                        onClick={() => pickExisting(probable.id)}
+                      >
+                        {s.label} is {probable.name}
+                      </Button>
+                    ) : null}
+                    <Button
                       type="button"
-                      onClick={() => toggle(p.id)}
-                      aria-pressed={on}
-                      className={cn(
-                        'flex min-h-11 items-center gap-2.5 rounded-full border py-1 pr-4 pl-1 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]',
-                        on
-                          ? 'border-accent bg-accent-wash text-ink'
-                          : 'border-line bg-surface text-ink-secondary hover:border-line-strong',
-                      )}
+                      size="sm"
+                      variant={probable ? 'secondary' : 'primary'}
+                      className="min-h-10"
+                      onClick={() => addNewName(s.label)}
                     >
-                      <Avatar name={p.name} src={p.src} size="sm" />
-                      <span className="min-w-0">
-                        <span className="block leading-tight">{p.name}</span>
-                        {p.subtitle ? (
-                          <span className="text-ink-muted block truncate text-[0.6875rem] leading-tight">
-                            {p.subtitle}
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
+                      Add {s.label} as a new person
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="quiet"
+                      className="min-h-10"
+                      onClick={() => setDismissedSpeakers((prev) => new Set(prev).add(s.label))}
+                    >
+                      Not a person
+                    </Button>
                   </li>
                 )
               })}
             </ul>
-          </>
-        )}
+          </div>
+        ) : null}
       </section>
 
       {/* --- details ----------------------------------------------------------------- */}

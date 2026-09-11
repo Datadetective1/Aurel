@@ -174,6 +174,7 @@ export async function getUserContext(supabase: Client, userId: string): Promise<
   return {
     id: userId,
     displayName: displayNameOf(profile?.full_name ?? 'You', profile?.preferred_name ?? null),
+    fullName: profile?.full_name ?? null,
     jobTitle: profile?.job_title ?? null,
     company: profile?.company ?? null,
     coachingStyle: profile?.coaching_style ?? 'balanced',

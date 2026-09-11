@@ -14,7 +14,10 @@ import { resolveFaces } from '@/lib/conversations/avatars'
 import { relativeDay } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
-export const metadata: Metadata = { title: 'Add a conversation', robots: { index: false, follow: false } }
+export const metadata: Metadata = {
+  title: 'Add a conversation',
+  robots: { index: false, follow: false },
+}
 
 /**
  * ADD A CONVERSATION
@@ -38,7 +41,9 @@ export default async function NewConversationPage({
   const [{ data: people }, { data: meetings }] = await Promise.all([
     supabase
       .from('people')
-      .select('id, full_name, preferred_name, job_title, avatar_url, avatar_path, organizations(name)')
+      .select(
+        'id, full_name, preferred_name, job_title, avatar_url, avatar_path, organizations(name)',
+      )
       .eq('user_id', user.id)
       .is('archived_at', null)
       .order('last_interaction_at', { ascending: false, nullsFirst: false })
@@ -59,6 +64,8 @@ export default async function NewConversationPage({
   const capturePeople: CapturePerson[] = (people ?? []).map((p) => ({
     id: p.id,
     name: p.preferred_name || p.full_name,
+    fullName: p.full_name,
+    preferredName: p.preferred_name,
     src: faces.get(p.id) ?? null,
     subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
   }))
@@ -83,7 +90,15 @@ export default async function NewConversationPage({
   return (
     <Container size="narrow" className="py-8 sm:py-12">
       <Button asChild variant="quiet" size="sm" className="-ml-3">
-        <Link href={linkedMeeting ? `/meetings/${linkedMeeting.id}/brief` : person ? `/people/${person}` : '/conversations'}>
+        <Link
+          href={
+            linkedMeeting
+              ? `/meetings/${linkedMeeting.id}/brief`
+              : person
+                ? `/people/${person}`
+                : '/conversations'
+          }
+        >
           <ArrowLeft className="size-3.5" aria-hidden="true" />
           {linkedMeeting ? 'Back to brief' : person ? 'Back' : 'Conversations'}
         </Link>
@@ -104,6 +119,7 @@ export default async function NewConversationPage({
         initialPersonIds={initialPersonIds}
         initialMeetingId={linkedMeeting?.id ?? null}
         initialMode={initialMode}
+        userNames={[profile.full_name, profile.preferred_name]}
       />
     </Container>
   )

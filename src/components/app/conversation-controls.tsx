@@ -3,17 +3,15 @@
 import * as React from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { CircleAlert, Loader2, Pencil, RefreshCw, Trash2, UserPlus } from 'lucide-react'
+import { CircleAlert, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import {
-  addConversationParticipant,
   deleteConversation,
   reprocessConversation,
   retitleConversation,
   type ConversationState,
 } from '@/app/(app)/conversations/actions'
-import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Input, Select } from '@/components/ui/field'
+import { Input } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 
 /**
@@ -193,83 +191,5 @@ function RetitleSubmit() {
       {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
       Save
     </Button>
-  )
-}
-
-export function AddParticipant({
-  interactionId,
-  people,
-  className,
-}: {
-  interactionId: string
-  people: { id: string; name: string; src: string | null }[]
-  className?: string
-}) {
-  const [open, setOpen] = React.useState(false)
-  const [personId, setPersonId] = React.useState('')
-  const [pending, setPending] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  if (people.length === 0) return null
-
-  const add = async () => {
-    if (!personId) return
-    setPending(true)
-    setError(null)
-    const result = await addConversationParticipant(interactionId, personId)
-    setPending(false)
-    if (result.error) setError(result.error)
-    else {
-      setOpen(false)
-      setPersonId('')
-    }
-  }
-
-  if (!open) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className={cn('min-h-10', className)}
-        onClick={() => setOpen(true)}
-      >
-        <UserPlus className="size-3.5" aria-hidden="true" />
-        Add someone
-      </Button>
-    )
-  }
-
-  const chosen = people.find((p) => p.id === personId)
-
-  return (
-    <span className={cn('inline-flex flex-wrap items-center gap-2', className)}>
-      {chosen ? <Avatar name={chosen.name} src={chosen.src} size="xs" /> : null}
-      <Select
-        value={personId}
-        onChange={(e) => setPersonId(e.currentTarget.value)}
-        aria-label="Who"
-        className="h-9 w-auto text-xs"
-      >
-        <option value="">Who was there?</option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </Select>
-      <Button type="button" size="sm" onClick={add} disabled={!personId || pending}>
-        {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-        Add
-      </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-        Cancel
-      </Button>
-      {error ? (
-        <span role="alert" className="text-critical text-xs">
-          {error}
-        </span>
-      ) : null}
-    </span>
   )
 }

@@ -4,6 +4,7 @@ import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './
 import { attribute, extractDate, memoryProposalSchema, splitSentences } from './debrief'
 import { fenceUntrusted, UNTRUSTED_CONTENT_RULES } from '../untrusted'
 import { LOOP_PRESELECT_THRESHOLD, LOOP_PROPOSAL_FLOOR } from '@/lib/conversations/loops'
+import { isSelfLabel } from '@/lib/conversations/speakers'
 
 /**
  * CONVERSATION UNDERSTANDING
@@ -147,11 +148,20 @@ function clean(s: string) {
  * "I'll send it" with Ravi known as the speaker, so ownership can be read from
  * the label rather than guessed from the pronoun.
  */
+/**
+ * A speaker the transcript names who is not on record. Their words are kept
+ * under their label so that, once the person is added, what they promised can
+ * find them. Their first-person promise is never the user's.
+ */
+interface UnknownSpeaker {
+  label: string
+}
+
 function speakerOf(
   sentence: string,
   participants: PersonContext[],
-  userName: string,
-): { text: string; speaker: 'user' | PersonContext | null } {
+  userNames: (string | null | undefined)[],
+): { text: string; speaker: 'user' | PersonContext | UnknownSpeaker | null } {
   const match = sentence.match(
     /^\s*(?:\[[^\]]*\]\s*)?([A-Z][\w'.-]*(?:\s+[A-Z][\w'.-]*){0,2})\s*[:–-]\s+(.+)$/,
   )
@@ -159,12 +169,9 @@ function speakerOf(
   const label = match[1].toLowerCase()
   const text = match[2]
 
-  if (
-    label === userName.toLowerCase() ||
-    label === userName.split(' ')[0]?.toLowerCase() ||
-    label === 'me' ||
-    label === 'you'
-  ) {
+  // The user under any of their names: preferred, full, first, initials, or
+  // "Me". A transcript says "Alex Rivera" where the product says "Alex".
+  if (isSelfLabel(match[1], userNames)) {
     return { text, speaker: 'user' }
   }
   for (const p of participants) {
@@ -173,7 +180,19 @@ function speakerOf(
       .map((n) => (n as string).toLowerCase())
     if (names.includes(label)) return { text, speaker: p }
   }
-  return { text, speaker: null }
+  return { text, speaker: { label: match[1].trim() } }
+}
+
+function isKnown(
+  speaker: 'user' | PersonContext | UnknownSpeaker | null,
+): speaker is PersonContext {
+  return Boolean(speaker) && speaker !== 'user' && 'id' in (speaker as object)
+}
+
+function isUnknown(
+  speaker: 'user' | PersonContext | UnknownSpeaker | null,
+): speaker is UnknownSpeaker {
+  return Boolean(speaker) && speaker !== 'user' && !('id' in (speaker as object))
 }
 
 function composeConversation(input: ConversationInput): ConversationAnalysis {
@@ -183,12 +202,37 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
   // the label sits at its start; splitting into sentences before reading the
   // label would leave "Good. I'll send it Thursday." with the promise in a
   // sentence that no longer says who made it.
-  const sentences: { raw: string; text: string; speaker: 'user' | PersonContext | null }[] = []
-  for (const line of input.conversation.source.replace(/\r\n?/g, '\n').split(/\n+/)) {
+  const sentences: {
+    raw: string
+    text: string
+    speaker: 'user' | PersonContext | UnknownSpeaker | null
+  }[] = []
+  // Curly apostrophes are what phones and word processors type. Every cue
+  // below is written with a straight one, and "I’ll" matched none of them:
+  // the first production transcript yielded no promises at all for that.
+  const source = input.conversation.source
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u2018\u2019\u02BC]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+  for (const line of source.split(/\n+/)) {
     if (line.trim().length === 0) continue
-    const turn = speakerOf(line, participants, user.displayName)
+    const turn = speakerOf(line, participants, [user.displayName, user.fullName])
+    // The excerpt keeps the speaker's label. It is how a promise made by
+    // somebody not yet on record finds them once they are added.
+    const label =
+      turn.speaker === 'user'
+        ? user.displayName
+        : isKnown(turn.speaker)
+          ? turn.speaker.displayName
+          : isUnknown(turn.speaker)
+            ? turn.speaker.label
+            : null
     for (const sentence of splitSentences(turn.text)) {
-      sentences.push({ raw: sentence, text: sentence, speaker: turn.speaker })
+      sentences.push({
+        raw: label ? `${label}: ${sentence}` : sentence,
+        text: sentence,
+        speaker: turn.speaker,
+      })
     }
   }
 
@@ -210,7 +254,7 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
     // the record of a decision. The answer on the next line is the decision.
     if (CUES.decision.test(text) && !CUES.tentative.test(text) && !endsAsQuestion) {
       if (decisions.length < 8) {
-        const who = s.speaker && s.speaker !== 'user' ? s.speaker : attribute(text, participants)
+        const who = isKnown(s.speaker) ? s.speaker : attribute(text, participants)
         decisions.push({
           description: clean(text),
           context: null,
@@ -265,10 +309,18 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
     if (s.speaker === 'user') {
       named = namedInText
       owner = firstPerson || !namedInText ? 'user' : 'person'
-    } else if (s.speaker) {
+    } else if (isKnown(s.speaker)) {
       named = s.speaker
       owner = firstPerson ? 'person' : secondPerson ? 'user' : namedInText ? 'person' : 'shared'
       if (owner === 'person' && !firstPerson && namedInText) named = namedInText
+    } else if (isUnknown(s.speaker)) {
+      // Somebody the transcript names who is not on record. "I'll send it"
+      // on their line is THEIR promise -- owner person with nobody to point
+      // at yet, which normalises to shared, and the excerpt carries their
+      // label so the loop finds them when they are added. "Can you send it"
+      // on their line is the user's.
+      named = namedInText
+      owner = secondPerson ? 'user' : firstPerson ? 'person' : namedInText ? 'person' : 'shared'
     } else {
       named = namedInText
       owner = firstPerson ? 'user' : namedInText ? 'person' : 'shared'
@@ -294,7 +346,7 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
   // preference or friction cue. At most 'observed'; never 'confirmed'.
   const proposedMemories: ConversationAnalysis['proposedMemories'] = []
   for (const s of sentences) {
-    const who = s.speaker && s.speaker !== 'user' ? s.speaker : attribute(s.text, participants)
+    const who = isKnown(s.speaker) ? s.speaker : attribute(s.text, participants)
     if (!who) continue
     if (proposedMemories.filter((m) => m.personId === who.id).length >= 3) continue
 
@@ -425,6 +477,7 @@ export const conversationPrompt: PromptModule<ConversationInput, ConversationAna
 - kind: "commitment" for a promised deliverable or action, "question" for something asked that was not answered in the conversation, "follow_up" for a promise to circle back without a specific deliverable.
 - owner: "user" when the user owes it, "person" when a participant owes it, "shared" when it is unclear or genuinely joint. For a question, the owner is whoever owes the answer, or "shared".
 - ownerPersonId must be null unless owner is "person", and then it must be one of the ids listed under PEOPLE PRESENT. Never a name.
+- If the promise was made by a named speaker who is NOT listed under PEOPLE PRESENT, use owner "person" with ownerPersonId null, and begin the excerpt with that speaker's label exactly as written ("Adama: I'll send the requirements"). Never file another speaker's promise under the user.
 - dueOn is YYYY-MM-DD resolved against the date of the conversation, not today. "by Friday" is the next Friday after the conversation. Nothing to resolve means null.
 - confidence: 0.9+ for a first-person promise with a deliverable; 0.7-0.9 for a clear promise without a date; 0.4-0.7 when the words are ambiguous about who or whether; below 0.4 for hedged talk.
 - Every loop needs an excerpt: the actual words, or a close paraphrase of one sentence. No excerpt, no loop.

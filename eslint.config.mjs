@@ -19,6 +19,8 @@ export default [
       'next-env.d.ts',
       // Generated from the database schema; not ours to lint.
       'src/lib/supabase/types.ts',
+      // Local end-to-end scratch: throwaway scripts and screenshots.
+      '.e2e-tmp/**',
     ],
   },
   ...nextCoreWebVitals,

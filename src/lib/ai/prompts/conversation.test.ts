@@ -160,6 +160,26 @@ describe('composer: commitments', () => {
     expect(out.loops[0]!.owner).toBe('user')
   })
 
+  it('reads the user under their full name when the product shows their preferred name', () => {
+    // Profile: full name Alex Rivera, preferred Alex. The transcript says
+    // "Alex Rivera". That is still the user, not an unknown speaker.
+    const out = conversationPrompt.compose({
+      user: { ...user, displayName: 'Alex', fullName: 'Alex Rivera' },
+      participants: [jason, ravi],
+      priorObjective: null,
+      conversation: {
+        id: 'c1',
+        title: 'x',
+        occurredAt: '2026-09-10T15:00:00Z',
+        source: "Alex Rivera: I'll resubmit the case by Friday.",
+        sourceKind: 'pasted_transcript',
+        wentWell: null,
+      },
+    })
+    expect(out.loops).toHaveLength(1)
+    expect(out.loops[0]!.owner).toBe('user')
+  })
+
   it('ignores a commitment that was already completed', () => {
     const out = analyse('I already sent Jason the onboarding doc last week.')
     expect(out.loops).toHaveLength(0)
@@ -174,6 +194,59 @@ describe('composer: commitments', () => {
     const out = analyse('I will follow up with Ravi next week.')
     expect(out.loops[0]!.kind).toBe('follow_up')
     expect(out.loops[0]!.dueOn).toBe('2026-09-17')
+  })
+})
+
+describe('composer: speakers who are not on record', () => {
+  // The first production conversation: Amary and Adama, with Adama not yet a
+  // person. Her promise must not become the user's, and its excerpt must keep
+  // her label so it can find her once she is added.
+  const production = [
+    'Amary: I’ll send you the revised proposal by September 11, 2026.',
+    'Adama: I’ll send you the updated requirements by September 14, 2026.',
+    'Amary: We decided to use Option B for the pilot.',
+    'Adama: Can you confirm who owns the migration plan?',
+    'Adama: Maybe we should review the dashboard sometime.',
+  ].join('\n')
+
+  it("keeps an unknown speaker's promise out of the user's column", () => {
+    const out = conversationPrompt.compose({
+      user: { ...user, displayName: 'Amary Coulibaly' },
+      participants: [],
+      priorObjective: null,
+      conversation: {
+        id: 'c1',
+        title: 'Production Conversation Test',
+        occurredAt: '2026-09-10T20:10:00Z',
+        source: production,
+        sourceKind: 'typed_notes',
+        wentWell: null,
+      },
+    })
+    const promises = out.loops.filter((l) => l.kind !== 'question')
+    expect(promises).toHaveLength(2)
+    const mine = promises.find((l) => /proposal/.test(l.description))!
+    const theirs = promises.find((l) => /requirements/.test(l.description))!
+    expect(mine.owner).toBe('user')
+    // Owner "person" with nobody to point at; the label travels in the excerpt.
+    expect(theirs.owner).toBe('person')
+    expect(theirs.ownerPersonId).toBeNull()
+    expect(theirs.excerpt).toMatch(/^Adama: /)
+    expect(mine.excerpt).toMatch(/^Amary Coulibaly: /)
+    // The question keeps its asker; the hedge is not a loop; the decision is one.
+    expect(out.loops.filter((l) => l.kind === 'question')).toHaveLength(1)
+    expect(out.loops.some((l) => /dashboard/.test(l.description))).toBe(false)
+    expect(out.decisions).toHaveLength(1)
+  })
+
+  it("files an unknown speaker's 'can you' as the user's promise", () => {
+    const out = analyse('Adama: Can you send me the deck by Friday?\nAlex Rivera: Sure.', {
+      sourceKind: 'pasted_transcript',
+    })
+    // "Can you…?" ends with a question mark, so it is a question here, not a
+    // promise; the user's "Sure" alone carries no commitment cue. What matters
+    // is that nothing was filed under a person who is not on record.
+    expect(out.loops.every((l) => l.ownerPersonId === null)).toBe(true)
   })
 })
 

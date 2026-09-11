@@ -9,7 +9,16 @@ import { getProfile, requireUser } from '@/lib/auth'
 import { ownership, ownershipNoVisibility } from '@/lib/workspace'
 import { checkCapability } from '@/lib/billing/entitlements'
 import { processConversation, touchPeopleWindows } from '@/lib/conversations/process'
-import { cleanTranscript, titleFromFileName, transcriptFormat } from '@/lib/conversations/transcript'
+import {
+  attachPersonToConversation,
+  detachPersonFromConversation,
+} from '@/lib/conversations/attribution'
+import { matchPerson } from '@/lib/conversations/speakers'
+import {
+  cleanTranscript,
+  titleFromFileName,
+  transcriptFormat,
+} from '@/lib/conversations/transcript'
 import { extractDocument } from '@/lib/sources/document'
 import { formatDate } from '@/lib/format'
 import { track } from '@/lib/analytics'
@@ -128,8 +137,7 @@ export async function createConversation(
 
   // Recordings of other people need the user to have told them. Asked, not
   // policed: the product cannot know, so it records that it asked.
-  const isRecording =
-    sourceKind === 'uploaded_audio' || sourceKind === 'meeting_recording'
+  const isRecording = sourceKind === 'uploaded_audio' || sourceKind === 'meeting_recording'
   if (isRecording && v.consent !== 'yes') {
     return {
       fieldErrors: {
@@ -168,6 +176,22 @@ export async function createConversation(
     participantIds = (people ?? []).map((p) => p.id)
   }
 
+  // People who were there but were not on record until now. A name is all
+  // that is needed; the rest of their page fills in later. A name that
+  // already belongs to somebody links to them rather than making a second.
+  const newNames = [
+    ...new Set(
+      formData
+        .getAll('newParticipant')
+        .map((v) => String(v).trim())
+        .filter((v) => v.length >= 2),
+    ),
+  ].slice(0, 12)
+  for (const name of newNames) {
+    const person = await findOrCreatePerson(supabase, own, user.id, name)
+    if (person && !participantIds.includes(person.id)) participantIds.push(person.id)
+  }
+
   let meetingId: string | null = null
   let meetingTitle: string | null = null
   if (v.meetingId) {
@@ -197,8 +221,7 @@ export async function createConversation(
   }
 
   // --- the row, before anything clever ----------------------------------------------
-  const isTranscript =
-    sourceKind !== 'typed_notes' && sourceKind !== 'voice_note'
+  const isTranscript = sourceKind !== 'typed_notes' && sourceKind !== 'voice_note'
 
   const { data: interaction, error } = await supabase
     .from('interactions')
@@ -261,6 +284,71 @@ export async function createConversation(
   if (meetingId) revalidatePath(`/meetings/${meetingId}`)
 
   redirect(`/conversations/${interaction.id}?new=1`)
+}
+
+/**
+ * The person a typed name refers to, creating them when nobody matches.
+ *
+ * An exact name match links the existing person: the user typed the same
+ * name, and two records for one colleague is the failure the duplicate
+ * review exists to undo. A merely probable match is NOT taken silently --
+ * the picker shows it first and the user decides -- so by the time a name
+ * reaches here as "new", the user has said it is somebody else.
+ */
+async function findOrCreatePerson(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  own: { user_id: string; workspace_id: string; visibility: 'private' | 'shared' },
+  userId: string,
+  name: string,
+): Promise<{
+  id: string
+  fullName: string
+  preferredName: string | null
+  created: boolean
+} | null> {
+  const trimmed = name.trim().slice(0, 160)
+  if (trimmed.length < 2) return null
+
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, full_name, preferred_name')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .limit(500)
+
+  const match = matchPerson(
+    trimmed,
+    (people ?? []).map((p) => ({
+      id: p.id,
+      fullName: p.full_name,
+      preferredName: p.preferred_name,
+    })),
+  )
+  if (match.kind === 'exact') {
+    return {
+      id: match.person.id,
+      fullName: match.person.fullName,
+      preferredName: match.person.preferredName,
+      created: false,
+    }
+  }
+
+  const { data: created, error } = await supabase
+    .from('people')
+    .insert({ ...own, full_name: trimmed })
+    .select('id, full_name, preferred_name')
+    .single()
+  if (error || !created) {
+    logger.warn('conversation.person_create_failed', { code: error?.code })
+    return null
+  }
+  await track('person_added', { source: 'conversation' })
+  return {
+    id: created.id,
+    fullName: created.full_name,
+    preferredName: created.preferred_name,
+    created: true,
+  }
 }
 
 function defaultTitle(
@@ -336,7 +424,11 @@ export async function submitReview(
 
   for (const loop of loops ?? []) {
     if (keepLoops.has(loop.id)) {
-      const description = formData.get(`loop:${loop.id}:description`)?.toString().trim().slice(0, 500)
+      const description = formData
+        .get(`loop:${loop.id}:description`)
+        ?.toString()
+        .trim()
+        .slice(0, 500)
       const owner = formData.get(`loop:${loop.id}:owner`)?.toString()
       const dueOn = formData.get(`loop:${loop.id}:dueOn`)?.toString().trim()
       const ownerPersonId = formData.get(`loop:${loop.id}:ownerPersonId`)?.toString().trim()
@@ -550,21 +642,120 @@ export async function addConversationParticipant(
       .eq('id', interactionId)
       .eq('user_id', user.id)
       .maybeSingle(),
-    supabase.from('people').select('id').eq('id', personId).eq('user_id', user.id).maybeSingle(),
+    supabase
+      .from('people')
+      .select('id, full_name, preferred_name')
+      .eq('id', personId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
   if (!interaction) return { error: 'That conversation could not be found.' }
   if (!person) return { error: 'That person could not be found.' }
 
-  const { error } = await supabase
-    .from('interaction_participants')
-    .upsert(
-      { ...ownNoVis, interaction_id: interactionId, person_id: personId },
-      { onConflict: 'interaction_id,person_id' },
-    )
-  if (error) return { error: 'We could not add that person.' }
+  const own = await ownership()
+  try {
+    await attachPersonToConversation(supabase, own, interactionId, {
+      id: person.id,
+      fullName: person.full_name,
+      preferredName: person.preferred_name,
+    })
+  } catch (error) {
+    logger.warn('conversation.participant_attach_failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    })
+    return { error: 'We could not add that person.' }
+  }
+  void ownNoVis
 
-  await touchPeopleWindows(supabase, user.id, [personId], interaction.occurred_at)
-  revalidatePath(`/conversations/${interactionId}`)
-  revalidatePath(`/people/${personId}`)
+  revalidateAround(interactionId, [personId])
   return { message: 'Added.' }
+}
+
+/**
+ * Add somebody who is not on record yet, by name, and attach them.
+ *
+ * The minimum: a name. Their page, photo and research can come later. What
+ * this conversation extracted under their label becomes theirs at once.
+ */
+export async function createAndAttachParticipant(
+  interactionId: string,
+  name: string,
+): Promise<ConversationState & { personId?: string; created?: boolean }> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const own = await ownership()
+
+  const { data: interaction } = await supabase
+    .from('interactions')
+    .select('id')
+    .eq('id', interactionId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!interaction) return { error: 'That conversation could not be found.' }
+
+  const person = await findOrCreatePerson(supabase, own, user.id, name)
+  if (!person) return { error: 'Give them a name of at least two letters.' }
+
+  await attachPersonToConversation(supabase, own, interactionId, person)
+  await track('conversation_participant_added', { created: person.created })
+
+  revalidateAround(interactionId, [person.id])
+  return {
+    message: person.created
+      ? `${person.fullName} added.`
+      : `Linked to ${person.preferredName || person.fullName}.`,
+    personId: person.id,
+    created: person.created,
+  }
+}
+
+/**
+ * Remove somebody from a conversation. What was filed under them moves to
+ * the person named, to a new person, or to nobody -- never nowhere silently.
+ */
+export async function removeConversationParticipant(
+  interactionId: string,
+  personId: string,
+  options: { moveToPersonId?: string | null; moveToNewName?: string | null } = {},
+): Promise<ConversationState> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const own = await ownership()
+
+  const { data: interaction } = await supabase
+    .from('interactions')
+    .select('id')
+    .eq('id', interactionId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!interaction) return { error: 'That conversation could not be found.' }
+
+  let moveTo: { id: string; fullName: string; preferredName: string | null } | null = null
+  if (options.moveToNewName) {
+    moveTo = await findOrCreatePerson(supabase, own, user.id, options.moveToNewName)
+  } else if (options.moveToPersonId) {
+    const { data: target } = await supabase
+      .from('people')
+      .select('id, full_name, preferred_name')
+      .eq('id', options.moveToPersonId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (target)
+      moveTo = { id: target.id, fullName: target.full_name, preferredName: target.preferred_name }
+  }
+
+  await detachPersonFromConversation(supabase, own, interactionId, personId, moveTo)
+  await track('conversation_participant_removed', { moved: Boolean(moveTo) })
+
+  revalidateAround(interactionId, [personId, ...(moveTo ? [moveTo.id] : [])])
+  return { message: moveTo ? `Moved to ${moveTo.preferredName || moveTo.fullName}.` : 'Removed.' }
+}
+
+function revalidateAround(interactionId: string, personIds: string[]) {
+  revalidatePath(`/conversations/${interactionId}`)
+  revalidatePath('/conversations')
+  revalidatePath('/loops')
+  revalidatePath('/today')
+  revalidatePath('/people')
+  for (const id of personIds) revalidatePath(`/people/${id}`)
 }

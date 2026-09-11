@@ -35,6 +35,7 @@ silent. Several were written _after_ a bug, and the comment above them says so.
 | `follow-through/select`       | Done, cancelled, dropped, proposed and not-yet-deferred loops are never mailed; due today and overdue qualify, tomorrow only for the user's own promise, undated only on Mondays; "You said you'd" vs "Ravi said they'd" vs "Still unanswered".                                                                                                                                                                            |
 | `follow-through/schedule`     | The user's own day and hour from any zone, UTC fallback for nonsense, catch-up after the preferred hour, never twice in a local day, daily mode ignores the hour.                                                                                                                                                                                                                                                          |
 | `follow-through/email`        | Initials render without images, photo on top when present, every line links to its loop, person and conversation, the preheader carries counts only, the job checks the secret before it touches the database.                                                                                                                                                                                                             |
+| `conversations/speakers`      | Who a transcript names: labels detected most-talkative first, headings ignored, the account holder never suggested, an existing person offered as exact or probable before a new one is created. The first production conversation was Amary and Adama; the picker offered only existing people and Jonathan was attached instead.                                                                                         |
 | `calendar/normalize`          | Graph returns wall-clock time rather than an instant, Google splits all-day events into a different field, and the two express "cancelled" differently. Each is a way a real meeting silently goes missing or lands an hour out.                                                                                                                                                                                           |
 | `calendar/privacy`            | A private event must keep its time and its people and store nothing about what it says, and no calendar event content may reach analytics or logs. Enforced by reading the call sites, because a unit test only checks the paths it thinks to call.                                                                                                                                                                        |
 | `crypto`                      | The token columns were named `_encrypted` from the beginning and nothing encrypted them. Round-trip, tamper detection, wrong-key, and refusing to store a secret at all when no key is configured.                                                                                                                                                                                                                         |
@@ -199,3 +200,14 @@ on its last line and rolled the whole deletion back.
 
 The RLS isolation file gained conversations, loops, decisions and
 `search_everything`, and was run against production (it rolls back).
+
+### Participants, end to end
+
+Walked on 11 September 2026 against a local production build and the live
+database: a pasted transcript naming somebody not on record produces
+"Adama appears in this conversation"; one tap adds her by name; her promise
+is hers in the review, on her page, in Ask, and in the next brief's "Since
+last time"; the picker shows a probable existing match first and offers no
+"new person" for an exact existing name; removing a wrongly attached person
+moves their loops and decision to a new person with nothing duplicated or
+lost; adding "Adama" a second time links rather than duplicates. 30 of 30.

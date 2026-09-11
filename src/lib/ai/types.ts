@@ -139,6 +139,13 @@ export interface PublicSourceContext {
 export interface UserContext {
   id: string
   displayName: string
+  /**
+   * The full name as well, when a preferred name is what is displayed. A
+   * transcript labels the user "Alex Rivera" while the product calls them
+   * "Alex"; both must read as the user, or their own promise becomes a
+   * stranger's.
+   */
+  fullName?: string | null
   jobTitle: string | null
   company: string | null
   coachingStyle: CoachingStyle

@@ -15,11 +15,11 @@ import {
 } from 'lucide-react'
 import { SOURCE_LABEL } from '@/components/app/conversation-card'
 import {
-  AddParticipant,
   DeleteConversationButton,
   ReprocessButton,
   RetitleForm,
 } from '@/components/app/conversation-controls'
+import { ConversationParticipants } from '@/components/app/conversation-participants'
 import { ConversationReview } from '@/components/app/conversation-review'
 import { EmptyVisual } from '@/components/app/empty-visual'
 import { FaceStack } from '@/components/app/face-stack'
@@ -34,6 +34,7 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { resolveFaces } from '@/lib/conversations/avatars'
 import { getConversation, listDecisions, listLoops } from '@/lib/conversations/queries'
+import { unknownSpeakers } from '@/lib/conversations/speakers'
 import { formatDate, formatTime, pluralise } from '@/lib/format'
 import { brand } from '@/lib/brand'
 
@@ -135,10 +136,22 @@ export default async function ConversationPage({
 
   const faces = await resolveFaces(supabase, allPeople ?? [], (p) => p.id)
   const participantIds = new Set(conversation.participants.map((p) => p.id))
-  const addable = (allPeople ?? [])
-    .filter((p) => !participantIds.has(p.id))
-    .map((p) => ({ id: p.id, name: p.preferred_name || p.full_name, src: faces.get(p.id) ?? null }))
+  const pickable = (allPeople ?? []).map((p) => ({
+    id: p.id,
+    fullName: p.full_name,
+    preferredName: p.preferred_name,
+    src: faces.get(p.id) ?? null,
+  }))
+  const participantPeople = pickable.filter((p) => participantIds.has(p.id))
   const loopPeople = conversation.participants.map((p) => ({ id: p.id, name: p.name }))
+
+  // Speakers the transcript names who are not in the room. Suggested, never
+  // added on their own.
+  const speakerSuggestions = unknownSpeakers(text, {
+    userNames: [profile.full_name, profile.preferred_name],
+    participants: participantPeople,
+    people: pickable,
+  })
 
   // Memory proposals from this conversation, grouped by person, reusing the
   // person page's own gate so the two never disagree about what a proposal is.
@@ -159,8 +172,13 @@ export default async function ConversationPage({
     memoryByPerson.set(o.person_id, entry)
   }
 
-  const nextTime = ((artifact?.content as { nextTime?: string[] } | null)?.nextTime ?? []).slice(0, 4)
-  const objections = ((artifact?.content as { objections?: string[] } | null)?.objections ?? []).slice(0, 4)
+  const nextTime = ((artifact?.content as { nextTime?: string[] } | null)?.nextTime ?? []).slice(
+    0,
+    4,
+  )
+  const objections = (
+    (artifact?.content as { objections?: string[] } | null)?.objections ?? []
+  ).slice(0, 4)
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -174,9 +192,9 @@ export default async function ConversationPage({
       {justCreated && conversation.processingStatus === 'ready' ? (
         <p
           role="status"
-          className="mt-6 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-line bg-bg-sunken px-4 py-3 text-sm leading-relaxed text-ink-secondary"
+          className="border-line bg-bg-sunken text-ink-secondary mt-6 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3 text-sm leading-relaxed"
         >
-          <CircleCheck className="mt-0.5 size-4 shrink-0 text-positive" aria-hidden="true" />
+          <CircleCheck className="text-positive mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
             Kept.{' '}
             {pending > 0
@@ -195,31 +213,23 @@ export default async function ConversationPage({
         )}
         <div className="min-w-0 flex-1">
           <Eyebrow>
-            {formatDate(conversation.occurredAt, timeZone)} · {formatTime(conversation.occurredAt, timeZone)}
-            {conversation.durationSeconds ? ` · ${Math.max(1, Math.round(conversation.durationSeconds / 60))} min` : ''}
+            {formatDate(conversation.occurredAt, timeZone)} ·{' '}
+            {formatTime(conversation.occurredAt, timeZone)}
+            {conversation.durationSeconds
+              ? ` · ${Math.max(1, Math.round(conversation.durationSeconds / 60))} min`
+              : ''}
           </Eyebrow>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-3xl text-ink sm:text-4xl">{conversation.title}</h1>
+            <h1 className="font-display text-ink text-3xl sm:text-4xl">{conversation.title}</h1>
             <RetitleForm interactionId={id} title={conversation.title} />
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            {conversation.participants.length > 0 ? (
-              <span className="text-sm text-ink-secondary">
-                With{' '}
-                {conversation.participants.map((p, i) => (
-                  <span key={p.id}>
-                    {i > 0 ? (i === conversation.participants.length - 1 ? ' and ' : ', ') : ''}
-                    <Link href={`/people/${p.id}`} className="text-ink underline-offset-4 hover:underline">
-                      {p.name}
-                    </Link>
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <span className="text-sm text-ink-muted">Nobody attached yet.</span>
-            )}
-            <AddParticipant interactionId={id} people={addable} />
-          </div>
+          <ConversationParticipants
+            className="mt-3"
+            interactionId={id}
+            participants={participantPeople}
+            people={pickable}
+            suggestions={speakerSuggestions}
+          />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">{SOURCE_LABEL[conversation.sourceKind]}</Badge>
             {row?.meetings ? (
@@ -228,7 +238,11 @@ export default async function ConversationPage({
                 {row.meetings.title}
               </Badge>
             ) : null}
-            {row?.went_well ? <Badge tone="outline">Went {['badly', 'not great', 'fine', 'well', 'very well'][row.went_well - 1]}</Badge> : null}
+            {row?.went_well ? (
+              <Badge tone="outline">
+                Went {['badly', 'not great', 'fine', 'well', 'very well'][row.went_well - 1]}
+              </Badge>
+            ) : null}
             {conversation.topics.slice(0, 4).map((t) => (
               <Badge key={t} tone="outline">
                 {t}
@@ -239,18 +253,22 @@ export default async function ConversationPage({
       </header>
 
       {/* --- processing states ---------------------------------------------------- */}
-      {conversation.processingStatus === 'pending' || conversation.processingStatus === 'processing' ? (
-        <p role="status" className="mt-8 flex items-center gap-2.5 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 text-sm text-ink-secondary">
-          <Loader2 className="size-4 animate-spin text-ink-faint" aria-hidden="true" />
+      {conversation.processingStatus === 'pending' ||
+      conversation.processingStatus === 'processing' ? (
+        <p
+          role="status"
+          className="border-line bg-surface text-ink-secondary mt-8 flex items-center gap-2.5 rounded-[var(--radius-md)] border px-4 py-3 text-sm"
+        >
+          <Loader2 className="text-ink-faint size-4 animate-spin" aria-hidden="true" />
           Reading this conversation…
           <ReprocessButton interactionId={id} label="Check again" />
         </p>
       ) : null}
 
       {conversation.processingStatus === 'failed' ? (
-        <div className="mt-8 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3">
-          <p className="flex items-start gap-2 text-sm text-ink-secondary">
-            <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
+        <div className="border-caution/25 bg-caution-wash mt-8 rounded-[var(--radius-md)] border px-4 py-3">
+          <p className="text-ink-secondary flex items-start gap-2 text-sm">
+            <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
             {conversation.processingError ?? 'The automatic reading did not run.'} Your words are
             safe below.
           </p>
@@ -280,9 +298,11 @@ export default async function ConversationPage({
           <Rule />
           <section>
             <Eyebrow>What it was about</Eyebrow>
-            <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink">{conversation.summary}</p>
+            <p className="text-ink mt-3 max-w-2xl text-base leading-relaxed">
+              {conversation.summary}
+            </p>
             {conversation.outcome ? (
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-secondary">
+              <p className="text-ink-secondary mt-3 max-w-2xl text-sm leading-relaxed">
                 <span className="text-ink-muted">Upshot — </span>
                 {conversation.outcome}
               </p>
@@ -297,7 +317,7 @@ export default async function ConversationPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <Eyebrow>What it left open</Eyebrow>
-            <h2 className="mt-2 font-display text-xl text-ink">
+            <h2 className="font-display text-ink mt-2 text-xl">
               {openKept.length === 0
                 ? 'Nothing open'
                 : `${openKept.length} open ${openKept.length === 1 ? 'loop' : 'loops'}`}
@@ -314,13 +334,21 @@ export default async function ConversationPage({
         </div>
 
         {openKept.length > 0 ? (
-          <LoopList className="mt-5" loops={openKept} timeZone={timeZone} now={now} showSource={false} />
+          <LoopList
+            className="mt-5"
+            loops={openKept}
+            timeZone={timeZone}
+            now={now}
+            showSource={false}
+          />
         ) : showReview ? (
-          <p className="mt-3 text-sm text-ink-muted">Confirm what is real above and it will appear here.</p>
+          <p className="text-ink-muted mt-3 text-sm">
+            Confirm what is real above and it will appear here.
+          </p>
         ) : (
-          <div className="mt-4 flex items-center gap-4 rounded-[var(--radius-md)] border border-dashed border-line px-4 py-3">
-            <Handshake className="size-5 shrink-0 text-ink-faint" aria-hidden="true" />
-            <p className="text-sm text-ink-muted">
+          <div className="border-line mt-4 flex items-center gap-4 rounded-[var(--radius-md)] border border-dashed px-4 py-3">
+            <Handshake className="text-ink-faint size-5 shrink-0" aria-hidden="true" />
+            <p className="text-ink-muted text-sm">
               No promises or questions were kept from this conversation.
             </p>
           </div>
@@ -328,15 +356,26 @@ export default async function ConversationPage({
 
         {closedKept.length > 0 ? (
           <details className="mt-4">
-            <summary className="cursor-pointer text-xs text-ink-muted hover:text-ink">
+            <summary className="text-ink-muted hover:text-ink cursor-pointer text-xs">
               {pluralise(closedKept.length, 'closed loop')}
             </summary>
-            <LoopList className="mt-3" loops={closedKept} timeZone={timeZone} now={now} showSource={false} grouped={false} />
+            <LoopList
+              className="mt-3"
+              loops={closedKept}
+              timeZone={timeZone}
+              now={now}
+              showSource={false}
+              grouped={false}
+            />
           </details>
         ) : null}
 
         <div className="mt-4">
-          <AddLoop people={loopPeople} defaultPersonId={loopPeople[0]?.id ?? ''} interactionId={id} />
+          <AddLoop
+            people={loopPeople}
+            defaultPersonId={loopPeople[0]?.id ?? ''}
+            interactionId={id}
+          />
         </div>
       </section>
 
@@ -348,17 +387,20 @@ export default async function ConversationPage({
             <Eyebrow>Decided</Eyebrow>
             <ul className="mt-4 grid gap-3">
               {confirmedDecisions.map((d) => (
-                <li key={d.id} className="flex gap-3 rounded-[var(--radius-md)] border border-line bg-surface p-4">
-                  <Scale className="mt-0.5 size-4 shrink-0 text-positive" aria-hidden="true" />
+                <li
+                  key={d.id}
+                  className="border-line bg-surface flex gap-3 rounded-[var(--radius-md)] border p-4"
+                >
+                  <Scale className="text-positive mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm leading-relaxed text-ink">{d.description}</p>
+                    <p className="text-ink text-sm leading-relaxed">{d.description}</p>
                     {d.context ? (
-                      <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+                      <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
                         <span className="text-ink-muted">Because — </span>
                         {d.context}
                       </p>
                     ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                    <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span>{formatDate(d.decidedOn, timeZone)}</span>
                       {d.people.length > 0 ? (
                         <span className="inline-flex items-center gap-1.5">
@@ -386,8 +428,8 @@ export default async function ConversationPage({
             <Eyebrow>Pushback</Eyebrow>
             <ul className="mt-3 grid gap-2.5">
               {objections.map((o) => (
-                <li key={o} className="flex gap-3 text-sm leading-relaxed text-ink-secondary">
-                  <span aria-hidden="true" className="mt-2.5 h-px w-3 shrink-0 bg-caution" />
+                <li key={o} className="text-ink-secondary flex gap-3 text-sm leading-relaxed">
+                  <span aria-hidden="true" className="bg-caution mt-2.5 h-px w-3 shrink-0" />
                   {o}
                 </li>
               ))}
@@ -412,11 +454,11 @@ export default async function ConversationPage({
       {nextTime.length > 0 ? (
         <>
           <Rule />
-          <section className="rounded-[var(--radius-lg)] border border-accent/25 bg-accent-wash p-5">
+          <section className="border-accent/25 bg-accent-wash rounded-[var(--radius-lg)] border p-5">
             <Eyebrow className="text-accent">Next time</Eyebrow>
             <ol className="mt-3 grid gap-2.5">
               {nextTime.map((n, i) => (
-                <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-ink">
+                <li key={i} className="text-ink flex gap-2.5 text-sm leading-relaxed">
                   <span aria-hidden="true" className="font-display text-accent tabular-nums">
                     {i + 1}
                   </span>
@@ -448,8 +490,8 @@ export default async function ConversationPage({
       ) : null}
 
       {/* --- provenance and controls ---------------------------------------------------------- */}
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-        <p className="flex items-center gap-2 text-xs text-ink-faint">
+      <div className="border-line mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+        <p className="text-ink-faint flex items-center gap-2 text-xs">
           {artifact ? (
             artifact.grounded_fallback ? (
               <>
@@ -465,7 +507,9 @@ export default async function ConversationPage({
           ) : null}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {conversation.processingStatus === 'ready' ? <ReprocessButton interactionId={id} /> : null}
+          {conversation.processingStatus === 'ready' ? (
+            <ReprocessButton interactionId={id} />
+          ) : null}
           <DeleteConversationButton interactionId={id} />
         </div>
       </div>
