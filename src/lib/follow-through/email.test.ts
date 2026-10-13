@@ -41,7 +41,11 @@ describe('followThroughEmail', () => {
     expect(plain).toContain('>JO<')
     expect(plain).not.toContain('<img')
 
-    const withPhoto = build([item({ person: { name: 'Jason Ortiz', initials: 'JO', photoUrl: 'https://cdn.invalid/j.jpg' } })]).html
+    const withPhoto = build([
+      item({
+        person: { name: 'Jason Ortiz', initials: 'JO', photoUrl: 'https://cdn.invalid/j.jpg' },
+      }),
+    ]).html
     expect(withPhoto).toContain('<img src="https://cdn.invalid/j.jpg" alt="JO"')
   })
 
@@ -68,18 +72,22 @@ describe('followThroughEmail', () => {
         source: null,
       }),
     ]).html
-    expect(html).toContain("You said you&#39;d send the proposal.")
-    expect(html).toContain("Ravi said they&#39;d confirm the pricing assumptions.")
+    expect(html).toContain('You said you&#39;d send the proposal.')
+    expect(html).toContain('Ravi said they&#39;d confirm the pricing assumptions.')
     expect(html).toContain('Still unanswered: Who owns the migration budget?')
     expect(html).toContain('Overdue by 1 day')
     // A person's name is never HTML-injected.
-    expect(build([item({ person: { name: '<b>x</b>', initials: 'X', photoUrl: null } })]).html).not.toContain('<b>x</b>')
+    expect(
+      build([item({ person: { name: '<b>x</b>', initials: 'X', photoUrl: null } })]).html,
+    ).not.toContain('<b>x</b>')
   })
 
   it('reads as a short plain-text list, links included', () => {
     const text = toPlainText(build([item()], 2).html)
     expect(text).toContain('3 things worth following up on today.')
-    expect(text).toContain("You said you'd send the proposal. (https://example.invalid/loops?focus=abc)")
+    expect(text).toContain(
+      "You said you'd send the proposal. (https://example.invalid/loops?focus=abc)",
+    )
     expect(text).toContain('2 more loops are open beyond these.')
     expect(text).toContain('Turn these emails off')
   })
@@ -113,9 +121,14 @@ describe('the scheduled job', () => {
   })
 
   it('reserves the day through the ledger rather than trusting its own memory', () => {
-    const send = readFileSync(join(process.cwd(), 'src', 'lib', 'follow-through', 'send.ts'), 'utf8')
+    const send = readFileSync(
+      join(process.cwd(), 'src', 'lib', 'follow-through', 'send.ts'),
+      'utf8',
+    )
     // Reserve, then send, then record: the insert precedes sendEmail.
-    expect(send.indexOf("from('follow_through_deliveries')")).toBeLessThan(send.indexOf('await sendEmail('))
+    expect(send.indexOf("from('follow_through_deliveries')")).toBeLessThan(
+      send.indexOf('await sendEmail('),
+    )
     // A duplicate reservation is the unique-violation code, treated as already sent.
     expect(send).toContain("'23505'")
   })

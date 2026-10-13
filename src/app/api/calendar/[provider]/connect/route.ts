@@ -37,7 +37,9 @@ export function verifyState(state: string | null): string | null {
 
   const payload = state.slice(0, index)
   const provided = Buffer.from(state.slice(index + 1))
-  const expected = Buffer.from(createHmac('sha256', stateSecret()).update(payload).digest('base64url'))
+  const expected = Buffer.from(
+    createHmac('sha256', stateSecret()).update(payload).digest('base64url'),
+  )
 
   if (provided.length !== expected.length) return null
   return timingSafeEqual(provided, expected) ? payload : null

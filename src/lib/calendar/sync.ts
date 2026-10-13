@@ -37,7 +37,13 @@ export interface SyncOutcome {
   cancelled: number
   attendeesMatched: number
   attendeesUnmatched: number
-  reason?: 'not_connected' | 'needs_reconnect' | 'admin_consent_required' | 'rate_limited' | 'unavailable' | 'error'
+  reason?:
+    | 'not_connected'
+    | 'needs_reconnect'
+    | 'admin_consent_required'
+    | 'rate_limited'
+    | 'unavailable'
+    | 'error'
 }
 
 interface IntegrationRow {
@@ -172,11 +178,15 @@ function sameInstant(a: string | null | undefined, b: string | null | undefined)
  * just computed. Email plus personId only -- a display name changing in
  * somebody's address book is not a reason to rewrite the row.
  */
-function sameMatches(stored: unknown, computed: { email: string | null; personId: string | null }[]): boolean {
+function sameMatches(
+  stored: unknown,
+  computed: { email: string | null; personId: string | null }[],
+): boolean {
   if (!Array.isArray(stored)) return false
   if (stored.length !== computed.length) return false
 
-  const key = (a: { email: string | null; personId: string | null }) => `${a.email ?? ''}:${a.personId ?? ''}`
+  const key = (a: { email: string | null; personId: string | null }) =>
+    `${a.email ?? ''}:${a.personId ?? ''}`
   const before = new Set(
     (stored as { email?: string | null; personId?: string | null }[]).map((a) =>
       key({ email: a.email ?? null, personId: a.personId ?? null }),

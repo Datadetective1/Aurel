@@ -116,9 +116,13 @@ function composeAdaptation(input: MessageAdaptationInput): MessageAdaptation {
     /recommendation|conclusion|headline|bottom line|the ask|up front|first/i.test(o.content),
   )
   const wantsEvidence = signals.some((o) =>
-    /data|evidence|number|proof|detail|methodology|utilisation|utilization|analysis/i.test(o.content),
+    /data|evidence|number|proof|detail|methodology|utilisation|utilization|analysis/i.test(
+      o.content,
+    ),
   )
-  const prefersBrevity = signals.some((o) => /brief|short|concise|to the point|keep it/i.test(o.content))
+  const prefersBrevity = signals.some((o) =>
+    /brief|short|concise|to the point|keep it/i.test(o.content),
+  )
 
   // 1. Strip greeting preamble for the modes where it costs more than it earns.
   if (mode === 'concise' || mode === 'executive' || mode === 'direct') {
@@ -137,7 +141,12 @@ function composeAdaptation(input: MessageAdaptationInput): MessageAdaptation {
   // 2. Remove hedging where the mode calls for directness.
   if (mode === 'direct' || mode === 'concise' || mode === 'executive') {
     const before = sentences.join(' ')
-    sentences = sentences.map((s) => s.replace(HEDGES, '').replace(/\s{2,}/g, ' ').trim())
+    sentences = sentences.map((s) =>
+      s
+        .replace(HEDGES, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim(),
+    )
     if (sentences.join(' ') !== before) {
       changes.push({
         what: 'Cut hedging language.',
@@ -250,7 +259,10 @@ function composeAdaptation(input: MessageAdaptationInput): MessageAdaptation {
   cautions.push('Read it once before sending — this rewrote your words, it did not verify them.')
 
   return {
-    adapted: sentences.join(' ').replace(/\s{2,}/g, ' ').trim(),
+    adapted: sentences
+      .join(' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim(),
     changes: changes.slice(0, 6),
     cautions: cautions.slice(0, 3),
   }

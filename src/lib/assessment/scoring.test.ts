@@ -20,7 +20,8 @@ function loadDimension(target: DimensionId, direction: 1 | -1): Response[] {
     // MOST: an item keyed toward the target pole when present, else any filler.
     const most = wanted ?? filler[0]!
     // LEAST: the opposite-keyed target item when present, else a different filler.
-    const least = opposite ?? filler.find((i) => i.id !== most.id) ?? block.items.find((i) => i.id !== most.id)!
+    const least =
+      opposite ?? filler.find((i) => i.id !== most.id) ?? block.items.find((i) => i.id !== most.id)!
     return { blockId: block.id, mostItemId: most.id, leastItemId: least.id }
   })
 }

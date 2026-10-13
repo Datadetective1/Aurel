@@ -103,7 +103,10 @@ export function loopGroup(loop: { kind: LoopKind; owner: LoopOwner }): LoopGroup
 
 export const LOOP_GROUP_META: Record<LoopGroup, { label: string; hint: string }> = {
   you_promised: { label: 'You promised', hint: 'Things you said you would do.' },
-  waiting_on_them: { label: 'Waiting on them', hint: 'Things somebody said they would do for you.' },
+  waiting_on_them: {
+    label: 'Waiting on them',
+    hint: 'Things somebody said they would do for you.',
+  },
   unanswered: { label: 'Unanswered', hint: 'Questions that came up and were not settled.' },
   shared: { label: 'Between you', hint: 'Open, with no single owner yet.' },
 }

@@ -22,7 +22,9 @@ async function load(stub: typeof fetch, apiKey: string | null = KEY) {
 
 function reply(body: unknown, status = 200) {
   return (async () =>
-    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })) as typeof fetch
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+      status,
+    })) as typeof fetch
 }
 
 function audio(bytes = 4096, type = 'audio/webm') {
@@ -104,10 +106,13 @@ describe('transcribeAudio', () => {
 
   it('refuses to run without a key rather than calling out', async () => {
     let called = false
-    const { transcribeAudio } = await load((async () => {
-      called = true
-      return new Response('{}', { status: 200 })
-    }) as typeof fetch, null)
+    const { transcribeAudio } = await load(
+      (async () => {
+        called = true
+        return new Response('{}', { status: 200 })
+      }) as typeof fetch,
+      null,
+    )
 
     const result = await transcribeAudio({ audio: audio(), extension: 'webm' })
     expect(called).toBe(false)

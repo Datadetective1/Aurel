@@ -183,30 +183,32 @@ export function renderEmail({ preheader, body, footerNote, unsubscribeUrl }: Ema
  * hand per template would guarantee the two drift apart, so it is derived.
  */
 export function toPlainText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<head[\s\S]*?<\/head>/gi, '')
-    // Keep the destination of a link, since a text reader cannot click through.
-    .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
-    .replace(/<\/(p|h1|h2|tr|div)>/gi, '\n\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#8204;/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/[ \t]+/g, ' ')
-    // Every line trimmed BEFORE blank runs are collapsed. Stripping a table
-    // layout leaves lines holding a single space, and a line like that is not
-    // empty - so `\\n{3,}` never matched and the plain-text part opened with a
-    // dozen blank lines before the first word. It was a fallback that existed
-    // and was not worth reading.
-    .split('\n')
-    .map((line) => line.trim())
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  return (
+    html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<head[\s\S]*?<\/head>/gi, '')
+      // Keep the destination of a link, since a text reader cannot click through.
+      .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
+      .replace(/<\/(p|h1|h2|tr|div)>/gi, '\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#8204;/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/[ \t]+/g, ' ')
+      // Every line trimmed BEFORE blank runs are collapsed. Stripping a table
+      // layout leaves lines holding a single space, and a line like that is not
+      // empty - so `\\n{3,}` never matched and the plain-text part opened with a
+      // dozen blank lines before the first word. It was a fallback that existed
+      // and was not worth reading.
+      .split('\n')
+      .map((line) => line.trim())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  )
 }

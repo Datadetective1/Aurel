@@ -15,12 +15,7 @@
  */
 
 export type IdentityMatchStatus =
-  | 'confirmed'
-  | 'probable'
-  | 'ambiguous'
-  | 'no_match'
-  | 'conflicting'
-  | 'unreviewed'
+  'confirmed' | 'probable' | 'ambiguous' | 'no_match' | 'conflicting' | 'unreviewed'
 
 export interface IdentitySubject {
   fullName: string
@@ -141,7 +136,10 @@ export function assessIdentity(
   // A source that names the person but contradicts their employer is a likely
   // different individual with the same name — the exact failure to avoid.
   const contradictsOrganization =
-    Boolean(org) && signals.exactNameInText === true && !signals.organizationMatch && hasCompetingEmployer(haystack, org!)
+    Boolean(org) &&
+    signals.exactNameInText === true &&
+    !signals.organizationMatch &&
+    hasCompetingEmployer(haystack, org!)
 
   if (contradictsOrganization && !options.userSuppliedUrl) {
     return {

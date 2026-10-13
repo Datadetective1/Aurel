@@ -143,7 +143,7 @@ describe('what it says out loud', () => {
 
   it('does not hand provider errors to the user', () => {
     // Two sentences, both actionable. Nothing about status codes or models.
-    expect(source).toContain("You can try again or type your debrief.")
+    expect(source).toContain('You can try again or type your debrief.')
     expect(source).not.toMatch(/error: [^']*result\.reason/)
   })
 

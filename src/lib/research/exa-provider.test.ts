@@ -174,7 +174,9 @@ describe('exa provider', () => {
 
   it('drops malformed results rather than passing a URL-less row down the pipeline', async () => {
     const provider = await withExa(
-      reply({ results: [{ title: 'No URL here' }, { url: 'https://ok.example/x', title: 'Fine' }] }),
+      reply({
+        results: [{ title: 'No URL here' }, { url: 'https://ok.example/x', title: 'Fine' }],
+      }),
     )
     const result = await provider.search({ name: 'Jordan Avery' })
     expect(result.ok).toBe(true)

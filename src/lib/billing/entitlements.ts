@@ -307,7 +307,11 @@ export async function checkPersonLimit(): Promise<CapabilityCheck> {
     }
   }
 
-  return { allowed: true, remaining: entitlements.limits.people - used, limit: entitlements.limits.people }
+  return {
+    allowed: true,
+    remaining: entitlements.limits.people - used,
+    limit: entitlements.limits.people,
+  }
 }
 
 /** Exported so the copy that embeds them can be tested. */

@@ -25,7 +25,11 @@ const MEASURED = {
   wikipedia: { bytes: 478_752, text: 35_404 },
 }
 
-const read = (bytes: number, textLength: number, over: Partial<Parameters<typeof classifyRead>[0]> = {}) =>
+const read = (
+  bytes: number,
+  textLength: number,
+  over: Partial<Parameters<typeof classifyRead>[0]> = {},
+) =>
   classifyRead({
     text: 'x'.repeat(textLength),
     title: null,

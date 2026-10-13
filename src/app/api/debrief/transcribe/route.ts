@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
   if (audio.size < MIN_BYTES) {
     // A tap on the button, or a microphone that produced nothing.
     return NextResponse.json(
-      { error: "That recording was empty. Try again, or type your debrief." },
+      { error: 'That recording was empty. Try again, or type your debrief.' },
       { status: 400 },
     )
   }
@@ -199,8 +199,5 @@ export async function POST(request: NextRequest) {
     durationBucket: durationBucket(declaredSeconds),
   })
 
-  return NextResponse.json(
-    { text: result.text },
-    { headers: { 'cache-control': 'no-store' } },
-  )
+  return NextResponse.json({ text: result.text }, { headers: { 'cache-control': 'no-store' } })
 }

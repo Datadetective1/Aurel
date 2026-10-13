@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { forwardedHeaders } from '@/lib/bearer-routes'
 
 /**
  * Session refresh + route protection.
@@ -51,7 +52,7 @@ function isPrivate(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
+  let response = NextResponse.next({ request: { headers: forwardedHeaders(request) } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,7 +64,7 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          response = NextResponse.next({ request: { headers: forwardedHeaders(request) } })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           )

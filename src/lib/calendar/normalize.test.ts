@@ -23,7 +23,10 @@ describe('microsoft normalization', () => {
     organizer: { emailAddress: { address: 'Maya@Northwind.com' } },
     attendees: [
       { emailAddress: { address: 'Maya@Northwind.com', name: 'Maya Chen' }, type: 'required' },
-      { emailAddress: { address: 'room3@northwind.com', name: 'Meeting Room 3' }, type: 'resource' },
+      {
+        emailAddress: { address: 'room3@northwind.com', name: 'Meeting Room 3' },
+        type: 'resource',
+      },
     ],
     lastModifiedDateTime: '2026-08-20T09:00:00Z',
   }
@@ -111,7 +114,11 @@ describe('google normalization', () => {
   it('reads an all-day event from the date field', () => {
     // Google puts all-day events in `date`, not `dateTime`. Reading only
     // dateTime would drop them entirely.
-    const event = normalizeGoogleEvent({ ...base, start: { date: '2026-09-01' }, end: { date: '2026-09-02' } })
+    const event = normalizeGoogleEvent({
+      ...base,
+      start: { date: '2026-09-01' },
+      end: { date: '2026-09-02' },
+    })
     expect(event?.isAllDay).toBe(true)
     expect(event?.startsAt).toBe('2026-09-01T00:00:00.000Z')
   })
@@ -148,7 +155,11 @@ describe('google normalization', () => {
       subject: 'Same meeting',
       start: { dateTime: '2026-09-01T14:00:00.0000000', timeZone: 'UTC' },
     })
-    const g = normalizeGoogleEvent({ id: 'x', summary: 'Same meeting', start: { dateTime: '2026-09-01T14:00:00Z' } })
+    const g = normalizeGoogleEvent({
+      id: 'x',
+      summary: 'Same meeting',
+      start: { dateTime: '2026-09-01T14:00:00Z' },
+    })
 
     expect(Object.keys(ms!).sort()).toEqual(Object.keys(g!).sort())
     expect(ms?.startsAt).toBe(g?.startsAt)
@@ -165,18 +176,42 @@ describe('resource detection', () => {
   it('does not mistake a person for furniture', () => {
     // A false positive here silently drops a real attendee from the room.
     expect(looksLikeResource({ email: 'maya@northwind.com', displayName: 'Maya Chen' })).toBe(false)
-    expect(looksLikeResource({ email: 'daniel.rooming@x.com', displayName: 'Daniel Rooming' })).toBe(
-      false,
-    )
+    expect(
+      looksLikeResource({ email: 'daniel.rooming@x.com', displayName: 'Daniel Rooming' }),
+    ).toBe(false)
   })
 })
 
 describe('candidateAttendees', () => {
   const people = [
-    { email: 'maya@northwind.com', displayName: 'Maya', isOrganizer: false, isResource: false, response: 'accepted' },
-    { email: 'room@northwind.com', displayName: 'Room', isOrganizer: false, isResource: true, response: 'none' },
-    { email: 'me@mine.com', displayName: 'Me', isOrganizer: true, isResource: false, response: 'accepted' },
-    { email: null, displayName: 'No address', isOrganizer: false, isResource: false, response: 'none' },
+    {
+      email: 'maya@northwind.com',
+      displayName: 'Maya',
+      isOrganizer: false,
+      isResource: false,
+      response: 'accepted',
+    },
+    {
+      email: 'room@northwind.com',
+      displayName: 'Room',
+      isOrganizer: false,
+      isResource: true,
+      response: 'none',
+    },
+    {
+      email: 'me@mine.com',
+      displayName: 'Me',
+      isOrganizer: true,
+      isResource: false,
+      response: 'accepted',
+    },
+    {
+      email: null,
+      displayName: 'No address',
+      isOrganizer: false,
+      isResource: false,
+      response: 'none',
+    },
   ]
 
   it('excludes resources, the account owner, and anyone with no address', () => {

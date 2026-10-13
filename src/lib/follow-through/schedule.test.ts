@@ -11,7 +11,11 @@ describe('localClock', () => {
   it('reckons the day and hour where the user is', () => {
     // 13:00 UTC on the 10th: 8am Chicago (CDT), 22:00 Tokyo, still the 10th in both.
     const now = new Date('2026-09-10T13:00:00Z')
-    expect(localClock(now, 'America/Chicago')).toMatchObject({ date: '2026-09-10', hour: 8, weekday: 4 })
+    expect(localClock(now, 'America/Chicago')).toMatchObject({
+      date: '2026-09-10',
+      hour: 8,
+      weekday: 4,
+    })
     expect(localClock(now, 'Asia/Tokyo')).toMatchObject({ date: '2026-09-10', hour: 22 })
     // 23:30 UTC is already the 11th in Tokyo.
     expect(localClock(new Date('2026-09-10T23:30:00Z'), 'Asia/Tokyo').date).toBe('2026-09-11')

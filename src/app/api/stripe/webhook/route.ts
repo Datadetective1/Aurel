@@ -156,10 +156,7 @@ async function resolveUserId(subscription: Stripe.Subscription): Promise<string 
   return data?.user_id ?? null
 }
 
-async function syncSubscription(
-  userId: string,
-  subscription: Stripe.Subscription,
-): Promise<void> {
+async function syncSubscription(userId: string, subscription: Stripe.Subscription): Promise<void> {
   const admin = createServiceRoleClient()
 
   const item = subscription.items.data[0]
@@ -184,26 +181,24 @@ async function syncSubscription(
 
   const founding = await resolveFounding(existing, plan)
 
-  const { error } = await admin
-    .from('subscriptions')
-    .upsert(
-      {
-        user_id: userId,
-        plan,
-        status: status as never,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscription.id,
-        stripe_price_id: priceId,
-        current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
-        cancel_at_period_end: subscription.cancel_at_period_end,
-        trial_ends_at: subscription.trial_end
-          ? new Date(subscription.trial_end * 1000).toISOString()
-          : null,
-        billing_interval: intervalForPrice(priceId),
-        ...founding,
-      },
-      { onConflict: 'user_id' },
-    )
+  const { error } = await admin.from('subscriptions').upsert(
+    {
+      user_id: userId,
+      plan,
+      status: status as never,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscription.id,
+      stripe_price_id: priceId,
+      current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      trial_ends_at: subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : null,
+      billing_interval: intervalForPrice(priceId),
+      ...founding,
+    },
+    { onConflict: 'user_id' },
+  )
 
   if (error) throw new Error(`subscription upsert failed: ${error.code}`)
 

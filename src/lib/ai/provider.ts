@@ -115,9 +115,7 @@ export async function runPrompt<TInput, TOutput>(
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const timeout = AbortSignal.timeout(GENERATION_TIMEOUT_MS)
-    const signal = options.signal
-      ? AbortSignal.any([options.signal, timeout])
-      : timeout
+    const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
 
     try {
       const model = await resolveModel(modelId)

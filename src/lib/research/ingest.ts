@@ -136,10 +136,10 @@ const MIN_USABLE_TEXT = 200
  * Exported for the tests that pin this classification: it is pure, and the
  * alternative is standing up a Supabase client to assert on a string.
  */
-export function accessStatusFor(failure: {
-  reason: string
-  status?: number
-}): { status: AccessStatus; message: string } {
+export function accessStatusFor(failure: { reason: string; status?: number }): {
+  status: AccessStatus
+  message: string
+} {
   switch (failure.reason) {
     case 'blocked_host':
     case 'blocked_scheme':
@@ -189,7 +189,8 @@ const RESTRICTED_MESSAGE =
 const THIN_MESSAGE = 'There wasn’t enough readable information on this page to use.'
 
 /** Paths a site redirects to when it wants a session before showing anything. */
-const AUTH_PATH = /\/(login|signin|sign-in|sign_in|auth|authwall|checkpoint|challenge|consent)(\/|$|\?)/i
+const AUTH_PATH =
+  /\/(login|signin|sign-in|sign_in|auth|authwall|checkpoint|challenge|consent)(\/|$|\?)/i
 
 /**
  * Why the extraction came back unusable, if it did.
@@ -216,7 +217,10 @@ export function classifyRead(input: {
     }
   }
   if (/\b(subscribe to (?:read|continue)|this article is for subscribers|paywall)\b/.test(sample)) {
-    return { status: 'paywall', message: 'That page is behind a paywall. Paste the relevant text instead.' }
+    return {
+      status: 'paywall',
+      message: 'That page is behind a paywall. Paste the relevant text instead.',
+    }
   }
 
   if (text.length >= MIN_USABLE_TEXT) return null

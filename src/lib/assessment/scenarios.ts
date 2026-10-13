@@ -112,7 +112,8 @@ export const CORE_SCENARIOS: readonly Scenario[] = [
   {
     id: 'con-core',
     dimension: 'conflict',
-    prompt: 'A meeting is moving toward a decision you think is wrong, and nobody else has objected.',
+    prompt:
+      'A meeting is moving toward a decision you think is wrong, and nobody else has objected.',
     options: [
       { id: 'con-core-a', label: 'Keep pressing the point', direction: 1 },
       { id: 'con-core-b', label: 'Look for something everyone can live with', direction: -1 },
@@ -297,7 +298,10 @@ export const SCENARIO_POLES: Record<
   },
   detail: {
     label: 'Detail',
-    high: { pole: 'Detail-first', blurb: 'Wants the reasoning and the numbers, not just the answer.' },
+    high: {
+      pole: 'Detail-first',
+      blurb: 'Wants the reasoning and the numbers, not just the answer.',
+    },
     low: { pole: 'Headline-first', blurb: 'Wants the conclusion, and the detail on request.' },
   },
   conflict: {

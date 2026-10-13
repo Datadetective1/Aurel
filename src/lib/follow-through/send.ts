@@ -8,7 +8,13 @@ import { absoluteUrl } from '@/lib/brand'
 import { formatDateIn } from '@/lib/tz'
 import { initials } from '@/lib/utils'
 import { logger } from '@/lib/logger'
-import { headline, selectFollowThrough, subjectFor, type DigestLoop, type Selection } from './select'
+import {
+  headline,
+  selectFollowThrough,
+  subjectFor,
+  type DigestLoop,
+  type Selection,
+} from './select'
 import { localClock, type LocalClock } from './schedule'
 
 type Client = SupabaseClient<Database>
@@ -68,7 +74,9 @@ export async function loadDigestLoops(supabase: Client, userId: string): Promise
     personName: row.people ? row.people.preferred_name || row.people.full_name : null,
     interactionId: row.interaction_id,
     interactionTitle: row.interactions?.title ?? null,
-    interactionDay: row.interactions?.occurred_at ? row.interactions.occurred_at.slice(0, 10) : null,
+    interactionDay: row.interactions?.occurred_at
+      ? row.interactions.occurred_at.slice(0, 10)
+      : null,
   }))
 }
 
@@ -91,14 +99,26 @@ export async function composeFollowThrough(
 
   // One signing call for every face in the email. Photos are optional: the
   // initials render whether or not the client shows images.
-  const personIds = [...new Set(selection.items.map((i) => i.loop.personId).filter((id): id is string => Boolean(id)))]
+  const personIds = [
+    ...new Set(
+      selection.items.map((i) => i.loop.personId).filter((id): id is string => Boolean(id)),
+    ),
+  ]
   const { data: people } = personIds.length
     ? await supabase
         .from('people')
         .select('id, full_name, preferred_name, avatar_url, avatar_path')
         .eq('user_id', profile.id)
         .in('id', personIds)
-    : { data: [] as { id: string; full_name: string; preferred_name: string | null; avatar_url: string | null; avatar_path: string | null }[] }
+    : {
+        data: [] as {
+          id: string
+          full_name: string
+          preferred_name: string | null
+          avatar_url: string | null
+          avatar_path: string | null
+        }[],
+      }
 
   const photoByPerson = new Map<string, string | null>()
   const paths = (people ?? []).filter((p) => p.avatar_path).map((p) => p.avatar_path as string)
@@ -134,7 +154,9 @@ export async function composeFollowThrough(
         : null,
       href: absoluteUrl(`/loops?focus=${item.loop.id}`),
       personHref: item.loop.personId ? absoluteUrl(`/people/${item.loop.personId}`) : null,
-      sourceHref: item.loop.interactionId ? absoluteUrl(`/conversations/${item.loop.interactionId}`) : null,
+      sourceHref: item.loop.interactionId
+        ? absoluteUrl(`/conversations/${item.loop.interactionId}`)
+        : null,
     })),
   })
 

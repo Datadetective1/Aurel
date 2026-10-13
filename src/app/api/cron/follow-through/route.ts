@@ -113,7 +113,11 @@ export async function GET(request: NextRequest) {
       // user just served. Counts and the mode only, like every other event.
       await admin
         .from('analytics_events')
-        .insert({ user_id: profile.id, name: 'follow_through_sent', props: { loops: outcome.count, mode } })
+        .insert({
+          user_id: profile.id,
+          name: 'follow_through_sent',
+          props: { loops: outcome.count, mode },
+        })
     } else if (outcome.status === 'skipped') {
       tally.skipped++
     } else {
@@ -122,5 +126,8 @@ export async function GET(request: NextRequest) {
   }
 
   logger.info('follow_through.run', { mode, ...tally })
-  return NextResponse.json({ ok: true, mode, ...tally }, { headers: { 'cache-control': 'no-store' } })
+  return NextResponse.json(
+    { ok: true, mode, ...tally },
+    { headers: { 'cache-control': 'no-store' } },
+  )
 }

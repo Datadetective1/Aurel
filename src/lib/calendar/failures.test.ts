@@ -28,7 +28,9 @@ async function withProvider(stub: typeof fetch, which: 'microsoft' | 'google' = 
 
 function reply(body: unknown, status = 200) {
   return (async () =>
-    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })) as typeof fetch
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), {
+      status,
+    })) as typeof fetch
 }
 
 afterEach(() => {
@@ -91,12 +93,18 @@ describe('listing failures', () => {
   it('separates Google’s two meanings for 403', async () => {
     // Google uses 403 for both "not granted" and "slow down", which need
     // different remedies: reconnect versus wait.
-    const limited = await withProvider(reply({ error: { message: 'rateLimitExceeded' } }, 403), 'google')
+    const limited = await withProvider(
+      reply({ error: { message: 'rateLimitExceeded' } }, 403),
+      'google',
+    )
     const limitedResult = await limited.listEvents({ accessToken: 'a', ...window })
     expect(limitedResult.ok).toBe(false)
     if (!limitedResult.ok) expect(limitedResult.reason).toBe('rate_limited')
 
-    const denied = await withProvider(reply({ error: { message: 'insufficientPermissions' } }, 403), 'google')
+    const denied = await withProvider(
+      reply({ error: { message: 'insufficientPermissions' } }, 403),
+      'google',
+    )
     const deniedResult = await denied.listEvents({ accessToken: 'a', ...window })
     expect(deniedResult.ok).toBe(false)
     if (!deniedResult.ok) expect(deniedResult.reason).toBe('unauthorized')

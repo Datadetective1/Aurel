@@ -286,10 +286,7 @@ export function formatTimeIn(value: string | Date | null | undefined, timeZone: 
 }
 
 /** "27 Aug 2026", in the account holder's zone. */
-export function formatDateIn(
-  value: string | Date | null | undefined,
-  timeZone: string,
-): string {
+export function formatDateIn(value: string | Date | null | undefined, timeZone: string): string {
   const zone = safeZone(timeZone)
   const date = isDateOnly(value) ? new Date(`${value}T12:00:00Z`) : toDate(value)
   if (!date) return '—'

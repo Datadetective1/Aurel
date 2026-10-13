@@ -372,9 +372,7 @@ export function resolveSearchProvider(): SearchProvider {
         ? braveSearch(serverEnv.BRAVE_SEARCH_API_KEY)
         : unconfiguredSearch
     case 'serper':
-      return serverEnv.SERPER_API_KEY
-        ? serperSearch(serverEnv.SERPER_API_KEY)
-        : unconfiguredSearch
+      return serverEnv.SERPER_API_KEY ? serperSearch(serverEnv.SERPER_API_KEY) : unconfiguredSearch
     case 'mock':
       return mockSearch()
     default:

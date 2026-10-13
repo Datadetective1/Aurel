@@ -266,7 +266,10 @@ export function classifyUrl(url: string): {
   if (host === 'youtube.com' || host === 'youtu.be' || host === 'vimeo.com') {
     return { sourceType: 'video', hint: 'Video appearance' }
   }
-  if (/podcast|anchor\.fm|buzzsprout|simplecast|transistor\.fm/.test(host) || path.includes('/podcast')) {
+  if (
+    /podcast|anchor\.fm|buzzsprout|simplecast|transistor\.fm/.test(host) ||
+    path.includes('/podcast')
+  ) {
     return { sourceType: 'podcast', hint: 'Podcast appearance' }
   }
   if (host === 'x.com' || host === 'twitter.com' || host === 'mastodon.social') {

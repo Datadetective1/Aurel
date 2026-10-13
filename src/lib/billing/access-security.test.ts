@@ -65,9 +65,7 @@ describe('what the redemption function may write', () => {
     //
     // 'owner' does appear in the function -- in the read that checks whether
     // the caller already has access. What matters is what it INSERTS.
-    const inserts = [...fn.matchAll(/insert into public\.access_grants[\s\S]*?;/g)].map(
-      (m) => m[0],
-    )
+    const inserts = [...fn.matchAll(/insert into public\.access_grants[\s\S]*?;/g)].map((m) => m[0])
     expect(inserts.length).toBeGreaterThan(0)
     for (const statement of inserts) {
       expect(statement).toMatch(/'pilot'/)
