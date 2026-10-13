@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { TrendingDown, UserPlus } from 'lucide-react'
 import { CompanyMark } from '@/components/visual/company-mark'
 import { AtlasConnections, AtlasLegend } from '@/components/visual/atlas-connections'
-import { describeConnection, findConnections } from '@/lib/visual/commonality'
+import { loadAtlasConnections } from '@/lib/visual/atlas.server'
 import type { VisualConnection } from '@/lib/visual/types'
 import { Avatar } from '@/components/ui/avatar'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
@@ -38,13 +38,7 @@ export default async function AtlasPage() {
 
   const supabase = await createClient()
 
-  const [
-    { data: people },
-    { data: commitments },
-    { data: facts },
-    { data: attendance },
-    { data: participation },
-  ] = await Promise.all([
+  const [{ data: people }, { data: commitments }] = await Promise.all([
     supabase
       .from('people')
       .select(
@@ -60,25 +54,6 @@ export default async function AtlasPage() {
       .eq('user_id', user.id)
       .eq('status', 'open')
       .eq('review_status', 'confirmed'),
-    // The evidence connections may rest on: sourced facts about past employers
-    // and schools, and who was in which meeting and conversation together.
-    supabase
-      .from('professional_facts')
-      .select('person_id, kind, value, evidence_level')
-      .eq('user_id', user.id)
-      .in('kind', ['prior_role', 'education'])
-      .in('evidence_level', ['confirmed', 'observed'])
-      .limit(2000),
-    supabase
-      .from('meeting_attendees')
-      .select('meeting_id, person_id')
-      .eq('user_id', user.id)
-      .limit(3000),
-    supabase
-      .from('interaction_participants')
-      .select('interaction_id, person_id')
-      .eq('user_id', user.id)
-      .limit(3000),
   ])
 
   const faces = await resolveFaces(supabase, people ?? [], (p) => p.id)
@@ -114,37 +89,7 @@ export default async function AtlasPage() {
   // Same-organisation pairs are already visible in the grouping below, so the
   // list shows the connections the grouping cannot: shared history, and
   // sourced facts in common.
-  const group = <K extends string>(rows: { person_id: string }[] | null, key: (r: never) => K) => {
-    const map = new Map<string, string[]>()
-    for (const r of rows ?? []) {
-      const k = key(r as never)
-      map.set(k, [...(map.get(k) ?? []), r.person_id])
-    }
-    return [...map.entries()].map(([id, personIds]) => ({ id, personIds }))
-  }
-  const connectionOrder = ['shared_conversation', 'shared_meeting', 'former_employer', 'education']
-  const connections: VisualConnection[] = findConnections({
-    people: list.map((p) => ({
-      id: p.id,
-      organizationId: p.organization_id,
-      organizationName: p.organizations?.name ?? null,
-    })),
-    facts: (facts ?? []).map((f) => ({
-      personId: f.person_id,
-      kind: f.kind,
-      value: f.value,
-      evidence: f.evidence_level,
-    })),
-    meetings: group(attendance, (r: { meeting_id: string }) => r.meeting_id),
-    conversations: group(participation, (r: { interaction_id: string }) => r.interaction_id),
-  })
-    .filter((c) => c.kind !== 'same_organization')
-    .sort(
-      (a, b) =>
-        connectionOrder.indexOf(a.kind) - connectionOrder.indexOf(b.kind) || b.count - a.count,
-    )
-    .slice(0, 12)
-    .map((c) => ({ ...c, description: describeConnection(c) }))
+  const connections: VisualConnection[] = await loadAtlasConnections(supabase, user.id, list)
   const atlasPeople = new Map(
     list.map((p) => [
       p.id,

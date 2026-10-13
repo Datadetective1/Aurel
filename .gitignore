@@ -30,3 +30,6 @@ supabase/.temp/
 
 # Local end-to-end scratch (screenshots, throwaway scripts)
 .e2e-tmp
+
+# The native app's icon, splash and favicon are build inputs, same reason.
+!mobile/assets/*.png

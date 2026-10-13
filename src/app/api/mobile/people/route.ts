@@ -26,6 +26,7 @@ export async function GET() {
   const faces = await resolveFaces(ctx.supabase, people ?? [], (p) => p.id)
 
   const body: PeopleResponse = {
+    timeZone: ctx.timeZone,
     people: (people ?? []).map((p) => {
       const mine = loops.filter((l) => l.personId === p.id)
       const label = relationshipLabel(p.relationship_type)

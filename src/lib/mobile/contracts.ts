@@ -102,6 +102,7 @@ export interface MeetingResponse {
 
 // --- GET /api/mobile/people ---------------------------------------------------
 export interface PeopleResponse {
+  timeZone: string
   people: (VisualPerson & { relationshipLabel: string })[]
 }
 
@@ -175,4 +176,16 @@ export interface ReviewRequest {
 }
 export interface ReviewResult {
   message: string
+}
+
+// --- GET /api/mobile/atlas ------------------------------------------------------
+export interface AtlasResponse {
+  timeZone: string
+  /** People grouped by the organisation on their record, largest first. */
+  organizations: { name: string; domain: string | null; people: VisualPerson[] }[]
+  unaffiliated: VisualPerson[]
+  /** Connections the record holds at both ends; never inferred. */
+  connections: VisualConnection[]
+  /** People the user marked important with no contact in 30 days. */
+  goingQuiet: VisualPerson[]
 }
