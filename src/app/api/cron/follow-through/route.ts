@@ -111,13 +111,11 @@ export async function GET(request: NextRequest) {
       tally.sent++
       // There is no session to attribute to, so the event is written for the
       // user just served. Counts and the mode only, like every other event.
-      await admin
-        .from('analytics_events')
-        .insert({
-          user_id: profile.id,
-          name: 'follow_through_sent',
-          props: { loops: outcome.count, mode },
-        })
+      await admin.from('analytics_events').insert({
+        user_id: profile.id,
+        name: 'follow_through_sent',
+        props: { loops: outcome.count, mode },
+      })
     } else if (outcome.status === 'skipped') {
       tally.skipped++
     } else {

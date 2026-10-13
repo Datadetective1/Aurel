@@ -149,7 +149,13 @@ async function assertPublicHost(hostname: string): Promise<{ ok: true } | FetchF
  * re-validated, and streams the body so the size cap is enforced as bytes
  * arrive rather than trusting Content-Length.
  */
-export async function safeFetch(rawUrl: string): Promise<SafeFetchResult> {
+export async function safeFetch(
+  rawUrl: string,
+  options: {
+    /** Checked on the first URL and every redirect hop; false refuses the fetch. */
+    allowHost?: (hostname: string) => boolean
+  } = {},
+): Promise<SafeFetchResult> {
   const parsed = parseUrl(rawUrl)
   if (!parsed) return { ok: false, reason: 'invalid_url' }
 
@@ -157,6 +163,9 @@ export async function safeFetch(rawUrl: string): Promise<SafeFetchResult> {
   let redirects = 0
 
   while (true) {
+    if (options.allowHost && !options.allowHost(current.hostname)) {
+      return { ok: false, reason: 'blocked_host' }
+    }
     const hostCheck = await assertPublicHost(current.hostname)
     if ('reason' in hostCheck) return hostCheck
 
@@ -339,6 +348,8 @@ export type SafeImageResult =
 export async function safeFetchImage(
   rawUrl: string,
   maxBytes = 1024 * 1024,
+  /** Checked on the first URL and every redirect hop; false refuses the fetch. */
+  allowHost?: (hostname: string) => boolean,
 ): Promise<SafeImageResult> {
   const parsed = parseUrl(rawUrl)
   if (!parsed) return { ok: false, reason: 'invalid_url' }
@@ -347,6 +358,7 @@ export async function safeFetchImage(
   let redirects = 0
 
   while (true) {
+    if (allowHost && !allowHost(current.hostname)) return { ok: false, reason: 'blocked_host' }
     const hostCheck = await assertPublicHost(current.hostname)
     if ('reason' in hostCheck) return hostCheck
 

@@ -49,7 +49,7 @@ create table if not exists public.person_photo_suggestions (
   constraint person_photo_suggestions_status check (status in ('suggested', 'confirmed', 'rejected')),
   constraint person_photo_suggestions_image_len check (char_length(image_url) between 1 and 2048),
   constraint person_photo_suggestions_source_len check (char_length(source_url) between 1 and 2048),
-  constraint person_photo_suggestions_unique unique (person_id, image_url)
+  constraint person_photo_suggestions_unique unique (user_id, person_id, image_url)
 );
 
 create index if not exists person_photo_suggestions_person_idx

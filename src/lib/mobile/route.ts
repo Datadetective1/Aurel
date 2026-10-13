@@ -1,7 +1,7 @@
 import 'server-only'
 import type { User } from '@supabase/supabase-js'
 import { getOptionalUser, getProfile } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { bearerToken, createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -27,6 +27,11 @@ export async function mobileContext(): Promise<
     }
   | { ok: false; response: Response }
 > {
+  // Bearer only: these routes are the app's, and a browser cookie is not how
+  // the app authenticates. Requiring the token also keeps them out of reach
+  // of any cross-site form post carrying a cookie.
+  if (!(await bearerToken()))
+    return { ok: false, response: json({ error: 'unauthenticated' }, 401) }
   const user = await getOptionalUser()
   if (!user) return { ok: false, response: json({ error: 'unauthenticated' }, 401) }
   const profile = await getProfile()

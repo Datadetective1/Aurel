@@ -1,9 +1,11 @@
 import { getOptionalUser, getProfile } from '@/lib/auth'
 import { json } from '@/lib/mobile/route'
+import { bearerToken } from '@/lib/supabase/server'
 import type { MeResponse } from '@/lib/mobile/contracts'
 
 /** Who the token belongs to. Answers before onboarding too, so the app can say so. */
 export async function GET() {
+  if (!(await bearerToken())) return json({ error: 'unauthenticated' }, 401)
   const user = await getOptionalUser()
   if (!user) return json({ error: 'unauthenticated' }, 401)
   const profile = await getProfile()

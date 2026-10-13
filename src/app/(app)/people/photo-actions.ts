@@ -8,12 +8,7 @@ import { ownership } from '@/lib/workspace'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import { safeFetchImage } from '@/lib/sources/fetch'
-import {
-  AVATAR_BUCKET,
-  imageExtension,
-  MAX_AVATAR_BYTES,
-  personAvatarPath,
-} from '@/lib/conversations/avatars'
+import { AVATAR_BUCKET, imageExtension, MAX_AVATAR_BYTES } from '@/lib/conversations/avatars'
 import {
   PHOTO_PROVIDERS,
   decidedImageUrls,
@@ -22,6 +17,7 @@ import {
   suggestionsTable,
   type PhotoSuggestionRow,
 } from '@/lib/photos/suggestions'
+import { isRestrictedPhotoHost } from '@/lib/photos/candidates'
 
 /**
  * PHOTO SUGGESTION ACTIONS
@@ -98,7 +94,11 @@ export async function findPublicPhoto(
     for (const candidate of candidates) {
       if (decided.has(candidate.imageUrl)) continue
 
-      const image = await safeFetchImage(candidate.imageUrl, MAX_AVATAR_BYTES)
+      const image = await safeFetchImage(
+        candidate.imageUrl,
+        MAX_AVATAR_BYTES,
+        (host) => !isRestrictedPhotoHost(`https://${host}/`),
+      )
       if (!image.ok) continue
       const ext = imageExtension(image.contentType)
       if (!ext) continue
@@ -128,10 +128,18 @@ export async function findPublicPhoto(
           .eq('user_id', user.id)
         continue
       }
-      await suggestionsTable(supabase)
+      const { error: pathError } = await suggestionsTable(supabase)
         .update({ storage_path: path })
         .eq('id', (row as { id: string }).id)
         .eq('user_id', user.id)
+      if (pathError) {
+        await supabase.storage.from(AVATAR_BUCKET).remove([path])
+        await suggestionsTable(supabase)
+          .delete()
+          .eq('id', (row as { id: string }).id)
+          .eq('user_id', user.id)
+        continue
+      }
 
       await track('profile_photo_suggestion_found', { provider: provider.id })
       revalidatePath(`/people/${person.id}`)
@@ -169,7 +177,9 @@ export async function confirmPhotoSuggestion(
   }
 
   const ext = suggestion.storage_path.split('.').pop() ?? 'jpg'
-  const target = personAvatarPath(user.id, suggestion.person_id, ext)
+  // A path no existing photo can share, so nothing is overwritten before the
+  // new face is safely attached.
+  const target = `${user.id}/people/${suggestion.person_id}-${suggestion.id}.${ext}`
 
   const { data: person } = await supabase
     .from('people')
@@ -179,11 +189,8 @@ export async function confirmPhotoSuggestion(
     .maybeSingle()
   if (!person) return { error: 'That person could not be found.' }
 
-  // Copy, then remove the suggestion copy. A failed copy leaves the old face.
-  if (person.avatar_path && person.avatar_path !== target) {
-    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
-  }
-  await supabase.storage.from(AVATAR_BUCKET).remove([target])
+  // Move, attach, and only then remove the old face. Any failure before the
+  // attach leaves the person exactly as they were.
   const { error: moveError } = await supabase.storage
     .from(AVATAR_BUCKET)
     .move(suggestion.storage_path, target)
@@ -197,7 +204,15 @@ export async function confirmPhotoSuggestion(
     .update({ avatar_path: target, avatar_suggestion_id: suggestion.id })
     .eq('id', suggestion.person_id)
     .eq('user_id', user.id)
-  if (error) return { error: 'The photo could not be attached. Try again.' }
+  if (error) {
+    // Put the review copy back so the suggestion still works.
+    await supabase.storage.from(AVATAR_BUCKET).move(target, suggestion.storage_path)
+    return { error: 'The photo could not be attached. Try again.' }
+  }
+
+  if (person.avatar_path && person.avatar_path !== target) {
+    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
+  }
 
   await suggestionsTable(supabase)
     .update({ status: 'confirmed', decided_at: new Date().toISOString(), storage_path: null })

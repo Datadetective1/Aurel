@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { publicEnv, serverEnv } from '@/lib/env'
 import type { Database } from '@/lib/supabase/types'
-import { BEARER_FLAG } from '@/lib/bearer-routes'
+import { BEARER_FLAG, bearerFlagValue } from '@/lib/bearer-routes'
 
 /**
  * Request-scoped Supabase client bound to the user's session cookies.
@@ -65,7 +65,8 @@ const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
  */
 export async function bearerToken(): Promise<string | null> {
   const h = await headers()
-  if (h.get(BEARER_FLAG) !== '1') return null
+  const mark = h.get(BEARER_FLAG)
+  if (!mark || mark !== (await bearerFlagValue())) return null
   const token = h
     .get('authorization')
     ?.match(/^Bearer\s+(.+)$/i)?.[1]

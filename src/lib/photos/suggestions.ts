@@ -57,7 +57,9 @@ export const confirmedSourcePageProvider: PhotoCandidateProvider = {
     const out: PhotoCandidate[] = []
     for (const source of input.confirmedSources.slice(0, 4)) {
       if (isRestrictedPhotoHost(source.url)) continue
-      const page = await safeFetch(source.url)
+      const page = await safeFetch(source.url, {
+        allowHost: (host) => !isRestrictedPhotoHost(`https://${host}/`),
+      })
       if (!page.ok || !page.contentType.includes('html')) continue
       for (const imageUrl of pageImageCandidates(page.body.slice(0, 300_000), page.finalUrl)) {
         if (isRestrictedPhotoHost(imageUrl)) continue

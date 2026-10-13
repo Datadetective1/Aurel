@@ -43,9 +43,14 @@ function remember(domain: string, entry: Entry) {
 
 async function findLogo(domain: string): Promise<Entry> {
   const origin = `https://${domain}`
+  // Every hop, redirects included, must stay on the organisation's own domain.
+  const ownDomain = (host: string) => {
+    const h = host.toLowerCase().replace(/^www\./, '')
+    return h === domain || h.endsWith(`.${domain}`)
+  }
   const candidates: string[] = []
 
-  const home = await safeFetch(`${origin}/`)
+  const home = await safeFetch(`${origin}/`, { allowHost: ownDomain })
   if (home.ok && home.contentType.includes('html')) {
     candidates.push(...declaredIcons(home.body.slice(0, 200_000), home.finalUrl).slice(0, 2))
   }
@@ -61,7 +66,7 @@ async function findLogo(domain: string): Promise<Entry> {
     }
     if (host !== domain && !host.endsWith(`.${domain}`)) continue
 
-    const image = await safeFetchImage(url, 512 * 1024)
+    const image = await safeFetchImage(url, 512 * 1024, ownDomain)
     if (image.ok && image.bytes.byteLength > 100) {
       return { bytes: image.bytes, type: image.contentType }
     }
