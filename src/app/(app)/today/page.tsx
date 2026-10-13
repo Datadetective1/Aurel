@@ -2,13 +2,15 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ArrowRight, CalendarClock, Loader2, Mic, Sparkles } from 'lucide-react'
-import { Avatar } from '@/components/ui/avatar'
 import { ConversationCard } from '@/components/app/conversation-card'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { LoopList } from '@/components/app/loop-list'
 import { RelationshipCard } from '@/components/app/relationship-card'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
+import { MeetingCard } from '@/components/visual/meeting-card'
+import { prepState } from '@/lib/visual/glance'
+import { actionDirection } from '@/lib/visual/relationship-actions'
+import { Container, Eyebrow, Panel } from '@/components/ui/primitives'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { MeetingCountdownCard } from '@/components/app/meeting-countdown'
 import {
@@ -153,11 +155,19 @@ export default async function TodayPage({
   const { data: attendeeRows } = attendeeIds.length
     ? await supabase
         .from('people')
-        .select('id, avatar_url, avatar_path')
+        .select('id, avatar_url, avatar_path, organizations(domain)')
         .eq('user_id', user.id)
         .in('id', attendeeIds)
-    : { data: [] as { id: string; avatar_url: string | null; avatar_path: string | null }[] }
+    : {
+        data: [] as {
+          id: string
+          avatar_url: string | null
+          avatar_path: string | null
+          organizations: { domain: string | null } | null
+        }[],
+      }
   const faces = await resolveFaces(supabase, attendeeRows ?? [], (p) => p.id)
+  const domains = new Map((attendeeRows ?? []).map((p) => [p.id, p.organizations?.domain ?? null]))
 
   const awaitingReview = conversations.filter(
     (c) => c.processingStatus === 'ready' && c.pendingReview > 0 && !c.reviewedAt,
@@ -432,69 +442,34 @@ export default async function TodayPage({
 
           <ul className="border-line bg-line mt-5 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
             {(meetings ?? []).map((meeting) => {
-              const people = (attendeesByMeeting.get(meeting.id) ?? [])
+              const ids = attendeesByMeeting.get(meeting.id) ?? []
+              const people = ids
                 .map((id) => peopleMap.get(id))
                 .filter((p): p is NonNullable<typeof p> => Boolean(p))
-              const isPrepared = prepared.has(meeting.id)
+              const roomLoops = loops.filter((l) => l.personId && ids.includes(l.personId))
 
               return (
                 <li key={meeting.id} className="bg-bg">
-                  <div className="flex flex-wrap items-start gap-4 p-5">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-ink-muted text-xs">
-                          {meeting.scheduled_at
-                            ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
-                            : 'Unscheduled'}
-                        </span>
-                        {meeting.importance >= 4 ? (
-                          <Badge tone="accent">Importance {meeting.importance}/5</Badge>
-                        ) : null}
-                        {isPrepared ? (
-                          <Badge tone="positive">Prepared</Badge>
-                        ) : (
-                          <Badge tone="outline">Not prepared</Badge>
-                        )}
-                      </div>
-
-                      <Link
-                        href={`/meetings/${meeting.id}`}
-                        className="font-display text-ink hover:text-accent mt-1.5 block text-lg"
-                      >
-                        {meeting.title}
-                      </Link>
-
-                      {meeting.objective ? (
-                        <p className="text-ink-secondary mt-1.5 line-clamp-2 text-sm leading-relaxed">
-                          {meeting.objective}
-                        </p>
-                      ) : (
-                        <p className="text-ink-faint mt-1.5 text-sm">No objective recorded yet.</p>
-                      )}
-
-                      {people.length > 0 ? (
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          {people.slice(0, 5).map((p) => (
-                            <span key={p.id} className="flex items-center gap-1.5">
-                              <Avatar name={p.fullName} src={faces.get(p.id) ?? null} size="sm" />
-                              <span className="text-ink-muted text-xs">{p.displayName}</span>
-                            </span>
-                          ))}
-                          {people.length > 5 ? (
-                            <span className="text-ink-faint text-xs">
-                              +{people.length - 5} more
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <Button asChild variant={isPrepared ? 'secondary' : 'primary'} size="sm">
-                      <Link href={`/meetings/${meeting.id}/brief`}>
-                        {isPrepared ? 'View brief' : 'Prepare'}
-                      </Link>
-                    </Button>
-                  </div>
+                  <MeetingCard
+                    id={meeting.id}
+                    title={meeting.title}
+                    scheduledAt={meeting.scheduled_at}
+                    objective={meeting.objective}
+                    people={people.map((p) => ({
+                      id: p.id,
+                      name: p.displayName,
+                      fullName: p.fullName,
+                      src: faces.get(p.id) ?? null,
+                      company: p.organization,
+                      companyDomain: domains.get(p.id) ?? null,
+                    }))}
+                    prep={prepState({ hasBrief: prepared.has(meeting.id), attendeeCount: people.length })}
+                    openLoops={roomLoops.length}
+                    owe={roomLoops.filter((l) => actionDirection(l) === 'owe').length}
+                    important={meeting.importance >= 4}
+                    timeZone={timeZone}
+                    now={now}
+                  />
                 </li>
               )
             })}
