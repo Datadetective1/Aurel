@@ -13,6 +13,8 @@ each has a reason it cannot be an action:
 | `/api/calendar/[provider]/…`                               | OAuth round trips                                                            |
 | `/api/debrief/transcribe`, `/api/conversations/transcribe` | A multipart audio body, transcribed and dropped; the words go back to a form |
 | `/dev/emails`                                              | Renders raw HTML, and 404s in production                                     |
+| `/api/logo`                                                | A binary image from an organisation's own domain, so the browser never tells a third party who the user is meeting |
+| `/api/mobile/*`                                            | The native app, authenticated by bearer token rather than cookie; each handler reuses the web's read models and actions |
 
 Everything else is a Server Component reading through the request-scoped
 Supabase client, or a Server Action writing through it.
@@ -135,3 +137,13 @@ the composer never does worse than nothing.
 Photos are the user's to supply. `resolveFaces()` signs every path a page
 needs in one storage call; the initials fallback is the honest face when there
 is no photo, and the product never fetches a likeness from anywhere.
+
+## Bearer routes
+
+The native app cannot hold a cookie session, so a short list of route
+handlers (`src/lib/bearer-routes.ts`) accept `Authorization: Bearer <access
+token>`. The middleware marks those requests with an internal header and
+strips any copy arriving from outside; `createClient()` honours a bearer
+token only when that mark is present and the token has the shape of a JWT,
+and `getOptionalUser()` verifies it with the auth server. Every page and
+server action remains cookie-only. Row level security applies identically.

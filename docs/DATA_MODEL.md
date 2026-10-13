@@ -147,3 +147,15 @@ Migrations `0015b` and `0015c` are drift repairs: production had two migrations
 applied on 27–28 Aug 2026 that were never committed. They were recovered
 verbatim from `supabase_migrations.schema_migrations`, are idempotent, and
 were not re-run against production.
+
+## Photo suggestions (0020) — PREPARED, NOT APPLIED
+
+`person_photo_suggestions` holds candidate faces found on pages already
+confirmed to be about a person, with where each was found (`image_url`,
+`source_url`, `source_id`, `provider`), a private review copy
+(`storage_path`) and the user's decision (`suggested` / `confirmed` /
+`rejected`). `people.avatar_suggestion_id` records which suggestion a
+confirmed face came from; uploads leave it null. Additive only, same RLS
+shape as every domain table. The application detects the table's absence and
+hides the flow, so the code can deploy before the migration. Apply it, then
+regenerate `src/lib/supabase/types.ts`. See docs/VISUAL_AND_MOBILE.md.
