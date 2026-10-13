@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
 import { applyAccessTier, parseAccessTier, type AccessTier } from './access'
 import { resolveEntitlement, type EntitlementProvider } from './sources'
+import { transcriptionAllowance, type AllowanceDecision } from './transcription'
 import { brand } from '@/lib/brand'
 
 /**
@@ -306,6 +307,37 @@ export async function recordUsage(record: UsageRecord): Promise<void> {
       error: error instanceof Error ? error.name : 'unknown',
     })
   }
+}
+
+/**
+ * Whether a recording of this length may be transcribed now. The canonical
+ * check: every transcription path calls it before any audio leaves the
+ * server. Owner and pilot accounts have no ceiling (see lib/billing/access).
+ */
+export async function checkTranscriptionAllowance(
+  requestSeconds: number,
+): Promise<AllowanceDecision> {
+  const entitlements = await getEntitlements()
+  const limit = entitlements.quotas.transcription_seconds
+  const used =
+    limit === null || limit === undefined
+      ? 0
+      : await usageInPeriod('transcription_seconds', entitlements.periodStart)
+  const decision = transcriptionAllowance({
+    limitSeconds: limit,
+    usedSeconds: used,
+    requestSeconds,
+    plan: entitlements.plan,
+  })
+  if (!decision.allowed) {
+    await track('limit_reached', {
+      capability: 'transcription',
+      meter: 'transcription_seconds',
+      limit: limit ?? 0,
+      plan: entitlements.plan,
+    })
+  }
+  return decision
 }
 
 /** Whether the user may add another person. */

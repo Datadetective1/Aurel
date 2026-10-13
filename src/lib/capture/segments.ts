@@ -91,7 +91,10 @@ export type TranscribeFn = (input: {
   audio: Blob
   extension: string
   declaredSeconds: number
-}) => Promise<{ ok: true; text: string; seconds: number } | { ok: false; reason: string }>
+}) => Promise<
+  | { ok: true; text: string; seconds: number; notice?: string | null }
+  | { ok: false; reason: string; message?: string }
+>
 
 export interface SegmentDeps {
   store: SegmentStore
@@ -101,6 +104,8 @@ export interface SegmentDeps {
 }
 
 const PERMANENT_FAILURES = new Set([
+  // The monthly transcription allowance: retrying cannot change it.
+  'allowance',
   'unsupported_media',
   'too_large',
   'empty_result',
@@ -185,8 +190,8 @@ export async function requestSegmentUpload(
 // --- 2. transcribe one segment -------------------------------------------------
 
 export type SegmentTranscription =
-  | { ok: true; text: string; seconds: number }
-  | { ok: false; status: 404 | 409 | 413 | 422 | 502; error: string; retryable: boolean }
+  | { ok: true; text: string; seconds: number; notice: string | null }
+  | { ok: false; status: 403 | 404 | 409 | 413 | 422 | 502; error: string; retryable: boolean }
 
 export async function transcribeSegment(
   userId: string,
@@ -256,7 +261,7 @@ export async function transcribeSegment(
       transcribedAt: now(),
       errorCode: null,
     })
-    return { ok: true, text: result.text, seconds: result.seconds }
+    return { ok: true, text: result.text, seconds: result.seconds, notice: result.notice ?? null }
   }
 
   const permanent = PERMANENT_FAILURES.has(result.reason) || attempts >= MAX_ATTEMPTS
@@ -264,8 +269,8 @@ export async function transcribeSegment(
   await deps.store.update(row.id, { status: 'failed', attempts, errorCode: result.reason })
   return {
     ok: false,
-    status: 502,
-    error: deps.failureMessage(result.reason),
+    status: result.reason === 'allowance' ? 403 : 502,
+    error: result.message ?? deps.failureMessage(result.reason),
     retryable: !permanent,
   }
 }

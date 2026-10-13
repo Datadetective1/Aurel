@@ -142,11 +142,11 @@ describe('checkout and subscription creation', () => {
     expect(notified).toEqual(['activated'])
   })
 
-  it('marks the subscriber founding while the offer is open, with no cap or lock applied', async () => {
+  it('assigns no founding status while no founding offer is defined', async () => {
     const remote = { current: subscription() }
     const { store, deps } = setup(remote)
     await processStripeEvent(checkout(), deps)
-    expect(store.rows.get(USER)?.isFounding).toBe(true)
+    expect(store.rows.get(USER)?.isFounding).toBe(false)
   })
 
   it('never confers Pro for a price that is not ours', async () => {

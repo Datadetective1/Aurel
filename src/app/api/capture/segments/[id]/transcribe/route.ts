@@ -35,8 +35,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       ...supabaseSegmentDeps(),
       transcribe: async ({ audio, extension, declaredSeconds }) => {
         const metered = await transcribeAndMeter({ audio, extension, declaredSeconds })
-        return metered.ok
-          ? { ok: true, text: metered.text, seconds: metered.duration.seconds }
+        if (metered.ok) {
+          return {
+            ok: true,
+            text: metered.text,
+            seconds: metered.duration.seconds,
+            notice: metered.notice,
+          }
+        }
+        return metered.reason === 'allowance'
+          ? { ok: false, reason: 'allowance', message: metered.message }
           : { ok: false, reason: metered.reason }
       },
       failureMessage: (reason) => transcriptionFailureMessage(reason as TranscribeFailure),
@@ -50,7 +58,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       )
     }
     await track('capture_segment_transcribed', {})
-    return NextResponse.json({ text: result.text, seconds: result.seconds }, { headers: noStore })
+    return NextResponse.json(
+      { text: result.text, seconds: result.seconds, notice: result.notice },
+      { headers: noStore },
+    )
   } catch (error) {
     logger.error('capture.segment_transcribe_failed', {
       error: error instanceof Error ? error.message.slice(0, 60) : 'unknown',

@@ -86,18 +86,12 @@ export default function PricingPage() {
                 </Badge>
               ) : null}
 
-              <h2 className="font-display text-ink text-2xl">
-                {FOUNDING_OFFER.enabled ? FOUNDING_OFFER.label : pro.name}
-              </h2>
+              <h2 className="font-display text-ink text-2xl">{pro.name}</h2>
               <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{pro.tagline}</p>
 
               <div className="mt-6 flex items-baseline gap-3">
                 <p className="font-display text-ink text-4xl">
-                  {formatPrice(
-                    FOUNDING_OFFER.enabled
-                      ? FOUNDING_OFFER.monthlyPriceCents
-                      : pro.monthlyPriceCents,
-                  )}
+                  {formatPrice(pro.monthlyPriceCents)}
                 </p>
                 <span className="text-ink-muted text-sm">per month</span>
               </div>
@@ -180,7 +174,8 @@ export default function PricingPage() {
           </p>
           <p className="text-ink-secondary mt-4 leading-relaxed">
             What is metered is the work that genuinely costs something to run: reading the public
-            web, generating a brief, analyzing a transcript, and extended coach use.
+            web, generating a brief, analyzing a transcript, transcribing voice, and extended coach
+            use.
           </p>
 
           <ApertureRule className="my-12" />
@@ -206,6 +201,7 @@ export default function PricingPage() {
                   'Researching a public footprint',
                   'Meeting briefs',
                   'Transcript and document analysis',
+                  'Voice transcription minutes',
                   `${brand.assistantName} conversations`,
                 ].map((item) => (
                   <Feature key={item}>{item}</Feature>

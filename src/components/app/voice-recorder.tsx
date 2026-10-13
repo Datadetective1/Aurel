@@ -53,6 +53,8 @@ export function VoiceRecorder({
   const [phase, setPhase] = React.useState<Phase>('idle')
   const [elapsed, setElapsed] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
+  /** Near the month's transcription allowance: said once, after a success. */
+  const [notice, setNotice] = React.useState<string | null>(null)
 
   const supported = React.useSyncExternalStore(
     subscribeToNothing,
@@ -116,6 +118,7 @@ export function VoiceRecorder({
       const payload = (await response.json().catch(() => null)) as {
         text?: string
         error?: string
+        notice?: string | null
       } | null
 
       if (!response.ok || !payload?.text) {
@@ -126,6 +129,7 @@ export function VoiceRecorder({
         return
       }
 
+      setNotice(payload.notice ?? null)
       onTranscript(payload.text, seconds, origin)
       setPhase('idle')
       setElapsed(0)
@@ -325,6 +329,11 @@ export function VoiceRecorder({
           : 'Say what happened in your own words. Audio is used to create the transcript and is not retained.'}
       </p>
 
+      {notice && !error ? (
+        <p role="status" className="text-ink-muted mt-2 text-xs">
+          {notice}
+        </p>
+      ) : null}
       {error ? (
         <p
           role="alert"

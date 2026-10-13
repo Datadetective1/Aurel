@@ -91,7 +91,7 @@ describe('what it stores', () => {
   it('records usage without inventing a price', () => {
     // Recording moved into the shared meter, so the single-upload and the
     // segmented paths count the same way. Real token counts and measured
-    // seconds go in; a model with no published per-minute rate stays
+    // seconds go in; a model with no published per-minute rate on file stays
     // unpriced and is logged, never given a guessed one.
     expect(source).toMatch(/transcribeAndMeter\(/)
     const meter = readFileSync(join(process.cwd(), 'src/lib/capture/transcribe.server.ts'), 'utf8')
@@ -100,7 +100,8 @@ describe('what it stores', () => {
     const pricing = readFileSync(join(process.cwd(), 'src/lib/billing/transcription.ts'), 'utf8')
     expect(pricing).toContain("meter: 'voice_transcription'")
     expect(pricing).toContain("meter: 'transcription_seconds'")
-    expect(pricing).not.toMatch(/'gpt-transcribe':/)
+    // The supported model carries its published per-minute rate.
+    expect(pricing).toMatch(/'gpt-transcribe': 0\.0045/)
   })
 })
 

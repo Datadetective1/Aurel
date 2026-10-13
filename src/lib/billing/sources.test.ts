@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveEntitlement } from './sources'
 import { effectivePlan, transitionsBetween } from './subscription-state'
 import { applyAccessTier } from './access'
-import { PLANS, FOUNDING_OFFER, foundingProtectionBlurb } from './plans'
+import { PLANS, PRO_PRICE, FOUNDING_OFFER, foundingProtectionBlurb } from './plans'
 
 describe('one canonical entitlement from every provider', () => {
   it('a Free account with nothing is Free', () => {
@@ -65,9 +65,9 @@ describe('one canonical entitlement from every provider', () => {
 })
 
 describe('the plan matrix the server enforces', () => {
-  it('keeps Atlas and calendar on Pro, and Free genuinely useful', () => {
+  it('keeps the Atlas on Pro, calendar on both, and Free genuinely useful', () => {
     expect(PLANS.free.capabilities.relationshipAtlas).toBe(false)
-    expect(PLANS.free.capabilities.calendarIntegration).toBe(false)
+    expect(PLANS.free.capabilities.calendarIntegration).toBe(true)
     expect(PLANS.pro.capabilities.relationshipAtlas).toBe(true)
     expect(PLANS.pro.capabilities.calendarIntegration).toBe(true)
     for (const c of [
@@ -88,19 +88,19 @@ describe('the plan matrix the server enforces', () => {
     expect(PLANS.free.quotas.quick_brief).toBeNull()
   })
 
-  it('sets no transcription allowance yet on any plan', () => {
-    expect(PLANS.free.quotas.transcription_seconds).toBeUndefined()
-    expect(PLANS.pro.quotas.transcription_seconds).toBeUndefined()
+  it('allows 60 transcription minutes on Free and 600 on Pro, unlimited for pilots', () => {
+    expect(PLANS.free.quotas.transcription_seconds).toBe(60 * 60)
+    expect(PLANS.pro.quotas.transcription_seconds).toBe(600 * 60)
+    expect(applyAccessTier('pilot', PLANS.free).quotas.transcription_seconds).toBeNull()
+    expect(applyAccessTier('owner', PLANS.pro).quotas.transcription_seconds).toBeNull()
   })
 
-  it('prices Pro at the founding $29 a month, with no annual plan', () => {
+  it('sells Pro as Pro at $29 a month, with no annual plan and no founding label', () => {
+    expect(PLANS.pro.name).toBe('Pro')
     expect(PLANS.pro.monthlyPriceCents).toBe(2900)
     expect(PLANS.pro.yearlyPriceCents).toBeNull()
-    expect(FOUNDING_OFFER).toMatchObject({
-      label: 'Pro Founding',
-      monthlyPriceCents: 2900,
-      currency: 'usd',
-    })
+    expect(PRO_PRICE).toEqual({ monthlyPriceCents: 2900, currency: 'usd' })
+    expect(FOUNDING_OFFER.enabled).toBe(false)
   })
 
   it('makes no founding claim that has not been approved', () => {

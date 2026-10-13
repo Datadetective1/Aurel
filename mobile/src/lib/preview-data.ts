@@ -84,7 +84,7 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
     const body: AccountResponse = {
       email: 'amary@example.com',
       name: 'Amary',
-      planLabel: 'Pro Founding',
+      planLabel: 'Pro',
       billing: 'web',
       legal: {
         privacyUrl: 'https://www.atturel.com/privacy',

@@ -73,25 +73,64 @@ describe('transcribeAudio', () => {
     expect(model).toBe('gpt-transcribe')
   })
 
-  it('falls back to the previous model rather than failing the pilot', async () => {
-    // If the account cannot reach the newer model, a debrief should still
-    // transcribe. Same API shape, one generation back.
+  it('never falls back to the deprecated model', async () => {
+    // gpt-4o-transcribe is deprecated and scheduled for removal. A missing
+    // model is an outage to report, not something to hide behind it.
     const models: string[] = []
     const { transcribeAudio } = await load((async (_url, init) => {
-      const form = (init as RequestInit).body as FormData
-      const model = String(form.get('model'))
-      models.push(model)
-      if (model === 'gpt-transcribe') {
-        return new Response(JSON.stringify({ error: { message: 'model not found' } }), {
-          status: 404,
-        })
-      }
-      return new Response(JSON.stringify({ text: 'ok' }), { status: 200 })
+      models.push(String(((init as RequestInit).body as FormData).get('model')))
+      return new Response(JSON.stringify({ error: { message: 'model not found' } }), {
+        status: 404,
+      })
     }) as typeof fetch)
 
-    const result = await transcribeAudio({ audio: audio(), extension: 'webm' })
-    expect(models).toEqual(['gpt-transcribe', 'gpt-4o-transcribe'])
+    const result = await transcribeAudio(
+      { audio: audio(), extension: 'webm' },
+      { sleep: async () => {} },
+    )
+    expect(models).toEqual(['gpt-transcribe'])
+    expect(result).toMatchObject({ ok: false, reason: 'unavailable' })
+  })
+
+  it('retries a transient failure, then succeeds', async () => {
+    let calls = 0
+    const waits: number[] = []
+    const { transcribeAudio } = await load((async () => {
+      calls++
+      return calls < 3
+        ? new Response('{}', { status: calls === 1 ? 429 : 503 })
+        : new Response(JSON.stringify({ text: 'ok' }), { status: 200 })
+    }) as typeof fetch)
+
+    const result = await transcribeAudio(
+      { audio: audio(), extension: 'webm' },
+      { sleep: async (ms) => void waits.push(ms) },
+    )
     expect(result.ok).toBe(true)
+    expect(calls).toBe(3)
+    expect(waits).toEqual([1_000, 3_000])
+  })
+
+  it('gives up after two retries, and never retries what retrying cannot fix', async () => {
+    let calls = 0
+    const { transcribeAudio } = await load((async () => {
+      calls++
+      return new Response('{}', { status: 503 })
+    }) as typeof fetch)
+    const result = await transcribeAudio(
+      { audio: audio(), extension: 'webm' },
+      { sleep: async () => {} },
+    )
+    expect(result).toMatchObject({ ok: false, reason: 'unavailable' })
+    expect(calls).toBe(3)
+
+    let unsupported = 0
+    const second = await load((async () => {
+      unsupported++
+      return new Response('{}', { status: 415 })
+    }) as typeof fetch)
+    await second.transcribeAudio({ audio: audio(), extension: 'webm' }, { sleep: async () => {} })
+    expect(unsupported).toBe(1)
   })
 
   it('treats an empty transcript as a failure, not a success', async () => {
@@ -129,7 +168,10 @@ describe('transcribeAudio', () => {
       [503, 'unavailable'],
     ] as const) {
       const { transcribeAudio } = await load(reply({ error: 'x' }, status))
-      const result = await transcribeAudio({ audio: audio(), extension: 'webm' })
+      const result = await transcribeAudio(
+        { audio: audio(), extension: 'webm' },
+        { sleep: async () => {} },
+      )
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.reason).toBe(reason)
     }
@@ -139,7 +181,10 @@ describe('transcribeAudio', () => {
     const { transcribeAudio } = await load((async () => {
       throw new TypeError('fetch failed')
     }) as typeof fetch)
-    const result = await transcribeAudio({ audio: audio(), extension: 'webm' })
+    const result = await transcribeAudio(
+      { audio: audio(), extension: 'webm' },
+      { sleep: async () => {} },
+    )
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.reason).toBe('unavailable')

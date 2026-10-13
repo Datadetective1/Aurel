@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireOnboardedUser } from '@/lib/auth'
 import { features } from '@/lib/env'
-import { checkCapability } from '@/lib/billing/entitlements'
+import { checkCapability, checkTranscriptionAllowance } from '@/lib/billing/entitlements'
 import { logger } from '@/lib/logger'
 import { requestSegmentUpload, sweepOrphans } from '@/lib/capture/segments'
 import { supabaseSegmentDeps } from '@/lib/capture/segments.server'
@@ -42,6 +42,19 @@ export async function POST(request: Request) {
     declaredSeconds?: unknown
   } | null
   if (!body) return NextResponse.json({ error: 'That request could not be read.' }, { status: 400 })
+
+  // Before a byte is uploaded: will this part fit in the month's allowance?
+  // Checked again, canonically, when the segment is transcribed.
+  const declared = Number(body.declaredSeconds)
+  const allowance = await checkTranscriptionAllowance(
+    Number.isFinite(declared) && declared > 0 ? declared : 1,
+  )
+  if (!allowance.allowed) {
+    return NextResponse.json(
+      { error: allowance.message, code: 'allowance' },
+      { status: 403, headers: noStore },
+    )
+  }
 
   const deps = supabaseSegmentDeps()
   try {

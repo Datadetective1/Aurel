@@ -140,7 +140,7 @@ describe('transcribing a segment', () => {
       transcribe: ok,
       failureMessage: message,
     })
-    expect(out).toEqual({ ok: true, text: 'hello', seconds: 600 })
+    expect(out).toEqual({ ok: true, text: 'hello', seconds: 600, notice: null })
     expect(m.objects.has(r.path)).toBe(false)
     expect(m.rows.get(r.uploadId)).toMatchObject({ status: 'transcribed' })
   })
@@ -201,6 +201,45 @@ describe('transcribing a segment', () => {
       failureMessage: message,
     })
     expect(out).toMatchObject({ ok: false, retryable: true })
+  })
+})
+
+describe('the transcription allowance on a segment', () => {
+  it('refuses without retrying, deletes the audio, and says why in product language', async () => {
+    const m = memory()
+    const r = await upload(m)
+    const out = await transcribeSegment(ALICE, r.uploadId, {
+      ...m.deps,
+      transcribe: async () => ({
+        ok: false,
+        reason: 'allowance',
+        message: "You've used this month's 60 minutes of transcription.",
+      }),
+      failureMessage: message,
+    })
+    expect(out).toEqual({
+      ok: false,
+      status: 403,
+      error: "You've used this month's 60 minutes of transcription.",
+      retryable: false,
+    })
+    expect(m.objects.has(r.path)).toBe(false)
+  })
+
+  it('passes a near-limit notice back with the words', async () => {
+    const m = memory()
+    const r = await upload(m)
+    const out = await transcribeSegment(ALICE, r.uploadId, {
+      ...m.deps,
+      transcribe: async () => ({
+        ok: true,
+        text: 'hi',
+        seconds: 60,
+        notice: '8 minutes of transcription left this month.',
+      }),
+      failureMessage: message,
+    })
+    expect(out).toMatchObject({ ok: true, notice: '8 minutes of transcription left this month.' })
   })
 })
 
@@ -305,7 +344,9 @@ describe('measuring what was transcribed', () => {
 
   it('meters seconds and calls, priced only where a published rate is on file', () => {
     expect(transcriptionCostMicros('gpt-4o-transcribe', 600)).toBe(60_000)
-    expect(transcriptionCostMicros('gpt-transcribe', 600)).toBeNull()
+    // gpt-transcribe at $0.0045 a minute: ten minutes is 4.5 cents.
+    expect(transcriptionCostMicros('gpt-transcribe', 600)).toBe(45_000)
+    expect(transcriptionCostMicros('some-unlisted-model', 600)).toBeNull()
     const rows = transcriptionUsageRecords({
       model: 'gpt-4o-transcribe',
       duration: { seconds: 600, source: 'container' },

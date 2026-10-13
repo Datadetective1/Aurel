@@ -77,7 +77,12 @@ export default function Capture() {
 
   // What the server will accept. Until it answers, the single-upload limit.
   const account = useApi<AccountResponse>('/api/mobile/account')
-  const maxSeconds = account.data?.capture.maxSeconds ?? MAX_RECORDING_SECONDS
+  const lengthLimit = account.data?.capture.maxSeconds ?? MAX_RECORDING_SECONDS
+  // The month's transcription allowance, when there is one: a recording that
+  // would not fit stops at what is left, rather than failing once it is sent.
+  const remaining = account.data?.capture.remainingSeconds ?? null
+  const maxSeconds = remaining === null ? lengthLimit : Math.min(lengthLimit, remaining)
+  const allowanceBound = remaining !== null && remaining < lengthLimit
   const segmentSeconds = account.data?.capture.segmentSeconds ?? null
 
   // Segmented capture: the recorder restarts every segment, so the elapsed
@@ -160,17 +165,29 @@ export default function Capture() {
   React.useEffect(() => {
     if (phase !== 'recording') return
     if (seconds >= maxSeconds) {
-      void stop(`Stopped at ${Math.round(maxSeconds / 60)} minutes, the longest one recording can be.`)
+      void stop(
+        allowanceBound
+          ? "Stopped: that's the rest of this month's transcription minutes. You can add typed notes before sending."
+          : `Stopped at ${Math.round(maxSeconds / 60)} minutes, the longest one recording can be.`,
+      )
     } else if (seconds >= maxSeconds - 120 && !notice) {
-      setNotice('Two minutes left before this recording stops itself.')
+      setNotice(
+        allowanceBound
+          ? 'Two minutes of transcription left this month.'
+          : 'Two minutes left before this recording stops itself.',
+      )
     }
-  }, [seconds, phase, stop, notice, maxSeconds])
+  }, [seconds, phase, stop, notice, maxSeconds, allowanceBound])
 
   const start = async () => {
     setError(null)
     setNotice(null)
     if (!canStart(mode, othersKnow)) {
       setError('Confirm the people in the conversation know it is being recorded.')
+      return
+    }
+    if (remaining !== null && remaining < 60) {
+      setError("You've used this month's transcription minutes. You can still type what happened; minutes reset on the 1st.")
       return
     }
     if (!config.previewData) {

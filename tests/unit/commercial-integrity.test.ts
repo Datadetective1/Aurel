@@ -50,7 +50,9 @@ describe('Pro capabilities are refused by the server, not just hidden', () => {
     )
   })
 
-  it('every calendar door checks the plan: connect, callback and sync', () => {
+  it('every calendar door goes through the capability check: connect, callback and sync', () => {
+    // Calendar is on Free and Pro; the check stays so plan policy remains a
+    // single line in lib/billing/plans.
     checksBefore(
       read('app', 'api', 'calendar', '[provider]', 'connect', 'route.ts'),
       'calendarIntegration',
@@ -103,7 +105,7 @@ describe('checkout charges exactly what the page shows', () => {
   const actions = code(read('app', '(app)', 'settings', 'billing', 'actions.ts'))
 
   it('verifies the Stripe price against the offer before creating a session', () => {
-    const verify = actions.indexOf('priceMatchesOffer(price, FOUNDING_OFFER)')
+    const verify = actions.indexOf('priceMatchesOffer(price, PRO_PRICE)')
     const create = actions.indexOf('checkout.sessions.create(')
     expect(verify).toBeGreaterThan(-1)
     expect(create).toBeGreaterThan(verify)
@@ -195,4 +197,43 @@ describe('customers do not see infrastructure', () => {
       }
     },
   )
+})
+
+describe('the transcription allowance is enforced on the server, before audio leaves', () => {
+  const meter = code(read('lib', 'capture', 'transcribe.server.ts'))
+
+  it('checks the allowance against the measured duration before calling the provider', () => {
+    const check = meter.indexOf('checkTranscriptionAllowance(duration.seconds)')
+    const call = meter.indexOf('transcribeAudio({')
+    expect(check).toBeGreaterThan(-1)
+    expect(call).toBeGreaterThan(check)
+  })
+
+  it('every transcription route goes through the metered path and answers in product language', () => {
+    for (const parts of [
+      ['app', 'api', 'conversations', 'transcribe', 'route.ts'],
+      ['app', 'api', 'debrief', 'transcribe', 'route.ts'],
+      ['app', 'api', 'capture', 'segments', '[id]', 'transcribe', 'route.ts'],
+    ]) {
+      const s = code(read(...parts))
+      expect(s).toContain('transcribeAndMeter(')
+      expect(s).not.toContain('transcribeAudio(')
+    }
+    expect(code(read('app', 'api', 'conversations', 'transcribe', 'route.ts'))).toMatch(
+      /code: 'allowance'/,
+    )
+  })
+
+  it('a segmented upload is refused before any byte is stored when the month is used up', () => {
+    const s = code(read('app', 'api', 'capture', 'segments', 'route.ts'))
+    expect(s.indexOf('checkTranscriptionAllowance(')).toBeLessThan(
+      s.indexOf('requestSegmentUpload('),
+    )
+  })
+
+  it('uses one supported model, with no deprecated fallback', () => {
+    const t = code(read('lib', 'ai', 'transcribe.ts'))
+    expect(t).toContain("TRANSCRIPTION_MODEL = 'gpt-transcribe'")
+    expect(t).not.toMatch(/'gpt-4o-transcribe'/)
+  })
 })

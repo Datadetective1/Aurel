@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import {
-  FOUNDING_OFFER,
-  PLANS,
-  foundingProtectionBlurb,
-  formatPrice,
-  type MeterKind,
-} from '@/lib/billing/plans'
+import { PLANS, foundingProtectionBlurb, formatPrice, type MeterKind } from '@/lib/billing/plans'
 import { foundingPlacesRemaining } from './actions'
 import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
 import { InvitationPanel } from '@/components/app/invitation-panel'
@@ -27,7 +21,12 @@ const METER_LABEL: Partial<Record<MeterKind, string>> = {
   document_analysis: 'Documents read',
   ai_coach_message: 'Coach questions',
   message_adaptation: 'Messages adapted',
+  transcription_seconds: 'Transcription minutes',
 }
+
+/** Seconds are metered; minutes are what a person reads. */
+const display = (kind: MeterKind, n: number) =>
+  kind === 'transcription_seconds' ? Math.floor(n / 60) : n
 
 export default async function BillingSettingsPage({
   searchParams,
@@ -123,7 +122,7 @@ export default async function BillingSettingsPage({
                   <div className="flex items-baseline justify-between gap-4">
                     <span className="text-ink text-sm">{METER_LABEL[row.kind]}</span>
                     <span className="text-ink-muted text-xs tabular-nums">
-                      {row.used} of {row.limit}
+                      {display(row.kind, row.used)} of {display(row.kind, row.limit)}
                     </span>
                   </div>
                   <div
@@ -153,11 +152,7 @@ export default async function BillingSettingsPage({
       <div className={fullAccess ? 'hidden' : 'mt-10 flex flex-wrap items-start gap-2'}>
         {features.billing && entitlements.plan === 'free' ? (
           <UpgradeButton
-            label={
-              FOUNDING_OFFER.enabled && (founding === null || founding > 0)
-                ? `Upgrade to ${FOUNDING_OFFER.label} — ${formatPrice(FOUNDING_OFFER.monthlyPriceCents)} a month`
-                : 'Upgrade to Pro'
-            }
+            label={`Upgrade to ${PLANS.pro.name} — ${formatPrice(PLANS.pro.monthlyPriceCents)} a month`}
           />
         ) : null}
         <Button asChild variant="secondary" size="sm">

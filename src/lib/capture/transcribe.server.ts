@@ -1,6 +1,6 @@
 import 'server-only'
 import { transcribeAudio, type TranscribeFailure } from '@/lib/ai/transcribe'
-import { recordUsage } from '@/lib/billing/entitlements'
+import { checkTranscriptionAllowance, recordUsage } from '@/lib/billing/entitlements'
 import { transcriptionCostMicros, transcriptionUsageRecords } from '@/lib/billing/transcription'
 import { logger } from '@/lib/logger'
 import { measureDuration, type MeasuredDuration } from './audio-duration'
@@ -14,8 +14,18 @@ import { measureDuration, type MeasuredDuration } from './audio-duration'
  * anyone.
  */
 export type MeteredTranscription =
-  | { ok: true; text: string; model: string; duration: MeasuredDuration; latencyMs: number }
+  | {
+      ok: true
+      text: string
+      model: string
+      duration: MeasuredDuration
+      latencyMs: number
+      /** "8 minutes of transcription left this month." when close, else null. */
+      notice: string | null
+    }
   | { ok: false; reason: TranscribeFailure; latencyMs: number }
+  /** Refused before any audio was sent: the monthly allowance. */
+  | { ok: false; reason: 'allowance'; message: string; latencyMs: 0 }
 
 export async function transcribeAndMeter(input: {
   audio: Blob
@@ -29,19 +39,25 @@ export async function transcribeAndMeter(input: {
       ? new Uint8Array(await input.audio.arrayBuffer())
       : null
 
-  const result = await transcribeAudio({
-    audio: input.audio,
-    extension: input.extension,
-    keywords: input.keywords,
-  })
-  if (!result.ok) return result
-
+  // Measured before the provider call, so the allowance is checked against
+  // what this recording will cost -- and a refusal sends nothing anywhere.
   const duration = measureDuration({
     bytes: head,
     extension: input.extension,
     declaredSeconds: input.declaredSeconds,
     byteLength: input.audio.size,
   })
+  const allowance = await checkTranscriptionAllowance(duration.seconds)
+  if (!allowance.allowed) {
+    return { ok: false, reason: 'allowance', message: allowance.message, latencyMs: 0 }
+  }
+
+  const result = await transcribeAudio({
+    audio: input.audio,
+    extension: input.extension,
+    keywords: input.keywords,
+  })
+  if (!result.ok) return result
 
   for (const record of transcriptionUsageRecords({
     model: result.model,
@@ -55,7 +71,14 @@ export async function transcribeAndMeter(input: {
     logger.warn('usage.unpriced_transcription_model', { model: result.model })
   }
 
-  return { ok: true, text: result.text, model: result.model, duration, latencyMs: result.latencyMs }
+  return {
+    ok: true,
+    text: result.text,
+    model: result.model,
+    duration,
+    latencyMs: result.latencyMs,
+    notice: allowance.notice,
+  }
 }
 
 /** What a person is told when transcription fails. No provider, no configuration. */

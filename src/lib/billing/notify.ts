@@ -8,7 +8,7 @@ import {
 } from '@/lib/email/templates'
 import { formatDate } from '@/lib/format'
 import { logger } from '@/lib/logger'
-import { FOUNDING_OFFER, PLANS } from './plans'
+import { PLANS } from './plans'
 import type { SubscriptionTransition } from './subscription-state'
 
 /**
@@ -46,7 +46,7 @@ export async function notifyBillingTransition(
     transition.kind === 'activated'
       ? proActivatedEmail({
           firstName,
-          planLabel: FOUNDING_OFFER.enabled ? FOUNDING_OFFER.label : PLANS.pro.name,
+          planLabel: PLANS.pro.name,
         })
       : transition.kind === 'cancellation_scheduled'
         ? proCancellationScheduledEmail({

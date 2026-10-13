@@ -1,8 +1,8 @@
 import { getOptionalUser, getProfile } from '@/lib/auth'
 import { json, readJson } from '@/lib/mobile/route'
 import { bearerToken } from '@/lib/supabase/server'
-import { getEntitlements } from '@/lib/billing/entitlements'
-import { FOUNDING_OFFER, PLANS } from '@/lib/billing/plans'
+import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
+import { PLANS } from '@/lib/billing/plans'
 import { hasFullAccess } from '@/lib/billing/access'
 import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { captureLimits } from '@/lib/capture/limits'
@@ -33,14 +33,20 @@ export async function GET() {
 
   const [profile, entitlements] = await Promise.all([getProfile(), getEntitlements()])
   const paid = entitlements.plan !== 'free'
+  const limit = entitlements.quotas.transcription_seconds
+  const remainingSeconds =
+    limit === null || limit === undefined
+      ? null
+      : Math.max(
+          0,
+          limit - (await usageInPeriod('transcription_seconds', entitlements.periodStart)),
+        )
 
   const body: AccountResponse = {
     email: user.email ?? null,
     name: profile?.preferred_name || profile?.full_name || 'You',
     planLabel: paid
-      ? entitlements.isFounding
-        ? FOUNDING_OFFER.label
-        : PLANS[entitlements.plan].name
+      ? PLANS[entitlements.plan].name
       : hasFullAccess(entitlements.tier)
         ? 'Full access'
         : PLANS.free.name,
@@ -57,7 +63,7 @@ export async function GET() {
       termsUrl: absoluteUrl('/terms'),
       supportEmail: brand.email.support,
     },
-    capture: captureLimits(features.captureStorage),
+    capture: { ...captureLimits(features.captureStorage), remainingSeconds },
   }
   return json(body)
 }

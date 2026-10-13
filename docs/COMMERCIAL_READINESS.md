@@ -9,11 +9,12 @@ applied.
 | Was | Now | Where |
 | --- | --- | --- |
 | Deletion left a Stripe subscription charging | Billing is stopped first (open checkouts expired, subscriptions cancelled immediately, open invoices voided); if Stripe cannot confirm, nothing is deleted. A late subscription for a deleted account is cancelled by the webhook. Minimal audit row in `account_deletions`. | `lib/account/deletion.ts`, `deletion.server.ts`, migration 0021 |
-| Founding price not wired; $49 shown | Pro is $29/month (`PLANS.pro`, `FOUNDING_OFFER`); checkout refuses to start unless the Stripe price is exactly $29 USD monthly | `lib/billing/plans.ts`, `stripe.ts` `priceMatchesOffer`, `settings/billing/actions.ts` |
+| Founding price not wired; $49 shown | Sold as **Pro, $29/month** (`PLANS.pro`, `PRO_PRICE`); checkout refuses to start unless the Stripe price is exactly $29 USD monthly. No "founding" label: no founding benefit is defined, so `FOUNDING_OFFER.enabled` is `false` | `lib/billing/plans.ts`, `stripe.ts` `priceMatchesOffer`, `settings/billing/actions.ts` |
 | Unapproved claims: "first 250 members", "$49" strikethrough, "held for 12 months" | Not shown, not enforced, not stored — `maxCustomers`, `referencePriceCents`, `priceProtectionMonths` are `null` until approved | `FOUNDING_OFFER` |
 | Yearly price advertised but unbuyable | No annual plan offered | pricing page, checkout |
-| Atlas and calendar advertised as Pro but open to Free | Enforced on the server (web page, mobile route, calendar connect/callback/sync) | `checkCapability('relationshipAtlas' / 'calendarIntegration')` |
-| Transcribed audio metered as "1 call" | Metered in seconds from the file's own header (`transcription_seconds`), priced per minute where a published rate exists; no allowance set yet | `lib/billing/transcription.ts`, `lib/capture/audio-duration.ts` |
+| Atlas advertised as Pro but open to Free | Atlas enforced as Pro on the server (web page, mobile route). Calendar is on **Free and Pro** — it is how meetings arrive, and Free's three briefs need meetings to spend them on; connect/callback/sync still go through `checkCapability('calendarIntegration')` so the policy is one line | `checkCapability('relationshipAtlas' / 'calendarIntegration')` |
+| Transcribed audio metered as "1 call"; no limit | Metered in seconds from the file's own header (`transcription_seconds`), priced at the published rate (gpt-transcribe $0.0045/min). **Allowance: Free 60 min/month, Pro 600 min/month, owner/pilot unlimited**, checked on the server against the measured duration before any audio is sent, in product language | `lib/billing/transcription.ts`, `lib/billing/entitlements.ts` `checkTranscriptionAllowance`, `lib/capture/transcribe.server.ts` |
+| Deprecated `gpt-4o-transcribe` used as a silent fallback | One supported model (`gpt-transcribe`); network errors, 429 and 5xx retried twice with backoff; a missing model is reported, never papered over | `lib/ai/transcribe.ts` |
 | Webhook had no ledger, could reorder | `stripe_events` ledger with atomic claim; every event re-reads the subscription; older reads never overwrite newer | `lib/billing/webhook.ts`, migration 0021 |
 | No billing emails | Pro activated, cancellation scheduled, Pro ended. Receipts and failed-payment emails are Stripe's — switch them on (see below) | `lib/billing/notify.ts` |
 | ~17-minute recording ceiling | Segmented, private, temporary storage: ten-minute segments, transcribed and deleted one by one, two-hour ceiling | `lib/capture/*`, `api/capture/*`, migration 0022 |
@@ -27,9 +28,9 @@ applied.
 1. Apply migration **0021** (billing integrity) to production. The webhook
    refuses to process events without its ledger (by design), so 0021 must be
    applied **before** this branch's webhook receives live events.
-2. In Stripe (test mode first): create the product **Pro Founding**, one
+2. In Stripe (test mode first): create the product, one
    recurring price **$29.00 USD monthly**, and set
-   `STRIPE_PRICE_PRO_MONTHLY` to its id. Set `STRIPE_SECRET_KEY` and
+   `STRIPE_PRICE_PRO_MONTHLY` to its id. (Name the Stripe product **Pro**.) Set `STRIPE_SECRET_KEY` and
    `STRIPE_WEBHOOK_SECRET`; point the webhook at `/api/stripe/webhook` with
    these events: `checkout.session.completed`,
    `customer.subscription.created|updated|deleted|paused|resumed`,
@@ -41,8 +42,12 @@ applied.
    receipts and failed-payment emails (Atturel deliberately does not send its
    own copies).
 5. Decide: refund policy (Terms currently says nothing about refunds);
-   whether Stripe Tax is needed; whether the founding cap, reference price or
-   price lock are wanted at all.
+   whether Stripe Tax is needed. A founding offer, if ever wanted, needs a
+   defined benefit first (`FOUNDING_OFFER` is off).
+
+Transcription economics at the launch allowances (gpt-transcribe,
+$0.0045/min): a Free account at its full 60 minutes costs about $0.27 a
+month; a Pro account at its full 600 minutes about $2.70 of the $29.
 6. Legal facts below, and lawyer review of Terms and Privacy (both still show
    "Draft").
 

@@ -53,7 +53,7 @@ export interface MeResponse {
 export interface AccountResponse {
   email: string | null
   name: string
-  /** "Free", "Pro Founding", "Pro". */
+  /** "Free", "Pro", "Full access". */
   planLabel: string
   /** Where the plan is managed, so the app never shows a web-only control as its own. */
   billing: 'none' | 'web' | 'apple' | 'included'
@@ -67,6 +67,8 @@ export interface CaptureLimits {
   maxSeconds: number
   /** Segment length for segmented upload, or null when only a single upload is available. */
   segmentSeconds: number | null
+  /** Transcription left this month, in seconds; null when unlimited. */
+  remainingSeconds?: number | null
 }
 
 // --- DELETE /api/mobile/account ------------------------------------------------

@@ -7,7 +7,7 @@ import { absoluteUrl, brand } from '@/lib/brand'
 import { features } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
-import { FOUNDING_OFFER } from '@/lib/billing/plans'
+import { FOUNDING_OFFER, PRO_PRICE } from '@/lib/billing/plans'
 import { priceMatchesOffer, proPriceId, stripe } from '@/lib/billing/stripe'
 
 /**
@@ -56,9 +56,9 @@ export async function startCheckout(
     // checkout does not start. A wrong price id in configuration must fail
     // here, loudly, and never on a customer's card.
     const price = await stripe().prices.retrieve(priceId)
-    if (!priceMatchesOffer(price, FOUNDING_OFFER)) {
+    if (!priceMatchesOffer(price, PRO_PRICE)) {
       logger.error('billing.price_mismatch', {
-        expectedCents: FOUNDING_OFFER.monthlyPriceCents,
+        expectedCents: PRO_PRICE.monthlyPriceCents,
         currency: price.currency,
         interval: price.recurring?.interval ?? 'none',
         active: price.active,

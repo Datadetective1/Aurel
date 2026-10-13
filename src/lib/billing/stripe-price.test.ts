@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { planForPrice, priceMatchesOffer } from './stripe'
-import { FOUNDING_OFFER } from './plans'
+import { PRO_PRICE } from './plans'
 
 /** Checkout starts only when the Stripe price bills what the page advertises. */
 const price = (over: Record<string, unknown> = {}) =>
@@ -15,7 +15,7 @@ const price = (over: Record<string, unknown> = {}) =>
 
 describe('priceMatchesOffer', () => {
   it('accepts the $29 monthly USD price', () => {
-    expect(priceMatchesOffer(price(), FOUNDING_OFFER)).toBe(true)
+    expect(priceMatchesOffer(price(), PRO_PRICE)).toBe(true)
   })
 
   it.each([
@@ -26,7 +26,7 @@ describe('priceMatchesOffer', () => {
     ['a one-time price', { type: 'one_time', recurring: null }],
     ['an archived price', { active: false }],
   ])('refuses %s', (_label, over) => {
-    expect(priceMatchesOffer(price(over), FOUNDING_OFFER)).toBe(false)
+    expect(priceMatchesOffer(price(over), PRO_PRICE)).toBe(false)
   })
 })
 

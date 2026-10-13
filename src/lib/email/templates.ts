@@ -412,12 +412,12 @@ export function proActivatedEmail({
   return {
     subject: `${planLabel} is on`,
     html: renderEmail({
-      preheader: 'Unlimited people, the Atlas, calendar and more conversations.',
+      preheader: 'Unlimited people, the Atlas, and more of everything each month.',
       body: [
         eyebrow('Your plan'),
         heading(`${escapeHtml(name)}, ${escapeHtml(planLabel)} is on`),
         paragraph(
-          'Unlimited people, the Relationship Atlas, calendar connection, and more briefs, research and conversations each month are now part of your account.',
+          'Unlimited people, the Relationship Atlas, 600 minutes of transcription, and more briefs, research and conversations each month are now part of your account.',
         ),
         paragraph(
           'Your receipt comes separately from our payment processor. You can change or cancel the plan any time from Settings.',

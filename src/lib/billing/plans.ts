@@ -100,6 +100,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       ...NO_CAPABILITIES,
       // Free must demonstrate the actual product, not a crippled preview.
       researchPerson: true,
+      // Calendar is how meetings arrive without typing them in. Free already
+      // gets three briefs a month; without the calendar it would be hard to
+      // find the meetings to spend them on.
+      calendarIntegration: true,
       meetingBrief: true,
       quickBrief: true,
       debrief: true,
@@ -128,13 +132,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       document_analysis: 2,
       source_ingest: 15,
       deep_research: 0,
+      // Seconds of audio. 60 minutes a month.
+      transcription_seconds: 60 * 60,
     },
     limits: { people: 5 },
     highlights: [
       'Your Interaction Profile',
       'Up to 5 people',
       '3 researched people and 3 meeting briefs a month',
+      'Connect your calendar',
       'Keep 10 conversations a month and confirm what they left open',
+      '60 minutes of voice transcription a month',
       `20 questions to ${brand.assistantName} a month`,
       'Export or delete everything, any time',
     ],
@@ -144,8 +152,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: 'pro',
     name: 'Pro',
     tagline: 'The full relationship record, and preparation for every room.',
-    // The launch price is the founding price; see FOUNDING_OFFER. There is no
-    // annual plan in this launch.
+    // $29 a month, monthly only: there is no annual plan in this launch. The
+    // Stripe price is checked against this before checkout (PRO_PRICE).
     monthlyPriceCents: 2900,
     yearlyPriceCents: null,
     capabilities: {
@@ -178,6 +186,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       transcript_analysis: 60,
       document_analysis: 100,
       source_ingest: 500,
+      // Seconds of audio. 600 minutes a month.
+      transcription_seconds: 600 * 60,
     },
     limits: { people: null },
     highlights: [
@@ -185,7 +195,8 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Research a person’s public professional footprint',
       'Meeting briefs, Quick Brief and debriefs',
       'Keep up to 60 conversations a month',
-      'Calendar integration and the Relationship Atlas',
+      '600 minutes of voice transcription a month',
+      'The Relationship Atlas',
     ],
   },
 
@@ -223,33 +234,33 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   },
 }
 
+/** What Stripe must bill for Pro, checked before every checkout. */
+export const PRO_PRICE = {
+  monthlyPriceCents: PLANS.pro.monthlyPriceCents as number,
+  currency: 'usd',
+} as const
+
 /**
- * PRO FOUNDING
+ * FOUNDING OFFER -- OFF
  * =============================================================================
- * The launch offer: Pro at $29 a month. Configuration, not a promotions engine.
+ * Pro is sold as Pro, at $29 a month. There is no founding-member benefit
+ * defined, so nothing is shown, assigned or stored as "founding".
  *
- * The Stripe price behind it is STRIPE_PRICE_PRO_MONTHLY; checkout refuses to
- * start if that price does not bill exactly this amount monthly in USD, so the
- * page can never show one price while Stripe charges another.
- *
- * Deliberately UNSET until approved in writing: a cap on founding places, a
- * reference ("was") price and a price-lock duration. Each one is a public
- * promise. While null, none is shown, enforced or stored.
+ * The switch and its terms stay as configuration so an approved offer is a
+ * config change, not a rebuild. Each field is a public promise; none may be
+ * set without approval in writing: a cap on places, a reference ("was") price,
+ * a price-lock duration.
  * =============================================================================
  */
 export const FOUNDING_OFFER: {
   enabled: boolean
   label: string
-  monthlyPriceCents: number
-  currency: 'usd'
   maxCustomers: number | null
   referencePriceCents: number | null
   priceProtectionMonths: number | null
 } = {
-  enabled: true,
-  label: 'Pro Founding',
-  monthlyPriceCents: 2900,
-  currency: 'usd',
+  enabled: false,
+  label: 'Founding',
   maxCustomers: null,
   referencePriceCents: null,
   priceProtectionMonths: null,

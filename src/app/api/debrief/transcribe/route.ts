@@ -146,6 +146,14 @@ export async function POST(request: NextRequest) {
 
   const result = await transcribeAndMeter({ audio, extension, keywords, declaredSeconds })
 
+  // The monthly allowance: said in product language, before any audio left.
+  if (!result.ok && result.reason === 'allowance') {
+    return NextResponse.json(
+      { error: result.message, code: 'allowance' },
+      { status: 403, headers: { 'cache-control': 'no-store' } },
+    )
+  }
+
   if (!result.ok) {
     await track('voice_debrief_transcription_failed', {
       reason: result.reason,
@@ -184,5 +192,8 @@ export async function POST(request: NextRequest) {
     durationBucket: durationBucket(declaredSeconds),
   })
 
-  return NextResponse.json({ text: result.text }, { headers: { 'cache-control': 'no-store' } })
+  return NextResponse.json(
+    { text: result.text, notice: result.notice },
+    { headers: { 'cache-control': 'no-store' } },
+  )
 }
