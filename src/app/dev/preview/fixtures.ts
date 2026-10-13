@@ -1,4 +1,5 @@
 import { normalizeBrief } from '@/lib/brief'
+import { brand } from '@/lib/brand'
 import { buildTimeline } from '@/lib/visual/timeline'
 import { composeRemember } from '@/lib/visual/glance'
 import { describeConnection, findConnections } from '@/lib/visual/commonality'
@@ -116,7 +117,7 @@ export const BRIEF = normalizeBrief({
     {
       objection: 'We already have a CRM for this',
       response:
-        'Atturel does not ask anyone to maintain records; it remembers conversations they already have.',
+        `${brand.name} does not ask anyone to maintain records; it remembers conversations they already have.`,
       basis: 'Raised by Maureen in the September call',
     },
   ],
