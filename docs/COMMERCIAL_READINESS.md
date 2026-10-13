@@ -1,5 +1,55 @@
 # Commercial readiness
 
+## Launch pass — 13 October 2026 (branch `visual-mobile-foundation`)
+
+Resolves items 1–7 of "Still contradictory or blocking" below. Nothing was
+deployed to production, Stripe live mode was not touched, and no migration was
+applied.
+
+| Was | Now | Where |
+| --- | --- | --- |
+| Deletion left a Stripe subscription charging | Billing is stopped first (open checkouts expired, subscriptions cancelled immediately, open invoices voided); if Stripe cannot confirm, nothing is deleted. A late subscription for a deleted account is cancelled by the webhook. Minimal audit row in `account_deletions`. | `lib/account/deletion.ts`, `deletion.server.ts`, migration 0021 |
+| Founding price not wired; $49 shown | Pro is $29/month (`PLANS.pro`, `FOUNDING_OFFER`); checkout refuses to start unless the Stripe price is exactly $29 USD monthly | `lib/billing/plans.ts`, `stripe.ts` `priceMatchesOffer`, `settings/billing/actions.ts` |
+| Unapproved claims: "first 250 members", "$49" strikethrough, "held for 12 months" | Not shown, not enforced, not stored — `maxCustomers`, `referencePriceCents`, `priceProtectionMonths` are `null` until approved | `FOUNDING_OFFER` |
+| Yearly price advertised but unbuyable | No annual plan offered | pricing page, checkout |
+| Atlas and calendar advertised as Pro but open to Free | Enforced on the server (web page, mobile route, calendar connect/callback/sync) | `checkCapability('relationshipAtlas' / 'calendarIntegration')` |
+| Transcribed audio metered as "1 call" | Metered in seconds from the file's own header (`transcription_seconds`), priced per minute where a published rate exists; no allowance set yet | `lib/billing/transcription.ts`, `lib/capture/audio-duration.ts` |
+| Webhook had no ledger, could reorder | `stripe_events` ledger with atomic claim; every event re-reads the subscription; older reads never overwrite newer | `lib/billing/webhook.ts`, migration 0021 |
+| No billing emails | Pro activated, cancellation scheduled, Pro ended. Receipts and failed-payment emails are Stripe's — switch them on (see below) | `lib/billing/notify.ts` |
+| ~17-minute recording ceiling | Segmented, private, temporary storage: ten-minute segments, transcribed and deleted one by one, two-hour ceiling | `lib/capture/*`, `api/capture/*`, migration 0022 |
+| Web recorder allowed 30 min / 24 MB over a 4.5 MB request limit | 17 minutes at 32 kbps, stated up front | `components/app/voice-recorder.tsx` |
+| Placeholders `[Registered address — pending]` on Terms and Privacy | Omitted until supplied | `lib/brand` |
+| No payments, voice or provider disclosure in Privacy | Added, describing what the code does | `(marketing)/privacy` |
+| "Weekly relationship summary" and meeting reminders promised in Settings | Removed (neither is sent) | `settings-forms.tsx` |
+
+### Before the first paying customer
+
+1. Apply migration **0021** (billing integrity) to production. The webhook
+   refuses to process events without its ledger (by design), so 0021 must be
+   applied **before** this branch's webhook receives live events.
+2. In Stripe (test mode first): create the product **Pro Founding**, one
+   recurring price **$29.00 USD monthly**, and set
+   `STRIPE_PRICE_PRO_MONTHLY` to its id. Set `STRIPE_SECRET_KEY` and
+   `STRIPE_WEBHOOK_SECRET`; point the webhook at `/api/stripe/webhook` with
+   these events: `checkout.session.completed`,
+   `customer.subscription.created|updated|deleted|paused|resumed`,
+   `invoice.paid`, `invoice.payment_failed`.
+3. Stripe → Settings → Billing → **Customer portal**: allow cancellation **at
+   the end of the billing period** (Terms and the pricing FAQ promise access
+   until the period ends), allow payment-method updates.
+4. Stripe → Settings → **Customer emails**: turn on successful-payment
+   receipts and failed-payment emails (Atturel deliberately does not send its
+   own copies).
+5. Decide: refund policy (Terms currently says nothing about refunds);
+   whether Stripe Tax is needed; whether the founding cap, reference price or
+   price lock are wanted at all.
+6. Legal facts below, and lawyer review of Terms and Privacy (both still show
+   "Draft").
+
+---
+
+## Earlier audit (session 1)
+
 Audited 13 October 2026 against the code on `visual-mobile-foundation`.
 Stripe was **not** activated. No prices, products or keys were created.
 

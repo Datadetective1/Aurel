@@ -1,4 +1,5 @@
-import { mobileContext, json } from '@/lib/mobile/route'
+import { mobileContext, json, planRequired } from '@/lib/mobile/route'
+import { checkCapability } from '@/lib/billing/entitlements'
 import { resolveFaces } from '@/lib/conversations/avatars'
 import { listLoops } from '@/lib/conversations/queries'
 import { relationshipLabel } from '@/lib/conversations/room'
@@ -14,6 +15,9 @@ import type { AtlasResponse, VisualPerson } from '@/lib/mobile/contracts'
 export async function GET() {
   const ctx = await mobileContext()
   if (!ctx.ok) return ctx.response
+
+  const access = await checkCapability('relationshipAtlas')
+  if (!access.allowed) return planRequired(access.message)
 
   const [{ data: people }, loops] = await Promise.all([
     ctx.supabase

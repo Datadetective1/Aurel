@@ -13,6 +13,8 @@
  * =============================================================================
  */
 
+import { brand } from '@/lib/brand'
+
 export type PlanId = 'free' | 'pro' | 'team'
 
 /** Everything the app can gate on. Add here, never inline. */
@@ -46,6 +48,8 @@ export type MeterKind =
   | 'message_adaptation'
   | 'source_ingest'
   | 'voice_transcription'
+  /** Seconds of audio transcribed. Measured on every plan; no allowance yet. */
+  | 'transcription_seconds'
 
 export interface PlanDefinition {
   id: PlanId
@@ -112,7 +116,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     quotas: {
       person_research: 3,
       meeting_brief: 3,
-      quick_brief: 10,
+      // Quick Brief is composed from the record without a model call, so it
+      // costs nothing to run and is not metered on any plan.
+      quick_brief: null,
       ai_coach_message: 20,
       message_adaptation: 5,
       // Conversations are the loop the product now closes -- keep one, see
@@ -129,6 +135,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Up to 5 people',
       '3 researched people and 3 meeting briefs a month',
       'Keep 10 conversations a month and confirm what they left open',
+      `20 questions to ${brand.assistantName} a month`,
       'Export or delete everything, any time',
     ],
   },
@@ -137,8 +144,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: 'pro',
     name: 'Pro',
     tagline: 'The full relationship record, and preparation for every room.',
-    monthlyPriceCents: 4900,
-    yearlyPriceCents: 42000,
+    // The launch price is the founding price; see FOUNDING_OFFER. There is no
+    // annual plan in this launch.
+    monthlyPriceCents: 2900,
+    yearlyPriceCents: null,
     capabilities: {
       researchPerson: true,
       deepResearch: true,
@@ -175,6 +184,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Unlimited people and relationship memory',
       'Research a person’s public professional footprint',
       'Meeting briefs, Quick Brief and debriefs',
+      'Keep up to 60 conversations a month',
       'Calendar integration and the Relationship Atlas',
     ],
   },
@@ -214,19 +224,42 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
 }
 
 /**
- * Founding-customer promotion. Configuration, not a promotions engine.
- * Enable by setting `enabled` and providing a Stripe price id in env.
+ * PRO FOUNDING
+ * =============================================================================
+ * The launch offer: Pro at $29 a month. Configuration, not a promotions engine.
+ *
+ * The Stripe price behind it is STRIPE_PRICE_PRO_MONTHLY; checkout refuses to
+ * start if that price does not bill exactly this amount monthly in USD, so the
+ * page can never show one price while Stripe charges another.
+ *
+ * Deliberately UNSET until approved in writing: a cap on founding places, a
+ * reference ("was") price and a price-lock duration. Each one is a public
+ * promise. While null, none is shown, enforced or stored.
+ * =============================================================================
  */
-export const FOUNDING_OFFER = {
+export const FOUNDING_OFFER: {
+  enabled: boolean
+  label: string
+  monthlyPriceCents: number
+  currency: 'usd'
+  maxCustomers: number | null
+  referencePriceCents: number | null
+  priceProtectionMonths: number | null
+} = {
   enabled: true,
-  label: 'Founding',
-  /** Promotion closes once this many founding subscriptions exist. */
-  maxCustomers: 250,
+  label: 'Pro Founding',
   monthlyPriceCents: 2900,
-  /** How long the founding price is honoured. Not lifetime. */
-  priceProtectionMonths: 12,
-  blurb: 'Founding price held for 12 months.',
-} as const
+  currency: 'usd',
+  maxCustomers: null,
+  referencePriceCents: null,
+  priceProtectionMonths: null,
+}
+
+/** The sentence about the price lock, only when one has been approved. */
+export function foundingProtectionBlurb(): string | null {
+  const months = FOUNDING_OFFER.priceProtectionMonths
+  return months ? `Founding price held for ${months} months.` : null
+}
 
 /** Human-readable price, e.g. "$49". */
 export function formatPrice(cents: number | null, currency = 'USD'): string {

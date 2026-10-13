@@ -11,6 +11,8 @@ import { PersonNode, type PersonNodeData } from '@/components/app/person-node'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Panel, Rule, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
+import { checkCapability } from '@/lib/billing/entitlements'
+import { PlanRequired } from '@/components/app/plan-required'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
 import { isOverdueIn } from '@/lib/tz'
@@ -35,6 +37,16 @@ export default async function AtlasPage() {
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
+
+  // A Pro capability. Checked before any of the record is read for it.
+  const access = await checkCapability('relationshipAtlas')
+  if (!access.allowed) {
+    return (
+      <Container size="default" className="py-8 sm:py-12">
+        <PlanRequired capability="relationshipAtlas" />
+      </Container>
+    )
+  }
 
   const supabase = await createClient()
 

@@ -25,7 +25,18 @@ export default function Today() {
   const { data, error, loading, refreshing, refresh } = useApi<TodayResponse>('/api/mobile/today')
 
   if (loading) return <Screen><Loading /></Screen>
-  if (error || !data) return <Screen onRefresh={refresh}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
+  if (error || !data) {
+    // Account stays reachable when the record is not -- someone who never
+    // finished onboarding can still sign out or delete their account.
+    return (
+      <Screen onRefresh={refresh}>
+        <View style={{ alignItems: 'flex-end' }}>
+          <AccountButton />
+        </View>
+        {error ? <Failure failure={error} onRetry={refresh} /> : null}
+      </Screen>
+    )
+  }
 
   const now = new Date(data.now)
   const tz = data.timeZone
@@ -38,8 +49,12 @@ export default function Today() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
-      <T variant="label" tone="muted">{formatDayLabel(data.now, tz)}</T>
-      <T variant="display" style={{ marginTop: 6 }} accessibilityRole="header">
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <T variant="label" tone="muted">{formatDayLabel(data.now, tz)}</T>
+        {/* Account, privacy, sign out and Delete Account live behind this. */}
+        <AccountButton />
+      </View>
+      <T variant="display" style={{ marginTop: 2 }} accessibilityRole="header">
         {greeting(now, tz)}, {data.name.split(' ')[0]}
       </T>
 
@@ -108,6 +123,21 @@ export default function Today() {
         )}
       </Section>
     </Screen>
+  )
+}
+
+function AccountButton() {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Account and settings"
+      hitSlop={8}
+      onPress={() => router.push('/account')}
+      style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+    >
+      <Feather name="user" size={20} color={c.inkSecondary} />
+    </Pressable>
   )
 }
 

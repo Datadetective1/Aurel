@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { serverEnv, features } from '@/lib/env'
 import { brand } from '@/lib/brand'
 import type { PlanId } from './plans'
+import { mapStripeStatus } from './webhook'
 
 /**
  * STRIPE
@@ -34,13 +35,34 @@ export function stripe(): Stripe {
   return client
 }
 
-export type BillingInterval = 'monthly' | 'yearly'
+export type BillingInterval = 'monthly'
 
-/** The configured price id for an interval, or null when it is not set up. */
-export function priceIdFor(interval: BillingInterval): string | null {
-  return interval === 'yearly'
-    ? (serverEnv.STRIPE_PRICE_PRO_YEARLY ?? null)
-    : (serverEnv.STRIPE_PRICE_PRO_MONTHLY ?? null)
+/** The configured Pro price id, or null when it is not set up. */
+export function proPriceId(): string | null {
+  return serverEnv.STRIPE_PRICE_PRO_MONTHLY ?? null
+}
+
+/**
+ * Whether a Stripe price is the one this product sells at the advertised
+ * amount: monthly, recurring, in the offer's currency, at the offer's price.
+ *
+ * Checked before checkout so a misconfigured price id cannot charge a
+ * customer something other than what the pricing page told them.
+ */
+export function priceMatchesOffer(
+  price: Pick<Stripe.Price, 'unit_amount' | 'currency' | 'type' | 'active'> & {
+    recurring: { interval: string; interval_count: number } | null
+  },
+  offer: { monthlyPriceCents: number; currency: string },
+): boolean {
+  return (
+    price.active &&
+    price.type === 'recurring' &&
+    price.recurring?.interval === 'month' &&
+    price.recurring.interval_count === 1 &&
+    price.currency === offer.currency &&
+    price.unit_amount === offer.monthlyPriceCents
+  )
 }
 
 /**
@@ -52,19 +74,7 @@ export function priceIdFor(interval: BillingInterval): string | null {
  * giving away paid capability indefinitely.
  */
 export function mapStatus(status: Stripe.Subscription.Status): string {
-  switch (status) {
-    case 'trialing':
-    case 'active':
-    case 'past_due':
-    case 'canceled':
-    case 'incomplete':
-    case 'incomplete_expired':
-    case 'unpaid':
-    case 'paused':
-      return status
-    default:
-      return 'canceled'
-  }
+  return mapStripeStatus(status)
 }
 
 /**
@@ -77,14 +87,20 @@ export function mapStatus(status: Stripe.Subscription.Status): string {
 export function planForPrice(priceId: string | null | undefined): PlanId {
   if (!priceId) return 'free'
   if (priceId === serverEnv.STRIPE_PRICE_PRO_MONTHLY) return 'pro'
-  if (priceId === serverEnv.STRIPE_PRICE_PRO_YEARLY) return 'pro'
+  // Recognised so an existing subscription on it is never silently dropped to
+  // free. Not offered: there is no annual plan in this launch.
+  if (serverEnv.STRIPE_PRICE_PRO_YEARLY && priceId === serverEnv.STRIPE_PRICE_PRO_YEARLY) {
+    return 'pro'
+  }
   return 'free'
 }
 
-/** The interval a known price bills on, for display and price protection. */
-export function intervalForPrice(priceId: string | null | undefined): BillingInterval | null {
+/** The interval a known price bills on, for display. */
+export function intervalForPrice(priceId: string | null | undefined): 'monthly' | 'yearly' | null {
   if (!priceId) return null
-  if (priceId === serverEnv.STRIPE_PRICE_PRO_YEARLY) return 'yearly'
+  if (serverEnv.STRIPE_PRICE_PRO_YEARLY && priceId === serverEnv.STRIPE_PRICE_PRO_YEARLY) {
+    return 'yearly'
+  }
   if (priceId === serverEnv.STRIPE_PRICE_PRO_MONTHLY) return 'monthly'
   return null
 }

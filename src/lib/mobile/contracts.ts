@@ -49,6 +49,39 @@ export interface MeResponse {
   onboarded: boolean
 }
 
+// --- GET /api/mobile/account ---------------------------------------------------
+export interface AccountResponse {
+  email: string | null
+  name: string
+  /** "Free", "Pro Founding", "Pro". */
+  planLabel: string
+  /** Where the plan is managed, so the app never shows a web-only control as its own. */
+  billing: 'none' | 'web' | 'apple' | 'included'
+  legal: { privacyUrl: string; termsUrl: string; supportEmail: string }
+  capture: CaptureLimits
+}
+
+/** What the server will accept for one recording, so the app can say so up front. */
+export interface CaptureLimits {
+  /** Longest recording the app should allow, in seconds. */
+  maxSeconds: number
+  /** Segment length for segmented upload, or null when only a single upload is available. */
+  segmentSeconds: number | null
+}
+
+// --- DELETE /api/mobile/account ------------------------------------------------
+export interface DeleteAccountRequest {
+  confirmation: string
+  appleAcknowledged?: boolean
+}
+export type DeleteAccountResponse =
+  | { deleted: true }
+  | {
+      deleted: false
+      stage: 'billing' | 'apple_acknowledgement' | 'data' | 'confirmation'
+      error: string
+    }
+
 // --- GET /api/mobile/today ----------------------------------------------------
 export interface TodayResponse {
   name: string

@@ -160,6 +160,8 @@ export type AnalyticsEvent =
   | 'voice_debrief_transcription_started'
   | 'voice_debrief_transcription_completed'
   | 'voice_debrief_transcription_failed'
+  | 'capture_segment_transcribed'
+  | 'capture_segment_failed'
   | 'voice_debrief_submitted'
   | 'memory_confirmed'
   | 'message_adapted'

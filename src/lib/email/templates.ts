@@ -389,3 +389,104 @@ export function followThroughEmail(input: FollowThroughInput): BuiltEmail {
     }),
   }
 }
+
+// =============================================================================
+// BILLING
+// =============================================================================
+//
+// Product messages about the plan, not receipts: Stripe sends the receipt and
+// the invoice, and a second copy from us would be noise. These say what the
+// change means inside the product -- what is now available, what happens to
+// the record -- which Stripe cannot.
+
+const billingUrl = absoluteUrl('/settings/billing')
+
+export function proActivatedEmail({
+  firstName,
+  planLabel,
+}: {
+  firstName: string
+  planLabel: string
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: `${planLabel} is on`,
+    html: renderEmail({
+      preheader: 'Unlimited people, the Atlas, calendar and more conversations.',
+      body: [
+        eyebrow('Your plan'),
+        heading(`${escapeHtml(name)}, ${escapeHtml(planLabel)} is on`),
+        paragraph(
+          'Unlimited people, the Relationship Atlas, calendar connection, and more briefs, research and conversations each month are now part of your account.',
+        ),
+        paragraph(
+          'Your receipt comes separately from our payment processor. You can change or cancel the plan any time from Settings.',
+        ),
+        button('See your plan', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+export function proCancellationScheduledEmail({
+  firstName,
+  endsOn,
+}: {
+  firstName: string
+  /** Already formatted for the reader, or null when unknown. */
+  endsOn: string | null
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: endsOn ? `Your Pro plan ends on ${endsOn}` : 'Your Pro plan is set to end',
+    html: renderEmail({
+      preheader: 'Your record stays exactly as it is.',
+      body: [
+        eyebrow('Your plan'),
+        heading('Your Pro plan is set to end'),
+        paragraph(
+          `${escapeHtml(name)}, you will keep Pro${endsOn ? ` until ${escapeHtml(endsOn)}` : ' until the end of the period you paid for'}. You will not be charged again.`,
+        ),
+        paragraph(
+          'After that the account moves to Free. Nothing is deleted: every person, conversation and commitment stays readable, and you can export it any time.',
+        ),
+        button('Keep Pro', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+export function proEndedEmail({
+  firstName,
+  reason,
+}: {
+  firstName: string
+  reason: 'canceled' | 'payment'
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject:
+      reason === 'payment'
+        ? 'Your Pro plan ended: payment not received'
+        : 'Your Pro plan has ended',
+    html: renderEmail({
+      preheader: 'Your record stays exactly as it is.',
+      body: [
+        eyebrow('Your plan'),
+        heading('Your account is now on Free'),
+        paragraph(
+          reason === 'payment'
+            ? `${escapeHtml(name)}, we could not collect the payment for Pro, so the plan has ended.`
+            : `${escapeHtml(name)}, your Pro plan has ended.`,
+        ),
+        paragraph(
+          'Nothing is deleted. Every person, conversation and commitment stays readable, and you can export it any time. Free limits now apply to new work.',
+        ),
+        button(reason === 'payment' ? 'Restart Pro' : 'See plans', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}

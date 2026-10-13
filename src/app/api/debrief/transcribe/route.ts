@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { transcribeAudio } from '@/lib/ai/transcribe'
-import { recordUsage } from '@/lib/billing/entitlements'
+import { transcribeAndMeter } from '@/lib/capture/transcribe.server'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -145,7 +144,7 @@ export async function POST(request: NextRequest) {
     sizeBucket: sizeBucket(audio.size),
   })
 
-  const result = await transcribeAudio({ audio, extension, keywords })
+  const result = await transcribeAndMeter({ audio, extension, keywords, declaredSeconds })
 
   if (!result.ok) {
     await track('voice_debrief_transcription_failed', {
@@ -164,25 +163,11 @@ export async function POST(request: NextRequest) {
       result.reason === 'empty_result'
         ? "We couldn't make out any speech in that recording. Try again, or type your debrief."
         : result.reason === 'not_configured'
-          ? 'Voice debrief is not available on this deployment. You can type your debrief.'
+          ? "Voice debrief isn't available right now. You can type your debrief."
           : "We couldn't transcribe that recording. You can try again or type your debrief."
 
     return NextResponse.json({ error: message }, { status: 502 })
   }
-
-  // Real token counts from the provider. The price table has no entry for a
-  // transcription model, so estimated cost stays zero and the existing
-  // `usage.unpriced_model` warning fires -- which is the honest outcome rather
-  // than a number nobody checked. See the report accompanying this feature.
-  await recordUsage({
-    meter: 'voice_transcription',
-    provider: 'openai',
-    model: result.model,
-    inputTokens: result.inputTokens ?? undefined,
-    outputTokens: result.outputTokens ?? undefined,
-    subjectKind: 'meeting',
-    subjectId: typeof meetingId === 'string' ? meetingId : undefined,
-  })
 
   await track('voice_debrief_transcription_completed', {
     latencyMs: result.latencyMs,

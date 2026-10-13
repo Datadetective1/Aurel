@@ -5,12 +5,12 @@ import { AudioQuality, IOSOutputFormat, type RecordingOptions } from 'expo-audio
  * =============================================================================
  * Recording settings tuned for speech, and the limits that follow from them.
  *
- * The audio goes to the same transcription route as the web recorder, which
- * runs on a serverless platform with a request body limit of about 4.5 MB.
- * Mono AAC at 32 kbps is about 240 KB a minute, so a recording stops itself at
- * seventeen minutes with room to spare, and says why. Longer conversations
- * need a direct-to-storage upload, which is not built yet -- the app says so
- * rather than failing at the end of a long meeting.
+ * Mono AAC at 32 kbps is about 240 KB a minute. Sent in one piece, a
+ * recording goes through a function whose request body is capped at about
+ * 4.5 MB, so it stops itself at seventeen minutes and says why. When the
+ * server offers segmented upload (GET /api/mobile/account), the recording is
+ * cut into ten-minute segments that go straight to private storage, and the
+ * limit is what the server says -- two hours today. See lib/segmented.
  * =============================================================================
  */
 
@@ -30,8 +30,8 @@ export const VOICE_RECORDING: RecordingOptions = {
   web: { mimeType: 'audio/webm', bitsPerSecond: 32000 },
 }
 
+/** The single-upload limit, used until the server says otherwise. */
 export const MAX_RECORDING_SECONDS = 17 * 60
-export const WARN_RECORDING_SECONDS = 15 * 60
 
 /** "4:07", "1:02:09". */
 export function elapsed(totalSeconds: number): string {

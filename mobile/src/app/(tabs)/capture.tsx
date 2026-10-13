@@ -3,14 +3,16 @@ import { AppState, Pressable, Switch, TextInput, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import * as Haptics from 'expo-haptics'
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import {
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio'
-import type { CaptureRequest, CaptureResponse } from '@atturel/web/lib/mobile/contracts'
-import { api, ApiError } from '~/lib/api'
+import type { AccountResponse, CaptureRequest, CaptureResponse } from '@atturel/web/lib/mobile/contracts'
+import { api, ApiError, segmentedDeps, useApi } from '~/lib/api'
+import { SegmentedCapture } from '~/lib/segmented'
 import { config } from '~/lib/config'
 import {
   canStart,
@@ -18,7 +20,6 @@ import {
   elapsed,
   MAX_RECORDING_SECONDS,
   VOICE_RECORDING,
-  WARN_RECORDING_SECONDS,
   type Bookmark,
   type CaptureMode,
 } from '~/lib/capture'
@@ -39,7 +40,9 @@ import { fonts, TOUCH, useTheme } from '~/theme'
  *   - recording happens only on this screen, in the foreground, visibly;
  *     leaving the app pauses it (background recording is off in app.json)
  *   - recording other people requires the user to confirm they know
- *   - audio is never stored by Atturel: it is uploaded, transcribed, dropped
+ *   - audio is never kept: it is uploaded, transcribed, and deleted. A long
+ *     conversation goes up in ten-minute segments to private, temporary
+ *     storage, each deleted as soon as it is transcribed (lib/segmented)
  *
  * Typed notes are always an alternative to recording.
  * =============================================================================
@@ -72,7 +75,18 @@ export default function Capture() {
     return () => clearInterval(t)
   }, [phase])
 
-  const seconds = config.previewData ? fakeSeconds : native.durationMillis / 1000
+  // What the server will accept. Until it answers, the single-upload limit.
+  const account = useApi<AccountResponse>('/api/mobile/account')
+  const maxSeconds = account.data?.capture.maxSeconds ?? MAX_RECORDING_SECONDS
+  const segmentSeconds = account.data?.capture.segmentSeconds ?? null
+
+  // Segmented capture: the recorder restarts every segment, so the elapsed
+  // time is the finished segments plus the one recording now.
+  const segmentedRef = React.useRef<SegmentedCapture | null>(null)
+  const finishedSecondsRef = React.useRef(0)
+  const rotatingRef = React.useRef(false)
+  const current = config.previewData ? fakeSeconds : native.durationMillis / 1000
+  const seconds = finishedSecondsRef.current + current
 
   const pause = React.useCallback(
     (reason?: string) => {
@@ -87,14 +101,52 @@ export default function Capture() {
   const stop = React.useCallback(
     async (reason?: string) => {
       if (phase !== 'recording' && phase !== 'paused') return
-      if (!config.previewData) await recorder.stop()
+      if (!config.previewData) {
+        const segmentLength = native.durationMillis / 1000
+        await recorder.stop()
+        // The last segment joins the queue; it is the only one left to process.
+        if (segmentedRef.current && recorder.uri) segmentedRef.current.add(recorder.uri, segmentLength)
+      }
       void setAudioModeAsync({ allowsRecording: false }).catch(() => {})
       setPhase('stopped')
       if (reason) setNotice(reason)
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     },
-    [phase, recorder],
+    [phase, recorder, native.durationMillis],
   )
+
+  // Segment rotation: finish this file, queue it, start the next. The queue
+  // uploads and transcribes it while the conversation carries on.
+  React.useEffect(() => {
+    if (phase !== 'recording' || !segmentSeconds || config.previewData) return
+    if (current < segmentSeconds || rotatingRef.current) return
+    rotatingRef.current = true
+    void (async () => {
+      try {
+        const length = native.durationMillis / 1000
+        await recorder.stop()
+        if (recorder.uri) segmentedRef.current?.add(recorder.uri, length)
+        finishedSecondsRef.current += length
+        await recorder.prepareToRecordAsync()
+        recorder.record()
+      } catch {
+        setError('The recording could not continue. What was recorded so far is kept — stop and send it.')
+        setPhase('paused')
+      } finally {
+        rotatingRef.current = false
+      }
+    })()
+  }, [current, phase, segmentSeconds, recorder, native.durationMillis])
+
+  // The screen stays awake while a recording is open, so auto-lock does not
+  // pause a long meeting. Leaving the app still does.
+  React.useEffect(() => {
+    if (phase !== 'recording' && phase !== 'paused') return
+    void activateKeepAwakeAsync('capture').catch(() => {})
+    return () => {
+      void deactivateKeepAwake('capture')
+    }
+  }, [phase])
 
   // Leaving the app pauses the recording. Nothing records out of sight.
   React.useEffect(() => {
@@ -107,12 +159,12 @@ export default function Capture() {
   // The length limit, said before it bites.
   React.useEffect(() => {
     if (phase !== 'recording') return
-    if (seconds >= MAX_RECORDING_SECONDS) {
-      void stop('Stopped at 17 minutes, the longest recording the app can send today. Longer conversations can be uploaded on the web.')
-    } else if (seconds >= WARN_RECORDING_SECONDS && !notice) {
+    if (seconds >= maxSeconds) {
+      void stop(`Stopped at ${Math.round(maxSeconds / 60)} minutes, the longest one recording can be.`)
+    } else if (seconds >= maxSeconds - 120 && !notice) {
       setNotice('Two minutes left before this recording stops itself.')
     }
-  }, [seconds, phase, stop, notice])
+  }, [seconds, phase, stop, notice, maxSeconds])
 
   const start = async () => {
     setError(null)
@@ -133,6 +185,8 @@ export default function Capture() {
     } else {
       setFakeSeconds(0)
     }
+    finishedSecondsRef.current = 0
+    segmentedRef.current = segmentSeconds && !config.previewData ? new SegmentedCapture(segmentedDeps()) : null
     setBookmarks([])
     setPhase('recording')
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
@@ -151,6 +205,10 @@ export default function Capture() {
   }
 
   const discard = () => {
+    // Segments already uploaded are deleted from storage now, not left to the sweep.
+    void segmentedRef.current?.cancel()
+    segmentedRef.current = null
+    finishedSecondsRef.current = 0
     setPhase('ready')
     setBookmarks([])
     setFakeSeconds(0)
@@ -164,8 +222,15 @@ export default function Capture() {
       let text = typed
       if (!fromTyping) {
         setStatus('Turning the recording into words…')
-        const uri = recorder.uri ?? 'preview.m4a'
-        const transcript = await api.transcribe(uri, seconds, params.personId ? [params.personId] : [])
+        let transcript: string
+        if (segmentedRef.current) {
+          const finished = await segmentedRef.current.finish()
+          if (!finished.ok) throw new ApiError({ kind: 'server', message: finished.error })
+          transcript = finished.text
+        } else {
+          const uri = recorder.uri ?? 'preview.m4a'
+          transcript = await api.transcribe(uri, seconds, params.personId ? [params.personId] : [])
+        }
         text = composeCaptureText(transcript, bookmarks, typed)
       }
       setStatus('Reading it for what was promised and decided…')
@@ -179,6 +244,8 @@ export default function Capture() {
       }
       const result = await api.post<CaptureResponse>('/api/mobile/conversations', body)
       setStatus(null)
+      segmentedRef.current = null
+      finishedSecondsRef.current = 0
       setPhase('ready')
       setTyped('')
       setTyping(false)

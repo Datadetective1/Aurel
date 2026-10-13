@@ -44,6 +44,7 @@ function Navigator() {
           <Stack.Screen name="meeting/[id]" options={{ title: '' }} />
           <Stack.Screen name="person/[id]" options={{ title: '' }} />
           <Stack.Screen name="review/[id]" options={{ title: 'What happened', presentation: 'modal' }} />
+          <Stack.Screen name="account" options={{ title: 'Account' }} />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />

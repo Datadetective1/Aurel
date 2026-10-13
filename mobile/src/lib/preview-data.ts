@@ -1,4 +1,5 @@
 import type {
+  AccountResponse,
   AtlasResponse,
   AskResponse,
   CaptureResponse,
@@ -78,6 +79,22 @@ function meeting(id: string): MeetingResponse {
 export async function previewResponse<T>(path: string, init: RequestInit): Promise<T> {
   await delay(250)
   const p = path.replace(/^\/api\/mobile/, '')
+
+  if (p === '/account') {
+    const body: AccountResponse = {
+      email: 'amary@example.com',
+      name: 'Amary',
+      planLabel: 'Pro Founding',
+      billing: 'web',
+      legal: {
+        privacyUrl: 'https://www.atturel.com/privacy',
+        termsUrl: 'https://www.atturel.com/terms',
+        supportEmail: 'support@atturel.com',
+      },
+      capture: { maxSeconds: 17 * 60, segmentSeconds: null },
+    }
+    return body as T
+  }
 
   if (p === '/today') {
     const body: TodayResponse = {

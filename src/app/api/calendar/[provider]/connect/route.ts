@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto'
 import { requireOnboardedUser } from '@/lib/auth'
+import { checkCapability } from '@/lib/billing/entitlements'
 import { calendarProvider, CALENDAR_PROVIDERS, providerConfigured } from '@/lib/calendar'
 import type { CalendarProviderId } from '@/lib/calendar'
 import { canStoreSecrets } from '@/lib/crypto'
@@ -69,6 +70,11 @@ export async function GET(
   if (!providerConfigured(id) || !canStoreSecrets()) {
     logger.warn('calendar.connect_unconfigured', { provider: id })
     return NextResponse.redirect(`${origin}/settings/capabilities?calendar=not_configured`)
+  }
+
+  // A Pro capability, refused before the consent screen for the same reason.
+  if (!(await checkCapability('calendarIntegration')).allowed) {
+    return NextResponse.redirect(`${origin}/settings/billing?upgrade=calendar`)
   }
 
   await track('calendar_connect_started', { provider: id })

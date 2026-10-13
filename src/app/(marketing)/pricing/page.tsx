@@ -4,7 +4,7 @@ import { ArrowRight, CircleCheck } from 'lucide-react'
 import { ApertureRule } from '@/components/brand/aperture'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
-import { FOUNDING_OFFER, PLANS, annualSavingPercent, formatPrice } from '@/lib/billing/plans'
+import { FOUNDING_OFFER, PLANS, foundingProtectionBlurb, formatPrice } from '@/lib/billing/plans'
 import { brand, title } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -41,7 +41,7 @@ export default function PricingPage() {
   const free = PLANS.free
   const pro = PLANS.pro
   const team = PLANS.team
-  const annualSaving = annualSavingPercent(pro)
+  const protection = foundingProtectionBlurb()
 
   return (
     <>
@@ -82,11 +82,13 @@ export default function PricingPage() {
             <Panel className="border-accent/30 bg-accent-wash relative flex flex-col p-7">
               {FOUNDING_OFFER.enabled ? (
                 <Badge tone="accent" className="absolute -top-2.5 left-7">
-                  {FOUNDING_OFFER.label} price
+                  Founding price
                 </Badge>
               ) : null}
 
-              <h2 className="font-display text-ink text-2xl">{pro.name}</h2>
+              <h2 className="font-display text-ink text-2xl">
+                {FOUNDING_OFFER.enabled ? FOUNDING_OFFER.label : pro.name}
+              </h2>
               <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{pro.tagline}</p>
 
               <div className="mt-6 flex items-baseline gap-3">
@@ -100,16 +102,20 @@ export default function PricingPage() {
                 <span className="text-ink-muted text-sm">per month</span>
               </div>
 
-              {FOUNDING_OFFER.enabled ? (
+              {/* Only claims that have been approved: no "was" price, no cap on
+                  places, no lock period unless FOUNDING_OFFER sets one. */}
+              {FOUNDING_OFFER.enabled && FOUNDING_OFFER.referencePriceCents ? (
                 <p className="text-ink-secondary mt-1 text-xs">
-                  <span className="line-through">{formatPrice(pro.monthlyPriceCents)}</span> for the
-                  first {FOUNDING_OFFER.maxCustomers} members. {FOUNDING_OFFER.blurb}
-                </p>
-              ) : annualSaving ? (
-                <p className="text-ink-muted mt-1 text-xs">
-                  Or {formatPrice(pro.yearlyPriceCents)} a year, saving {annualSaving}%.
+                  <span className="line-through">
+                    {formatPrice(FOUNDING_OFFER.referencePriceCents)}
+                  </span>
+                  {FOUNDING_OFFER.maxCustomers
+                    ? ` for the first ${FOUNDING_OFFER.maxCustomers} members.`
+                    : null}
                 </p>
               ) : null}
+              {protection ? <p className="text-ink-muted mt-1 text-xs">{protection}</p> : null}
+              <p className="text-ink-muted mt-1 text-xs">Billed monthly. Cancel any time.</p>
 
               <ul className="mt-7 grid flex-1 gap-3">
                 {pro.highlights.map((item) => (

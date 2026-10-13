@@ -5,6 +5,7 @@ import { CircleAlert, Loader2, Mic, Square, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatElapsed, pickMimeType, recordingSupported } from './voice-debrief'
 import { cn } from '@/lib/utils'
+import { SINGLE_UPLOAD_MAX_BYTES, SINGLE_UPLOAD_MAX_SECONDS } from '@/lib/capture/limits'
 
 /**
  * VOICE RECORDER
@@ -15,17 +16,20 @@ import { cn } from '@/lib/utils'
  *
  * Longer than the debrief's three minutes because this is for the
  * conversation itself as well as a note about it afterwards. The ceiling is
- * the provider's 25 MB, which in Opus is comfortably over an hour; thirty
- * minutes is the honest limit for a first version, stated up front rather
- * than discovered at upload time.
+ * the platform's request-body limit (see lib/capture/limits): recorded at
+ * 32 kbps, seventeen minutes fits with room to spare, and that is the limit
+ * stated up front rather than discovered at upload time. Longer recordings
+ * use the iPhone app's segmented upload.
  *
  * Audio leaves this component once, as a POST to our own route, and is not
  * kept anywhere. The words come back and go into the form beside it.
  * =============================================================================
  */
 
-const MAX_SECONDS = 30 * 60
-const MAX_BYTES = 24 * 1024 * 1024
+const MAX_SECONDS = SINGLE_UPLOAD_MAX_SECONDS
+const MAX_BYTES = SINGLE_UPLOAD_MAX_BYTES
+/** Speech encoding: small enough that MAX_SECONDS fits under MAX_BYTES. */
+const BITS_PER_SECOND = 32_000
 
 type Phase = 'idle' | 'recording' | 'transcribing' | 'error'
 
@@ -88,7 +92,9 @@ export function VoiceRecorder({
   async function send(blob: Blob, seconds: number, origin: 'recorded' | 'file', fileName?: string) {
     if (blob.size > MAX_BYTES) {
       setPhase('error')
-      setError('That audio is larger than 24 MB. Split it, or paste a transcript instead.')
+      setError(
+        `That audio is larger than ${Math.floor(MAX_BYTES / 1_000_000)} MB. Split it, or paste a transcript instead.`,
+      )
       return
     }
     if (blob.size < 1_000) {
@@ -161,7 +167,10 @@ export function VoiceRecorder({
 
     let recorder: MediaRecorder
     try {
-      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: BITS_PER_SECOND,
+      })
     } catch {
       cleanup()
       setPhase('error')
@@ -304,7 +313,7 @@ export function VoiceRecorder({
 
       <p className="sr-only" role="status" aria-live="polite">
         {phase === 'recording'
-          ? `Recording, ${formatElapsed(elapsed)} elapsed of thirty minutes maximum.`
+          ? `Recording, ${formatElapsed(elapsed)} elapsed of seventeen minutes maximum.`
           : phase === 'transcribing'
             ? 'Transcribing your recording.'
             : ''}

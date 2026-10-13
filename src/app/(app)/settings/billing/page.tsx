@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import { FOUNDING_OFFER, PLANS, formatPrice, type MeterKind } from '@/lib/billing/plans'
+import {
+  FOUNDING_OFFER,
+  PLANS,
+  foundingProtectionBlurb,
+  formatPrice,
+  type MeterKind,
+} from '@/lib/billing/plans'
 import { foundingPlacesRemaining } from './actions'
 import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
 import { InvitationPanel } from '@/components/app/invitation-panel'
@@ -33,6 +39,7 @@ export default async function BillingSettingsPage({
   const entitlements = await getEntitlements()
   const plan = PLANS[entitlements.plan]
   const founding = await foundingPlacesRemaining()
+  const protection = foundingProtectionBlurb()
 
   // Only meters with an actual numeric quota are worth showing a bar for.
   const metered = (Object.keys(METER_LABEL) as MeterKind[]).filter((kind) => {
@@ -63,8 +70,8 @@ export default async function BillingSettingsPage({
           className="border-positive/25 bg-positive-wash text-positive mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
         >
           <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          Payment received. Your plan updates the moment Stripe confirms it — usually within
-          seconds. Reload if this page still shows the old plan.
+          Thank you. Your plan changes as soon as the payment is confirmed — usually within seconds.
+          Reload if this page still shows the old plan.
         </p>
       ) : null}
 
@@ -147,8 +154,8 @@ export default async function BillingSettingsPage({
         {features.billing && entitlements.plan === 'free' ? (
           <UpgradeButton
             label={
-              founding !== null && founding > 0
-                ? `Upgrade at the founding price — ${formatPrice(FOUNDING_OFFER.monthlyPriceCents)}`
+              FOUNDING_OFFER.enabled && (founding === null || founding > 0)
+                ? `Upgrade to ${FOUNDING_OFFER.label} — ${formatPrice(FOUNDING_OFFER.monthlyPriceCents)} a month`
                 : 'Upgrade to Pro'
             }
           />
@@ -171,13 +178,14 @@ export default async function BillingSettingsPage({
           a deployment that cannot sell is a claim with nothing behind it. */}
       {features.billing && founding !== null && founding > 0 && entitlements.plan === 'free' ? (
         <p className="text-ink-muted mt-3 text-xs">
-          {founding} founding {founding === 1 ? 'place' : 'places'} left. {FOUNDING_OFFER.blurb}
+          {founding} founding {founding === 1 ? 'place' : 'places'} left.
+          {protection ? ` ${protection}` : ''}
         </p>
       ) : null}
 
       {entitlements.isFounding ? (
         <p className="text-ink-muted mt-3 text-xs">
-          You joined as a founding customer. {FOUNDING_OFFER.blurb}
+          You joined as a founding customer.{protection ? ` ${protection}` : ''}
         </p>
       ) : null}
 

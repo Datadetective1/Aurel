@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
 import { applyAccessTier, parseAccessTier, type AccessTier } from './access'
+import { resolveEntitlement, type EntitlementProvider } from './sources'
 import { brand } from '@/lib/brand'
 
 /**
@@ -30,6 +31,8 @@ export interface Entitlements {
    * the free plan commercially, it simply is not subject to its ceilings.
    */
   tier: AccessTier
+  /** Which provider confers the plan, for "manage billing" and deletion. */
+  provider: EntitlementProvider
   isFounding: boolean
   /** Start of the current billing period, used as the quota bucket key. */
   periodStart: string
@@ -74,15 +77,19 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
       .maybeSingle(),
   ])
 
-  // A subscription that lapsed drops to free rather than staying entitled.
-  const rawPlan = (subscription?.plan ?? 'free') as PlanId
-  const status = subscription?.status
-  const entitledStatuses = ['trialing', 'active', 'past_due']
-  const plan: PlanId =
-    rawPlan !== 'free' && status && !entitledStatuses.includes(status) ? 'free' : rawPlan
+  // One canonical answer from every provider. A subscription that lapsed
+  // confers Free rather than staying entitled; see lib/billing/sources.
+  const tier = parseAccessTier(grant?.tier)
+  const resolved = resolveEntitlement({
+    stripe: subscription
+      ? { plan: (subscription.plan ?? 'free') as PlanId, status: subscription.status ?? null }
+      : null,
+    apple: null,
+    tier,
+  })
+  const plan = resolved.plan
 
   const definition = PLANS[plan] ?? PLANS.free
-  const tier = parseAccessTier(grant?.tier)
 
   // Standard comes back identical to the plan. Full access lifts the ceiling
   // and nothing else -- metering is untouched, see lib/billing/access.
@@ -105,6 +112,7 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   return {
     plan,
     tier,
+    provider: resolved.provider,
     isFounding: subscription?.is_founding ?? false,
     periodStart: currentPeriodStart(),
     capabilities,
@@ -132,6 +140,8 @@ export type CapabilityCheck =
 export async function checkCapability(
   capability: Capability,
   meter?: MeterKind,
+  /** How much this action will consume, for meters counted in units (seconds). */
+  amount = 1,
 ): Promise<CapabilityCheck> {
   const entitlements = await getEntitlements()
 
@@ -155,7 +165,7 @@ export async function checkCapability(
 
   const used = await usageInPeriod(meter, entitlements.periodStart)
 
-  if (used >= limit) {
+  if (used + Math.max(1, amount) > limit) {
     // Defined since the beginning and never fired. Which quota bites first, and
     // how often, is what tells us whether the free tier is the right shape --
     // and that is a pilot question, not a launch one.
@@ -190,7 +200,9 @@ export async function usageInPeriod(meter: MeterKind, periodStart: string): Prom
     .from('usage_meters')
     .select('quantity')
     .eq('user_id', user.id)
-    .eq('kind', meter)
+    // `transcription_seconds` is added to the enum by migration 0021, after
+    // the generated types; the value is checked by MeterKind above.
+    .eq('kind', meter as never)
     .eq('period_start', periodStart)
 
   if (error) {
@@ -218,6 +230,11 @@ export interface UsageRecord {
   searchProvider?: string
   subjectKind?: string
   subjectId?: string
+  /**
+   * The cost when it is not token-priced (transcription bills by the minute).
+   * Overrides the token estimate; still an estimate, still internal.
+   */
+  estimatedCostMicros?: number | null
 }
 
 /**
@@ -241,10 +258,11 @@ export async function recordUsage(record: UsageRecord): Promise<void> {
       return
     }
 
-    await supabase.from('usage_meters').insert({
+    const { error: insertError } = await supabase.from('usage_meters').insert({
       workspace_id: profile.default_workspace_id,
       user_id: user.id,
-      kind: record.meter,
+      // See usageInPeriod: an enum value newer than the generated types.
+      kind: record.meter as never,
       quantity: record.quantity ?? 1,
       period_start: entitlements.periodStart,
       cost_units: record.costUnits ?? 0,
@@ -257,19 +275,29 @@ export async function recordUsage(record: UsageRecord): Promise<void> {
       search_requests: record.searchRequests ?? 0,
       // Priced at the moment the work ran, so a later price change does not
       // silently rewrite what last month cost.
-      estimated_cost_micros: estimateCostMicros({
-        provider: record.provider,
-        model: record.model,
-        inputTokens: record.inputTokens,
-        outputTokens: record.outputTokens,
-        searchRequests: record.searchRequests,
-        searchProvider: record.searchProvider,
-      }),
+      estimated_cost_micros:
+        record.estimatedCostMicros ??
+        estimateCostMicros({
+          provider: record.provider,
+          model: record.model,
+          inputTokens: record.inputTokens,
+          outputTokens: record.outputTokens,
+          searchRequests: record.searchRequests,
+          searchProvider: record.searchProvider,
+        }),
     })
+
+    if (insertError) {
+      logger.warn('entitlements.record_insert_failed', {
+        meter: record.meter,
+        code: insertError.code,
+      })
+      return
+    }
 
     // An unpriced model still bills; it just bills invisibly. Worth a line so
     // the gap is findable rather than showing up as a suspiciously cheap month.
-    if (record.model && !hasKnownPrice(record.model)) {
+    if (record.model && record.estimatedCostMicros === undefined && !hasKnownPrice(record.model)) {
       logger.warn('usage.unpriced_model', { meter: record.meter, model: record.model })
     }
   } catch (error) {

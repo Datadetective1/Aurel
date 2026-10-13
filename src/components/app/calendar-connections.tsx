@@ -32,6 +32,7 @@ export type CalendarConnectionStatus =
   | 'admin_consent_required'
   | 'error'
   | 'unavailable'
+  | 'plan_required'
 
 export interface CalendarConnection {
   provider: 'microsoft' | 'google'
@@ -69,7 +70,7 @@ const STATE: Record<
   revoked: {
     label: 'Needs attention',
     tone: 'caution',
-    detail: 'Access was withdrawn at the provider. Reconnect to resume.',
+    detail: 'Access was withdrawn in your calendar account. Reconnect to resume.',
   },
   admin_consent_required: {
     label: 'Needs approval',
@@ -86,6 +87,12 @@ const STATE: Record<
     label: 'Unavailable',
     tone: 'outline',
     detail: 'Not available yet.',
+  },
+  plan_required: {
+    label: 'Pro',
+    tone: 'outline',
+    detail:
+      'Connecting a calendar is part of Pro. Upgrade to bring your meetings in automatically.',
   },
 }
 
@@ -109,7 +116,8 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
   const needsAttention = ['expired', 'revoked', 'error', 'admin_consent_required'].includes(
     connection.status,
   )
-  const canConnect = connection.status !== 'unavailable'
+  const canConnect = connection.status !== 'unavailable' && connection.status !== 'plan_required'
+  const planRequired = connection.status === 'plan_required'
 
   async function run(kind: 'sync' | 'disconnect') {
     setBusy(kind)
@@ -202,6 +210,10 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
             <a href={`/api/calendar/${connection.provider}/connect`}>
               {needsAttention ? 'Reconnect' : 'Connect'}
             </a>
+          </Button>
+        ) : planRequired ? (
+          <Button asChild size="sm" variant="secondary">
+            <a href="/settings/billing">See Pro</a>
           </Button>
         ) : null}
       </div>

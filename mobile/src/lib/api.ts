@@ -2,6 +2,8 @@ import * as React from 'react'
 import { config } from './config'
 import { supabase } from './supabase'
 import { previewResponse } from './preview-data'
+import type { DeleteAccountResponse } from '@atturel/web/lib/mobile/contracts'
+import type { SegmentedDeps, SegmentUploadTicket } from './segmented'
 
 /**
  * THE APP'S ONE DOOR TO THE BACKEND
@@ -20,6 +22,7 @@ export type ApiFailure =
   | { kind: 'unauthenticated' }
   | { kind: 'onboarding_required' }
   | { kind: 'not_found' }
+  | { kind: 'plan_required'; message: string }
   | { kind: 'server'; message: string }
 
 export class ApiError extends Error {
@@ -54,10 +57,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError({ kind: 'offline' })
   }
 
-  const body = (await response.json().catch(() => null)) as { error?: string } | null
+  const body = (await response.json().catch(() => null)) as { error?: string; code?: string } | null
   if (response.status === 401) throw new ApiError({ kind: 'unauthenticated' })
   if (response.status === 403 && body?.error === 'onboarding_required') {
     throw new ApiError({ kind: 'onboarding_required' })
+  }
+  if (response.status === 403 && body?.code === 'plan_required') {
+    throw new ApiError({ kind: 'plan_required', message: body.error ?? 'This is part of Pro.' })
   }
   if (response.status === 404) throw new ApiError({ kind: 'not_found' })
   if (!response.ok) {
@@ -68,6 +74,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+
+  /**
+   * Delete the account. Returns the server's answer as data, including the
+   * refusals the screen must explain (billing could not be stopped; an Apple
+   * subscription needs cancelling first) rather than throwing them away.
+   */
+  async deleteAccount(body: { confirmation: string; appleAcknowledged?: boolean }): Promise<DeleteAccountResponse> {
+    if (config.previewData) {
+      return { deleted: false, stage: 'confirmation', error: 'Preview data cannot be deleted.' }
+    }
+    const access = await token()
+    if (!access) throw new ApiError({ kind: 'unauthenticated' })
+    let response: Response
+    try {
+      response = await fetch(`${config.apiUrl}/api/mobile/account`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      throw new ApiError({ kind: 'offline' })
+    }
+    if (response.status === 401) throw new ApiError({ kind: 'unauthenticated' })
+    const result = (await response.json().catch(() => null)) as DeleteAccountResponse | null
+    return result ?? { deleted: false, stage: 'data', error: 'Something went wrong. Nothing was deleted.' }
+  },
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
 
@@ -85,6 +117,62 @@ export const api = {
     const result = await request<{ text: string }>('/api/conversations/transcribe', { method: 'POST', body: form })
     return result.text
   },
+}
+
+/** The private bucket segments are uploaded to (migration 0022). */
+const CAPTURE_BUCKET = 'capture-audio'
+
+/**
+ * Segmented capture over the real endpoints. Each upload goes to a signed
+ * URL for a path the server chose, under the user's own folder; the app
+ * never names a path itself.
+ */
+export function segmentedDeps(): SegmentedDeps {
+  const authed = async (path: string, init: RequestInit) => {
+    const access = await token()
+    if (!access) throw new ApiError({ kind: 'unauthenticated' })
+    try {
+      return await fetch(`${config.apiUrl}${path}`, {
+        ...init,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
+      })
+    } catch {
+      throw new ApiError({ kind: 'offline' })
+    }
+  }
+
+  return {
+    requestUpload: (input) =>
+      request<SegmentUploadTicket>('/api/capture/segments', { method: 'POST', body: JSON.stringify(input) }),
+
+    async readFile(uri) {
+      return (await fetch(uri)).arrayBuffer()
+    },
+
+    async putObject(ticket, body) {
+      const { error } = await supabase.storage
+        .from(CAPTURE_BUCKET)
+        .uploadToSignedUrl(ticket.path, ticket.token, body, { contentType: ticket.contentType, upsert: false })
+      if (error) throw new Error('That part of the recording could not be uploaded.')
+    },
+
+    async transcribe(uploadId) {
+      const response = await authed(`/api/capture/segments/${uploadId}/transcribe`, { method: 'POST' })
+      const body = (await response.json().catch(() => null)) as
+        | { text?: string; error?: string; retryable?: boolean }
+        | null
+      if (response.ok && typeof body?.text === 'string') return { ok: true, text: body.text }
+      return {
+        ok: false,
+        error: body?.error ?? 'That part of the recording could not be transcribed.',
+        retryable: Boolean(body?.retryable),
+      }
+    },
+
+    async discard(captureId) {
+      await authed(`/api/capture/${captureId}`, { method: 'DELETE' })
+    },
+  }
 }
 
 /** A small fetch-on-mount hook with pull-to-refresh, typed by the contract. */

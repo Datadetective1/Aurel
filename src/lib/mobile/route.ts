@@ -43,6 +43,14 @@ export async function mobileContext(): Promise<
   return { ok: true, user, profile, supabase, timeZone: profile.timezone ?? 'UTC' }
 }
 
+/**
+ * A capability the account's plan does not include. 403 with a code the app
+ * recognises, so it can show the plan state rather than a generic failure.
+ */
+export function planRequired(message: string): Response {
+  return json({ error: message, code: 'plan_required' }, 403)
+}
+
 /** Read a JSON body, or null when it is not JSON. */
 export async function readJson<T>(request: Request): Promise<T | null> {
   try {

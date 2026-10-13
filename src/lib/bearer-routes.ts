@@ -9,7 +9,7 @@
  * (static-looking URLs), where an incoming header would otherwise pass
  * through untouched -- because it does not know the value.
  */
-export const BEARER_PATHS = ['/api/mobile/', '/api/conversations/transcribe']
+export const BEARER_PATHS = ['/api/mobile/', '/api/conversations/transcribe', '/api/capture/']
 export const BEARER_FLAG = 'x-atturel-bearer-route'
 
 let flagValue: Promise<string> | null = null

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { checkCapability } from '@/lib/billing/entitlements'
 import { ownership } from '@/lib/workspace'
 import { calendarProvider } from '@/lib/calendar'
 import type { CalendarProviderId } from '@/lib/calendar'
@@ -39,6 +40,9 @@ export async function syncCalendarNow(provider: CalendarProviderId): Promise<Cal
     .maybeSingle()
 
   if (!integration) return { error: 'That calendar is not connected.' }
+
+  const capability = await checkCapability('calendarIntegration')
+  if (!capability.allowed) return { error: capability.message }
 
   // Our own rate limit, ahead of the provider's. A user leaning on the button
   // should not be the reason a tenant gets throttled.

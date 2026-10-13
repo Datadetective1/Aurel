@@ -117,11 +117,15 @@ export default async function CapabilitiesSettingsPage() {
 
   const connections: CalendarConnection[] = providers.map((provider) => {
     const row = (integrations ?? []).find((i) => i.provider === provider.id)
+    // Calendar connection is a Pro capability. A connection made before the
+    // plan changed still shows, but cannot sync until the plan allows it.
     const status: CalendarConnectionStatus = !provider.configured
       ? 'unavailable'
-      : !row
-        ? 'not_connected'
-        : (row.status as CalendarConnectionStatus)
+      : !entitlements.capabilities.calendarIntegration
+        ? 'plan_required'
+        : !row
+          ? 'not_connected'
+          : (row.status as CalendarConnectionStatus)
 
     return {
       provider: provider.id,

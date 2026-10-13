@@ -170,8 +170,8 @@ export function PreferencesSettingsForm({
             Send me useful {brand.name} email
           </span>
           <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">
-            The daily follow-through below, meeting reminders when something is unprepared, and your
-            weekly relationship summary. Never marketing.
+            The daily follow-through below, and notices about your account and plan. Never
+            marketing.
           </span>
         </span>
       </label>

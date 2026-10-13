@@ -96,10 +96,12 @@ export default function TermsPage() {
 
         <Section title="Payment">
           <p>
-            Paid plans are billed in advance for the period you choose. You can cancel at any time
-            from Settings and keep access until the end of that period. Fair-use limits apply to
-            computationally expensive operations; your plan&rsquo;s current monthly limits and usage
-            are shown under Settings &rarr; Plan.
+            Pro is billed monthly, in advance, through our payment processor; we never see or store
+            your card number. You can cancel at any time from Settings &rarr; Plan and keep access
+            until the end of the month you have paid for. Deleting your account ends a paid plan
+            immediately and stops all future charges. Fair-use limits apply to computationally
+            expensive operations; your plan&rsquo;s current monthly limits and usage are shown under
+            Settings &rarr; Plan.
           </p>
         </Section>
 
@@ -129,8 +131,10 @@ export default function TermsPage() {
             </a>
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.legalEntity}, {brand.legal.entityAddress}. Governing law:{' '}
-            {brand.legal.jurisdiction}. Last updated {brand.legal.policiesLastUpdated}.
+            {brand.legalEntity}
+            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}.
+            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
+            updated {brand.legal.policiesLastUpdated}.
           </p>
         </Section>
       </div>
