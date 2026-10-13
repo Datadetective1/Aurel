@@ -25,7 +25,7 @@ const FAQ = [
   },
   {
     q: 'Is my relationship record private?',
-    a: `It is scoped to your account at the database level. It is not shared with anyone, and it is not used to train a shared model. On a team plan, your private notes stay private — sharing is always an explicit act.`,
+    a: `It is scoped to your account at the database level. It is not shared with anyone, and it is not used to train a shared model. If team plans are introduced, your private notes will stay private — sharing will always be an explicit act.`,
   },
   {
     q: 'What does "research" actually do?',
@@ -45,14 +45,14 @@ export default function PricingPage() {
 
   return (
     <>
-      <section className="border-b border-line py-20 sm:py-24">
+      <section className="border-line border-b py-20 sm:py-24">
         <Container size="wide">
           <div className="max-w-2xl">
             <Eyebrow>Pricing</Eyebrow>
-            <h1 className="mt-4 font-display text-4xl leading-tight text-ink sm:text-5xl">
+            <h1 className="font-display text-ink mt-4 text-4xl leading-tight sm:text-5xl">
               Priced for the conversations that matter.
             </h1>
-            <p className="mt-6 leading-relaxed text-ink-secondary">
+            <p className="text-ink-secondary mt-6 leading-relaxed">
               Start free. Upgrade when {brand.name} has enough of your relationship record to be
               genuinely useful — which is usually after the first few meetings you prepare for.
             </p>
@@ -61,11 +61,11 @@ export default function PricingPage() {
           <div className="mt-14 grid gap-6 lg:grid-cols-3">
             {/* --- free ------------------------------------------------------- */}
             <Panel className="flex flex-col p-7">
-              <h2 className="font-display text-2xl text-ink">{free.name}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{free.tagline}</p>
+              <h2 className="font-display text-ink text-2xl">{free.name}</h2>
+              <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{free.tagline}</p>
 
-              <p className="mt-6 font-display text-4xl text-ink">Free</p>
-              <p className="mt-1 text-xs text-ink-muted">No card required.</p>
+              <p className="font-display text-ink mt-6 text-4xl">Free</p>
+              <p className="text-ink-muted mt-1 text-xs">No card required.</p>
 
               <ul className="mt-7 grid flex-1 gap-3">
                 {free.highlights.map((item) => (
@@ -79,32 +79,34 @@ export default function PricingPage() {
             </Panel>
 
             {/* --- pro -------------------------------------------------------- */}
-            <Panel className="relative flex flex-col border-accent/30 bg-accent-wash p-7">
+            <Panel className="border-accent/30 bg-accent-wash relative flex flex-col p-7">
               {FOUNDING_OFFER.enabled ? (
                 <Badge tone="accent" className="absolute -top-2.5 left-7">
                   {FOUNDING_OFFER.label} price
                 </Badge>
               ) : null}
 
-              <h2 className="font-display text-2xl text-ink">{pro.name}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{pro.tagline}</p>
+              <h2 className="font-display text-ink text-2xl">{pro.name}</h2>
+              <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{pro.tagline}</p>
 
               <div className="mt-6 flex items-baseline gap-3">
-                <p className="font-display text-4xl text-ink">
+                <p className="font-display text-ink text-4xl">
                   {formatPrice(
-                    FOUNDING_OFFER.enabled ? FOUNDING_OFFER.monthlyPriceCents : pro.monthlyPriceCents,
+                    FOUNDING_OFFER.enabled
+                      ? FOUNDING_OFFER.monthlyPriceCents
+                      : pro.monthlyPriceCents,
                   )}
                 </p>
-                <span className="text-sm text-ink-muted">per month</span>
+                <span className="text-ink-muted text-sm">per month</span>
               </div>
 
               {FOUNDING_OFFER.enabled ? (
-                <p className="mt-1 text-xs text-ink-secondary">
+                <p className="text-ink-secondary mt-1 text-xs">
                   <span className="line-through">{formatPrice(pro.monthlyPriceCents)}</span> for the
                   first {FOUNDING_OFFER.maxCustomers} members. {FOUNDING_OFFER.blurb}
                 </p>
               ) : annualSaving ? (
-                <p className="mt-1 text-xs text-ink-muted">
+                <p className="text-ink-muted mt-1 text-xs">
                   Or {formatPrice(pro.yearlyPriceCents)} a year, saving {annualSaving}%.
                 </p>
               ) : null}
@@ -125,11 +127,13 @@ export default function PricingPage() {
 
             {/* --- teams ------------------------------------------------------ */}
             <Panel className="flex flex-col p-7">
-              <h2 className="font-display text-2xl text-ink">{team.name}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-ink-secondary">{team.tagline}</p>
+              <h2 className="font-display text-ink text-2xl">{team.name}</h2>
+              <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{team.tagline}</p>
 
-              <p className="mt-6 font-display text-4xl text-ink">Talk to us</p>
-              <p className="mt-1 text-xs text-ink-muted">Per seat, billed annually.</p>
+              <p className="font-display text-ink mt-6 text-4xl">Talk to us</p>
+              <p className="text-ink-muted mt-1 text-xs">
+                Not available yet — tell us if your team would use it.
+              </p>
 
               <ul className="mt-7 grid flex-1 gap-3">
                 {team.highlights.map((item) => (
@@ -138,14 +142,16 @@ export default function PricingPage() {
               </ul>
 
               <Button asChild variant="secondary" size="lg" className="mt-8 w-full">
-                <a href={`mailto:${brand.email.support}?subject=${encodeURIComponent(`${brand.name} for teams`)}`}>
+                <a
+                  href={`mailto:${brand.email.support}?subject=${encodeURIComponent(`${brand.name} for teams`)}`}
+                >
                   Get in touch
                 </a>
               </Button>
             </Panel>
           </div>
 
-          <p className="mt-8 max-w-2xl text-xs leading-relaxed text-ink-muted">
+          <p className="text-ink-muted mt-8 max-w-2xl text-xs leading-relaxed">
             Fair-use limits apply to the expensive operations — researching a person, generating
             briefs, analyzing transcripts. They are set well above normal use; if you hit one, tell
             us and we will look at it.
@@ -157,15 +163,16 @@ export default function PricingPage() {
       <section className="py-20 sm:py-24">
         <Container size="narrow">
           <Eyebrow>What is metered</Eyebrow>
-          <h2 className="mt-4 font-display text-3xl leading-tight text-ink">
+          <h2 className="font-display text-ink mt-4 text-3xl leading-tight">
             You are not charged for remembering people.
           </h2>
-          <p className="mt-6 leading-relaxed text-ink-secondary">
+          <p className="text-ink-secondary mt-6 leading-relaxed">
             The value of {brand.name} compounds with the size of your relationship record, so making
-            you ration it would be self-defeating. Storing people, observations, notes, interactions
-            and commitments is unmetered on every plan.
+            you ration it would be self-defeating. Storing observations, notes, interactions and
+            commitments is unmetered on every plan. Free holds up to five people; Pro has no limit
+            on people.
           </p>
-          <p className="mt-4 leading-relaxed text-ink-secondary">
+          <p className="text-ink-secondary mt-4 leading-relaxed">
             What is metered is the work that genuinely costs something to run: reading the public
             web, generating a brief, analyzing a transcript, and extended coach use.
           </p>
@@ -174,17 +181,20 @@ export default function PricingPage() {
 
           <div className="grid gap-8 sm:grid-cols-2">
             <div>
-              <p className="text-sm font-medium text-ink">Never metered</p>
+              <p className="text-ink text-sm font-medium">Never metered</p>
               <ul className="mt-3 grid gap-2.5">
-                {['People', 'Observations and memory', 'Notes and interactions', 'Commitments', 'Data export'].map(
-                  (item) => (
-                    <Feature key={item}>{item}</Feature>
-                  ),
-                )}
+                {[
+                  'Observations and memory',
+                  'Notes and interactions',
+                  'Commitments',
+                  'Data export',
+                ].map((item) => (
+                  <Feature key={item}>{item}</Feature>
+                ))}
               </ul>
             </div>
             <div>
-              <p className="text-sm font-medium text-ink">Metered, generously</p>
+              <p className="text-ink text-sm font-medium">Metered, generously</p>
               <ul className="mt-3 grid gap-2.5">
                 {[
                   'Researching a public footprint',
@@ -201,14 +211,14 @@ export default function PricingPage() {
       </section>
 
       {/* --- FAQ ------------------------------------------------------------------- */}
-      <section className="border-t border-line bg-bg-sunken py-20 sm:py-24">
+      <section className="border-line bg-bg-sunken border-t py-20 sm:py-24">
         <Container size="narrow">
           <Eyebrow>Questions</Eyebrow>
           <dl className="mt-8 grid gap-8">
             {FAQ.map((item) => (
               <div key={item.q}>
-                <dt className="font-display text-lg text-ink">{item.q}</dt>
-                <dd className="mt-2.5 leading-relaxed text-ink-secondary">{item.a}</dd>
+                <dt className="font-display text-ink text-lg">{item.q}</dt>
+                <dd className="text-ink-secondary mt-2.5 leading-relaxed">{item.a}</dd>
               </div>
             ))}
           </dl>
@@ -231,8 +241,8 @@ export default function PricingPage() {
 
 function Feature({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex gap-2.5 text-sm leading-relaxed text-ink-secondary">
-      <CircleCheck className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden="true" />
+    <li className="text-ink-secondary flex gap-2.5 text-sm leading-relaxed">
+      <CircleCheck className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
       {children}
     </li>
   )
@@ -248,5 +258,7 @@ function FaqStructuredData() {
       acceptedAnswer: { '@type': 'Answer', text: item.a },
     })),
   }
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+  return (
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />
+  )
 }

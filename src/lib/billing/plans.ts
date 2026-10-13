@@ -176,7 +176,6 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Research a person’s public professional footprint',
       'Meeting briefs, Quick Brief and debriefs',
       'Calendar integration and the Relationship Atlas',
-      'Weekly relationship intelligence',
     ],
   },
 
@@ -210,7 +209,6 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Everything in Pro, per seat',
       'Shared account and stakeholder context',
       'Your private notes stay private',
-      'Shared meetings and commitments',
     ],
   },
 }
