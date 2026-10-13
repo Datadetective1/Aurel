@@ -221,3 +221,19 @@ describe('logos', () => {
     expect(monogram('The Atlantic')).toBe('A')
   })
 })
+
+describe('declaredIcons', () => {
+  it('prefers touch icons and refuses SVG and data URLs', async () => {
+    const { declaredIcons } = await import('./logo')
+    const html = `
+      <link rel="icon" href="/favicon-32.png" sizes="32x32">
+      <link rel="icon" type="image/svg+xml" href="/logo.svg">
+      <link rel="apple-touch-icon" href="https://cdn.bell.ca/touch.png">
+      <link rel="icon" href="data:image/png;base64,AAAA">
+      <link rel="stylesheet" href="/x.css">`
+    expect(declaredIcons(html, 'https://bell.ca/')).toEqual([
+      'https://cdn.bell.ca/touch.png',
+      'https://bell.ca/favicon-32.png',
+    ])
+  })
+})

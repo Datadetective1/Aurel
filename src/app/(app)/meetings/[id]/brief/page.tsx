@@ -8,18 +8,18 @@ import { GenerateBriefPanel } from '@/components/app/generate-brief'
 import type { PersonChoice } from '@/components/app/add-participants'
 import { ArtifactFeedback } from '@/components/app/artifact-feedback'
 import { RegenerateBrief } from '@/components/app/regenerate-brief'
-import { RoomStrip, roleLabel, type RoomPerson } from '@/components/app/room-strip'
+import { MeetingCockpit } from '@/components/visual/meeting-cockpit'
+import { RoomView } from '@/components/visual/room-view'
 import { SinceLastTime } from '@/components/app/since-last-time'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, Eyebrow } from '@/components/ui/primitives'
+import { Badge, Container } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
-import { resolveFaces } from '@/lib/conversations/avatars'
-import { relationshipLabel } from '@/lib/conversations/room'
-import { listConversations, listDecisions, listLoops } from '@/lib/conversations/queries'
+import { listConversations, listDecisions } from '@/lib/conversations/queries'
 import { formatDate, formatTime, relativeDay } from '@/lib/format'
-import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
+import { listeningCues, startProximity } from '@/lib/brief'
+import { loadMeetingVisual } from '@/lib/visual/meeting.server'
 
 export const metadata: Metadata = {
   title: 'Meeting brief',
@@ -40,55 +40,12 @@ export default async function BriefPage({
   const now = new Date()
   const supabase = await createClient()
 
-  const { data: meeting } = await supabase
-    .from('meetings')
-    .select('id, title, kind, scheduled_at, objective, stakes, importance, status')
-    .eq('user_id', user.id)
-    .eq('id', id)
-    .maybeSingle()
+  const visual = await loadMeetingVisual(supabase, user.id, id, { timeZone, now })
+  if (!visual) notFound()
 
-  if (!meeting) notFound()
-
-  // Most recent brief for this meeting.
-  const { data: artifact } = await supabase
-    .from('ai_artifacts')
-    .select('id, content, grounded_fallback, created_at, provider')
-    .eq('user_id', user.id)
-    .eq('kind', 'meeting_brief')
-    .eq('subject_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const { data: attendees } = await supabase
-    .from('meeting_attendees')
-    .select(
-      'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, organizations(name))',
-    )
-    .eq('user_id', user.id)
-    .eq('meeting_id', id)
-
-  const attendeeFaces = await resolveFaces(
-    supabase,
-    (attendees ?? []).map((a) => a.people).filter((p): p is NonNullable<typeof p> => Boolean(p)),
-    (p) => p.id,
-  )
-  // The room, with what places each person in it. Decision makers first,
-  // because that is the order the room is worked in.
-  const roleWeight = (role: string | null) =>
-    role === 'decision_maker' ? 4 : role === 'influencer' ? 3 : role === 'presenter' ? 2 : 0
-  const roomPeople: RoomPerson[] = (attendees ?? [])
-    .filter((a) => a.people)
-    .sort((a, b) => roleWeight(b.role) - roleWeight(a.role))
-    .map((a) => ({
-      id: a.person_id,
-      name: a.people!.preferred_name || a.people!.full_name,
-      fullName: a.people!.full_name,
-      src: attendeeFaces.get(a.person_id) ?? null,
-      title: a.people!.job_title,
-      company: a.people!.organizations?.name ?? null,
-      context: roleLabel(a.role) || relationshipLabel(a.people!.relationship_type),
-    }))
+  const { meeting, people: roomPeople } = visual
+  const artifact = visual.artifact
+  const attendeeIds = roomPeople.map((p) => p.id)
 
   const citations: BriefCitation[] = artifact
     ? ((
@@ -108,7 +65,6 @@ export default async function BriefPage({
   // --- has the evidence moved since this brief was made? --------------------
   // Checked against the things a brief actually rests on. A brief that goes on
   // citing a source the user has since deleted is the failure worth catching.
-  const attendeeIds = (attendees ?? []).map((a) => a.person_id)
 
   // People the user could still add. Excluding the ones already in the room
   // keeps the picker honest -- offering somebody already listed reads as though
@@ -131,7 +87,7 @@ export default async function BriefPage({
   let staleReason: string | null = null
 
   if (artifact && attendeeIds.length > 0) {
-    const since = artifact.created_at
+    const since = artifact.createdAt
     const [{ count: newFacts }, { count: newObservations }, { count: newSources }] =
       await Promise.all([
         supabase
@@ -167,45 +123,37 @@ export default async function BriefPage({
   // Normalised once at the boundary. `content` is a Json column that is cast,
   // never parsed, so a brief written before a field existed simply lacks it --
   // and the three depths all read the same object.
-  const brief = artifact ? normalizeBrief(artifact.content) : null
+  const brief = visual.brief
 
   // Promises still open with this room. Read here rather than composed into the
   // artifact because a commitment closes between generating a brief and reading
   // it, and a stale "still open" is worse than none.
-  const { data: openCommitments } =
-    brief && attendeeIds.length > 0
-      ? await supabase
-          .from('commitments')
-          .select('description, owner, due_on')
-          .eq('user_id', user.id)
-          .eq('status', 'open')
-          .eq('review_status', 'confirmed')
-          .in('person_id', attendeeIds)
-          .order('due_on', { ascending: true, nullsFirst: false })
-          .limit(4)
-      : { data: [] as { description: string; owner: string; due_on: string | null }[] }
+  const openCommitments = visual.loops
+    .filter((l) => l.status === 'open')
+    .slice(0, 4)
+    .map((l) => ({ description: l.description, owner: l.owner }))
 
-  const cues = brief ? listeningCues(brief, { openCommitments: openCommitments ?? [] }) : []
+  const cues = brief ? listeningCues(brief, { openCommitments }) : []
 
   // What the last conversation with this room left behind. Built from the
   // record, never from the model, and read fresh on every visit: a loop
   // closed this morning must not still show as open at two o'clock.
-  const [roomLoops, roomDecisions, roomConversations] =
+  const [roomDecisions, roomConversations] =
     attendeeIds.length > 0
       ? await Promise.all([
-          listLoops(supabase, user.id, { timeZone, now, scope: 'active' }),
           listDecisions(supabase, user.id, { personId: attendeeIds[0], limit: 6 }),
           listConversations(supabase, user.id, { personId: attendeeIds[0], limit: 1 }),
         ])
-      : [[], [], []]
-  const loopsForRoom = roomLoops.filter((l) => l.personId && attendeeIds.includes(l.personId))
+      : [[], []]
+  const loopsForRoom = visual.loops
   const lastConversation = roomConversations[0] ?? null
 
   if (brief) {
     await track('brief_deep_viewed', {
-      proximity: startProximity(meeting.scheduled_at, now),
+      proximity: startProximity(meeting.scheduledAt, now),
       participants: brief.participants.length,
       listening_cues: cues.length,
+      room_view: roomPeople.length > 1,
     })
   }
 
@@ -238,25 +186,34 @@ export default async function BriefPage({
         </p>
       ) : null}
 
-      <header className="mt-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Eyebrow>
-            {meeting.scheduled_at
-              ? `${relativeDay(meeting.scheduled_at, timeZone, now)} · ${formatTime(meeting.scheduled_at, timeZone)}`
-              : 'Unscheduled'}
-          </Eyebrow>
-          {meeting.importance >= 4 ? (
-            <Badge tone="accent">Importance {meeting.importance}/5</Badge>
-          ) : null}
-        </div>
+      <MeetingCockpit
+        className="mt-4"
+        title={meeting.title}
+        scheduledAt={meeting.scheduledAt}
+        people={roomPeople}
+        prep={visual.prep}
+        openLoops={visual.visualLoops.length}
+        owe={visual.visualLoops.filter((l) => l.direction === 'owe').length}
+        timeZone={timeZone}
+        now={now}
+      />
+      {meeting.importance >= 4 ? (
+        <p className="mt-3">
+          <Badge tone="accent">Importance {meeting.importance}/5</Badge>
+        </p>
+      ) : null}
 
-        <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">{meeting.title}</h1>
-
-        {/* The room, as faces. One person gets a portrait with their role and
-            company; a few get cards; many get a stack. Preparing for Jonathan
-            should look like preparing for Jonathan. */}
-        <RoomStrip people={roomPeople} hero={roomPeople.length === 1} className="mt-6" />
-      </header>
+      {roomPeople.length > 1 ? (
+        <RoomView
+          className="border-line mt-8 border-t pt-6"
+          people={roomPeople}
+          connections={visual.connections}
+          centerLabel={meeting.scheduledAt ? formatTime(meeting.scheduledAt, timeZone) : 'Meeting'}
+          centerDetail={meeting.scheduledAt ? relativeDay(meeting.scheduledAt, timeZone, now) : null}
+          timeZone={timeZone}
+          now={now}
+        />
+      ) : null}
 
       {lastConversation || loopsForRoom.length > 0 || roomDecisions.length > 0 ? (
         <SinceLastTime
@@ -282,7 +239,7 @@ export default async function BriefPage({
               <Link href={`/conversations/new?meeting=${id}`}>Debrief this meeting</Link>
             </Button>
             <span className="text-ink-faint text-xs">
-              Prepared {formatDate(artifact!.created_at, timeZone)}
+              Prepared {formatDate(artifact!.createdAt, timeZone)}
             </span>
             <RegenerateBrief meetingId={id} stale={false} reason={null} />
           </div>
@@ -304,7 +261,7 @@ export default async function BriefPage({
             <MeetingBriefView
               brief={brief}
               citations={citations}
-              grounded={artifact!.grounded_fallback}
+              grounded={artifact!.grounded}
               meetingId={id}
               cues={cues}
               faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
@@ -319,7 +276,7 @@ export default async function BriefPage({
         <GenerateBriefPanel
           meetingId={id}
           hasObjective={Boolean(meeting.objective)}
-          attendeeCount={(attendees ?? []).length}
+          attendeeCount={roomPeople.length}
           addablePeople={addablePeople}
         />
       )}

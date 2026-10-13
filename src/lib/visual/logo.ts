@@ -53,3 +53,26 @@ export function monogram(name: string): string {
   if (words.length === 1) return words[0]!.slice(0, 1).toUpperCase()
   return (words[0]!.slice(0, 1) + words[1]!.slice(0, 1)).toUpperCase()
 }
+
+/** Icon hrefs declared in a page's markup, touch icons first, SVG excluded. */
+export function declaredIcons(html: string, base: string): string[] {
+  const links = html.match(/<link\b[^>]*>/gi) ?? []
+  const found: { href: string; weight: number }[] = []
+  for (const tag of links) {
+    const rel = tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? ''
+    if (!/\bicon\b|apple-touch-icon/.test(rel)) continue
+    const href = tag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]
+    if (!href || /\.svg(\?|#|$)/i.test(href) || /^data:/i.test(href)) continue
+    const type = tag.match(/\btype\s*=\s*["']([^"']+)["']/i)?.[1] ?? ''
+    if (/svg/i.test(type)) continue
+    const size = Number(tag.match(/\bsizes\s*=\s*["'](\d+)x\d+["']/i)?.[1] ?? 0)
+    const weight = (rel.includes('apple-touch-icon') ? 1000 : 0) + Math.min(size, 512)
+    try {
+      found.push({ href: new URL(href, base).toString(), weight })
+    } catch {
+      // An unparseable href is simply not a candidate.
+    }
+  }
+  return found.sort((a, b) => b.weight - a.weight).map((f) => f.href)
+}
+
