@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils'
 
 export interface HeroFact {
   label: string
+  /** Where the fact comes from, when that is not obvious: "You set this". */
+  hint?: string
   tone?: 'neutral' | 'accent' | 'positive' | 'caution' | 'critical' | 'info' | 'outline'
   href?: string
 }
@@ -58,12 +60,16 @@ export function PersonHero({
   className?: string
 }) {
   const subtitle = [title, company].filter(Boolean).join(' · ')
+  // A real photo earns a large portrait; initials do not. With no photo the
+  // face stays modest and sits beside the name, and the organisation's mark
+  // and the relationship carry the identity instead of a giant circle.
+  const portraitSize = src ? (size === 'page' ? '3xl' : '2xl') : size === 'page' ? 'xl' : 'lg'
 
   return (
     <header
       className={cn(
         'border-line bg-surface relative overflow-hidden rounded-[var(--radius-xl)] border',
-        size === 'page' ? 'p-6 sm:p-8' : 'p-5 sm:p-6',
+        size === 'page' ? 'p-4 sm:p-6' : 'p-4 sm:p-5',
         className,
       )}
     >
@@ -72,12 +78,17 @@ export function PersonHero({
         aria-hidden="true"
         className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(ellipse_at_left,var(--accent-wash),transparent_70%)]"
       />
-      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-7">
+      <div
+        className={cn(
+          'relative flex gap-4 sm:items-center sm:gap-6',
+          src ? 'flex-col sm:flex-row' : 'flex-row items-start',
+        )}
+      >
         <Portrait
           personId={personId}
           name={fullName}
           src={src}
-          size={size === 'page' ? '3xl' : '2xl'}
+          size={portraitSize}
           addable
           persistent
           className="shrink-0"
@@ -86,8 +97,8 @@ export function PersonHero({
         <div className="min-w-0 flex-1">
           <h1
             className={cn(
-              'font-display text-ink',
-              size === 'page' ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl',
+              'font-display text-ink leading-tight',
+              size === 'page' ? 'text-[1.75rem] sm:text-4xl' : 'text-2xl sm:text-3xl',
             )}
           >
             {name}
@@ -95,7 +106,7 @@ export function PersonHero({
           <p
             className={cn(
               'text-ink-secondary mt-1 flex min-w-0 items-center gap-2',
-              size === 'page' ? 'text-base' : 'text-sm',
+              size === 'page' ? 'text-sm sm:text-base' : 'text-sm',
             )}
           >
             {company ? <CompanyMark name={company} domain={companyDomain} size="sm" /> : null}
@@ -103,26 +114,30 @@ export function PersonHero({
           </p>
 
           {facts.length > 0 ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {facts.map((fact) =>
-                fact.href ? (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              {facts.map((fact) => {
+                const badge = (
+                  <Badge tone={fact.tone ?? 'neutral'} title={fact.hint}>
+                    {fact.label}
+                    {fact.hint ? <span className="sr-only"> ({fact.hint})</span> : null}
+                  </Badge>
+                )
+                return fact.href ? (
                   <Link key={fact.label} href={fact.href} className="rounded-full">
-                    <Badge tone={fact.tone ?? 'neutral'}>{fact.label}</Badge>
+                    {badge}
                   </Link>
                 ) : (
-                  <Badge key={fact.label} tone={fact.tone ?? 'neutral'}>
-                    {fact.label}
-                  </Badge>
-                ),
-              )}
+                  <span key={fact.label}>{badge}</span>
+                )
+              })}
             </div>
           ) : null}
-
-          {actions ? <div className="mt-5 flex flex-wrap gap-2">{actions}</div> : null}
         </div>
 
         {aside ? <div className="shrink-0 sm:self-start">{aside}</div> : null}
       </div>
+
+      {actions ? <div className="relative mt-4 flex flex-wrap gap-2">{actions}</div> : null}
     </header>
   )
 }

@@ -64,7 +64,7 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
           <Sparkles className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <Eyebrow>Getting started</Eyebrow>
-            <p className="text-ink mt-3 font-display text-xl leading-snug">
+            <p className="text-ink font-display mt-3 text-xl leading-snug">
               You&rsquo;re ready. Let&rsquo;s make {brand.name} useful.
             </p>
             <p className="text-ink-secondary mt-2 text-sm leading-relaxed">
@@ -86,7 +86,7 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
                       : 'Connected. Nothing scheduled in the next two weeks yet.'
                     : state.calendarAvailable
                       ? `${brand.name} reads your next two weeks so it can find the meetings and the people for you. Read-only — it never creates, edits or answers anything.`
-                      : 'No calendar provider is configured on this deployment, so meetings are added by hand.'
+                      : 'Add meetings by hand — preparation works the same way.'
                 }
                 action={
                   !state.calendarConnected && state.calendarAvailable
@@ -110,7 +110,10 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
                 action={
                   researchDone
                     ? undefined
-                    : { label: state.peopleCount > 0 ? 'Go to People' : 'Add a person', href: state.peopleCount > 0 ? '/people' : '/people/new' }
+                    : {
+                        label: state.peopleCount > 0 ? 'Go to People' : 'Add a person',
+                        href: state.peopleCount > 0 ? '/people' : '/people/new',
+                      }
                 }
               />
 

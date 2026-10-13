@@ -1,18 +1,21 @@
 import Link from 'next/link'
-import { Portrait } from './person-portrait'
-import { Badge } from '@/components/ui/primitives'
+import { CalendarClock, Handshake, Inbox } from 'lucide-react'
+import { Avatar } from '@/components/ui/avatar'
+import { CompanyMark } from '@/components/visual/company-mark'
+import { Chip } from '@/components/visual/chip'
 import { cn } from '@/lib/utils'
 
 /**
- * PEOPLE CARDS
+ * PEOPLE, AS A SCANNABLE LIST
  * =============================================================================
- * The People page as a room of people rather than a table of rows. A card
- * per person: a 56px portrait, the name in display type, role and company,
- * and the two facts that make the list scannable -- what is open between
- * you and when you last spoke. Three across on a desktop, one on a phone.
+ * One compact row per person: face, name, role and organisation (with its
+ * mark), and on the right the facts that decide whether to open the row --
+ * what is open, when you next meet, whether anything waits on review. When
+ * you last spoke sits quietly under the name.
  *
- * Still the user's private record, not a directory: no stats, no scores, no
- * feeds. The face is the point.
+ * No "Add photo" on every empty face: in a list the person is the subject,
+ * and adding a photo belongs on their page. Still the user's private record,
+ * not a directory -- no stats, no scores, no feeds.
  * =============================================================================
  */
 
@@ -23,6 +26,7 @@ export interface PersonCardData {
   src: string | null
   title: string | null
   company: string | null
+  companyDomain?: string | null
   relationship: string
   lastSpokeLabel: string | null
   nextLabel: string | null
@@ -40,51 +44,58 @@ export function PeopleCards({
   className?: string
 }) {
   return (
-    <ul className={cn('grid gap-3 sm:grid-cols-2 lg:grid-cols-3', className)}>
-      {people.map((p) => {
-        const subtitle = [p.title, p.company].filter(Boolean).join(' · ')
-        return (
-          <li key={p.id} className="min-w-0">
-            <div className="group border-line bg-surface hover:border-line-strong relative flex h-full flex-col rounded-[var(--radius-lg)] border p-4 transition-colors">
-              <div className="flex items-start gap-3.5">
-                <Portrait personId={p.id} name={p.fullName} src={p.src} size="lg" addable />
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/people/${p.id}`}
-                    className="font-display text-ink group-hover:text-accent block text-lg leading-tight after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
-                  >
-                    {p.name}
-                  </Link>
-                  <p className="text-ink-secondary mt-0.5 truncate text-sm">
-                    {subtitle || p.relationship}
-                  </p>
-                  {subtitle ? (
-                    <p className="text-ink-muted truncate text-xs">{p.relationship}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                {p.isDemo ? <Badge tone="outline">Demo</Badge> : null}
-                {p.toReview > 0 ? <Badge tone="accent">{p.toReview} to review</Badge> : null}
-                {p.openLoops > 0 ? (
-                  <Badge tone="caution">
-                    {p.openLoops} open {p.openLoops === 1 ? 'loop' : 'loops'}
-                  </Badge>
+    <ul
+      className={cn(
+        'border-line bg-surface divide-line grid divide-y overflow-hidden rounded-[var(--radius-lg)] border lg:grid-cols-2 lg:divide-y-0',
+        className,
+      )}
+    >
+      {people.map((p) => (
+        <li key={p.id} className="lg:border-line min-w-0 lg:border-b lg:odd:border-r">
+          <Link
+            href={`/people/${p.id}`}
+            className="group hover:bg-bg-sunken/60 flex min-h-16 items-center gap-3 px-3.5 py-2.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          >
+            <Avatar name={p.fullName} src={p.src} size="md" />
+            <span className="min-w-0 flex-1">
+              <span className="text-ink group-hover:text-accent block truncate text-[0.9375rem] leading-tight font-medium">
+                {p.name}
+              </span>
+              <span className="text-ink-secondary mt-0.5 flex min-w-0 items-center gap-1.5 text-xs">
+                {p.company ? (
+                  <CompanyMark name={p.company} domain={p.companyDomain} size="xs" />
                 ) : null}
-                {p.nextLabel ? <Badge tone="info">{p.nextLabel}</Badge> : null}
-              </div>
-
-              <p className="text-ink-muted mt-auto pt-3 text-xs">
-                {p.lastSpokeLabel ? `Last spoke ${p.lastSpokeLabel}` : 'No conversation kept yet'}
-                {p.learned > 0
-                  ? ` · ${p.learned} ${p.learned === 1 ? 'thing' : 'things'} learned`
-                  : ''}
-              </p>
-            </div>
-          </li>
-        )
-      })}
+                <span className="truncate">
+                  {[p.title, p.company].filter(Boolean).join(' · ') || p.relationship}
+                </span>
+              </span>
+              <span className="text-ink-muted mt-0.5 block truncate text-xs">
+                {p.lastSpokeLabel ? `Last spoke ${p.lastSpokeLabel}` : 'No conversation yet'}
+              </span>
+            </span>
+            <span className="flex shrink-0 flex-col items-end gap-1">
+              {p.nextLabel ? (
+                <Chip icon={CalendarClock} tone="info" className="px-2">
+                  {p.nextLabel.replace(/^Next /, '')}
+                </Chip>
+              ) : null}
+              {p.openLoops > 0 ? (
+                <Chip icon={Handshake} tone="neutral" className="px-2">
+                  <span className="sr-only">Open loops: </span>
+                  {p.openLoops}
+                </Chip>
+              ) : null}
+              {p.toReview > 0 ? (
+                <Chip icon={Inbox} tone="neutral" className="px-2">
+                  <span className="sr-only">To review: </span>
+                  {p.toReview}
+                </Chip>
+              ) : null}
+              {p.isDemo ? <Chip tone="quiet">Demo</Chip> : null}
+            </span>
+          </Link>
+        </li>
+      ))}
     </ul>
   )
 }

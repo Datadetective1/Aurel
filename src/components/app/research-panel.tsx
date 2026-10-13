@@ -2,7 +2,16 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, CircleAlert, ExternalLink, Loader2, RefreshCw, Search, Telescope } from 'lucide-react'
+import {
+  ArrowDown,
+  CircleAlert,
+  ExternalLink,
+  Link2,
+  Loader2,
+  RefreshCw,
+  Search,
+  Telescope,
+} from 'lucide-react'
 import { researchPerson, type ResearchState } from '@/app/(app)/people/research-actions'
 import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
@@ -89,25 +98,35 @@ export function ResearchPanel({
   const blocked = !canDiscover && !hasProfileUrl
 
   return (
-    <section className="rounded-[var(--radius-lg)] border border-line bg-surface p-5 sm:p-6">
+    <section className="border-line bg-surface rounded-[var(--radius-lg)] border p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Eyebrow className="flex items-center gap-1.5">
-            <Telescope className="size-3 text-accent" aria-hidden="true" />
+            <Telescope className="text-accent size-3" aria-hidden="true" />
             Public footprint
           </Eyebrow>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-secondary">
+          <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
             {sourceCount > 0
               ? `Built from ${sourceCount} source${sourceCount === 1 ? '' : 's'}${
                   storedSourceCount && storedSourceCount > sourceCount
                     ? ` of ${storedSourceCount} reviewed`
                     : ''
                 }. Every claim links back to where it came from.`
-              : `${brand.name} will search legitimate public professional sources for ${personName} — company bios, talks, articles, interviews — check each one is genuinely about them, and build a source-backed picture. Add a link or a note yourself whenever you have something specific.`}
+              : canDiscover || hasProfileUrl
+                ? `Public professional sources about ${personName}, checked and cited.`
+                : (discoveryHint ??
+                  `Add a link and ${brand.name} reads it for professional context.`)}
           </p>
         </div>
 
-        {!running ? (
+        {!running && blocked ? (
+          <Button asChild variant="secondary" size="sm">
+            <a href="#add-context">
+              <Link2 className="size-3.5" aria-hidden="true" />
+              Add a source
+            </a>
+          </Button>
+        ) : !running ? (
           <Button
             onClick={run}
             variant={sourceCount > 0 ? 'secondary' : 'primary'}
@@ -131,28 +150,21 @@ export function ResearchPanel({
 
       {running ? (
         <div className="mt-5" role="status" aria-live="polite">
-          <div className="flex items-center gap-2.5 text-sm text-ink">
-            <Loader2 className="size-4 animate-spin text-accent" aria-hidden="true" />
+          <div className="text-ink flex items-center gap-2.5 text-sm">
+            <Loader2 className="text-accent size-4 animate-spin" aria-hidden="true" />
             {STAGES[stage]}
           </div>
-          <div className="mt-3 h-px w-full overflow-hidden bg-line">
+          <div className="bg-line mt-3 h-px w-full overflow-hidden">
             <div
-              className="h-full bg-accent-graphic transition-[width] duration-700 ease-[var(--ease-out-quint)]"
+              className="bg-accent-graphic h-full transition-[width] duration-700 ease-[var(--ease-out-quint)]"
               style={{ width: `${((stage + 1) / STAGES.length) * 100}%` }}
             />
           </div>
-          <p className="mt-3 text-xs text-ink-muted">
-            Only professional context. Nothing enters your relationship memory without your approval.
+          <p className="text-ink-muted mt-3 text-xs">
+            Only professional context. Nothing enters your relationship memory without your
+            approval.
           </p>
         </div>
-      ) : null}
-
-      {blocked ? (
-        <p className="mt-5 flex items-start gap-2 rounded-[var(--radius-md)] border border-line bg-bg-sunken px-3.5 py-3 text-xs leading-relaxed text-ink-secondary">
-          <CircleAlert className="mt-px size-3.5 shrink-0 text-ink-muted" aria-hidden="true" />
-          {discoveryHint ??
-            'Add a professional profile or website link to this person, then research will read it.'}
-        </p>
       ) : null}
 
       {result && !running ? (
@@ -181,8 +193,8 @@ export function ResearchPanel({
               ) : null}
             </div>
           ) : (
-            <p className="flex items-start gap-2 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-3.5 py-3 text-xs leading-relaxed text-ink-secondary">
-              <CircleAlert className="mt-px size-3.5 shrink-0 text-caution" aria-hidden="true" />
+            <p className="border-caution/25 bg-caution-wash text-ink-secondary flex items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
+              <CircleAlert className="text-caution mt-px size-3.5 shrink-0" aria-hidden="true" />
               <span>
                 {result.error}
                 <br />
@@ -196,7 +208,7 @@ export function ResearchPanel({
       ) : null}
 
       {lastResearchedAt && !running ? (
-        <p className="mt-4 text-xs text-ink-faint">
+        <p className="text-ink-faint mt-4 text-xs">
           Last researched {formatDate(lastResearchedAt, timeZone)}.
         </p>
       ) : null}
@@ -217,7 +229,7 @@ export function SourceLink({
   const label = title || publisher || url || 'Source'
 
   if (!url) {
-    return <span className="text-xs text-ink-muted">{label}</span>
+    return <span className="text-ink-muted text-xs">{label}</span>
   }
 
   return (
@@ -227,7 +239,7 @@ export function SourceLink({
       // noreferrer as well as noopener: research sources are arbitrary third
       // parties and should not receive our URLs as referrer.
       rel="noopener noreferrer nofollow"
-      className="inline-flex max-w-full items-center gap-1 truncate text-xs text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent"
+      className="text-accent decoration-accent/40 hover:decoration-accent inline-flex max-w-full items-center gap-1 truncate text-xs underline underline-offset-2"
     >
       <span className="truncate">{label}</span>
       <ExternalLink className="size-3 shrink-0" aria-hidden="true" />

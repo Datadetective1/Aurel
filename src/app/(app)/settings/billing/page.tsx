@@ -184,8 +184,7 @@ export default async function BillingSettingsPage({
       {!features.billing ? (
         <p className="border-line bg-bg-sunken text-ink-muted mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          Payments are not connected on this deployment, so upgrading is unavailable. Everything
-          else works normally.
+          Upgrading is not available yet. Everything else works normally.
         </p>
       ) : null}
 

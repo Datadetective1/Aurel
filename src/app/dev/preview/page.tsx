@@ -3,12 +3,13 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LoopList } from '@/components/app/loop-list'
+import { TodayShortcuts } from '@/components/app/today-shortcuts'
 import { ConversationCard } from '@/components/app/conversation-card'
 import { MeetingCockpit } from '@/components/visual/meeting-cockpit'
 import { GlanceBrief } from '@/components/visual/glance-brief'
 import { QuickBrief } from '@/components/visual/quick-brief'
 import { RoomView } from '@/components/visual/room-view'
-import { PersonGlance } from '@/components/visual/person-glance'
+import { RelationshipMap } from '@/components/visual/relationship-map'
 import { MeetingCard } from '@/components/visual/meeting-card'
 import { AtlasConnections, AtlasLegend } from '@/components/visual/atlas-connections'
 import { PhotoSuggestionCard } from '@/components/visual/photo-suggestion'
@@ -105,7 +106,9 @@ export default async function VisualPreview({
   })
 
   return (
-    <AppShell user={{ name: 'Amary', email: 'preview@example.invalid', avatarUrl: null, plan: 'free' }}>
+    <AppShell
+      user={{ name: 'Amary', email: 'preview@example.invalid', avatarUrl: null, plan: 'free' }}
+    >
       <nav aria-label="Preview screens" className="border-line bg-surface border-b">
         <Container size="default" className="flex flex-wrap items-center gap-2 py-2">
           <span className="label mr-2">Preview</span>
@@ -198,17 +201,35 @@ export default async function VisualPreview({
                 sourceLabel: 'Halden Telecom — Leadership',
               }}
             />
-            <PersonGlance
+            <RelationshipMap
               className="mt-5"
-              firstName="Columbus"
-              lastInteractionAt={columbus.lastInteractionAt}
-              firstInteractionAt={new Date(NOW.getTime() - 40 * 86_400_000).toISOString()}
-              nextMeeting={{
-                id: 'm-1',
-                title: 'Prototype review with Columbus',
-                scheduledAt: MEETING_START,
+              you={{ name: 'Amary', src: null }}
+              person={{ name: columbus.name, fullName: columbus.fullName, src: null }}
+              organization={{
+                name: columbus.company ?? 'Halden Telecom',
+                domain: columbus.companyDomain,
+                title: columbus.title,
+                colleagues: [
+                  { id: 'p-maureen', name: 'Maureen Okafor', src: null },
+                  { id: 'p-adama', name: 'Adama Diallo', src: null },
+                ],
+              }}
+              meetings={{
+                held: 2,
+                next: {
+                  id: 'm-1',
+                  title: 'Prototype review with Columbus',
+                  scheduledAt: MEETING_START,
+                },
+              }}
+              conversations={{
+                count: 2,
+                lastAt: columbus.lastInteractionAt,
+                firstAt: new Date(NOW.getTime() - 40 * 86_400_000).toISOString(),
+                lastId: 'c-1',
               }}
               directions={countDirections(LOOP_RECORDS.filter((l) => l.personId === columbus.id))}
+              background={[{ label: "Queen's University", kind: 'education' }]}
               themes={['Relationship map', 'Pilot scope', 'Data residency']}
               timeZone={TZ}
               now={now}
@@ -229,13 +250,16 @@ export default async function VisualPreview({
         ) : null}
 
         {screen === 'today' ? (
-          <Container size="default" className="py-8 sm:py-12">
+          <Container size="default" className="py-6 sm:py-12">
             <Eyebrow>Tuesday 13 October</Eyebrow>
-            <h1 className="font-display text-ink mt-2 text-3xl">Good afternoon, Amary</h1>
-            <section className="mt-10">
+            <h1 className="font-display text-ink mt-2 text-[1.75rem] sm:text-4xl">
+              Good afternoon, Amary
+            </h1>
+            <TodayShortcuts className="mt-4" />
+            <section className="mt-9">
               <Eyebrow>Upcoming</Eyebrow>
               <h2 className="font-display text-ink mt-2 text-xl">Next seven days</h2>
-              <ul className="border-line bg-line mt-5 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
+              <ul className="border-line bg-line mt-5 grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-[var(--radius-lg)] border">
                 {MEETINGS.map((m) => (
                   <li key={m.id} className="bg-bg">
                     <MeetingCard
@@ -255,18 +279,24 @@ export default async function VisualPreview({
                 ))}
               </ul>
             </section>
-            <section className="mt-12">
+            <section className="mt-9">
+              <Eyebrow>Open loops</Eyebrow>
+              <h2 className="font-display text-ink mt-2 text-xl">1 past due</h2>
+              <LoopList
+                className="mt-5"
+                loops={LOOP_RECORDS.slice(0, 3)}
+                timeZone={TZ}
+                now={now}
+                grouped={false}
+              />
+            </section>
+            <section className="mt-9">
               <Eyebrow className="text-accent">Waiting on you</Eyebrow>
               <ul className="mt-4 grid gap-3">
                 <ConversationCard conversation={CONVERSATIONS[1]!} timeZone={TZ} now={now} />
               </ul>
             </section>
-            <section className="mt-12">
-              <Eyebrow>Open loops</Eyebrow>
-              <h2 className="font-display text-ink mt-2 text-xl">1 past due</h2>
-              <LoopList className="mt-5" loops={LOOP_RECORDS} timeZone={TZ} now={now} grouped={false} />
-            </section>
-            <section className="mt-12">
+            <section className="mt-9">
               <Eyebrow>Remember</Eyebrow>
               <h2 className="font-display text-ink mt-2 text-xl">Recent conversations</h2>
               <ul className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -299,7 +329,10 @@ export default async function VisualPreview({
             keptCount={CONVERSATION_LOOPS.length}
             pending={0}
             showReview={false}
-            loopPeople={[{ id: 'p-columbus', name: 'Columbus' }, { id: 'p-maureen', name: 'Maureen' }]}
+            loopPeople={[
+              { id: 'p-columbus', name: 'Columbus' },
+              { id: 'p-maureen', name: 'Maureen' },
+            ]}
             memoryByPerson={new Map()}
             nextTime={NEXT_TIME}
             objections={OBJECTIONS}

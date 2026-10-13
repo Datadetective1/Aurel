@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Search, UserPlus } from 'lucide-react'
+import { Info, Search, UserPlus } from 'lucide-react'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { PeopleCards, type PersonCardData } from '@/components/app/people-cards'
 import { Button } from '@/components/ui/button'
-import { Container, Eyebrow, SectionHeader } from '@/components/ui/primitives'
+import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { relativeDay, pluralise } from '@/lib/format'
@@ -41,7 +41,7 @@ export default async function PeoplePage() {
   const { data: people } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, relationship_type, relevance, last_interaction_at, last_researched_at, avatar_url, avatar_path, is_demo, organizations(name)',
+      'id, full_name, preferred_name, job_title, relationship_type, relevance, last_interaction_at, last_researched_at, avatar_url, avatar_path, is_demo, organizations(name, domain)',
     )
     .eq('user_id', user.id)
     .is('archived_at', null)
@@ -120,6 +120,7 @@ export default async function PeoplePage() {
       src: faces.get(person.id) ?? null,
       title: person.job_title,
       company: person.organizations?.name ?? null,
+      companyDomain: person.organizations?.domain ?? null,
       relationship: RELATIONSHIP_LABEL[person.relationship_type] ?? 'Other',
       lastSpokeLabel: person.last_interaction_at
         ? relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()
@@ -176,7 +177,7 @@ export default async function PeoplePage() {
           }
         />
       ) : (
-        <PeopleCards people={cards} className="mt-8" />
+        <PeopleCards people={cards} className="mt-6" />
       )}
 
       {list.length > 8 ? (
@@ -187,12 +188,17 @@ export default async function PeoplePage() {
         </p>
       ) : null}
 
-      <Eyebrow className="mt-12 block">A note on what this is</Eyebrow>
-      <p className="text-ink-muted mt-3 max-w-xl text-xs leading-relaxed">
-        This is your private working record of the people you interact with professionally. It is
-        visible only to you, it focuses on professional context, and you can delete any person, any
-        observation or the whole record at any time.
-      </p>
+      <details className="group mt-10">
+        <summary className="text-ink-muted hover:text-ink inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs [&::-webkit-details-marker]:hidden">
+          <Info className="size-3.5" aria-hidden="true" />
+          About this record
+        </summary>
+        <p className="text-ink-muted max-w-xl text-xs leading-relaxed">
+          This is your private working record of the people you interact with professionally. It is
+          visible only to you, it focuses on professional context, and you can delete any person,
+          any observation or the whole record at any time.
+        </p>
+      </details>
     </Container>
   )
 }

@@ -36,6 +36,8 @@ export interface PersonRecordVisual {
   themes: string[]
   nextMeeting: { id: string; title: string; scheduledAt: string | null } | null
   lastMeetingAt: string | null
+  /** Meetings already held together, cancelled ones aside. */
+  meetingsHeld: number
 }
 
 export async function loadPersonRecordVisual(
@@ -182,5 +184,6 @@ export async function loadPersonRecordVisual(
     themes: themes.slice(0, 8),
     nextMeeting: next ? { id: next.id, title: next.title, scheduledAt: next.scheduled_at } : null,
     lastMeetingAt: past[0]?.scheduled_at ?? null,
+    meetingsHeld: past.length,
   }
 }

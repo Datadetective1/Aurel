@@ -1,17 +1,15 @@
-import Link from 'next/link'
-import { Mic } from 'lucide-react'
+import { Handshake, History, Mic } from 'lucide-react'
 import { AddLoop } from '@/components/app/add-loop'
 import { LoopList } from '@/components/app/loop-list'
 import { EvidenceLine } from '@/components/app/evidence'
 import type { Provenance } from '@/components/app/provenance'
 import { RelationshipTimeline } from '@/components/visual/timeline'
-import { Button } from '@/components/ui/button'
+import { QuietEmpty } from '@/components/visual/quiet-empty'
 import { Eyebrow } from '@/components/ui/primitives'
 import type { LoopRecord } from '@/lib/conversations/queries'
 import type { TimelineEntry } from '@/lib/visual/timeline'
 import type { Database } from '@/lib/supabase/types'
 import { pluralise } from '@/lib/format'
-import { brand } from '@/lib/brand'
 
 /**
  * The person page's two working columns -- what is open, and the dated
@@ -60,9 +58,7 @@ export function PersonRelationshipSections({
             <div>
               <Eyebrow>Open loops</Eyebrow>
               <h2 id="loops-heading" className="font-display text-ink mt-2 text-xl">
-                {loops.length === 0
-                  ? `Nothing open with ${firstName}`
-                  : `${loops.length} open with ${firstName}`}
+                {loops.length === 0 ? 'Nothing open' : `${loops.length} open with ${firstName}`}
               </h2>
             </div>
             <AddLoop people={[{ id: personId, name }]} defaultPersonId={personId} />
@@ -76,10 +72,12 @@ export function PersonRelationshipSections({
               showPerson={false}
             />
           ) : (
-            <p className="text-ink-muted mt-3 max-w-lg text-sm leading-relaxed">
-              Promises, follow-ups and unanswered questions from your conversations with {firstName}{' '}
-              collect here, and {brand.name} raises them before you next speak.
-            </p>
+            <QuietEmpty
+              className="mt-3"
+              icon={Handshake}
+              title="You're clear"
+              body={`Nothing is owed either way with ${firstName}.`}
+            />
           )}
           {closedCount > 0 ? (
             <p className="text-ink-muted mt-3 text-xs">
@@ -94,9 +92,7 @@ export function PersonRelationshipSections({
               <div className="mt-4 grid gap-6">
                 {learned.map(({ category, label, items }) => (
                   <div key={category}>
-                    <h3 className="text-ink text-sm font-medium">
-                      {label}
-                    </h3>
+                    <h3 className="text-ink text-sm font-medium">{label}</h3>
                     <ul className="mt-3 grid gap-3.5">
                       {items.map((o) => (
                         <EvidenceLine
@@ -119,26 +115,26 @@ export function PersonRelationshipSections({
           <Eyebrow>Relationship memory</Eyebrow>
           <h2 id="timeline-heading" className="font-display text-ink mt-2 text-xl">
             {interactionCount === 0
-              ? 'Nothing kept yet'
+              ? 'No memory yet'
               : `${pluralise(interactionCount, 'conversation')} on record`}
           </h2>
-          <RelationshipTimeline
-            className="mt-5"
-            entries={timeline}
-            timeZone={timeZone}
-            emptyText={`After you next speak with ${firstName}, capture the conversation — a voice note, a pasted transcript or a few typed lines. That is where this starts compounding.`}
-          />
-          {timeline.length === 0 ? (
-            <Button asChild size="sm" className="mt-4">
-              <Link href={`/conversations/new?person=${personId}`}>
-                <Mic className="size-3.5" aria-hidden="true" />
-                Capture a conversation
-              </Link>
-            </Button>
-          ) : null}
+          {timeline.length > 0 ? (
+            <RelationshipTimeline className="mt-5" entries={timeline} timeZone={timeZone} />
+          ) : (
+            <QuietEmpty
+              className="mt-3"
+              icon={History}
+              title={`Nothing kept with ${firstName} yet`}
+              body="Your first captured conversation starts the record."
+              action={{
+                label: 'Capture',
+                href: `/conversations/new?person=${personId}`,
+                icon: Mic,
+              }}
+            />
+          )}
         </section>
       </div>
-
     </>
   )
 }

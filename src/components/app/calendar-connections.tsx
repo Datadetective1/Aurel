@@ -85,7 +85,7 @@ const STATE: Record<
   unavailable: {
     label: 'Unavailable',
     tone: 'outline',
-    detail: 'This deployment has no credentials for that provider.',
+    detail: 'Not available yet.',
   },
 }
 
@@ -160,7 +160,12 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {isConnected ? (
           <>
-            <Button size="sm" variant="secondary" onClick={() => run('sync')} disabled={busy !== null}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => run('sync')}
+              disabled={busy !== null}
+            >
               {busy === 'sync' ? (
                 <>
                   <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -173,7 +178,12 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
                 </>
               )}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => run('disconnect')} disabled={busy !== null}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => run('disconnect')}
+              disabled={busy !== null}
+            >
               {busy === 'disconnect' ? (
                 <>
                   <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

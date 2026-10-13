@@ -11,6 +11,7 @@ import { MeetingCard } from '@/components/visual/meeting-card'
 import { prepState } from '@/lib/visual/glance'
 import { actionDirection } from '@/lib/visual/relationship-actions'
 import { Container, Eyebrow, Panel } from '@/components/ui/primitives'
+import { TodayShortcuts } from '@/components/app/today-shortcuts'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
 import { MeetingCountdownCard } from '@/components/app/meeting-countdown'
 import {
@@ -333,22 +334,24 @@ export default async function TodayPage({
   }))
 
   return (
-    <Container size="default" className="py-8 sm:py-12">
+    <Container size="default" className="py-6 sm:py-12">
       {welcome ? <WelcomeBanner name={firstName} className="mb-8" /> : null}
 
       <header>
         <Eyebrow>{formatDayLabel(now, timeZone)}</Eyebrow>
-        <h1 className="font-display text-ink mt-3 text-3xl sm:text-4xl">
+        <h1 className="font-display text-ink mt-2 text-[1.75rem] sm:text-4xl">
           Good {timeOfDay(timeZone, now)}, {firstName}.
         </h1>
       </header>
+
+      <TodayShortcuts className="mt-4" />
 
       {/* Above everything, including the focus card, because it is the only
           thing on this page with a deadline. It renders from data already
           loaded and never waits on the model. */}
       {imminent ? (
         <MeetingCountdownCard
-          className="mt-8"
+          className="mt-6"
           meetingId={imminent.meeting.id}
           title={imminent.meeting.title}
           startsAt={imminent.meeting.scheduled_at!}
@@ -360,7 +363,7 @@ export default async function TodayPage({
 
       {spotlight && spotlightPeople.length > 0 ? (
         <RelationshipCard
-          className="mt-8"
+          className="mt-6"
           meetingId={spotlight.id}
           title={spotlight.title}
           whenLabel={
@@ -386,47 +389,15 @@ export default async function TodayPage({
           own once they are done — see components/app/first-run. */}
       <FirstRun state={firstRun} className="mt-9" />
 
-      {/* Today's focus — the single most important thing, with its reasoning.
-          Only rendered when there is something to reason about; the first-run
-          panel above is the better answer on an empty account.
-
-          Streamed: everything above and below this point paints without waiting
-          for the model. */}
-      <Suspense fallback={<FocusPending />}>
-        <FocusCard focusPromise={focusPromise} />
-      </Suspense>
-
       <UpcomingMeetings
         events={upcomingEvents}
         timeZone={profile.timezone ?? 'UTC'}
         nowIso={now.toISOString()}
       />
 
-      {/* Only once the checklist above has gone. Before that it would say the
-          same thing twice, in two different shapes, on the same screen. */}
-      {!hasAnything && firstRunComplete(firstRun) ? (
-        <IllustratedEmpty
-          className="mt-8"
-          subject="quiet"
-          tone="wash"
-          title="A quiet day"
-          description={`Nothing is scheduled and nothing is overdue. When you add a person or connect a meeting, ${brand.name} will have something to say here.`}
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button asChild>
-                <Link href="/people/new">Add a person</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/meetings">Prepare for a meeting</Link>
-              </Button>
-            </div>
-          }
-        />
-      ) : null}
-
       {/* Upcoming interactions */}
       {(meetings ?? []).length > 0 ? (
-        <section className="mt-12">
+        <section className="mt-9">
           <div className="flex items-end justify-between gap-4">
             <div>
               <Eyebrow>Upcoming</Eyebrow>
@@ -440,7 +411,7 @@ export default async function TodayPage({
             </Button>
           </div>
 
-          <ul className="border-line bg-line mt-5 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
+          <ul className="border-line bg-line mt-5 grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-[var(--radius-lg)] border">
             {(meetings ?? []).map((meeting) => {
               const ids = attendeesByMeeting.get(meeting.id) ?? []
               const people = ids
@@ -480,30 +451,11 @@ export default async function TodayPage({
         </section>
       ) : null}
 
-      {/* Conversations waiting on a review come first: they are the one thing
-          on this page that is blocked on the user, and a proposal that sits
-          unreviewed is a promise the product cannot yet keep. */}
-      {awaitingReview.length > 0 ? (
-        <section className="mt-12">
-          <Eyebrow className="text-accent">Waiting on you</Eyebrow>
-          <h2 className="font-display text-ink mt-2 text-xl">
-            {awaitingReview.length === 1
-              ? 'A conversation to confirm'
-              : `${awaitingReview.length} conversations to confirm`}
-          </h2>
-          <ul className="mt-5 grid gap-3">
-            {awaitingReview.map((c) => (
-              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} compact />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       {/* Open loops: what you promised, what they promised, what nobody
           answered. Done, Later and Cancel work from here, because the moment
           somebody remembers they sent the deck is not a moment for a detour. */}
       {loops.length > 0 ? (
-        <section className="mt-12">
+        <section className="mt-9">
           <div className="flex items-end justify-between gap-4">
             <div>
               <Eyebrow>Open loops</Eyebrow>
@@ -524,14 +476,14 @@ export default async function TodayPage({
           </div>
           <LoopList
             className="mt-5"
-            loops={loops.slice(0, 6)}
+            loops={loops.slice(0, 3)}
             timeZone={timeZone}
             now={now}
             grouped={false}
           />
-          {loops.length > 6 ? (
+          {loops.length > 3 ? (
             <p className="text-ink-muted mt-3 text-xs">
-              {loops.length - 6} more on the{' '}
+              {loops.length - 3} more on the{' '}
               <Link href="/loops" className="text-ink underline-offset-4 hover:underline">
                 open loops
               </Link>{' '}
@@ -541,8 +493,65 @@ export default async function TodayPage({
         </section>
       ) : null}
 
+      {/* Conversations waiting on a review come first: they are the one thing
+          on this page that is blocked on the user, and a proposal that sits
+          unreviewed is a promise the product cannot yet keep. */}
+      {awaitingReview.length > 0 ? (
+        <section className="mt-9">
+          <Eyebrow className="text-accent">Waiting on you</Eyebrow>
+          <h2 className="font-display text-ink mt-2 text-xl">
+            {awaitingReview.length === 1
+              ? 'A conversation to confirm'
+              : `${awaitingReview.length} conversations to confirm`}
+          </h2>
+          <ul className="mt-5 grid gap-3">
+            {awaitingReview.map((c) => (
+              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} compact />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Relationship signals. No fallback: this is supplementary, and a
+          placeholder for content that may not exist would be noise. */}
+      <Suspense fallback={null}>
+        <WatchItems focusPromise={focusPromise} />
+      </Suspense>
+
+      {/* Today's focus — the single most important thing, with its reasoning.
+          Only rendered when there is something to reason about; the first-run
+          panel above is the better answer on an empty account.
+
+          Streamed: everything above and below this point paints without waiting
+          for the model. */}
+      <Suspense fallback={<FocusPending />}>
+        <FocusCard focusPromise={focusPromise} />
+      </Suspense>
+
+      {/* Only once the checklist above has gone. Before that it would say the
+          same thing twice, in two different shapes, on the same screen. */}
+      {!hasAnything && firstRunComplete(firstRun) ? (
+        <IllustratedEmpty
+          className="mt-8"
+          subject="quiet"
+          tone="wash"
+          title="A quiet day"
+          description={`Nothing is scheduled and nothing is overdue. When you add a person or connect a meeting, ${brand.name} will have something to say here.`}
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild>
+                <Link href="/people/new">Add a person</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/meetings">Prepare for a meeting</Link>
+              </Button>
+            </div>
+          }
+        />
+      ) : null}
+
       {/* Recent conversations, and the way to keep the next one. */}
-      <section className="mt-12">
+      <section className="mt-9">
         <div className="flex items-end justify-between gap-4">
           <div>
             <Eyebrow>Remember</Eyebrow>
@@ -570,12 +579,6 @@ export default async function TodayPage({
           </p>
         )}
       </section>
-
-      {/* Relationship signals. No fallback: this is supplementary, and a
-          placeholder for content that may not exist would be noise. */}
-      <Suspense fallback={null}>
-        <WatchItems focusPromise={focusPromise} />
-      </Suspense>
 
       {/* Below the day's real content on purpose: refinement is never the most
           important thing on this screen. */}
@@ -609,7 +612,7 @@ async function FocusCard({ focusPromise }: { focusPromise: FocusPromise }) {
 
   return (
     <section className="mt-9">
-      <Panel className="p-6 sm:p-7">
+      <Panel className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Sparkles className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -617,25 +620,38 @@ async function FocusCard({ focusPromise }: { focusPromise: FocusPromise }) {
             <p className="font-display text-ink mt-3 text-xl leading-snug sm:text-2xl">
               {focus.output.headline}
             </p>
-            <p className="text-ink-secondary mt-3 text-sm leading-relaxed">
-              {focus.output.reasoning}
-            </p>
-
-            {focus.output.priorities.length > 1 ? (
-              <ol className="border-line mt-6 grid gap-3 border-t pt-5">
-                {focus.output.priorities.slice(1).map((priority, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span aria-hidden="true" className="bg-accent-graphic mt-2 h-px w-3 shrink-0" />
-                    <span className="min-w-0">
-                      <span className="text-ink block text-sm">{priority.what}</span>
-                      <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">
-                        {priority.why}
+            {/* The reasoning and the rest of the day's priorities are kept,
+                one tap away: the headline is what to act on. */}
+            <details className="group mt-3">
+              <summary className="text-ink-secondary hover:text-ink inline-flex min-h-11 cursor-pointer list-none items-center gap-1 text-xs font-medium [&::-webkit-details-marker]:hidden">
+                <span className="group-open:hidden">
+                  Why
+                  {focus.output.priorities.length > 1
+                    ? ` · ${focus.output.priorities.length - 1} more priorit${focus.output.priorities.length - 1 === 1 ? 'y' : 'ies'}`
+                    : ''}
+                </span>
+                <span className="hidden group-open:inline">Hide reasoning</span>
+              </summary>
+              <p className="text-ink-secondary text-sm leading-relaxed">{focus.output.reasoning}</p>
+              {focus.output.priorities.length > 1 ? (
+                <ol className="border-line mt-5 grid gap-3 border-t pt-4">
+                  {focus.output.priorities.slice(1).map((priority, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="bg-accent-graphic mt-2 h-px w-3 shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="text-ink block text-sm">{priority.what}</span>
+                        <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">
+                          {priority.why}
+                        </span>
                       </span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            ) : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+            </details>
           </div>
         </div>
       </Panel>
@@ -656,7 +672,7 @@ async function FocusCard({ focusPromise }: { focusPromise: FocusPromise }) {
 function FocusPending() {
   return (
     <section className="mt-9">
-      <Panel className="p-6 sm:p-7">
+      <Panel className="p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <Sparkles className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -682,7 +698,7 @@ async function WatchItems({ focusPromise }: { focusPromise: FocusPromise }) {
   if (!focus || focus.output.watchItems.length === 0) return null
 
   return (
-    <section className="mt-12">
+    <section className="mt-9">
       <Eyebrow>Worth watching</Eyebrow>
       <ul className="mt-4 grid gap-2.5">
         {focus.output.watchItems.map((item) => (
@@ -702,7 +718,7 @@ async function FocusProvenance({ focusPromise }: { focusPromise: FocusPromise })
   if (!focus) return null
 
   return (
-    <p className="text-ink-faint mt-14 flex items-center gap-2 text-xs">
+    <p className="text-ink-faint mt-10 flex items-center gap-2 text-xs">
       <CalendarClock className="size-3.5" aria-hidden="true" />
       {focus.provenance.groundedFallback
         ? 'Composed directly from your records.'

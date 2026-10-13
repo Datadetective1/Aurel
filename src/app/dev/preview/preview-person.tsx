@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { MessageSquare, MessagesSquare, Mic, Settings2, Sparkles } from 'lucide-react'
 import { PersonHero } from '@/components/app/person-hero'
 import { Button } from '@/components/ui/button'
+import { relevanceChip } from '@/lib/visual/relevance'
 
 /** The person page's hero with the page's own facts and actions. */
 export function PersonHeroView({
@@ -35,7 +36,12 @@ export function PersonHeroView({
       title={title}
       company={company}
       companyDomain={companyDomain}
-      facts={[{ label: relationship }, { label: `Importance ${relevance}/5`, tone: 'outline' }]}
+      facts={[
+        { label: relationship },
+        ...(relevanceChip(relevance)
+          ? [{ label: relevanceChip(relevance)!, tone: 'accent' as const, hint: 'You set this' }]
+          : []),
+      ]}
       actions={
         <>
           <Button asChild>
@@ -56,12 +62,24 @@ export function PersonHeroView({
               Ask
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" className="size-11" aria-label={`Draft a message to ${first}`}>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="size-11"
+            aria-label={`Draft a message to ${first}`}
+          >
             <Link href={`/coach?person=${personId}&mode=adapt`}>
               <MessageSquare className="size-4" aria-hidden="true" />
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" className="size-11" aria-label={`Edit ${name}`}>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="size-11"
+            aria-label={`Edit ${name}`}
+          >
             <Link href={`/people/${personId}/edit`}>
               <Settings2 className="size-4" aria-hidden="true" />
             </Link>

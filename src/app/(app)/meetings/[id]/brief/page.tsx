@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { meetingImportanceChip } from '@/lib/visual/relevance'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { ArrowLeft, CircleCheck } from 'lucide-react'
@@ -197,9 +198,9 @@ export default async function BriefPage({
         timeZone={timeZone}
         now={now}
       />
-      {meeting.importance >= 4 ? (
+      {meetingImportanceChip(meeting.importance) ? (
         <p className="mt-3">
-          <Badge tone="accent">Importance {meeting.importance}/5</Badge>
+          <Badge tone="accent">{meetingImportanceChip(meeting.importance)}</Badge>
         </p>
       ) : null}
 

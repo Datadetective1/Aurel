@@ -60,7 +60,7 @@ export function ConversationCard({
         className={cn(
           'group bg-surface hover:border-line-strong block rounded-[var(--radius-lg)] border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]',
           needsReview ? 'border-accent/30' : 'border-line',
-          compact ? 'p-4' : 'p-5',
+          compact ? 'p-3.5' : 'p-4',
         )}
       >
         <div className="flex items-start gap-4">
@@ -124,16 +124,21 @@ export function ConversationCard({
               </p>
             ) : null}
 
-            {c.summary && !compact ? (
-              <p className="text-ink-secondary mt-2 line-clamp-2 text-sm leading-relaxed">
-                {truncate(c.summary, 220)}
+            {/* The upshot, not the summary: one line that says what it came to.
+                The full account is on the conversation's own page. */}
+            {(c.outcome ?? c.summary) && !compact ? (
+              <p className="text-ink-secondary mt-1.5 line-clamp-1 text-sm">
+                {truncate(c.outcome ?? c.summary ?? '', 160)}
               </p>
             ) : null}
 
-            <div className="text-ink-muted mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <span className="inline-flex items-center gap-1.5">
+            <div className="text-ink-muted mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs">
+              <span className="inline-flex items-center gap-1.5" title={SOURCE_LABEL[c.sourceKind]}>
                 <Icon className="text-ink-faint size-3.5" aria-hidden="true" />
-                {SOURCE_LABEL[c.sourceKind]}
+                <span className="sr-only">{SOURCE_LABEL[c.sourceKind]}</span>
+                {c.durationSeconds
+                  ? `${Math.max(1, Math.round(c.durationSeconds / 60))} min`
+                  : null}
               </span>
               {c.openLoops > 0 ? (
                 <span className="inline-flex items-center gap-1.5">

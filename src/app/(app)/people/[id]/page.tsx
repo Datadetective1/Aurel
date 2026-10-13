@@ -19,7 +19,7 @@ import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
 import { ResearchPanel } from '@/components/app/research-panel'
 import { SourceRow, type SourceRowData } from '@/components/app/source-controls'
-import { PersonGlance } from '@/components/visual/person-glance'
+import { RelationshipMap } from '@/components/visual/relationship-map'
 import { PersonRelationshipSections } from '@/components/app/person-sections'
 import {
   FindPhotoButton,
@@ -31,9 +31,10 @@ import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
-import { resolveFace } from '@/lib/conversations/avatars'
+import { resolveFace, resolveFaces } from '@/lib/conversations/avatars'
 import { loadPersonRecordVisual } from '@/lib/visual/person.server'
 import { countDirections } from '@/lib/visual/relationship-actions'
+import { relevanceChip } from '@/lib/visual/relevance'
 import { pendingSuggestion, photoSuggestionsAvailable } from '@/lib/photos/suggestions'
 import { AVATAR_BUCKET } from '@/lib/conversations/avatars'
 import { track } from '@/lib/analytics'
@@ -127,6 +128,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     face,
     record,
     { data: organization },
+    { data: colleagueRows },
   ] = await Promise.all([
     supabase
       .from('observations')
@@ -167,7 +169,29 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           .eq('id', person.organization_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // Others in the user's own record at the same organisation -- the one
+    // "who else" the map draws, and only from people the user added.
+    person.organization_id
+      ? supabase
+          .from('people')
+          .select('id, full_name, preferred_name, avatar_url, avatar_path')
+          .eq('user_id', user.id)
+          .eq('organization_id', person.organization_id)
+          .neq('id', id)
+          .is('archived_at', null)
+          .order('last_interaction_at', { ascending: false, nullsFirst: false })
+          .limit(6)
+      : Promise.resolve({
+          data: [] as {
+            id: string
+            full_name: string
+            preferred_name: string | null
+            avatar_url: string | null
+            avatar_path: string | null
+          }[],
+        }),
   ])
+  const colleagueFaces = await resolveFaces(supabase, colleagueRows ?? [], (p) => p.id)
 
   const { activeLoops: loops, conversations, nextMeeting } = record
 
@@ -308,7 +332,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const heroFacts: HeroFact[] = [
     ...(person.is_demo ? [{ label: 'Demo', tone: 'outline' as const }] : []),
     { label: RELATIONSHIP_LABEL[person.relationship_type] ?? 'Colleague' },
-    { label: `Importance ${person.relevance}/5`, tone: 'outline' },
+    ...(relevanceChip(person.relevance)
+      ? [{ label: relevanceChip(person.relevance)!, tone: 'accent' as const, hint: 'You set this' }]
+      : []),
   ]
 
   return (
@@ -384,13 +410,43 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       ) : null}
 
       {/* --- what matters now ---------------------------------------------------- */}
-      <PersonGlance
+      <RelationshipMap
         className="mt-5"
-        firstName={firstName}
-        lastInteractionAt={person.last_interaction_at}
-        firstInteractionAt={person.first_interaction_at}
-        nextMeeting={nextMeeting}
+        you={{ name: profile.preferred_name || profile.full_name || 'You', src: null }}
+        person={{ name, fullName: person.full_name, src: face }}
+        organization={
+          person.organizations?.name
+            ? {
+                name: person.organizations.name,
+                domain: organization?.domain ?? null,
+                title: person.job_title,
+                colleagues: (colleagueRows ?? []).map((c) => ({
+                  id: c.id,
+                  name: c.preferred_name || c.full_name,
+                  src: colleagueFaces.get(c.id) ?? null,
+                })),
+              }
+            : null
+        }
+        meetings={{ held: record.meetingsHeld, next: nextMeeting }}
+        conversations={{
+          count: interactionCount,
+          lastAt: person.last_interaction_at,
+          firstAt: person.first_interaction_at,
+          lastId: conversations[0]?.id ?? null,
+        }}
         directions={directions}
+        // Sourced background, at confirmed or observed only, and only when the
+        // fact is a name rather than a sentence -- a chip is not a quote.
+        background={(facts ?? [])
+          .filter(
+            (f) =>
+              (f.kind === 'education' || f.kind === 'prior_role') &&
+              (f.evidence_level === 'confirmed' || f.evidence_level === 'observed') &&
+              f.value.length <= 48 &&
+              !f.has_conflict,
+          )
+          .map((f) => ({ label: f.value, kind: f.kind as 'education' | 'prior_role' }))}
         themes={record.themes}
         timeZone={timeZone}
         now={now}
@@ -564,7 +620,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       ) : null}
 
       {/* --- add context -------------------------------------------------------- */}
-      <div className="border-line bg-bg-sunken mt-8 rounded-[var(--radius-lg)] border p-5 sm:p-6">
+      <div
+        id="add-context"
+        className="border-line bg-bg-sunken mt-8 scroll-mt-20 rounded-[var(--radius-lg)] border p-5 sm:p-6"
+      >
         <AddContext personId={id} personName={person.full_name} />
         <AddDocument personId={id} />
       </div>

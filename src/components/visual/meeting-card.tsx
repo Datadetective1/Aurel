@@ -68,11 +68,13 @@ export function MeetingCard({
     <article
       className={cn('flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5', className)}
     >
-      <div className="flex min-w-0 flex-1 items-start gap-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
         {people.length > 0 ? (
           <FaceStack
             people={people.map((p) => ({ id: p.id, name: p.fullName, src: p.src }))}
-            size="lg"
+            // A room of several gets smaller faces so the details keep their
+            // width on a narrow phone.
+            size={people.length > 1 ? 'md' : 'lg'}
             max={3}
             className="shrink-0"
           />
@@ -127,7 +129,7 @@ export function MeetingCard({
               </Chip>
             ) : null}
             {openLoops > owe ? <Chip tone="neutral">{openLoops - owe} open</Chip> : null}
-            {important ? <Chip tone="quiet">Matters most</Chip> : null}
+            {important ? <Chip tone="quiet">Marked important</Chip> : null}
           </ChipRow>
         </div>
       </div>

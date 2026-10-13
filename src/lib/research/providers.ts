@@ -427,9 +427,13 @@ export function researchCapability() {
     canAnalyseUrls: true,
     searchProvider: search.id,
     enrichmentProvider: enrichment.id,
-    /** Shown in the UI when discovery is unavailable. */
+    /**
+     * Shown in the UI when discovery is unavailable. Product language only:
+     * which provider is or is not configured is for Settings → Capabilities,
+     * shown to the account owner, never to a customer.
+     */
     discoveryHint: search.configured
       ? null
-      : `Automatic source discovery is not configured. Paste a link — a company bio, a talk, an article — and ${brand.name} will analyze it.`,
+      : `Add a link — a company bio, a talk, an article — and ${brand.name} reads it for professional context.`,
   } as const
 }
