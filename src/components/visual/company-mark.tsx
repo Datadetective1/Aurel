@@ -41,7 +41,18 @@ export function CompanyMark({
 }) {
   const src = logoPath(domain)
   const [failed, setFailed] = React.useState(false)
-  const a11y = labelled ? { role: 'img' as const, 'aria-label': name } : { 'aria-hidden': true as const }
+  const imgRef = React.useRef<HTMLImageElement>(null)
+
+  // An image that fails before hydration fires its error event before React
+  // is listening, so the state is checked once on mount as well. A 1x1 pixel
+  // is the route's way of saying "no logo" without a console error.
+  React.useEffect(() => {
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth <= 1) setFailed(true)
+  }, [])
+  const a11y = labelled
+    ? { role: 'img' as const, 'aria-label': name }
+    : { 'aria-hidden': true as const }
 
   if (src && !failed) {
     return (
@@ -62,7 +73,11 @@ export function CompanyMark({
           loading="lazy"
           decoding="async"
           draggable={false}
+          ref={imgRef}
           onError={() => setFailed(true)}
+          onLoad={(e) => {
+            if (e.currentTarget.naturalWidth <= 1) setFailed(true)
+          }}
           className="size-full object-contain p-[12%]"
         />
       </span>

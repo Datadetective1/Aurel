@@ -98,7 +98,11 @@ const INTERACTION_LABEL: Record<string, string> = {
 }
 
 function firstLine(text: string, max = 120): string {
-  const line = text.split('\n').find((l) => l.trim().length > 0)?.trim() ?? text.trim()
+  const line =
+    text
+      .split('\n')
+      .find((l) => l.trim().length > 0)
+      ?.trim() ?? text.trim()
   if (line.length <= max) return line
   const cut = line.slice(0, max)
   const space = cut.lastIndexOf(' ')

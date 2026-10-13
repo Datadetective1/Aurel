@@ -209,7 +209,9 @@ export default async function BriefPage({
           people={roomPeople}
           connections={visual.connections}
           centerLabel={meeting.scheduledAt ? formatTime(meeting.scheduledAt, timeZone) : 'Meeting'}
-          centerDetail={meeting.scheduledAt ? relativeDay(meeting.scheduledAt, timeZone, now) : null}
+          centerDetail={
+            meeting.scheduledAt ? relativeDay(meeting.scheduledAt, timeZone, now) : null
+          }
           timeZone={timeZone}
           now={now}
         />

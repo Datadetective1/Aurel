@@ -27,11 +27,7 @@
  */
 
 export type ConnectionKind =
-  | 'same_organization'
-  | 'former_employer'
-  | 'education'
-  | 'shared_meeting'
-  | 'shared_conversation'
+  'same_organization' | 'former_employer' | 'education' | 'shared_meeting' | 'shared_conversation'
 
 export interface Connection {
   a: string
@@ -127,7 +123,10 @@ export function findConnections(input: ConnectionInput): Connection[] {
   }
 
   // --- sourced facts: prior employer, education -----------------------------
-  const factGroups = new Map<string, { kind: ConnectionKind; label: string; members: Map<string, ConnectionFact['evidence']> }>()
+  const factGroups = new Map<
+    string,
+    { kind: ConnectionKind; label: string; members: Map<string, ConnectionFact['evidence']> }
+  >()
   for (const f of input.facts ?? []) {
     if (f.evidence !== 'confirmed' && f.evidence !== 'observed') continue
     const kind: ConnectionKind | null =

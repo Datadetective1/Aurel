@@ -45,8 +45,7 @@ const ALLOWED_CONTENT_TYPES = [
 ]
 
 /** Presented to the site being fetched. Honest about what this is. */
-const USER_AGENT =
-  `${brand.slug}bot/1.0 (+${brand.domain}/bot; professional context research; respects robots.txt)`
+const USER_AGENT = `${brand.slug}bot/1.0 (+${brand.domain}/bot; professional context research; respects robots.txt)`
 
 export type FetchFailure =
   | 'invalid_url'
@@ -78,7 +77,6 @@ export interface FetchFailureResult {
 }
 
 export type SafeFetchResult = FetchSuccess | FetchFailureResult
-
 
 /**
  * True for addresses that must never be reachable from a user-supplied URL:
@@ -286,7 +284,6 @@ async function readCapped(
   }
 }
 
-
 // =============================================================================
 // IMAGES
 // =============================================================================
@@ -296,27 +293,42 @@ async function readCapped(
  * origin it is a document that can carry script, and no logo or portrait is
  * worth that.
  */
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/x-icon', 'image/vnd.microsoft.icon']
+const IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/x-icon',
+  'image/vnd.microsoft.icon',
+]
 
 /** Content sniffed from the first bytes. A declared type is not trusted on its own. */
 export function sniffImageType(bytes: Uint8Array): string | null {
   const b = bytes
-  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png'
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
+    return 'image/png'
   if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg'
-  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif'
+  if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38)
+    return 'image/gif'
   if (
     b.length >= 12 &&
-    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
-    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+    b[0] === 0x52 &&
+    b[1] === 0x49 &&
+    b[2] === 0x46 &&
+    b[3] === 0x46 &&
+    b[8] === 0x57 &&
+    b[9] === 0x45 &&
+    b[10] === 0x42 &&
+    b[11] === 0x50
   )
     return 'image/webp'
-  if (b.length >= 4 && b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00) return 'image/x-icon'
+  if (b.length >= 4 && b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00)
+    return 'image/x-icon'
   return null
 }
 
 export type SafeImageResult =
-  | { ok: true; finalUrl: string; contentType: string; bytes: Uint8Array }
-  | FetchFailureResult
+  { ok: true; finalUrl: string; contentType: string; bytes: Uint8Array } | FetchFailureResult
 
 /**
  * Fetch a public raster image with the same defences as `safeFetch`: DNS
@@ -324,7 +336,10 @@ export type SafeImageResult =
  * a timeout, and a size cap enforced while streaming. The returned type is
  * the one the bytes actually are, not the one the server claimed.
  */
-export async function safeFetchImage(rawUrl: string, maxBytes = 1024 * 1024): Promise<SafeImageResult> {
+export async function safeFetchImage(
+  rawUrl: string,
+  maxBytes = 1024 * 1024,
+): Promise<SafeImageResult> {
   const parsed = parseUrl(rawUrl)
   if (!parsed) return { ok: false, reason: 'invalid_url' }
 
@@ -343,7 +358,10 @@ export async function safeFetchImage(rawUrl: string, maxBytes = 1024 * 1024): Pr
         method: 'GET',
         redirect: 'manual',
         signal: controller.signal,
-        headers: { 'user-agent': USER_AGENT, accept: 'image/png,image/jpeg,image/webp,image/*;q=0.8' },
+        headers: {
+          'user-agent': USER_AGENT,
+          accept: 'image/png,image/jpeg,image/webp,image/*;q=0.8',
+        },
         credentials: 'omit',
         cache: 'no-store',
       })
@@ -374,8 +392,13 @@ export async function safeFetchImage(rawUrl: string, maxBytes = 1024 * 1024): Pr
 
     if (!response.ok) return { ok: false, reason: 'http_error', status: response.status }
 
-    const declaredType = (response.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
-    if (declaredType && !IMAGE_TYPES.includes(declaredType) && declaredType !== 'application/octet-stream') {
+    const declaredType =
+      (response.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+    if (
+      declaredType &&
+      !IMAGE_TYPES.includes(declaredType) &&
+      declaredType !== 'application/octet-stream'
+    ) {
       return { ok: false, reason: 'unsupported_content_type', detail: declaredType }
     }
     if (Number(response.headers.get('content-length') ?? '0') > maxBytes) {
@@ -387,14 +410,18 @@ export async function safeFetchImage(rawUrl: string, maxBytes = 1024 * 1024): Pr
     if (!buffer || buffer.byteLength === 0) return { ok: false, reason: 'network_error' }
 
     const sniffed = sniffImageType(buffer)
-    if (!sniffed) return { ok: false, reason: 'unsupported_content_type', detail: 'unrecognised image' }
+    if (!sniffed)
+      return { ok: false, reason: 'unsupported_content_type', detail: 'unrecognised image' }
 
     return { ok: true, finalUrl: current.toString(), contentType: sniffed, bytes: buffer }
   }
 }
 
 /** Stream a binary body, refusing it outright once it passes the cap. */
-async function readCappedBytes(response: Response, maxBytes: number): Promise<Uint8Array | 'too_large' | null> {
+async function readCappedBytes(
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array | 'too_large' | null> {
   if (!response.body) return null
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []

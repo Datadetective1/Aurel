@@ -18,14 +18,18 @@ export const runtime = 'nodejs'
  * SVG is refused, because served from this origin it is a document.
  *
  * Order tried: the site's declared touch icon or icon in its homepage markup,
- * then /apple-touch-icon.png, then /favicon.ico. A miss is a 404, which the
- * client turns into a monogram; it is cached too, so a company without a
+ * then /apple-touch-icon.png, then /favicon.ico. A miss is a transparent
+ * pixel, which the client turns into a monogram; it is cached too, so a company without a
  * usable icon costs one lookup a day rather than one per render.
  * =============================================================================
  */
 
 type Entry = { bytes: Uint8Array; type: string } | null
 const CACHE = new Map<string, { at: number; entry: Entry }>()
+const EMPTY_PIXEL = Uint8Array.from(
+  atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'),
+  (c) => c.charCodeAt(0),
+)
 const TTL_MS = 24 * 60 * 60 * 1000
 const MAX_ENTRIES = 500
 
@@ -67,7 +71,11 @@ async function findLogo(domain: string): Promise<Entry> {
 
 export async function GET(request: NextRequest) {
   const user = await getOptionalUser()
-  if (!user) return new Response(null, { status: 401 })
+  if (!user)
+    return new Response(EMPTY_PIXEL as unknown as BodyInit, {
+      status: 200,
+      headers: { 'content-type': 'image/gif', 'cache-control': 'no-store' },
+    })
 
   const domain = normaliseDomain(request.nextUrl.searchParams.get('domain'))
   if (!domain) return new Response(null, { status: 400 })
@@ -87,7 +95,15 @@ export async function GET(request: NextRequest) {
     'content-security-policy': "default-src 'none'; sandbox",
   }
 
-  if (!entry) return new Response(null, { status: 404, headers })
+  // No logo is an answer, not an error: a 1x1 transparent pixel the mark reads
+  // as "use the monogram", so the console stays clean for every company
+  // without a usable icon.
+  if (!entry) {
+    return new Response(EMPTY_PIXEL as unknown as BodyInit, {
+      status: 200,
+      headers: { ...headers, 'content-type': 'image/gif', 'x-atturel-logo': 'none' },
+    })
+  }
   return new Response(entry.bytes as unknown as BodyInit, {
     status: 200,
     headers: { ...headers, 'content-type': entry.type },

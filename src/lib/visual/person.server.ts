@@ -46,39 +46,46 @@ export async function loadPersonRecordVisual(
 ): Promise<PersonRecordVisual> {
   const now = options.now ?? new Date()
 
-  const [allLoops, conversations, decisions, { data: interactions }, { data: notes }, { data: memories }, { data: meetings }] =
-    await Promise.all([
-      listLoops(supabase, userId, { personId, scope: 'all', timeZone: options.timeZone, now }),
-      listConversations(supabase, userId, { personId, limit: 6 }),
-      listDecisions(supabase, userId, { personId, limit: 20 }),
-      supabase
-        .from('interaction_participants')
-        .select('interactions(id, title, occurred_at, kind, summary, outcome, meeting_id)')
-        .eq('user_id', userId)
-        .eq('person_id', personId)
-        .limit(100),
-      supabase
-        .from('notes')
-        .select('id, body, created_at')
-        .eq('user_id', userId)
-        .eq('person_id', personId)
-        .order('created_at', { ascending: false })
-        .limit(30),
-      supabase
-        .from('observations')
-        .select('id, content, created_at, evidence_level, source_kind')
-        .eq('user_id', userId)
-        .eq('person_id', personId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(30),
-      supabase
-        .from('meeting_attendees')
-        .select('meetings(id, title, scheduled_at, status)')
-        .eq('user_id', userId)
-        .eq('person_id', personId)
-        .limit(60),
-    ])
+  const [
+    allLoops,
+    conversations,
+    decisions,
+    { data: interactions },
+    { data: notes },
+    { data: memories },
+    { data: meetings },
+  ] = await Promise.all([
+    listLoops(supabase, userId, { personId, scope: 'all', timeZone: options.timeZone, now }),
+    listConversations(supabase, userId, { personId, limit: 6 }),
+    listDecisions(supabase, userId, { personId, limit: 20 }),
+    supabase
+      .from('interaction_participants')
+      .select('interactions(id, title, occurred_at, kind, summary, outcome, meeting_id)')
+      .eq('user_id', userId)
+      .eq('person_id', personId)
+      .limit(100),
+    supabase
+      .from('notes')
+      .select('id, body, created_at')
+      .eq('user_id', userId)
+      .eq('person_id', personId)
+      .order('created_at', { ascending: false })
+      .limit(30),
+    supabase
+      .from('observations')
+      .select('id, content, created_at, evidence_level, source_kind')
+      .eq('user_id', userId)
+      .eq('person_id', personId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(30),
+    supabase
+      .from('meeting_attendees')
+      .select('meetings(id, title, scheduled_at, status)')
+      .eq('user_id', userId)
+      .eq('person_id', personId)
+      .limit(60),
+  ])
 
   const activeLoops = allLoops.filter((l) =>
     loopIsActive(

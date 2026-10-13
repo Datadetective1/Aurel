@@ -8,7 +8,12 @@ import { ownership } from '@/lib/workspace'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import { safeFetchImage } from '@/lib/sources/fetch'
-import { AVATAR_BUCKET, imageExtension, MAX_AVATAR_BYTES, personAvatarPath } from '@/lib/conversations/avatars'
+import {
+  AVATAR_BUCKET,
+  imageExtension,
+  MAX_AVATAR_BYTES,
+  personAvatarPath,
+} from '@/lib/conversations/avatars'
 import {
   PHOTO_PROVIDERS,
   decidedImageUrls,
@@ -39,7 +44,10 @@ export interface PhotoActionState {
 
 const idSchema = z.string().uuid()
 
-export async function findPublicPhoto(_prev: PhotoActionState, formData: FormData): Promise<PhotoActionState> {
+export async function findPublicPhoto(
+  _prev: PhotoActionState,
+  formData: FormData,
+): Promise<PhotoActionState> {
   const personId = idSchema.safeParse(formData.get('personId'))
   if (!personId.success) return { error: 'That person could not be found.' }
 
@@ -114,7 +122,10 @@ export async function findPublicPhoto(_prev: PhotoActionState, formData: FormDat
         .from(AVATAR_BUCKET)
         .upload(path, image.bytes, { contentType: image.contentType, upsert: true })
       if (uploadError) {
-        await suggestionsTable(supabase).delete().eq('id', (row as { id: string }).id).eq('user_id', user.id)
+        await suggestionsTable(supabase)
+          .delete()
+          .eq('id', (row as { id: string }).id)
+          .eq('user_id', user.id)
         continue
       }
       await suggestionsTable(supabase)
@@ -136,7 +147,9 @@ async function loadSuggestion(id: string) {
   const user = await requireUser()
   const supabase = await createClient()
   const { data } = await suggestionsTable(supabase)
-    .select('id, person_id, image_url, source_url, source_label, source_id, provider, storage_path, status, created_at')
+    .select(
+      'id, person_id, image_url, source_url, source_label, source_id, provider, storage_path, status, created_at',
+    )
     .eq('id', id)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -171,7 +184,9 @@ export async function confirmPhotoSuggestion(
     await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
   }
   await supabase.storage.from(AVATAR_BUCKET).remove([target])
-  const { error: moveError } = await supabase.storage.from(AVATAR_BUCKET).move(suggestion.storage_path, target)
+  const { error: moveError } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .move(suggestion.storage_path, target)
   if (moveError) {
     logger.warn('person.photo_suggestion_move_failed', { message: moveError.message })
     return { error: 'The photo could not be attached. Try again.' }

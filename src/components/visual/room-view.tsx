@@ -31,9 +31,13 @@ function placement(index: number, count: number) {
   // stacked top and bottom, because that is how two people sit at a table.
   const offset = count === 2 ? 0 : -Math.PI / 2
   const angle = offset + (index * 2 * Math.PI) / count
+  const sin = Math.sin(angle)
   return {
     left: 50 + 38 * Math.cos(angle),
-    top: 50 + 36 * Math.sin(angle),
+    top: 50 + 36 * sin,
+    // Seats in the upper half carry their words above the face, so nothing
+    // hangs down into the table; the rest carry them below.
+    above: sin < -0.3,
   }
 }
 
@@ -64,20 +68,28 @@ function Seat({
   timeZone,
   now,
   layout,
+  above = false,
 }: {
   person: VisualPerson
   timeZone: string
   now: Date
   layout: 'around' | 'stack'
+  above?: boolean
 }) {
   return (
     <div
       className={cn(
         'flex min-w-0 items-center gap-3',
         layout === 'around' && 'w-44 flex-col gap-2 text-center',
+        layout === 'around' && above && 'flex-col-reverse',
       )}
     >
-      <Avatar name={person.fullName} src={person.src} size={layout === 'around' ? 'lg' : 'md'} className="bg-surface" />
+      <Avatar
+        name={person.fullName}
+        src={person.src}
+        size={layout === 'around' ? 'lg' : 'md'}
+        className="bg-surface"
+      />
       <div className={cn('min-w-0', layout === 'around' && 'flex flex-col items-center')}>
         <Link
           href={`/people/${person.id}`}
@@ -91,7 +103,12 @@ function Seat({
             <CompanyLabel name={person.company} domain={person.companyDomain} />
           </p>
         ) : null}
-        <div className={cn('mt-1.5 flex flex-wrap items-center gap-1.5', layout === 'around' && 'justify-center')}>
+        <div
+          className={cn(
+            'mt-1.5 flex flex-wrap items-center gap-1.5',
+            layout === 'around' && 'justify-center',
+          )}
+        >
           {person.context ? <Chip tone="quiet">{person.context}</Chip> : null}
           {personFact(person, timeZone, now)}
         </div>
@@ -130,14 +147,23 @@ export function RoomView({
 
       {/* --- around the table: wide screens --------------------------------- */}
       {around ? (
-        <div className="relative mt-4 hidden aspect-[16/10] max-h-[30rem] w-full sm:block">
+        <div className="relative mt-24 mb-28 hidden aspect-[16/9] max-h-[26rem] w-full sm:block">
           <svg
             aria-hidden="true"
             className="absolute inset-0 size-full"
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
           >
-            <ellipse cx="50" cy="50" rx="38" ry="36" fill="none" stroke="var(--line)" strokeWidth="0.25" vectorEffect="non-scaling-stroke" />
+            <ellipse
+              cx="50"
+              cy="50"
+              rx="38"
+              ry="36"
+              fill="none"
+              stroke="var(--line)"
+              strokeWidth="0.25"
+              vectorEffect="non-scaling-stroke"
+            />
             {people.map((p, i) => {
               const { left, top } = placement(i, people.length)
               return (
@@ -156,7 +182,7 @@ export function RoomView({
             })}
           </svg>
 
-          <div className="border-accent/30 bg-surface absolute top-1/2 left-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border p-3 text-center">
+          <div className="border-accent/30 bg-surface absolute top-1/2 left-1/2 flex size-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border p-3 text-center">
             <span className="font-display text-ink text-lg leading-tight">{centerLabel}</span>
             {centerDetail ? (
               <span className="text-ink-muted mt-1 line-clamp-2 text-xs">{centerDetail}</span>
@@ -165,14 +191,25 @@ export function RoomView({
 
           <ul aria-label="People in this meeting">
             {people.map((person, i) => {
-              const { left, top } = placement(i, people.length)
+              const { left, top, above } = placement(i, people.length)
               return (
                 <li
                   key={person.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
+                  // The face (56px) is centred on the seat; the words hang
+                  // outward from it.
+                  className={cn(
+                    'absolute -translate-x-1/2',
+                    above ? '-translate-y-[calc(100%-1.75rem)]' : '-translate-y-7',
+                  )}
                   style={{ left: `${left}%`, top: `${top}%` }}
                 >
-                  <Seat person={person} timeZone={timeZone} now={now} layout="around" />
+                  <Seat
+                    person={person}
+                    timeZone={timeZone}
+                    now={now}
+                    layout="around"
+                    above={above}
+                  />
                 </li>
               )
             })}
@@ -205,7 +242,12 @@ export function RoomView({
               <li key={`${c.a}-${c.b}-${c.kind}-${c.label}`}>
                 <Chip
                   tone="neutral"
-                  title={c.evidence === 'confirmed' ? 'Confirmed in your record' : 'Observed in public sources'}
+                  className="whitespace-normal"
+                  title={
+                    c.evidence === 'confirmed'
+                      ? 'Confirmed in your record'
+                      : 'Observed in public sources'
+                  }
                 >
                   {names.get(c.a)} &amp; {names.get(c.b)} · {c.description}
                 </Chip>

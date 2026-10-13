@@ -57,7 +57,7 @@ export function AtlasConnections({
   if (connections.length === 0) return null
 
   return (
-    <ul className={cn('grid gap-2 sm:grid-cols-2', className)}>
+    <ul className={cn('grid min-w-0 gap-2 sm:grid-cols-2', className)}>
       {connections.map((c) => {
         const a = people.get(c.a)
         const b = people.get(c.b)
@@ -67,15 +67,15 @@ export function AtlasConnections({
         return (
           <li
             key={`${c.a}-${c.b}-${c.kind}-${c.label}`}
-            className="border-line bg-surface flex items-center gap-3 rounded-[var(--radius-lg)] border p-3"
+            className="border-line bg-surface flex min-w-0 items-center gap-3 rounded-[var(--radius-lg)] border p-3"
           >
             <span className="flex shrink-0 items-center" aria-hidden="true">
               <Avatar name={a.fullName} src={a.src} size="md" className="ring-surface ring-2" />
-              <span className="bg-line-strong h-px w-4" />
+              <span className="bg-line-strong h-px w-2 sm:w-4" />
               <span className="border-line bg-bg-sunken text-ink-secondary flex size-7 items-center justify-center rounded-full border">
                 <Icon className="size-3.5" />
               </span>
-              <span className="bg-line-strong h-px w-4" />
+              <span className="bg-line-strong h-px w-2 sm:w-4" />
               <Avatar name={b.fullName} src={b.src} size="md" className="ring-surface ring-2" />
             </span>
             <span className="min-w-0 flex-1">
@@ -90,7 +90,9 @@ export function AtlasConnections({
               </span>
               <span className="text-ink-muted mt-0.5 flex items-center gap-1 text-xs">
                 <EvidenceIcon className="size-3" aria-hidden="true" />
-                <span className="sr-only">{c.evidence === 'confirmed' ? 'Confirmed: ' : 'Observed: '}</span>
+                <span className="sr-only">
+                  {c.evidence === 'confirmed' ? 'Confirmed: ' : 'Observed: '}
+                </span>
                 {c.description}
               </span>
             </span>
@@ -121,11 +123,17 @@ export function AtlasLegend({ className }: { className?: string }) {
   return (
     <ul
       aria-label="What the marks mean"
-      className={cn('text-ink-muted flex flex-wrap items-center gap-x-4 gap-y-2 text-xs', className)}
+      className={cn(
+        'text-ink-muted flex flex-wrap items-center gap-x-4 gap-y-2 text-xs',
+        className,
+      )}
     >
       {LEGEND.map((item) => (
         <li key={item.label} className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="text-ink-secondary flex size-5 items-center justify-center">
+          <span
+            aria-hidden="true"
+            className="text-ink-secondary flex size-5 items-center justify-center"
+          >
             {item.mark}
           </span>
           {item.label}

@@ -68,7 +68,10 @@ export function PersonGlance({
   const open = DIRECTION_ORDER.filter((d) => d !== 'completed' && directions[d] > 0)
 
   return (
-    <section aria-label={`Where things stand with ${firstName}`} className={cn('min-w-0', className)}>
+    <section
+      aria-label={`Where things stand with ${firstName}`}
+      className={cn('min-w-0', className)}
+    >
       <dl className="border-line bg-surface grid grid-cols-2 gap-x-5 gap-y-5 rounded-[var(--radius-lg)] border p-4 sm:grid-cols-4 sm:p-5">
         <Tile icon={MessagesSquare} label="Last spoke">
           {lastInteractionAt ? (
@@ -89,7 +92,9 @@ export function PersonGlance({
               className="hover:text-accent block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
             >
               <span className="block">
-                {nextMeeting.scheduledAt ? relativeDay(nextMeeting.scheduledAt, timeZone, now) : 'Planned'}
+                {nextMeeting.scheduledAt
+                  ? relativeDay(nextMeeting.scheduledAt, timeZone, now)
+                  : 'Planned'}
               </span>
               <span className="text-ink-muted block truncate text-xs">{nextMeeting.title}</span>
             </Link>
@@ -111,7 +116,11 @@ export function PersonGlance({
         </Tile>
 
         <Tile icon={History} label="On record since" className="hidden sm:block">
-          {firstInteractionAt ? formatDate(firstInteractionAt, timeZone) : <span className="text-ink-muted">No history yet</span>}
+          {firstInteractionAt ? (
+            formatDate(firstInteractionAt, timeZone)
+          ) : (
+            <span className="text-ink-muted">No history yet</span>
+          )}
         </Tile>
       </dl>
 

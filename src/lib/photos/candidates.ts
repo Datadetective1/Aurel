@@ -67,7 +67,8 @@ export function pageImageCandidates(html: string, base: string): string[] {
   }
 
   // schema.org Person with an image, from JSON-LD.
-  for (const block of html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) ?? []) {
+  for (const block of html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) ??
+    []) {
     const json = block.replace(/^<script[^>]*>|<\/script>$/gi, '')
     try {
       const data = JSON.parse(json) as unknown
@@ -78,7 +79,11 @@ export function pageImageCandidates(html: string, base: string): string[] {
         if (n['@type'] !== 'Person') continue
         const image = n.image
         if (typeof image === 'string') found.push(image)
-        else if (image && typeof image === 'object' && typeof (image as { url?: unknown }).url === 'string') {
+        else if (
+          image &&
+          typeof image === 'object' &&
+          typeof (image as { url?: unknown }).url === 'string'
+        ) {
           found.push((image as { url: string }).url)
         }
       }

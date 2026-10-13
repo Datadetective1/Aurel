@@ -65,7 +65,9 @@ export function MeetingCard({
   const meta = PREP_META[prep]
 
   return (
-    <article className={cn('flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5', className)}>
+    <article
+      className={cn('flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5', className)}
+    >
       <div className="flex min-w-0 flex-1 items-start gap-4">
         {people.length > 0 ? (
           <FaceStack
@@ -124,11 +126,7 @@ export function MeetingCard({
                 You owe {owe}
               </Chip>
             ) : null}
-            {openLoops > owe ? (
-              <Chip tone="neutral">
-                {openLoops - owe} open
-              </Chip>
-            ) : null}
+            {openLoops > owe ? <Chip tone="neutral">{openLoops - owe} open</Chip> : null}
             {important ? <Chip tone="quiet">Matters most</Chip> : null}
           </ChipRow>
         </div>

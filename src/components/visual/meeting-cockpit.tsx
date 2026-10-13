@@ -55,7 +55,9 @@ export function MeetingCockpit({
   className?: string
 }) {
   const prepMeta = PREP_META[prep]
-  const companies = [...new Map(people.filter((p) => p.company).map((p) => [p.company!, p])).values()]
+  const companies = [
+    ...new Map(people.filter((p) => p.company).map((p) => [p.company!, p])).values(),
+  ]
 
   return (
     <header className={cn('min-w-0', className)}>
@@ -63,7 +65,11 @@ export function MeetingCockpit({
         <CalendarClock className="text-accent size-3.5" aria-hidden="true" />
         {scheduledAt ? (
           <>
-            <LiveCountdown startsAt={scheduledAt} nowIso={now.toISOString()} className="text-accent" />
+            <LiveCountdown
+              startsAt={scheduledAt}
+              nowIso={now.toISOString()}
+              className="text-accent"
+            />
             <span aria-hidden="true">·</span>
             <span>
               {relativeDay(scheduledAt, timeZone, now)} {formatTime(scheduledAt, timeZone)}
@@ -90,7 +96,11 @@ export function MeetingCockpit({
             </Link>
             <p className="text-ink-secondary mt-0.5 flex min-w-0 items-center gap-1.5 text-sm">
               {people[0]!.company ? (
-                <CompanyMark name={people[0]!.company} domain={people[0]!.companyDomain} size="xs" />
+                <CompanyMark
+                  name={people[0]!.company}
+                  domain={people[0]!.companyDomain}
+                  size="xs"
+                />
               ) : null}
               <span className="truncate">
                 {[people[0]!.title, people[0]!.company].filter(Boolean).join(' · ') ||
@@ -119,7 +129,9 @@ export function MeetingCockpit({
             </li>
           ))}
           {people.length > 6 ? (
-            <li className="text-ink-muted flex h-14 items-center text-xs">+{people.length - 6} more</li>
+            <li className="text-ink-muted flex h-14 items-center text-xs">
+              +{people.length - 6} more
+            </li>
           ) : null}
         </ul>
       ) : null}

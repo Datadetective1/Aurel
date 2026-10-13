@@ -55,6 +55,12 @@ export function Chip({
 }
 
 /** A row of chips that wraps, never scrolls: a chip row is a summary, not a rail. */
-export function ChipRow({ children, className }: { children: React.ReactNode; className?: string }) {
+export function ChipRow({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
   return <div className={cn('flex flex-wrap items-center gap-1.5', className)}>{children}</div>
 }

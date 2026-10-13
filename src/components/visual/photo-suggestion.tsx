@@ -99,18 +99,32 @@ export function PhotoSuggestionCard({
           </p>
         ) : null}
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex shrink-0 flex-wrap gap-2">
         <form action={confirm}>
           <input type="hidden" name="suggestionId" value={suggestion.id} />
           <Button type="submit" size="md" disabled={confirming || rejecting} className="min-h-11">
-            {confirming ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
+            {confirming ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="size-4" aria-hidden="true" />
+            )}
             Use photo
           </Button>
         </form>
         <form action={reject}>
           <input type="hidden" name="suggestionId" value={suggestion.id} />
-          <Button type="submit" size="md" variant="secondary" disabled={confirming || rejecting} className="min-h-11">
-            {rejecting ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <X className="size-4" aria-hidden="true" />}
+          <Button
+            type="submit"
+            size="md"
+            variant="secondary"
+            disabled={confirming || rejecting}
+            className="min-h-11"
+          >
+            {rejecting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <X className="size-4" aria-hidden="true" />
+            )}
             Not this person
           </Button>
         </form>
@@ -121,7 +135,10 @@ export function PhotoSuggestionCard({
 
 /** "Look for a public photo": only offered when a confirmed source exists to look in. */
 export function FindPhotoButton({ personId, className }: { personId: string; className?: string }) {
-  const [state, find, pending] = React.useActionState<PhotoActionState, FormData>(findPublicPhoto, {})
+  const [state, find, pending] = React.useActionState<PhotoActionState, FormData>(
+    findPublicPhoto,
+    {},
+  )
   return (
     <form action={find} className={cn('flex flex-wrap items-center gap-2', className)}>
       <input type="hidden" name="personId" value={personId} />
@@ -134,7 +151,13 @@ export function FindPhotoButton({ personId, className }: { personId: string; cla
         Look for a public photo
       </Button>
       {state.message || state.error ? (
-        <span role="status" className={cn('flex items-center gap-1 text-xs', state.error ? 'text-critical' : 'text-ink-muted')}>
+        <span
+          role="status"
+          className={cn(
+            'flex items-center gap-1 text-xs',
+            state.error ? 'text-critical' : 'text-ink-muted',
+          )}
+        >
           {state.error ? <ImageOff className="size-3.5" aria-hidden="true" /> : null}
           {state.error ?? state.message}
         </span>

@@ -59,7 +59,10 @@ export function GlanceBrief({
           <ul className="mt-3 grid gap-3">
             {glance.remember.map((item, i) => (
               <li key={i} className="flex gap-3">
-                <span aria-hidden="true" className="bg-accent-graphic mt-[0.5625rem] size-1.5 shrink-0 rounded-full" />
+                <span
+                  aria-hidden="true"
+                  className="bg-accent-graphic mt-[0.5625rem] size-1.5 shrink-0 rounded-full"
+                />
                 <span className="min-w-0">
                   <span className="text-ink block text-[0.9375rem] leading-snug">{item.text}</span>
                   <span className="text-ink-muted mt-0.5 block text-xs">{item.basis}</span>
@@ -74,10 +77,17 @@ export function GlanceBrief({
         <section
           className={cn(
             'rounded-[var(--radius-lg)] border px-4 py-3.5',
-            loop.overdue ? 'border-critical/25 bg-critical-wash' : 'border-accent/25 bg-accent-wash',
+            loop.overdue
+              ? 'border-critical/25 bg-critical-wash'
+              : 'border-accent/25 bg-accent-wash',
           )}
         >
-          <h2 className={cn('label flex items-center gap-1.5', loop.overdue ? 'text-critical' : 'text-accent')}>
+          <h2
+            className={cn(
+              'label flex items-center gap-1.5',
+              loop.overdue ? 'text-critical' : 'text-accent',
+            )}
+          >
             {loop.overdue ? (
               <CircleAlert className="size-3.5" aria-hidden="true" />
             ) : (

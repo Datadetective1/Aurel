@@ -75,4 +75,3 @@ export function declaredIcons(html: string, base: string): string[] {
   }
   return found.sort((a, b) => b.weight - a.weight).map((f) => f.href)
 }
-

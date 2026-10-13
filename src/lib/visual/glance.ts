@@ -23,12 +23,14 @@ export function prepState(input: { hasBrief: boolean; attendeeCount: number }): 
   return 'not_prepared'
 }
 
-export const PREP_META: Record<PrepState, { label: string; tone: 'positive' | 'caution' | 'neutral' }> =
-  {
-    ready: { label: 'Brief ready', tone: 'positive' },
-    needs_people: { label: 'No one added yet', tone: 'neutral' },
-    not_prepared: { label: 'Not prepared', tone: 'caution' },
-  }
+export const PREP_META: Record<
+  PrepState,
+  { label: string; tone: 'positive' | 'caution' | 'neutral' }
+> = {
+  ready: { label: 'Brief ready', tone: 'positive' },
+  needs_people: { label: 'No one added yet', tone: 'neutral' },
+  not_prepared: { label: 'Not prepared', tone: 'caution' },
+}
 
 export interface RememberItem {
   text: string
@@ -93,7 +95,10 @@ export function composeRemember(input: RememberInput): RememberItem[] {
   const open = input.openLoopCount ?? 0
   if (open > 0) {
     push({
-      text: open === 1 ? 'One loop is still open between you' : `${open} loops are still open between you`,
+      text:
+        open === 1
+          ? 'One loop is still open between you'
+          : `${open} loops are still open between you`,
       personId: null,
       basis: 'Open loops on record',
     })

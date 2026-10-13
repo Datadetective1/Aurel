@@ -164,7 +164,11 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     resolveFace(supabase, person),
     loadPersonRecordVisual(supabase, user.id, id, { firstName, timeZone, now }),
     person.organization_id
-      ? supabase.from('organizations').select('domain').eq('id', person.organization_id).maybeSingle()
+      ? supabase
+          .from('organizations')
+          .select('domain')
+          .eq('id', person.organization_id)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ])
 
@@ -199,7 +203,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const interactionCount = (participations ?? []).length
   const directions = countDirections(loops)
   const closedCount = record.allLoops.filter(
-    (l) => l.reviewStatus === 'confirmed' && (l.status === 'done' || l.status === 'cancelled' || l.status === 'dropped'),
+    (l) =>
+      l.reviewStatus === 'confirmed' &&
+      (l.status === 'done' || l.status === 'cancelled' || l.status === 'dropped'),
   ).length
 
   // --- sources, with what each one is actually holding up --------------------
@@ -343,12 +349,24 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                 Ask
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="icon" className="size-11" aria-label={`Draft a message to ${firstName}`}>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label={`Draft a message to ${firstName}`}
+            >
               <Link href={`/coach?person=${id}&mode=adapt`}>
                 <MessageSquare className="size-4" aria-hidden="true" />
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="icon" className="size-11" aria-label={`Edit ${name}`}>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label={`Edit ${name}`}
+            >
               <Link href={`/people/${id}/edit`}>
                 <Settings2 className="size-4" aria-hidden="true" />
               </Link>
@@ -396,17 +414,25 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <div>
               <Eyebrow>Open loops</Eyebrow>
               <h2 id="loops-heading" className="font-display text-ink mt-2 text-xl">
-                {loops.length === 0 ? `Nothing open with ${firstName}` : `${loops.length} open with ${firstName}`}
+                {loops.length === 0
+                  ? `Nothing open with ${firstName}`
+                  : `${loops.length} open with ${firstName}`}
               </h2>
             </div>
             <AddLoop people={[{ id, name }]} defaultPersonId={id} />
           </div>
           {loops.length > 0 ? (
-            <LoopList className="mt-5" loops={loops} timeZone={timeZone} now={now} showPerson={false} />
+            <LoopList
+              className="mt-5"
+              loops={loops}
+              timeZone={timeZone}
+              now={now}
+              showPerson={false}
+            />
           ) : (
             <p className="text-ink-muted mt-3 max-w-lg text-sm leading-relaxed">
-              Promises, follow-ups and unanswered questions from your conversations with {firstName} collect
-              here, and {brand.name} raises them before you next speak.
+              Promises, follow-ups and unanswered questions from your conversations with {firstName}{' '}
+              collect here, and {brand.name} raises them before you next speak.
             </p>
           )}
           {closedCount > 0 ? (
@@ -422,7 +448,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               <div className="mt-4 grid gap-6">
                 {[...byCategory.entries()].map(([category, items]) => (
                   <div key={category}>
-                    <h3 className="text-ink text-sm font-medium">{CATEGORY_LABEL[category] ?? category}</h3>
+                    <h3 className="text-ink text-sm font-medium">
+                      {CATEGORY_LABEL[category] ?? category}
+                    </h3>
                     <ul className="mt-3 grid gap-3.5">
                       {items.map((o) => (
                         <EvidenceLine
@@ -541,16 +569,25 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                     <ul className="mt-3 grid gap-3.5">
                       {groupFacts.map((fact) => (
                         <li key={fact.id} className="flex gap-3">
-                          <span aria-hidden="true" className="bg-line-strong mt-2.5 h-px w-3 shrink-0" />
+                          <span
+                            aria-hidden="true"
+                            className="bg-line-strong mt-2.5 h-px w-3 shrink-0"
+                          />
                           <div className="min-w-0">
                             <p className="text-ink text-sm leading-relaxed">
                               {fact.value}
-                              {fact.detail ? <span className="text-ink-muted"> — {fact.detail}</span> : null}
+                              {fact.detail ? (
+                                <span className="text-ink-muted"> — {fact.detail}</span>
+                              ) : null}
                             </p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                               <EvidenceBadge level={fact.evidence_level} />
                               <ProvenanceLabel
-                                provenance={fact.evidence_level === 'inferred' ? 'inference' : 'public_research'}
+                                provenance={
+                                  fact.evidence_level === 'inferred'
+                                    ? 'inference'
+                                    : 'public_research'
+                                }
                               />
                               {/* Freshness. Phrased as the SOURCE's date, not the
                                   fact's: a page can predate the thing it describes. */}
@@ -561,7 +598,9 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                               ) : (
                                 <span className="text-ink-faint text-xs">source gave no date</span>
                               )}
-                              {fact.has_conflict ? <Badge tone="caution">Sources disagree</Badge> : null}
+                              {fact.has_conflict ? (
+                                <Badge tone="caution">Sources disagree</Badge>
+                              ) : null}
                             </div>
                           </div>
                         </li>
@@ -577,8 +616,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <section className="mt-8">
               <Eyebrow>Sources</Eyebrow>
               <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
-                Everything above that came from public material rests on these. Correct any of them —
-                what they alone supported is withdrawn with them.
+                Everything above that came from public material rests on these. Correct any of them
+                — what they alone supported is withdrawn with them.
               </p>
               <ul className="mt-3 grid gap-2">
                 {sources.map((source) => (
@@ -598,4 +637,3 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     </Container>
   )
 }
-

@@ -463,7 +463,10 @@ export default async function TodayPage({
                       company: p.organization,
                       companyDomain: domains.get(p.id) ?? null,
                     }))}
-                    prep={prepState({ hasBrief: prepared.has(meeting.id), attendeeCount: people.length })}
+                    prep={prepState({
+                      hasBrief: prepared.has(meeting.id),
+                      attendeeCount: people.length,
+                    })}
                     openLoops={roomLoops.length}
                     owe={roomLoops.filter((l) => actionDirection(l) === 'owe').length}
                     important={meeting.importance >= 4}

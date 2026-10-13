@@ -135,11 +135,15 @@ export async function loadMeetingVisual(
       rows.map((r) => r.people!),
       (p) => p.id,
     ),
-    ids.length ? listLoops(supabase, userId, { timeZone, now, scope: 'active' }) : Promise.resolve([]),
+    ids.length
+      ? listLoops(supabase, userId, { timeZone, now, scope: 'active' })
+      : Promise.resolve([]),
     ids.length
       ? supabase
           .from('interaction_participants')
-          .select('interaction_id, person_id, interactions(id, title, occurred_at, outcome, summary)')
+          .select(
+            'interaction_id, person_id, interactions(id, title, occurred_at, outcome, summary)',
+          )
           .eq('user_id', userId)
           .in('person_id', ids)
       : Promise.resolve({ data: [] as never[] }),
@@ -186,7 +190,13 @@ export async function loadMeetingVisual(
   type Participation = {
     interaction_id: string
     person_id: string
-    interactions: { id: string; title: string | null; occurred_at: string; outcome: string | null; summary: string | null } | null
+    interactions: {
+      id: string
+      title: string | null
+      occurred_at: string
+      outcome: string | null
+      summary: string | null
+    } | null
   }
   const parts = ((participations.data ?? []) as Participation[]).filter((p) => p.interactions)
   const latest = parts
@@ -205,7 +215,10 @@ export async function loadMeetingVisual(
   // --- what the people in the room verifiably share -------------------------
   const byInteraction = new Map<string, string[]>()
   for (const p of parts) {
-    byInteraction.set(p.interaction_id, [...(byInteraction.get(p.interaction_id) ?? []), p.person_id])
+    byInteraction.set(p.interaction_id, [
+      ...(byInteraction.get(p.interaction_id) ?? []),
+      p.person_id,
+    ])
   }
   const byMeeting = new Map<string, string[]>()
   for (const row of (coAttendance.data ?? []) as { meeting_id: string; person_id: string }[]) {
@@ -226,7 +239,12 @@ export async function loadMeetingVisual(
               value: string
               evidence_level: 'confirmed' | 'observed' | 'inferred' | 'unknown'
             }[]
-          ).map((f) => ({ personId: f.person_id, kind: f.kind, value: f.value, evidence: f.evidence_level })),
+          ).map((f) => ({
+            personId: f.person_id,
+            kind: f.kind,
+            value: f.value,
+            evidence: f.evidence_level,
+          })),
           meetings: [...byMeeting.entries()].map(([id, personIds]) => ({ id, personIds })),
           conversations: [...byInteraction.entries()].map(([id, personIds]) => ({ id, personIds })),
         }).map((c) => ({ ...c, description: describeConnection(c) }))

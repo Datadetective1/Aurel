@@ -13,7 +13,9 @@ describe('actionDirection', () => {
     expect(actionDirection({ kind: 'commitment', owner: 'shared', status: 'open' })).toBe('revisit')
     expect(actionDirection({ kind: 'question', owner: 'user', status: 'open' })).toBe('revisit')
     expect(actionDirection({ kind: 'follow_up', owner: 'user', status: 'open' })).toBe('personal')
-    expect(actionDirection({ kind: 'commitment', owner: 'person', status: 'done' })).toBe('completed')
+    expect(actionDirection({ kind: 'commitment', owner: 'person', status: 'done' })).toBe(
+      'completed',
+    )
   })
 
   it('a deferred loop keeps its direction rather than becoming a new state', () => {
@@ -50,8 +52,18 @@ describe('buildTimeline', () => {
           },
         ],
         meetings: [
-          { id: 'm-next', title: 'Follow-up', scheduledAt: '2026-10-20T15:00:00Z', status: 'upcoming' },
-          { id: 'm-past', title: 'Walkthrough', scheduledAt: '2026-10-01T15:00:00Z', status: 'completed' },
+          {
+            id: 'm-next',
+            title: 'Follow-up',
+            scheduledAt: '2026-10-20T15:00:00Z',
+            status: 'upcoming',
+          },
+          {
+            id: 'm-past',
+            title: 'Walkthrough',
+            scheduledAt: '2026-10-01T15:00:00Z',
+            status: 'completed',
+          },
         ],
         loops: [
           {
@@ -152,7 +164,10 @@ describe('composeRemember', () => {
       lastConversation: { title: 'Kickoff', outcome: 'Agreed a pilot', summary: null },
       openLoopCount: 2,
     })
-    expect(items.map((i) => i.text)).toEqual(['Agreed a pilot', '2 loops are still open between you'])
+    expect(items.map((i) => i.text)).toEqual([
+      'Agreed a pilot',
+      '2 loops are still open between you',
+    ])
     expect(composeRemember({ brief: null })).toEqual([])
   })
 
@@ -182,7 +197,10 @@ describe('findConnections', () => {
         // Near-misses are not joined.
         { personId: 'b', kind: 'education', value: 'Stanford', evidence: 'confirmed' },
       ],
-      meetings: [{ id: 'm1', personIds: ['a', 'c'] }, { id: 'm2', personIds: ['a', 'c'] }],
+      meetings: [
+        { id: 'm1', personIds: ['a', 'c'] },
+        { id: 'm2', personIds: ['a', 'c'] },
+      ],
     })
 
     const kinds = connections.map((c) => `${c.a}-${c.b}:${c.kind}`).sort()

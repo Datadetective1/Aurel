@@ -77,12 +77,21 @@ const SOURCE_WORD: Record<TimelineSource, string> = {
   inference: `inferred`,
 }
 
+const DETAIL_LABEL: Partial<Record<TimelineKind, string>> = {
+  decision: 'Show why',
+  note: 'Show the full note',
+  memory: 'Show in full',
+}
+
 function EntryRow({ entry, timeZone }: { entry: TimelineEntry; timeZone: string }) {
   const Icon = KIND_ICON[entry.kind]
   const EvidenceIcon = EVIDENCE_ICON[entry.evidence]
   const evidenceText = `${EVIDENCE_WORD[entry.evidence]}, ${SOURCE_WORD[entry.source]}`
   const title = entry.href ? (
-    <Link href={entry.href} className="hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]">
+    <Link
+      href={entry.href}
+      className="hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+    >
       {entry.title}
     </Link>
   ) : (
@@ -127,7 +136,9 @@ function EntryRow({ entry, timeZone }: { entry: TimelineEntry; timeZone: string 
         {entry.detail ? (
           <details className="group mt-1.5">
             <summary className="text-ink-muted hover:text-ink inline-flex min-h-8 cursor-pointer list-none items-center gap-1 text-xs underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
-              <span className="group-open:hidden">Show what was said</span>
+              <span className="group-open:hidden">
+                {DETAIL_LABEL[entry.kind] ?? 'Show what was said'}
+              </span>
               <span className="hidden group-open:inline">Hide</span>
             </summary>
             <p className="border-line text-ink-secondary mt-1 border-l-2 pl-3 text-[0.8125rem] leading-relaxed whitespace-pre-wrap">

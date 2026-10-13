@@ -111,7 +111,9 @@ function isMissingTable(error: { code?: string; message?: string } | null): bool
 
 /** Whether the suggestion flow can run here: the migration has been applied. */
 export async function photoSuggestionsAvailable(supabase: Client): Promise<boolean> {
-  const { error } = await suggestionsTable(supabase).select('id', { head: true, count: 'exact' }).limit(1)
+  const { error } = await suggestionsTable(supabase)
+    .select('id', { head: true, count: 'exact' })
+    .limit(1)
   if (isMissingTable(error)) return false
   return !error
 }
@@ -123,7 +125,9 @@ export async function pendingSuggestion(
   personId: string,
 ): Promise<PhotoSuggestionRow | null> {
   const { data, error } = await suggestionsTable(supabase)
-    .select('id, person_id, image_url, source_url, source_label, source_id, provider, storage_path, status, created_at')
+    .select(
+      'id, person_id, image_url, source_url, source_label, source_id, provider, storage_path, status, created_at',
+    )
     .eq('user_id', userId)
     .eq('person_id', personId)
     .eq('status', 'suggested')
@@ -147,6 +151,11 @@ export async function decidedImageUrls(
   return new Set(((data ?? []) as { image_url: string }[]).map((r) => r.image_url))
 }
 
-export function suggestionStoragePath(userId: string, personId: string, suggestionId: string, ext: string) {
+export function suggestionStoragePath(
+  userId: string,
+  personId: string,
+  suggestionId: string,
+  ext: string,
+) {
   return `${userId}/suggestions/${personId}/${suggestionId}.${ext}`
 }

@@ -66,7 +66,13 @@ export function QuickBrief({
   people: VisualPerson[]
   connections: VisualConnection[]
   loops: VisualLoop[]
-  lastConversation: { id: string; title: string; occurredAt: string; outcome: string | null; summary: string | null } | null
+  lastConversation: {
+    id: string
+    title: string
+    occurredAt: string
+    outcome: string | null
+    summary: string | null
+  } | null
   cues: ListeningCue[]
   centerLabel: string
   timeZone: string
@@ -89,7 +95,9 @@ export function QuickBrief({
           ) : null}
           {brief.outcomeToLeaveWith ? (
             <Module title="Leave with" icon={Flag}>
-              <p className="text-ink mt-2 text-[0.9375rem] leading-snug">{brief.outcomeToLeaveWith}</p>
+              <p className="text-ink mt-2 text-[0.9375rem] leading-snug">
+                {brief.outcomeToLeaveWith}
+              </p>
             </Module>
           ) : null}
         </div>
@@ -135,12 +143,22 @@ export function QuickBrief({
                             className="mt-0.5"
                           />
                         ) : (
-                          <span aria-hidden="true" className="bg-line-strong mt-2 h-px w-3 shrink-0" />
+                          <span
+                            aria-hidden="true"
+                            className="bg-line-strong mt-2 h-px w-3 shrink-0"
+                          />
                         )}
                         <span className="min-w-0">
-                          <span className="text-ink block text-sm leading-snug">{l.description}</span>
+                          <span className="text-ink block text-sm leading-snug">
+                            {l.description}
+                          </span>
                           {l.dueOn ? (
-                            <span className={cn('mt-0.5 block text-xs', l.overdue ? 'text-critical' : 'text-ink-muted')}>
+                            <span
+                              className={cn(
+                                'mt-0.5 block text-xs',
+                                l.overdue ? 'text-critical' : 'text-ink-muted',
+                              )}
+                            >
                               {l.overdue ? 'Overdue · ' : 'Due '}
                               {relativeDay(l.dueOn, timeZone, now).toLowerCase()}
                             </span>
@@ -178,7 +196,9 @@ export function QuickBrief({
                   <div className="min-w-0">
                     <h3 className="text-ink text-sm font-medium">{p.name}</h3>
                     {p.guidance[0] ? (
-                      <p className="text-ink-secondary mt-0.5 text-[0.8125rem] leading-relaxed">{p.guidance[0]}</p>
+                      <p className="text-ink-secondary mt-0.5 text-[0.8125rem] leading-relaxed">
+                        {p.guidance[0]}
+                      </p>
                     ) : null}
                     {p.knownConcerns[0] ? (
                       <p className="mt-1.5">
@@ -188,7 +208,9 @@ export function QuickBrief({
                       </p>
                     ) : null}
                     {p.publicOnly ? (
-                      <p className="text-ink-muted mt-1 text-xs">From public sources only — preliminary until you have met.</p>
+                      <p className="text-ink-muted mt-1 text-xs">
+                        From public sources only — preliminary until you have met.
+                      </p>
                     ) : null}
                   </div>
                 </li>
@@ -208,7 +230,9 @@ export function QuickBrief({
 
       {cues.length > 0 ? (
         <Module title="Listen for" icon={Ear}>
-          <p className="text-ink-muted mt-1.5 text-xs">Open in your record. {brand.name} is not predicting what anyone will say.</p>
+          <p className="text-ink-muted mt-1.5 text-xs">
+            Open in your record. {brand.name} is not predicting what anyone will say.
+          </p>
           <ul className="mt-3 grid gap-2.5">
             {cues.map((cue, i) => (
               <li key={i} className="flex gap-2.5">
@@ -231,16 +255,28 @@ export function QuickBrief({
                 <details className="group border-line bg-surface rounded-[var(--radius-md)] border">
                   <summary className="text-ink flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0">{o.objection}</span>
-                    <span aria-hidden="true" className="text-ink-muted shrink-0 text-xs group-open:hidden">
+                    <span
+                      aria-hidden="true"
+                      className="text-ink-muted shrink-0 text-xs group-open:hidden"
+                    >
                       Response
                     </span>
-                    <span aria-hidden="true" className="text-ink-muted hidden shrink-0 text-xs group-open:inline">
+                    <span
+                      aria-hidden="true"
+                      className="text-ink-muted hidden shrink-0 text-xs group-open:inline"
+                    >
                       Hide
                     </span>
                   </summary>
                   <div className="border-line border-t px-4 py-3">
-                    <p className="text-ink-secondary text-[0.8125rem] leading-relaxed">{o.response}</p>
-                    {o.basis ? <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">Why: {o.basis}</p> : null}
+                    <p className="text-ink-secondary text-[0.8125rem] leading-relaxed">
+                      {o.response}
+                    </p>
+                    {o.basis ? (
+                      <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
+                        Why: {o.basis}
+                      </p>
+                    ) : null}
                   </div>
                 </details>
               </li>
@@ -257,7 +293,10 @@ export function QuickBrief({
           </h2>
           <ul className="mt-2.5 grid gap-1.5">
             {brief.uncertainties.slice(0, 3).map((item, i) => (
-              <li key={i} className="text-ink-secondary flex gap-2.5 text-[0.8125rem] leading-relaxed">
+              <li
+                key={i}
+                className="text-ink-secondary flex gap-2.5 text-[0.8125rem] leading-relaxed"
+              >
                 <span aria-hidden="true" className="bg-caution/50 mt-2 h-px w-3 shrink-0" />
                 {item}
               </li>

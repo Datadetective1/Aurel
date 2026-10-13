@@ -49,7 +49,11 @@ export function actionDirection(loop: DirectionInput): ActionDirection {
  */
 export const DIRECTION_META: Record<
   ActionDirection,
-  { label: string; short: string; glyph: 'arrow-up-right' | 'arrow-down-left' | 'repeat' | 'bookmark' | 'check' }
+  {
+    label: string
+    short: string
+    glyph: 'arrow-up-right' | 'arrow-down-left' | 'repeat' | 'bookmark' | 'check'
+  }
 > = {
   owe: { label: 'I owe them', short: 'You owe', glyph: 'arrow-up-right' },
   waiting: { label: 'Waiting on them', short: 'Waiting', glyph: 'arrow-down-left' },
@@ -59,7 +63,13 @@ export const DIRECTION_META: Record<
 }
 
 /** Display order: what the user has to do first, what they are owed next. */
-export const DIRECTION_ORDER: ActionDirection[] = ['owe', 'personal', 'waiting', 'revisit', 'completed']
+export const DIRECTION_ORDER: ActionDirection[] = [
+  'owe',
+  'personal',
+  'waiting',
+  'revisit',
+  'completed',
+]
 
 export function countDirections(loops: DirectionInput[]): Record<ActionDirection, number> {
   const counts: Record<ActionDirection, number> = {

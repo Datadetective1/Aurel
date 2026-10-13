@@ -69,7 +69,11 @@ export default async function AtlasPage() {
       .in('kind', ['prior_role', 'education'])
       .in('evidence_level', ['confirmed', 'observed'])
       .limit(2000),
-    supabase.from('meeting_attendees').select('meeting_id, person_id').eq('user_id', user.id).limit(3000),
+    supabase
+      .from('meeting_attendees')
+      .select('meeting_id, person_id')
+      .eq('user_id', user.id)
+      .limit(3000),
     supabase
       .from('interaction_participants')
       .select('interaction_id, person_id')
