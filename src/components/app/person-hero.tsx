@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Portrait } from './person-portrait'
 import { Badge } from '@/components/ui/primitives'
+import { CompanyMark } from '@/components/visual/company-mark'
 import { cn } from '@/lib/utils'
 
 /**
@@ -32,6 +33,7 @@ export function PersonHero({
   src,
   title,
   company,
+  companyDomain = null,
   facts = [],
   actions,
   aside,
@@ -44,6 +46,8 @@ export function PersonHero({
   src: string | null
   title: string | null
   company: string | null
+  /** The organisation's domain on record; the only basis for showing its logo. */
+  companyDomain?: string | null
   facts?: HeroFact[]
   /** Buttons under the name. */
   actions?: React.ReactNode
@@ -88,8 +92,14 @@ export function PersonHero({
           >
             {name}
           </h1>
-          <p className={cn('text-ink-secondary mt-1', size === 'page' ? 'text-base' : 'text-sm')}>
-            {subtitle || 'No role recorded yet'}
+          <p
+            className={cn(
+              'text-ink-secondary mt-1 flex min-w-0 items-center gap-2',
+              size === 'page' ? 'text-base' : 'text-sm',
+            )}
+          >
+            {company ? <CompanyMark name={company} domain={companyDomain} size="sm" /> : null}
+            <span className="min-w-0">{subtitle || 'No role recorded yet'}</span>
           </p>
 
           {facts.length > 0 ? (
