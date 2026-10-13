@@ -3,17 +3,36 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LoopList } from '@/components/app/loop-list'
-import { PersonHero } from '@/components/app/person-hero'
+import { ConversationCard } from '@/components/app/conversation-card'
 import { MeetingCockpit } from '@/components/visual/meeting-cockpit'
 import { GlanceBrief } from '@/components/visual/glance-brief'
 import { QuickBrief } from '@/components/visual/quick-brief'
 import { RoomView } from '@/components/visual/room-view'
 import { PersonGlance } from '@/components/visual/person-glance'
-import { RelationshipTimeline } from '@/components/visual/timeline'
 import { MeetingCard } from '@/components/visual/meeting-card'
 import { AtlasConnections, AtlasLegend } from '@/components/visual/atlas-connections'
 import { PhotoSuggestionCard } from '@/components/visual/photo-suggestion'
 import { Container, Eyebrow } from '@/components/ui/primitives'
+import { AppShell } from '@/components/app/app-shell'
+import { ConversationDetailView } from '@/components/app/conversation-detail'
+import { PersonRelationshipSections } from '@/components/app/person-sections'
+import { ResearchPanel } from '@/components/app/research-panel'
+import { PeopleList } from './preview-people'
+import { ConversationsListView } from './preview-conversations'
+import { PersonHeroView } from './preview-person'
+import { researchCapability } from '@/lib/research/providers'
+import {
+  CONVERSATION,
+  CONVERSATION_DECISIONS,
+  CONVERSATION_LOOPS,
+  CONVERSATION_ROOM,
+  CONVERSATIONS,
+  NEXT_TIME,
+  OBJECTIONS,
+  PEOPLE_CARDS,
+  PICKABLE,
+  TRANSCRIPT,
+} from './fixtures-conversation'
 import { ThemeToggle } from '@/components/theme-provider'
 import { listeningCues } from '@/lib/brief'
 import { countDirections } from '@/lib/visual/relationship-actions'
@@ -47,7 +66,17 @@ export const metadata: Metadata = {
  * 404 on a production deployment.
  */
 
-const SCREENS = ['glance', 'quick', 'person', 'today', 'atlas'] as const
+const SCREENS = [
+  'today',
+  'glance',
+  'quick',
+  'conversation',
+  'people',
+  'person',
+  'person-empty',
+  'conversations',
+  'atlas',
+] as const
 type Screen = (typeof SCREENS)[number]
 
 const TZ = 'America/Toronto'
@@ -76,11 +105,8 @@ export default async function VisualPreview({
   })
 
   return (
-    <div className="bg-bg min-h-dvh">
-      <nav
-        aria-label="Preview screens"
-        className="border-line bg-surface sticky top-0 z-30 border-b"
-      >
+    <AppShell user={{ name: 'Amary', email: 'preview@example.invalid', avatarUrl: null, plan: 'free' }}>
+      <nav aria-label="Preview screens" className="border-line bg-surface border-b">
         <Container size="default" className="flex flex-wrap items-center gap-2 py-2">
           <span className="label mr-2">Preview</span>
           {SCREENS.map((s) => (
@@ -99,7 +125,7 @@ export default async function VisualPreview({
         </Container>
       </nav>
 
-      <main id="main">
+      <div>
         {screen === 'glance' ? (
           <Container size="narrow" className="py-6 sm:py-10">
             <MeetingCockpit
@@ -150,7 +176,7 @@ export default async function VisualPreview({
 
         {screen === 'person' ? (
           <Container size="default" className="py-8 sm:py-12">
-            <PersonHero
+            <PersonHeroView
               personId={columbus.id}
               name={columbus.name}
               fullName={columbus.fullName}
@@ -158,7 +184,8 @@ export default async function VisualPreview({
               title={columbus.title}
               company={columbus.company}
               companyDomain={columbus.companyDomain}
-              facts={[{ label: 'Customer' }, { label: 'Importance 5/5', tone: 'outline' }]}
+              relevance={5}
+              relationship="Customer"
             />
             <PhotoSuggestionCard
               className="mt-4"
@@ -186,29 +213,18 @@ export default async function VisualPreview({
               timeZone={TZ}
               now={now}
             />
-            <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-12">
-              <section>
-                <Eyebrow>Open loops</Eyebrow>
-                <h2 className="font-display text-ink mt-2 text-xl">2 open with Columbus</h2>
-                <LoopList
-                  className="mt-5"
-                  loops={LOOP_RECORDS.filter((l) => l.personId === columbus.id)}
-                  timeZone={TZ}
-                  now={now}
-                  showPerson={false}
-                />
-              </section>
-              <section>
-                <Eyebrow>Relationship memory</Eyebrow>
-                <h2 className="font-display text-ink mt-2 text-xl">2 conversations on record</h2>
-                <RelationshipTimeline
-                  className="mt-5"
-                  entries={TIMELINE}
-                  timeZone={TZ}
-                  initial={5}
-                />
-              </section>
-            </div>
+            <PersonRelationshipSections
+              personId={columbus.id}
+              name={columbus.name}
+              firstName="Columbus"
+              loops={LOOP_RECORDS.filter((l) => l.personId === columbus.id)}
+              closedCount={1}
+              learned={[]}
+              interactionCount={2}
+              timeline={TIMELINE}
+              timeZone={TZ}
+              now={now}
+            />
           </Container>
         ) : null}
 
@@ -239,6 +255,110 @@ export default async function VisualPreview({
                 ))}
               </ul>
             </section>
+            <section className="mt-12">
+              <Eyebrow className="text-accent">Waiting on you</Eyebrow>
+              <ul className="mt-4 grid gap-3">
+                <ConversationCard conversation={CONVERSATIONS[1]!} timeZone={TZ} now={now} />
+              </ul>
+            </section>
+            <section className="mt-12">
+              <Eyebrow>Open loops</Eyebrow>
+              <h2 className="font-display text-ink mt-2 text-xl">1 past due</h2>
+              <LoopList className="mt-5" loops={LOOP_RECORDS} timeZone={TZ} now={now} grouped={false} />
+            </section>
+            <section className="mt-12">
+              <Eyebrow>Remember</Eyebrow>
+              <h2 className="font-display text-ink mt-2 text-xl">Recent conversations</h2>
+              <ul className="mt-5 grid gap-3 sm:grid-cols-3">
+                {CONVERSATIONS.map((c) => (
+                  <ConversationCard key={c.id} conversation={c} timeZone={TZ} now={now} compact />
+                ))}
+              </ul>
+            </section>
+          </Container>
+        ) : null}
+
+        {screen === 'conversation' ? (
+          <ConversationDetailView
+            id="c-1"
+            justCreated={false}
+            conversation={CONVERSATION}
+            meeting={{ id: 'm-old', title: 'Pilot scoping' }}
+            wentWell={4}
+            timeZone={TZ}
+            now={now}
+            roomPeople={CONVERSATION_ROOM}
+            participantPeople={PICKABLE.slice(0, 2)}
+            pickable={PICKABLE}
+            speakerSuggestions={[]}
+            proposedLoops={[]}
+            proposedDecisions={[]}
+            confirmedDecisions={CONVERSATION_DECISIONS}
+            openKept={CONVERSATION_LOOPS}
+            closedKept={[]}
+            keptCount={CONVERSATION_LOOPS.length}
+            pending={0}
+            showReview={false}
+            loopPeople={[{ id: 'p-columbus', name: 'Columbus' }, { id: 'p-maureen', name: 'Maureen' }]}
+            memoryByPerson={new Map()}
+            nextTime={NEXT_TIME}
+            objections={OBJECTIONS}
+            text={TRANSCRIPT}
+            grounded={false}
+          />
+        ) : null}
+
+        {screen === 'people' ? (
+          <Container size="default" className="py-8 sm:py-12">
+            <h1 className="font-display text-ink text-3xl sm:text-4xl">People</h1>
+            <PeopleList people={PEOPLE_CARDS} className="mt-8" />
+          </Container>
+        ) : null}
+
+        {screen === 'conversations' ? (
+          <Container size="default" className="py-8 sm:py-12">
+            <h1 className="font-display text-ink text-3xl sm:text-4xl">Conversations</h1>
+            <ConversationsListView conversations={CONVERSATIONS} timeZone={TZ} now={now} />
+          </Container>
+        ) : null}
+
+        {screen === 'person-empty' ? (
+          <Container size="default" className="py-8 sm:py-12">
+            <PersonHeroView
+              personId="p-jonathan"
+              name="Jonathan Reyes"
+              fullName="Jonathan Reyes"
+              src={null}
+              title="Principal Engineer"
+              company="Northwind Labs"
+              companyDomain="northwind.example"
+              relevance={4}
+              relationship="External contact"
+            />
+            <PersonRelationshipSections
+              personId="p-jonathan"
+              name="Jonathan Reyes"
+              firstName="Jonathan"
+              loops={[]}
+              closedCount={0}
+              learned={[]}
+              interactionCount={0}
+              timeline={[]}
+              timeZone={TZ}
+              now={now}
+            />
+            <div className="mt-10">
+              <ResearchPanel
+                personId="p-jonathan"
+                personName="Jonathan"
+                canDiscover={false}
+                discoveryHint={researchCapability().discoveryHint}
+                hasProfileUrl={false}
+                lastResearchedAt={null}
+                sourceCount={0}
+                timeZone={TZ}
+              />
+            </div>
           </Container>
         ) : null}
 
@@ -268,7 +388,7 @@ export default async function VisualPreview({
             </section>
           </Container>
         ) : null}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

@@ -12,17 +12,15 @@ import {
 } from 'lucide-react'
 import { AddContext } from '@/components/app/add-context'
 import { AddDocument } from '@/components/app/add-document'
-import { AddLoop } from '@/components/app/add-loop'
 import { ConversationCard } from '@/components/app/conversation-card'
 import { PersonHero, type HeroFact } from '@/components/app/person-hero'
-import { LoopList } from '@/components/app/loop-list'
-import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
+import { EvidenceBadge } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
 import { ResearchPanel } from '@/components/app/research-panel'
 import { SourceRow, type SourceRowData } from '@/components/app/source-controls'
 import { PersonGlance } from '@/components/visual/person-glance'
-import { RelationshipTimeline } from '@/components/visual/timeline'
+import { PersonRelationshipSections } from '@/components/app/person-sections'
 import {
   FindPhotoButton,
   PhotoSuggestionCard,
@@ -40,7 +38,6 @@ import { pendingSuggestion, photoSuggestionsAvailable } from '@/lib/photos/sugge
 import { AVATAR_BUCKET } from '@/lib/conversations/avatars'
 import { track } from '@/lib/analytics'
 import { formatPublishedDate, pluralise } from '@/lib/format'
-import { brand } from '@/lib/brand'
 
 export async function generateMetadata({
   params,
@@ -407,91 +404,28 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         </div>
       ) : null}
 
-      {/* --- open loops and the timeline, side by side on a desk ------------------ */}
-      <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-12">
-        <section aria-labelledby="loops-heading" className="min-w-0">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <Eyebrow>Open loops</Eyebrow>
-              <h2 id="loops-heading" className="font-display text-ink mt-2 text-xl">
-                {loops.length === 0
-                  ? `Nothing open with ${firstName}`
-                  : `${loops.length} open with ${firstName}`}
-              </h2>
-            </div>
-            <AddLoop people={[{ id, name }]} defaultPersonId={id} />
-          </div>
-          {loops.length > 0 ? (
-            <LoopList
-              className="mt-5"
-              loops={loops}
-              timeZone={timeZone}
-              now={now}
-              showPerson={false}
-            />
-          ) : (
-            <p className="text-ink-muted mt-3 max-w-lg text-sm leading-relaxed">
-              Promises, follow-ups and unanswered questions from your conversations with {firstName}{' '}
-              collect here, and {brand.name} raises them before you next speak.
-            </p>
-          )}
-          {closedCount > 0 ? (
-            <p className="text-ink-muted mt-3 text-xs">
-              {pluralise(closedCount, 'loop')} closed with {firstName}.
-            </p>
-          ) : null}
-
-          {/* --- what you have learned, as short evidence lines -------------- */}
-          {active.length > 0 ? (
-            <div className="mt-10">
-              <Eyebrow>What you have learned</Eyebrow>
-              <div className="mt-4 grid gap-6">
-                {[...byCategory.entries()].map(([category, items]) => (
-                  <div key={category}>
-                    <h3 className="text-ink text-sm font-medium">
-                      {CATEGORY_LABEL[category] ?? category}
-                    </h3>
-                    <ul className="mt-3 grid gap-3.5">
-                      {items.map((o) => (
-                        <EvidenceLine
-                          key={o.id}
-                          content={o.content}
-                          level={o.evidence_level}
-                          provenance={provenanceFor(o.source_kind, o.evidence_level)}
-                          reinforcementCount={o.reinforcement_count}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </section>
-
-        <section aria-labelledby="timeline-heading" className="min-w-0">
-          <Eyebrow>Relationship memory</Eyebrow>
-          <h2 id="timeline-heading" className="font-display text-ink mt-2 text-xl">
-            {interactionCount === 0
-              ? 'Nothing kept yet'
-              : `${pluralise(interactionCount, 'conversation')} on record`}
-          </h2>
-          <RelationshipTimeline
-            className="mt-5"
-            entries={record.timeline}
-            timeZone={timeZone}
-            emptyText={`After you next speak with ${firstName}, capture the conversation — a voice note, a pasted transcript or a few typed lines. That is where this starts compounding.`}
-          />
-          {record.timeline.length === 0 ? (
-            <Button asChild size="sm" className="mt-4">
-              <Link href={`/conversations/new?person=${id}`}>
-                <Mic className="size-3.5" aria-hidden="true" />
-                Capture a conversation
-              </Link>
-            </Button>
-          ) : null}
-        </section>
-      </div>
+      <PersonRelationshipSections
+        personId={id}
+        name={name}
+        firstName={firstName}
+        loops={loops}
+        closedCount={closedCount}
+        learned={[...byCategory.entries()].map(([category, items]) => ({
+          category,
+          label: CATEGORY_LABEL[category] ?? category,
+          items: items.map((o) => ({
+            id: o.id,
+            content: o.content,
+            level: o.evidence_level,
+            provenance: provenanceFor(o.source_kind, o.evidence_level),
+            reinforcementCount: o.reinforcement_count,
+          })),
+        }))}
+        interactionCount={interactionCount}
+        timeline={record.timeline}
+        timeZone={timeZone}
+        now={now}
+      />
 
       {/* --- conversations waiting on the user, or the last few ------------------- */}
       {conversations.length > 0 ? (
