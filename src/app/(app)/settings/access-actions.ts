@@ -81,6 +81,9 @@ export async function redeemInvitation(
     expired: { error: 'That invitation has expired.' },
     revoked: { error: 'That invitation is no longer valid.' },
     exhausted: { error: 'That invitation has already been used.' },
+    // This account redeemed this invitation before; a revoked grant is never
+    // restored by the same code (migration 0024).
+    already_redeemed: { error: 'This invitation has already been used on this account.' },
     unauthenticated: { error: 'Sign in first.' },
   }
 

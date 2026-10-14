@@ -47,3 +47,41 @@ describe('pilot invitation RPC privileges (0023)', () => {
     expect(sql).toMatch(/expires_at_input, caller\)/)
   })
 })
+
+describe('one redemption per user per invitation (0024)', () => {
+  const once = readFileSync(
+    join(
+      __dirname,
+      '..',
+      '..',
+      'supabase',
+      'migrations',
+      '0024_pilot_redemption_once_per_user.sql',
+    ),
+    'utf8',
+  ).replace(/--.*$/gm, '')
+
+  it('an existing redemption row refuses and writes nothing, so a revoked grant is not restored', () => {
+    const branch = once.slice(
+      once.indexOf('if inserted = 0 then'),
+      once.indexOf('end if;', once.indexOf('if inserted = 0 then')),
+    )
+    expect(branch).toMatch(/return 'already_redeemed'/)
+    expect(branch).not.toMatch(/update public\.access_grants|insert into public\.access_grants/)
+  })
+
+  it('still takes the caller from auth.uid() and stays authenticated-only', () => {
+    expect(once).toMatch(/caller uuid := \(select auth\.uid\(\)\)/)
+    expect(once).toMatch(
+      /grant execute on function private\.redeem_pilot_invitation\(text\)\s*to authenticated;/,
+    )
+  })
+
+  it('the app explains the new outcome', () => {
+    const actions = readFileSync(
+      join(__dirname, '..', '..', 'src', 'app', '(app)', 'settings', 'access-actions.ts'),
+      'utf8',
+    )
+    expect(actions).toMatch(/already_redeemed:/)
+  })
+})
