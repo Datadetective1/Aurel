@@ -7,7 +7,7 @@ import { brand } from '@/lib/brand'
 
 const NAV = [
   { href: '/#how', label: 'How it works' },
-  { href: '/#research', label: 'Public research' },
+  { href: '/#follow', label: 'Follow-through' },
   { href: '/#memory', label: 'Relationship memory' },
   { href: '/#trust', label: 'Evidence' },
   { href: '/pricing', label: 'Pricing' },
