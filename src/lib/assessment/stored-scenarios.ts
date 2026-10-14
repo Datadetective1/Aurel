@@ -20,11 +20,7 @@ type Client = SupabaseClient<Database>
  * not produce, and inventing a number to fill the field would be exactly the
  * false precision this instrument replaced.
  */
-export async function scoreStoredScenarios(
-  supabase: Client,
-  userId: string,
-  assessmentId: string,
-) {
+export async function scoreStoredScenarios(supabase: Client, userId: string, assessmentId: string) {
   const { data } = await supabase
     .from('scenario_responses')
     .select('scenario_id, option_id')

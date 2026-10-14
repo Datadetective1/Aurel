@@ -67,9 +67,9 @@ describe('nothing sensitive reaches analytics', () => {
     // Only the props argument. The event NAME may legitimately mention a
     // token -- 'calendar.no_refresh_token' describes a missing one -- and
     // matching on the name is the false positive this originally tripped over.
-    const props = [...calendarSource.matchAll(/logger\.[a-z]+\(\s*'[a-z_.]+'\s*,\s*\{([^}]*)\}/g)].map(
-      (m) => m[1] ?? '',
-    )
+    const props = [
+      ...calendarSource.matchAll(/logger\.[a-z]+\(\s*'[a-z_.]+'\s*,\s*\{([^}]*)\}/g),
+    ].map((m) => m[1] ?? '')
 
     expect(props.length).toBeGreaterThan(4)
     for (const call of props) {
@@ -145,7 +145,14 @@ describe('read-only by construction', () => {
       contract.indexOf('export const MICROSOFT_SCOPES'),
     )
 
-    for (const forbidden of ['createEvent', 'updateEvent', 'deleteEvent', 'respond', 'accept', 'decline']) {
+    for (const forbidden of [
+      'createEvent',
+      'updateEvent',
+      'deleteEvent',
+      'respond',
+      'accept',
+      'decline',
+    ]) {
       expect(interfaceBlock).not.toContain(forbidden)
     }
   })

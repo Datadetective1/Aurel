@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto'
 import { requireOnboardedUser } from '@/lib/auth'
+import { checkCapability } from '@/lib/billing/entitlements'
 import { calendarProvider, CALENDAR_PROVIDERS, providerConfigured } from '@/lib/calendar'
 import type { CalendarProviderId } from '@/lib/calendar'
 import { canStoreSecrets } from '@/lib/crypto'
@@ -37,7 +38,9 @@ export function verifyState(state: string | null): string | null {
 
   const payload = state.slice(0, index)
   const provided = Buffer.from(state.slice(index + 1))
-  const expected = Buffer.from(createHmac('sha256', stateSecret()).update(payload).digest('base64url'))
+  const expected = Buffer.from(
+    createHmac('sha256', stateSecret()).update(payload).digest('base64url'),
+  )
 
   if (provided.length !== expected.length) return null
   return timingSafeEqual(provided, expected) ? payload : null
@@ -67,6 +70,11 @@ export async function GET(
   if (!providerConfigured(id) || !canStoreSecrets()) {
     logger.warn('calendar.connect_unconfigured', { provider: id })
     return NextResponse.redirect(`${origin}/settings/capabilities?calendar=not_configured`)
+  }
+
+  // A Pro capability, refused before the consent screen for the same reason.
+  if (!(await checkCapability('calendarIntegration')).allowed) {
+    return NextResponse.redirect(`${origin}/settings/billing?upgrade=calendar`)
   }
 
   await track('calendar_connect_started', { provider: id })

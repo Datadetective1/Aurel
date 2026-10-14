@@ -1,20 +1,18 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ArrowRight } from 'lucide-react'
-import { QuickBriefView } from '@/components/app/meeting-brief'
+import { ArrowRight, Mic } from 'lucide-react'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
-import { LiveCountdown } from '@/components/app/meeting-countdown'
-import { RoomStrip } from '@/components/app/room-strip'
+import { MeetingCockpit } from '@/components/visual/meeting-cockpit'
+import { QuickBrief } from '@/components/visual/quick-brief'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
 import { formatTime } from '@/lib/format'
-import { loadMeetingRoom } from '@/lib/conversations/room'
-import { listeningCues, normalizeBrief, startProximity } from '@/lib/brief'
-
+import { listeningCues, startProximity } from '@/lib/brief'
+import { loadMeetingVisual } from '@/lib/visual/meeting.server'
 export const metadata: Metadata = {
   title: 'Sixty seconds',
   robots: { index: false, follow: false },
@@ -36,101 +34,71 @@ export default async function QuickBriefPage({ params }: { params: Promise<{ id:
   const now = new Date()
   const supabase = await createClient()
 
-  const { data: meeting } = await supabase
-    .from('meetings')
-    .select('id, title, scheduled_at')
-    .eq('user_id', user.id)
-    .eq('id', id)
-    .maybeSingle()
-
-  if (!meeting) notFound()
-
-  const { data: artifact } = await supabase
-    .from('ai_artifacts')
-    .select('content')
-    .eq('user_id', user.id)
-    .eq('kind', 'meeting_brief')
-    .eq('subject_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const visual = await loadMeetingVisual(supabase, user.id, id, { timeZone, now })
+  if (!visual) notFound()
 
   // Nothing to show quickly if the brief has not been built yet.
-  if (!artifact) redirect(`/meetings/${id}/brief`)
+  if (!visual.artifact || !visual.brief) redirect(`/meetings/${id}/brief`)
 
-  const brief = normalizeBrief(artifact.content)
-
-  const { data: attendees } = await supabase
-    .from('meeting_attendees')
-    .select('person_id')
-    .eq('user_id', user.id)
-    .eq('meeting_id', id)
-
-  const attendeeIds = (attendees ?? []).map((a) => a.person_id)
-  const roomPeople = attendeeIds.length ? await loadMeetingRoom(supabase, user.id, id) : []
-  const { data: commitments } = attendeeIds.length
-    ? await supabase
-        .from('commitments')
-        .select('description, owner, due_on')
-        .eq('user_id', user.id)
-        .eq('status', 'open')
-        .in('person_id', attendeeIds)
-        .order('due_on', { ascending: true, nullsFirst: false })
-        .limit(4)
-    : { data: [] as { description: string; owner: string; due_on: string | null }[] }
-
-  const cues = listeningCues(brief, { openCommitments: commitments ?? [] })
+  const { meeting, brief, people } = visual
+  const cues = listeningCues(brief, {
+    openCommitments: visual.loops
+      .filter((l) => l.status === 'open')
+      .slice(0, 4)
+      .map((l) => ({ description: l.description, owner: l.owner })),
+  })
+  const owe = visual.visualLoops.filter((l) => l.direction === 'owe').length
 
   await track('quick_brief_viewed', {
-    proximity: startProximity(meeting.scheduled_at, now),
+    proximity: startProximity(meeting.scheduledAt, now),
     participants: brief.participants.length,
     listening_cues: cues.length,
+    room_view: people.length > 1,
   })
 
   return (
     <Container size="narrow" className="py-6 sm:py-10">
-      <header>
-        <p className="text-ink-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] tracking-[0.14em] uppercase">
-          {meeting.scheduled_at ? (
-            <>
-              <LiveCountdown
-                startsAt={meeting.scheduled_at}
-                nowIso={now.toISOString()}
-                className="text-accent"
-              />
-              <span aria-hidden="true">·</span>
-              <span>{formatTime(meeting.scheduled_at, timeZone)}</span>
-            </>
-          ) : (
-            <span>Unscheduled</span>
-          )}
-        </p>
-        <h1 className="font-display text-ink mt-2 text-2xl leading-tight sm:text-3xl">
-          {meeting.title}
-        </h1>
-        <RoomStrip people={roomPeople} className="mt-5" />
-      </header>
+      <MeetingCockpit
+        title={meeting.title}
+        scheduledAt={meeting.scheduledAt}
+        people={people}
+        prep={visual.prep}
+        openLoops={visual.visualLoops.length}
+        owe={owe}
+        timeZone={timeZone}
+        now={now}
+      />
 
-      <BriefDepthNav meetingId={id} current="quick" className="mt-5" />
+      <BriefDepthNav meetingId={id} current="quick" className="mt-6" />
 
-      <div className="mt-7">
-        <QuickBriefView
+      <div className="mt-8">
+        <QuickBrief
           brief={brief}
+          people={people}
+          connections={visual.connections}
+          loops={visual.visualLoops}
+          lastConversation={visual.lastConversation}
           cues={cues}
-          faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
+          centerLabel={meeting.scheduledAt ? formatTime(meeting.scheduledAt, timeZone) : 'Meeting'}
+          timeZone={timeZone}
+          now={now}
         />
       </div>
 
-      <Button asChild variant="secondary" size="lg" className="mt-8 w-full">
-        <Link href={`/meetings/${id}/brief`}>
-          Everything
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Link>
-      </Button>
-
-      <Button asChild size="lg" className="mt-3 w-full">
-        <Link href={`/meetings/${id}/debrief`}>Debrief after the meeting</Link>
-      </Button>
+      <div className="mt-10 grid gap-2.5 sm:grid-cols-2">
+        <Button asChild size="lg" className="w-full">
+          <Link href={`/conversations/new?meeting=${id}`}>
+            <Mic className="size-4" aria-hidden="true" />
+            Capture the conversation
+          </Link>
+        </Button>
+        <Button asChild variant="secondary" size="lg" className="w-full">
+          <Link href={`/meetings/${id}/brief`}>
+            Everything
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </Button>
+      </div>
     </Container>
   )
 }

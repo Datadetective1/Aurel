@@ -27,14 +27,22 @@ import { logger } from '@/lib/logger'
 const ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions'
 
 /**
- * Current recommended model for transcribing speech in its original language.
- * `gpt-4o-transcribe` is the fallback: same API shape, previous generation,
- * used only if the account cannot reach the newer model.
+ * The supported file-transcription model. There is deliberately no fallback:
+ * the previous generation (`gpt-4o-transcribe`) is deprecated and scheduled
+ * for removal, and silently switching to it would hide an outage behind a
+ * model that is about to stop existing. A failure is retried when it is
+ * transient, and otherwise reported.
  */
-const PRIMARY_MODEL = 'gpt-transcribe'
-const FALLBACK_MODEL = 'gpt-4o-transcribe'
+export const TRANSCRIPTION_MODEL = 'gpt-transcribe'
 
-const TIMEOUT_MS = 60_000
+/** Per attempt. Three attempts stay inside the segment route's two minutes. */
+const TIMEOUT_MS = 30_000
+
+/** Retries after the first attempt, for transient failures only. */
+const RETRIES = 2
+const BACKOFF_MS = [1_000, 3_000]
+/** Never wait longer than this for a provider-suggested Retry-After. */
+const MAX_RETRY_AFTER_MS = 5_000
 
 export type TranscribeFailure =
   | 'not_configured'
@@ -68,29 +76,39 @@ interface TranscribeInput {
   keywords?: string[]
 }
 
-export async function transcribeAudio(input: TranscribeInput): Promise<TranscribeResult> {
+export interface TranscribeDeps {
+  fetch?: typeof fetch
+  sleep?: (ms: number) => Promise<void>
+}
+
+export async function transcribeAudio(
+  input: TranscribeInput,
+  deps: TranscribeDeps = {},
+): Promise<TranscribeResult> {
   const started = Date.now()
+  const doFetch = deps.fetch ?? fetch
+  const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
 
   if (!serverEnv.OPENAI_API_KEY) {
     return { ok: false, reason: 'not_configured', latencyMs: 0 }
   }
 
-  const attempt = async (model: string): Promise<TranscribeResult | 'retry_other_model'> => {
+  type Attempt = TranscribeResult & { retryAfterMs?: number; transient?: boolean }
+
+  const attempt = async (): Promise<Attempt> => {
     const form = new FormData()
     // A name we construct, never one the browser sent. The extension is the
     // only part the provider needs and the only part we accept.
     form.set('file', input.audio, `debrief.${input.extension}`)
-    form.set('model', model)
+    form.set('model', TRANSCRIPTION_MODEL)
     form.set('response_format', 'json')
     if (input.keywords?.length) {
-      // Supported by gpt-transcribe; ignored by older models rather than
-      // rejected, which is why it is safe to send on both paths.
       form.set('keywords', input.keywords.slice(0, 24).join(', '))
     }
 
     let response: Response
     try {
-      response = await fetch(ENDPOINT, {
+      response = await doFetch(ENDPOINT, {
         method: 'POST',
         headers: { Authorization: `Bearer ${serverEnv.OPENAI_API_KEY}` },
         body: form,
@@ -98,18 +116,13 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
       })
     } catch {
       // Timeout and network failure are the same thing to a caller: no words.
-      return { ok: false, reason: 'unavailable', latencyMs: Date.now() - started }
+      return { ok: false, reason: 'unavailable', latencyMs: Date.now() - started, transient: true }
     }
 
     if (!response.ok) {
-      // Read as text and never log it -- a provider error body can echo the
+      // Read and discard, never log: a provider error body can echo the
       // request back, and the request is somebody's audio.
-      const body = await response.text().catch(() => '')
-
-      if (response.status === 400 && /model/i.test(body) && model === PRIMARY_MODEL) {
-        return 'retry_other_model'
-      }
-      if (response.status === 404 && model === PRIMARY_MODEL) return 'retry_other_model'
+      await response.text().catch(() => '')
 
       const reason: TranscribeFailure =
         response.status === 401 || response.status === 403
@@ -122,12 +135,25 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
                 ? 'unsupported_media'
                 : 'unavailable'
 
-      logger.warn('transcribe.provider_error', {
-        model,
-        status: response.status,
+      // 404 means the model itself cannot be reached. Reported loudly and
+      // never papered over with another model.
+      logger.warn(
+        response.status === 404 ? 'transcribe.model_unavailable' : 'transcribe.provider_error',
+        {
+          model: TRANSCRIPTION_MODEL,
+          status: response.status,
+          reason,
+        },
+      )
+      const retryAfter = Number(response.headers.get('retry-after'))
+      return {
+        ok: false,
         reason,
-      })
-      return { ok: false, reason, latencyMs: Date.now() - started }
+        latencyMs: Date.now() - started,
+        retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : undefined,
+        // Busy or briefly down. A missing model (404) is not transient.
+        transient: response.status === 429 || response.status >= 500,
+      }
     }
 
     const payload = (await response.json().catch(() => null)) as {
@@ -145,19 +171,22 @@ export async function transcribeAudio(input: TranscribeInput): Promise<Transcrib
     return {
       ok: true,
       text,
-      model,
+      model: TRANSCRIPTION_MODEL,
       latencyMs: Date.now() - started,
       inputTokens: payload?.usage?.input_tokens ?? null,
       outputTokens: payload?.usage?.output_tokens ?? null,
     }
   }
 
-  const first = await attempt(PRIMARY_MODEL)
-  if (first !== 'retry_other_model') return first
-
-  logger.warn('transcribe.model_fallback', { from: PRIMARY_MODEL, to: FALLBACK_MODEL })
-  const second = await attempt(FALLBACK_MODEL)
-  return second === 'retry_other_model'
-    ? { ok: false, reason: 'unavailable', latencyMs: Date.now() - started }
-    : second
+  for (let i = 0; ; i++) {
+    const result = await attempt()
+    if (result.ok || !result.transient || i >= RETRIES) {
+      const { retryAfterMs: _wait, transient: _transient, ...final } = result
+      if (!final.ok && i > 0)
+        logger.warn('transcribe.gave_up', { attempts: i + 1, reason: final.reason })
+      return final as TranscribeResult
+    }
+    const wait = Math.min(result.retryAfterMs ?? BACKOFF_MS[i] ?? 3_000, MAX_RETRY_AFTER_MS)
+    await sleep(wait)
+  }
 }

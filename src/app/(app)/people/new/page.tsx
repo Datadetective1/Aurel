@@ -24,11 +24,11 @@ export default async function NewPersonPage() {
       />
 
       {!limit.allowed ? (
-        <p className="mt-6 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3 text-sm text-ink-secondary">
+        <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-6 rounded-[var(--radius-md)] border px-4 py-3 text-sm">
           {limit.message}
         </p>
       ) : limit.limit !== null && limit.remaining !== null && limit.remaining <= 2 ? (
-        <p className="mt-6 text-xs text-ink-muted">
+        <p className="text-ink-muted mt-6 text-xs">
           <Badge tone="outline">{limit.remaining} left on your plan</Badge>
         </p>
       ) : null}

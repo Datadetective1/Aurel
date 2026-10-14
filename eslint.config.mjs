@@ -21,6 +21,8 @@ export default [
       'src/lib/supabase/types.ts',
       // Local end-to-end scratch: throwaway scripts and screenshots.
       '.e2e-tmp/**',
+      // The Expo app has its own toolchain, config and checks (mobile/).
+      'mobile/**',
     ],
   },
   ...nextCoreWebVitals,

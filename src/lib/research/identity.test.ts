@@ -109,7 +109,15 @@ describe('assessIdentity', () => {
   it('reports confidence within 0..1 for every outcome', () => {
     const cases = [
       assessIdentity(maya, { title: 'x', text: 'y', url: 'https://z.example' }),
-      assessIdentity(maya, { title: 'Maya Chen', text: 'Maya Chen at Acme Corporation VP Engineering', url: 'https://acme.com/a' }, { userSuppliedUrl: true }),
+      assessIdentity(
+        maya,
+        {
+          title: 'Maya Chen',
+          text: 'Maya Chen at Acme Corporation VP Engineering',
+          url: 'https://acme.com/a',
+        },
+        { userSuppliedUrl: true },
+      ),
     ]
     for (const result of cases) {
       expect(result.confidence).toBeGreaterThanOrEqual(0)

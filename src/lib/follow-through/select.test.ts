@@ -90,7 +90,12 @@ describe('what qualifies', () => {
   })
 
   it('raises undated loops only on Monday, and only once they are a few days old', () => {
-    const undated = loop({ id: 'u', dueOn: null, owner: 'person', createdAt: '2026-09-01T00:00:00Z' })
+    const undated = loop({
+      id: 'u',
+      dueOn: null,
+      owner: 'person',
+      createdAt: '2026-09-01T00:00:00Z',
+    })
     const fresh = loop({ id: 'f', dueOn: null, createdAt: '2026-09-13T00:00:00Z' })
     expect(select([undated, fresh], TODAY, 4).items).toHaveLength(0)
     const monday = select([undated, fresh], MONDAY, 1)
@@ -130,15 +135,17 @@ describe('wording distinguishes who owes what', () => {
   })
 
   it("says '<Name> said they'd' for another person's promise, never an instruction", () => {
-    const phrase = phraseFor(loop({ owner: 'person', description: "I'll confirm the pricing assumptions" }))
+    const phrase = phraseFor(
+      loop({ owner: 'person', description: "I'll confirm the pricing assumptions" }),
+    )
     expect(phrase).toBe("Jason said they'd confirm the pricing assumptions.")
     expect(phrase).not.toMatch(/^You/)
   })
 
   it('says Still unanswered for a question', () => {
-    expect(phraseFor(loop({ kind: 'question', description: 'who owns the migration budget' }))).toBe(
-      'Still unanswered: Who owns the migration budget?',
-    )
+    expect(
+      phraseFor(loop({ kind: 'question', description: 'who owns the migration budget' })),
+    ).toBe('Still unanswered: Who owns the migration budget?')
   })
 
   it('says Between you for a shared loop', () => {

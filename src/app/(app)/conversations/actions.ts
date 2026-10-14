@@ -76,6 +76,19 @@ export async function createConversation(
   _prev: ConversationState,
   formData: FormData,
 ): Promise<ConversationState> {
+  const result = await createConversationCore(formData)
+  if (result.interactionId) redirect(`/conversations/${result.interactionId}?new=1`)
+  return result
+}
+
+/**
+ * The capture itself, without the redirect, so the native app's route can
+ * call exactly the same path the web form does: same validation, same
+ * consent gate, same row-first write, same reading, same entitlement check.
+ */
+export async function createConversationCore(
+  formData: FormData,
+): Promise<ConversationState & { interactionId?: string }> {
   const raw = formData.get('wentWell')?.toString()
   const parsed = createSchema.safeParse({
     title: formData.get('title') || undefined,
@@ -283,7 +296,7 @@ export async function createConversation(
   for (const id of participantIds) revalidatePath(`/people/${id}`)
   if (meetingId) revalidatePath(`/meetings/${meetingId}`)
 
-  redirect(`/conversations/${interaction.id}?new=1`)
+  return { interactionId: interaction.id }
 }
 
 /**

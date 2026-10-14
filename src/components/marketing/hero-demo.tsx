@@ -81,27 +81,27 @@ export function HeroDemo({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[var(--radius-xl)] border border-line bg-surface',
+        'border-line bg-surface relative overflow-hidden rounded-[var(--radius-xl)] border',
         className,
       )}
     >
       {/* Meeting header */}
-      <div className="border-b border-line px-5 py-4 sm:px-7" style={stage(0)}>
+      <div className="border-line border-b px-5 py-4 sm:px-7" style={stage(0)}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="label">Tomorrow · 09:30</span>
-            <p className="mt-1.5 font-display text-lg text-ink sm:text-xl">Q3 capacity review</p>
+            <p className="font-display text-ink mt-1.5 text-lg sm:text-xl">Q3 capacity review</p>
           </div>
-          <Badge tone="accent">Importance 5 / 5</Badge>
+          <Badge tone="accent">You marked this critical</Badge>
         </div>
-        <p className="mt-3 max-w-md text-sm leading-relaxed text-ink-secondary">
+        <p className="text-ink-secondary mt-3 max-w-md text-sm leading-relaxed">
           <span className="text-ink-muted">Your objective — </span>
           Get approval to move two engineers onto the migration before the quarter closes.
         </p>
       </div>
 
       {/* The room */}
-      <div className="border-b border-line px-5 py-4 sm:px-7">
+      <div className="border-line border-b px-5 py-4 sm:px-7">
         <span className="label">In the room</span>
         <ul className="mt-3 space-y-3">
           {PARTICIPANTS.map((p, i) => {
@@ -110,7 +110,7 @@ export function HeroDemo({ className }: { className?: string }) {
               <li key={p.name} className="flex gap-3" style={stage(1 + i)}>
                 <span
                   aria-hidden="true"
-                  className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border border-line bg-bg-sunken text-[0.6875rem] font-medium text-ink-secondary"
+                  className="border-line bg-bg-sunken text-ink-secondary mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full border text-[0.6875rem] font-medium"
                 >
                   {p.name
                     .split(' ')
@@ -119,14 +119,14 @@ export function HeroDemo({ className }: { className?: string }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-medium text-ink">{p.name}</span>
-                    <span className="text-xs text-ink-muted">{p.chip}</span>
+                    <span className="text-ink text-sm font-medium">{p.name}</span>
+                    <span className="text-ink-muted text-xs">{p.chip}</span>
                     <Badge tone="outline">{p.role}</Badge>
                   </div>
-                  <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-secondary">
+                  <p className="text-ink-secondary mt-1 text-[0.8125rem] leading-relaxed">
                     {p.signal}
                   </p>
-                  <span className="mt-1.5 inline-flex items-center gap-1.5 text-[0.6875rem] tracking-[0.06em] text-ink-muted uppercase">
+                  <span className="text-ink-muted mt-1.5 inline-flex items-center gap-1.5 text-[0.6875rem] tracking-[0.06em] uppercase">
                     <meta.Icon
                       className={cn(
                         'size-3',
@@ -149,7 +149,7 @@ export function HeroDemo({ className }: { className?: string }) {
       <div className="bg-bg-sunken px-5 py-5 sm:px-7" style={stage(4)}>
         <span className="label">{brand.name}&rsquo;s brief</span>
 
-        <p className="mt-3 text-sm leading-relaxed text-ink">
+        <p className="text-ink mt-3 text-sm leading-relaxed">
           Open with the decision, not the method. Daniel wants the cost impact first; Maya will ask
           what the utilization data shows before she commits.
         </p>
@@ -161,17 +161,20 @@ export function HeroDemo({ className }: { className?: string }) {
             'Show Maya the utilization evidence, then return to the decision.',
             'Leave with an owner and a date.',
           ].map((step, i) => (
-            <li key={step} className="flex gap-2.5 text-[0.8125rem] leading-relaxed text-ink-secondary">
-              <span className="mt-px font-display text-accent tabular-nums">{i + 1}</span>
+            <li
+              key={step}
+              className="text-ink-secondary flex gap-2.5 text-[0.8125rem] leading-relaxed"
+            >
+              <span className="font-display text-accent mt-px tabular-nums">{i + 1}</span>
               {step}
             </li>
           ))}
         </ol>
 
-        <div className="mt-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-3.5 py-3">
-          <CircleHelp className="mt-0.5 size-3.5 shrink-0 text-caution" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-ink-secondary">
-            <span className="font-medium text-ink">What {brand.name} doesn&rsquo;t know — </span>
+        <div className="border-caution/25 bg-caution-wash mt-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-3.5 py-3">
+          <CircleHelp className="text-caution mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          <p className="text-ink-secondary text-xs leading-relaxed">
+            <span className="text-ink font-medium">What {brand.name} doesn&rsquo;t know — </span>
             you have no recorded history with Priya. Nothing above is a read on her.
           </p>
         </div>
@@ -179,10 +182,10 @@ export function HeroDemo({ className }: { className?: string }) {
 
       {/* Footer strip */}
       <div
-        className="flex items-center gap-2 border-t border-line px-5 py-3 text-xs text-ink-muted sm:px-7"
+        className="border-line text-ink-muted flex items-center gap-2 border-t px-5 py-3 text-xs sm:px-7"
         style={stage(5)}
       >
-        <ArrowRight className="size-3.5 text-accent" aria-hidden="true" />
+        <ArrowRight className="text-accent size-3.5" aria-hidden="true" />
         Every line above traces back to something you recorded.
       </div>
     </div>

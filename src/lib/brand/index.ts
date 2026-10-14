@@ -89,9 +89,12 @@ export const brand = {
   },
 
   legal: {
-    /** Placeholder — replace once the entity and jurisdiction are settled. */
-    entityAddress: '[Registered address — pending]',
-    jurisdiction: '[Governing jurisdiction — pending]',
+    /**
+     * Not yet supplied. While null, the legal pages omit the line rather than
+     * printing a placeholder. Set both to the real values; never guess them.
+     */
+    entityAddress: null as string | null,
+    jurisdiction: null as string | null,
     /** Year the policies were last reviewed by a human. */
     policiesLastUpdated: '2026-08-24',
     /** Set true only after a lawyer has reviewed Terms + Privacy. */

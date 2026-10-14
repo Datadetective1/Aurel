@@ -58,9 +58,8 @@ export async function getFirstRunState(supabase: Client, userId: string): Promis
     calendarConnected: (integration.data ?? []).length > 0,
     calendarAvailable,
     upcomingCount: eventRows.length,
-    unknownAttendees: new Set(
-      attendees.filter((a) => !a.personId).map((a) => JSON.stringify(a)),
-    ).size,
+    unknownAttendees: new Set(attendees.filter((a) => !a.personId).map((a) => JSON.stringify(a)))
+      .size,
     peopleCount: (people.data ?? []).length,
     researchedCount: new Set((researched.data ?? []).map((f) => f.person_id)).size,
     preparedCount: (briefs.data ?? []).length,

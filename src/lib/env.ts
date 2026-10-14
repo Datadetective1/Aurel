@@ -50,7 +50,12 @@ const serverSchema = z.object({
   STRIPE_SECRET_KEY: optional,
   STRIPE_WEBHOOK_SECRET: optional,
   STRIPE_PRICE_PRO_MONTHLY: optional,
+  // Recognised for any subscription already on it; not offered (no annual
+  // plan in this launch).
   STRIPE_PRICE_PRO_YEARLY: optional,
+  // Set to "1" only after migration 0022 (private capture-audio storage) is
+  // applied. Until then recordings use the single-upload path and its limit.
+  CAPTURE_STORAGE_ENABLED: optional,
   GOOGLE_CLIENT_ID: optional,
   GOOGLE_CLIENT_SECRET: optional,
   MICROSOFT_CLIENT_ID: optional,
@@ -260,6 +265,9 @@ export const features = {
    * transcription call goes to their audio endpoint directly.
    */
   transcription: Boolean(serverEnv.OPENAI_API_KEY),
+  /** Segmented, storage-backed capture: migration 0022 applied and the service role present. */
+  captureStorage:
+    serverEnv.CAPTURE_STORAGE_ENABLED === '1' && Boolean(serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** The scheduled follow-through email can run. */
   scheduledJobs: Boolean(serverEnv.CRON_SECRET && serverEnv.SUPABASE_SERVICE_ROLE_KEY),
   /** Automatic discovery of sources from a name alone. */

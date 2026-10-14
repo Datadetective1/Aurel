@@ -160,6 +160,8 @@ export type AnalyticsEvent =
   | 'voice_debrief_transcription_started'
   | 'voice_debrief_transcription_completed'
   | 'voice_debrief_transcription_failed'
+  | 'capture_segment_transcribed'
+  | 'capture_segment_failed'
   | 'voice_debrief_submitted'
   | 'memory_confirmed'
   | 'message_adapted'
@@ -178,6 +180,20 @@ export type AnalyticsEvent =
   | 'pilot_invitation_rejected'
   | 'data_exported'
   | 'account_deleted'
+  // Photo suggestions (migration 0020). Provider ids and outcomes only --
+  // never an image address, a source URL or whose face it was.
+  | 'profile_photo_suggestion_found'
+  | 'profile_photo_suggestion_shown'
+  | 'profile_photo_confirmed'
+  | 'profile_photo_rejected'
+  // The native app, through /api/mobile. Same rules as the web: counts,
+  // buckets and enum values only.
+  | 'mobile_today_opened'
+  | 'mobile_brief_opened'
+  | 'mobile_person_opened'
+  | 'mobile_capture_started'
+  | 'mobile_capture_completed'
+  | 'mobile_ask_used'
 
 type Props = Record<string, string | number | boolean | null | undefined>
 

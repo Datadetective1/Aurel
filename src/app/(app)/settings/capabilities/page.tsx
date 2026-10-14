@@ -117,11 +117,15 @@ export default async function CapabilitiesSettingsPage() {
 
   const connections: CalendarConnection[] = providers.map((provider) => {
     const row = (integrations ?? []).find((i) => i.provider === provider.id)
+    // Calendar connection is a Pro capability. A connection made before the
+    // plan changed still shows, but cannot sync until the plan allows it.
     const status: CalendarConnectionStatus = !provider.configured
       ? 'unavailable'
-      : !row
-        ? 'not_connected'
-        : (row.status as CalendarConnectionStatus)
+      : !entitlements.capabilities.calendarIntegration
+        ? 'plan_required'
+        : !row
+          ? 'not_connected'
+          : (row.status as CalendarConnectionStatus)
 
     return {
       provider: provider.id,
@@ -294,15 +298,38 @@ export default async function CapabilitiesSettingsPage() {
     },
   ]
 
-  const ready = capabilities.filter((c) => c.status === 'configured' || c.status === 'available')
-  const pending = capabilities.filter((c) => c.status !== 'configured' && c.status !== 'available')
+  // Deployment state -- which provider, which key, what is missing -- is for
+  // whoever runs this install. A customer sees what they can do, in product
+  // language, and nothing about configuration.
+  const admin = entitlements.tier === 'owner'
+  const CUSTOMER_DETAIL: Partial<Record<string, string>> = {
+    ai: 'Briefs combine your records, retrieved evidence and relationship memory.',
+    discovery: "Finds a person's public professional footprint from their name.",
+    email: 'Your daily follow-through, and nothing you did not ask for.',
+    conversations: features.transcription
+      ? 'Record a voice note or the conversation itself, upload audio, or paste a transcript. What was promised, decided and left open is proposed for you to confirm.'
+      : 'Paste or upload a transcript, or type what happened. What was promised, decided and left open is proposed for you to confirm.',
+  }
+  const shown = admin
+    ? capabilities
+    : capabilities
+        .filter((c) => c.status === 'configured' || c.status === 'available')
+        .map((c) => ({
+          ...c,
+          deploymentAction: undefined,
+          detail: CUSTOMER_DETAIL[c.id] ?? c.detail,
+        }))
+
+  const ready = shown.filter((c) => c.status === 'configured' || c.status === 'available')
+  const pending = shown.filter((c) => c.status !== 'configured' && c.status !== 'available')
 
   return (
     <div>
       <Eyebrow>Capabilities</Eyebrow>
       <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
-        What this deployment can actually do. {brand.name} tells you which parts are running, and
-        what would turn on the rest, rather than degrading quietly.
+        {admin
+          ? `What this deployment can actually do. ${brand.name} tells you which parts are running, and what would turn on the rest, rather than degrading quietly.`
+          : `What you can do with ${brand.name} today.`}
       </p>
 
       {ready.length > 0 ? (

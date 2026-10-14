@@ -54,9 +54,9 @@ describe('firstRunComplete', () => {
   it('counts people as researched only when evidence was accepted', () => {
     // A run that legitimately found nothing has not researched anybody, and
     // saying otherwise would tick a step the user did not complete.
-    expect(firstRunComplete(state({ calendarConnected: true, peopleCount: 5, preparedCount: 1 }))).toBe(
-      false,
-    )
+    expect(
+      firstRunComplete(state({ calendarConnected: true, peopleCount: 5, preparedCount: 1 })),
+    ).toBe(false)
   })
 })
 

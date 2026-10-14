@@ -136,7 +136,9 @@ describe('where later questions come from', () => {
   it('asks about the weakest evidence first', () => {
     // A fourth question about a settled dimension is how a refinement prompt
     // earns its dismissal.
-    expect(selector).toMatch(/directionalByDimension\[a\.dimension\] - directionalByDimension\[b\.dimension\]/)
+    expect(selector).toMatch(
+      /directionalByDimension\[a\.dimension\] - directionalByDimension\[b\.dimension\]/,
+    )
   })
 
   it('breaks ties deterministically, so the same state asks the same question', () => {
@@ -284,7 +286,10 @@ describe('a six-question profile is not presented as broken', () => {
   })
 
   it('does not badge the first version as a warning', () => {
-    const provisional = reveal.slice(reveal.indexOf('provisional: {'), reveal.indexOf('moderate: {'))
+    const provisional = reveal.slice(
+      reveal.indexOf('provisional: {'),
+      reveal.indexOf('moderate: {'),
+    )
     expect(provisional).not.toMatch(/tone: 'caution'/)
   })
 

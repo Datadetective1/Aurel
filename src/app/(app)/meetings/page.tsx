@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { meetingImportanceChip } from '@/lib/visual/relevance'
 import type { Metadata } from 'next'
 import { CalendarPlus, CircleCheck } from 'lucide-react'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
@@ -252,7 +253,7 @@ function MeetingList({
   past?: boolean
 }) {
   return (
-    <ul className="border-line bg-line mt-4 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
+    <ul className="border-line bg-line mt-4 grid grid-cols-[minmax(0,1fr)] gap-px overflow-hidden rounded-[var(--radius-lg)] border">
       {meetings.map((meeting) => {
         const people = peopleByMeeting.get(meeting.id) ?? []
         const isPrepared = prepared.has(meeting.id)
@@ -268,7 +269,7 @@ function MeetingList({
                       : 'Unscheduled'}
                   </span>
                   {meeting.importance >= 4 && !past ? (
-                    <Badge tone="accent">Importance {meeting.importance}/5</Badge>
+                    <Badge tone="accent">{meetingImportanceChip(meeting.importance)}</Badge>
                   ) : null}
                   {meeting.status === 'completed' ? (
                     <Badge tone="positive">

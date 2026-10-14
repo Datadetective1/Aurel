@@ -89,11 +89,19 @@ describe('what it stores', () => {
   })
 
   it('records usage without inventing a price', () => {
-    // Transcription is billed per minute; the estimator is per token. Real
-    // token counts go in, cost stays unpriced, and the existing warning fires.
-    expect(source).toContain("meter: 'voice_transcription'")
-    expect(source).toMatch(/inputTokens: result\.inputTokens/)
-    expect(source).not.toMatch(/costUnits|estimateCost/)
+    // Recording moved into the shared meter, so the single-upload and the
+    // segmented paths count the same way. Real token counts and measured
+    // seconds go in; a model with no published per-minute rate on file stays
+    // unpriced and is logged, never given a guessed one.
+    expect(source).toMatch(/transcribeAndMeter\(/)
+    const meter = readFileSync(join(process.cwd(), 'src/lib/capture/transcribe.server.ts'), 'utf8')
+    expect(meter).toMatch(/inputTokens: result\.inputTokens/)
+    expect(meter).toContain('usage.unpriced_transcription_model')
+    const pricing = readFileSync(join(process.cwd(), 'src/lib/billing/transcription.ts'), 'utf8')
+    expect(pricing).toContain("meter: 'voice_transcription'")
+    expect(pricing).toContain("meter: 'transcription_seconds'")
+    // The supported model carries its published per-minute rate.
+    expect(pricing).toMatch(/'gpt-transcribe': 0\.0045/)
   })
 })
 
@@ -143,7 +151,7 @@ describe('what it says out loud', () => {
 
   it('does not hand provider errors to the user', () => {
     // Two sentences, both actionable. Nothing about status codes or models.
-    expect(source).toContain("You can try again or type your debrief.")
+    expect(source).toContain('You can try again or type your debrief.')
     expect(source).not.toMatch(/error: [^']*result\.reason/)
   })
 

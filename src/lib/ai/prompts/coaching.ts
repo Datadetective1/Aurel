@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import type { Citation, CommitmentContext, PersonContext, PromptModule, UserContext } from '../types'
+import type {
+  Citation,
+  CommitmentContext,
+  PersonContext,
+  PromptModule,
+  UserContext,
+} from '../types'
 import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './shared'
 import { brand } from '@/lib/brand'
 import { relativeDay } from '@/lib/format'
@@ -65,21 +71,29 @@ function composeDailyFocus(input: DailyFocusInput): DailyFocus {
   // first, then overdue promises, then decay.
   const unprepared = meetings
     .filter((m) => !m.hasBrief)
-    .sort((a, b) => b.importance - a.importance || (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''))
+    .sort(
+      (a, b) =>
+        b.importance - a.importance || (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? ''),
+    )
 
   const priorities: DailyFocus['priorities'] = []
 
   for (const m of unprepared.slice(0, 2)) {
     const reasons: string[] = []
     if (m.importance >= 4) reasons.push(`you marked it ${m.importance}/5 for importance`)
-    const openWithAttendees = m.participants.flatMap((p) => p.openCommitments.filter((c) => c.isOverdue))
+    const openWithAttendees = m.participants.flatMap((p) =>
+      p.openCommitments.filter((c) => c.isOverdue),
+    )
     if (openWithAttendees.length > 0) {
       reasons.push(`there is an overdue commitment with someone in the room`)
     }
     if (!m.objective) reasons.push('no objective is recorded yet')
     priorities.push({
       what: `Prepare for "${m.title}"`,
-      why: reasons.length > 0 ? `It is unprepared and ${reasons.join(', and ')}.` : 'It is unprepared.',
+      why:
+        reasons.length > 0
+          ? `It is unprepared and ${reasons.join(', and ')}.`
+          : 'It is unprepared.',
       meetingId: m.id,
       personId: null,
     })
@@ -132,7 +146,12 @@ function composeDailyFocus(input: DailyFocusInput): DailyFocus {
     )
   }
 
-  return { headline, reasoning, priorities: priorities.slice(0, 4), watchItems: watchItems.slice(0, 4) }
+  return {
+    headline,
+    reasoning,
+    priorities: priorities.slice(0, 4),
+    watchItems: watchItems.slice(0, 4),
+  }
 }
 
 export const dailyFocusPrompt: PromptModule<DailyFocusInput, DailyFocus> = {
@@ -173,7 +192,10 @@ RULES
       input.overdueCommitments.length === 0
         ? 'None.'
         : input.overdueCommitments
-            .map((c) => `- ${c.description} (due ${c.dueOn}${c.personName ? `, to ${c.personName}` : ''})`)
+            .map(
+              (c) =>
+                `- ${c.description} (due ${c.dueOn}${c.personName ? `, to ${c.personName}` : ''})`,
+            )
             .join('\n'),
       '',
       `## DUE TODAY`,
@@ -184,7 +206,9 @@ RULES
       `## RELATIONSHIPS GOING QUIET`,
       input.quietRelationships.length === 0
         ? 'None flagged.'
-        : input.quietRelationships.map((q) => `- ${q.name}: ${q.daysSince} days since contact`).join('\n'),
+        : input.quietRelationships
+            .map((q) => `- ${q.name}: ${q.daysSince} days since contact`)
+            .join('\n'),
     ].join('\n'),
   compose: composeDailyFocus,
   cite: (input) => [
@@ -226,15 +250,20 @@ export interface RelationshipSummaryInput {
 function composeRelationshipSummary(input: RelationshipSummaryInput): RelationshipSummary {
   const p = input.person
   const all = [...p.observations.confirmed, ...p.observations.observed]
-  const byCategory = (cats: string[]) => all.filter((o) => cats.includes(o.category)).map((o) => o.content)
+  const byCategory = (cats: string[]) =>
+    all.filter((o) => cats.includes(o.category)).map((o) => o.content)
 
   const gaps: string[] = []
   if (p.interactionCount === 0) gaps.push('No interactions recorded yet.')
   if (p.observations.confirmed.length === 0) {
-    gaps.push('Nothing has been confirmed directly by them or by you — everything here is observed or inferred.')
+    gaps.push(
+      'Nothing has been confirmed directly by them or by you — everything here is observed or inferred.',
+    )
   }
   if (byCategory(['communication']).length === 0) {
-    gaps.push('No recorded communication preferences. Worth noticing how they like to receive information.')
+    gaps.push(
+      'No recorded communication preferences. Worth noticing how they like to receive information.',
+    )
   }
   if (p.observations.inferred.length > 0) {
     gaps.push(
@@ -285,7 +314,10 @@ function composeRelationshipSummary(input: RelationshipSummaryInput): Relationsh
   }
 }
 
-export const relationshipSummaryPrompt: PromptModule<RelationshipSummaryInput, RelationshipSummary> = {
+export const relationshipSummaryPrompt: PromptModule<
+  RelationshipSummaryInput,
+  RelationshipSummary
+> = {
   id: 'relationship-summary',
   kind: 'relationship_summary',
   version: 'relationship-summary@1.0.0',
@@ -303,7 +335,8 @@ RULES
 - Attribute observed patterns ("across three interactions..."). Hedge inferred ones ("may prefer...").
 - Never characterise the person. Describe behavior and stated preferences only.`,
     ].join('\n\n'),
-  user: (input) => [renderUser(input.user), '', '## THE PERSON', renderPerson(input.person)].join('\n'),
+  user: (input) =>
+    [renderUser(input.user), '', '## THE PERSON', renderPerson(input.person)].join('\n'),
   compose: composeRelationshipSummary,
   cite: (input): Citation[] => [
     ...[
@@ -393,7 +426,10 @@ function composeProfileNarrative(input: ProfileNarrativeInput): ProfileNarrative
  * for the other, so every reveal fell back to the same generic sentence. The
  * composite key cannot drift.
  */
-const POLE_COPY: Record<string, { best: string; pressure: string; experience: string; context: string }> = {
+const POLE_COPY: Record<
+  string,
+  { best: string; pressure: string; experience: string; context: string }
+> = {
   'directness:high': {
     best: 'People know where you stand, which makes decisions move faster.',
     pressure: 'Directness can arrive before the reasoning, and land harder than you intended.',
@@ -500,7 +536,8 @@ const fallback = {
 }
 
 const copyKey = (d: { id: string; lean: 'high' | 'low' | null }) => `${d.id}:${d.lean ?? 'high'}`
-const copyFor = (d: { id: string; lean: 'high' | 'low' | null }) => POLE_COPY[copyKey(d)] ?? fallback
+const copyFor = (d: { id: string; lean: 'high' | 'low' | null }) =>
+  POLE_COPY[copyKey(d)] ?? fallback
 
 export const profileNarrativePrompt: PromptModule<ProfileNarrativeInput, ProfileNarrative> = {
   id: 'profile-narrative',

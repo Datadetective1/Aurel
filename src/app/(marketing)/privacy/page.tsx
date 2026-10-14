@@ -24,21 +24,21 @@ export default function PrivacyPage() {
   return (
     <Container size="narrow" className="py-16 sm:py-24">
       <Eyebrow>Privacy</Eyebrow>
-      <h1 className="mt-4 font-display text-4xl leading-tight text-ink">
+      <h1 className="font-display text-ink mt-4 text-4xl leading-tight">
         You are storing notes about real colleagues.
       </h1>
-      <p className="mt-6 leading-relaxed text-ink-secondary">
+      <p className="text-ink-secondary mt-6 leading-relaxed">
         That deserves to be handled carefully, and described plainly. This page explains what{' '}
         {brand.name} stores, what it does with it, and what it will never do.
       </p>
 
       {!brand.legal.policiesLegallyReviewed ? (
-        <p className="mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3.5 text-sm leading-relaxed text-ink-secondary">
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
+        <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
+          <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="font-medium text-ink">Draft.</strong> This describes the product&rsquo;s
-            actual behavior accurately, but it has not yet been reviewed by a lawyer and is not a
-            final legal document.
+            <strong className="text-ink font-medium">Draft.</strong> This describes the
+            product&rsquo;s actual behavior accurately, but it has not yet been reviewed by a lawyer
+            and is not a final legal document.
           </span>
         </p>
       ) : null}
@@ -92,8 +92,8 @@ export default function PrivacyPage() {
           </p>
           <p>
             It does not bypass logins, paywalls or access controls, and it does not scrape platforms
-            whose terms prohibit it. Every extracted fact carries the source it came from, so you can
-            check it and remove it.
+            whose terms prohibit it. Every extracted fact carries the source it came from, so you
+            can check it and remove it.
           </p>
           <p className="text-ink">
             Research is limited to professional context. {brand.name} does not collect or surface
@@ -106,8 +106,9 @@ export default function PrivacyPage() {
         <Section title="What it will never infer">
           <p>
             {brand.name} does not infer or record race, ethnicity, religion, sexual orientation,
-            gender identity, medical conditions, disability, mental health, pregnancy, age, political
-            affiliation, union membership, immigration status or criminal history — about anyone.
+            gender identity, medical conditions, disability, mental health, pregnancy, age,
+            political affiliation, union membership, immigration status or criminal history — about
+            anyone.
           </p>
           <p>
             It also does not produce hiring, firing, promotion or compensation recommendations, or
@@ -127,13 +128,69 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="Voice recordings">
+          <p>
+            When you record a conversation or a voice note, the audio is sent to a speech-to-text
+            service to be turned into words, and the audio is then deleted. It is never added to
+            your record. A long recording is uploaded in parts to private, temporary storage that
+            only {brand.name}&rsquo;s servers can read; each part is deleted as soon as it has been
+            transcribed, and anything left behind is removed within about a day. What you keep is
+            the text, which you review and can edit or delete.
+          </p>
+          <p>
+            Before recording other people, you confirm they know. Recording happens only while the
+            app is open on screen.
+          </p>
+        </Section>
+
+        <Section title="Payments">
+          <p>
+            Payments are handled by Stripe. {brand.name} never receives or stores your card number.
+            We keep what is needed to run your plan: its status, the period it covers, and the
+            identifiers that link your account to your Stripe customer record.
+          </p>
+          <p>
+            If you delete your account, a minimal billing record is kept so a billing question can
+            still be answered: that an account was deleted, when, which plan it was on, and what was
+            done to stop its billing. It contains none of your relationship record. Stripe keeps its
+            own records of past payments, as payment processors are required to.
+          </p>
+        </Section>
+
+        <Section title="Service providers">
+          <p>
+            {brand.name} runs on a small number of providers, each used only for the job named here:
+          </p>
+          <ul className="grid gap-2 pl-5">
+            <li className="list-disc">Supabase — database, sign-in and file storage</li>
+            <li className="list-disc">Vercel — hosting the application</li>
+            <li className="list-disc">
+              OpenAI — the language model behind briefs, reading conversations and answering
+              questions, and speech-to-text. Only the bounded context a task needs is sent.
+            </li>
+            <li className="list-disc">
+              Exa — finding public professional material when you research someone
+            </li>
+            <li className="list-disc">Resend — sending account and product email</li>
+            <li className="list-disc">Stripe — payments</li>
+            <li className="list-disc">
+              Google and Microsoft — reading your calendar, only if you connect one
+            </li>
+          </ul>
+        </Section>
+
         <Section title="Your control">
           <p>You can, at any time and without contacting anyone:</p>
           <ul className="grid gap-2 pl-5">
             <li className="list-disc">Edit or delete any observation, note, person or source</li>
-            <li className="list-disc">Mark a source as the wrong person, which removes what it supported</li>
+            <li className="list-disc">
+              Mark a source as the wrong person, which removes what it supported
+            </li>
             <li className="list-disc">Export everything you have stored as JSON</li>
-            <li className="list-disc">Delete your account and destroy the entire record</li>
+            <li className="list-disc">
+              Delete your account and destroy the entire record, from the web or inside the iPhone
+              app. A paid plan billed on the web is cancelled first, so you are not charged again.
+            </li>
           </ul>
           <p>
             Deleting a source removes any fact that had no other supporting evidence. Observations
@@ -144,17 +201,24 @@ export default function PrivacyPage() {
         <Section title="Contact">
           <p>
             Privacy questions:{' '}
-            <a href={`mailto:${brand.email.privacy}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
+            <a
+              href={`mailto:${brand.email.privacy}`}
+              className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
+            >
               {brand.email.privacy}
             </a>
             . Anything else:{' '}
-            <a href={`mailto:${brand.email.support}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
+            <a
+              href={`mailto:${brand.email.support}`}
+              className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
+            >
               {brand.email.support}
             </a>
             .
           </p>
-          <p className="text-xs text-ink-muted">
-            {brand.legalEntity}, {brand.legal.entityAddress}. Last updated{' '}
+          <p className="text-ink-muted text-xs">
+            {brand.legalEntity}
+            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}. Last updated{' '}
             {brand.legal.policiesLastUpdated}.
           </p>
         </Section>
@@ -166,8 +230,8 @@ export default function PrivacyPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-display text-xl text-ink">{title}</h2>
-      <div className="mt-3 grid gap-3 leading-relaxed text-ink-secondary">{children}</div>
+      <h2 className="font-display text-ink text-xl">{title}</h2>
+      <div className="text-ink-secondary mt-3 grid gap-3 leading-relaxed">{children}</div>
     </section>
   )
 }

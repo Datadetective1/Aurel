@@ -3,9 +3,9 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { getProfile, requireUser } from '@/lib/auth'
-import { features } from '@/lib/env'
 import { getWorkspace } from '@/lib/workspace'
 import { seedDemoData } from '@/lib/demo/seed'
 import { isValidTimezone } from '@/lib/timezones'
@@ -161,7 +161,7 @@ export async function sendFollowThroughNow(): Promise<SettingsState> {
     return { message: 'Nothing is due, overdue or waiting today, so there was nothing to send.' }
   }
   if (outcome.status === 'skipped' && outcome.reason === 'not_configured') {
-    return { error: 'Email delivery is not configured on this deployment, so nothing was sent.' }
+    return { error: 'Email is not available yet, so nothing was sent.' }
   }
   return { error: 'That could not be sent. Try again in a moment.' }
 }
@@ -275,11 +275,9 @@ const deleteSchema = z.object({
 /**
  * Permanent account deletion.
  *
- * Two phases: the user's own rows are removed through an RLS-scoped function
- * (so it works even without a service role key), then the auth record itself is
- * deleted with the service role. If the second phase is unavailable the first
- * has still run, so no relationship data survives — the account shell is what
- * remains, and that is stated honestly rather than silently.
+ * Billing is stopped before anything irreversible happens; see
+ * lib/account/deletion for the order and why. If the subscription cannot be
+ * confirmed stopped, nothing is deleted and the user is told.
  */
 export async function deleteAccount(
   _prev: SettingsState,
@@ -290,48 +288,13 @@ export async function deleteAccount(
     return { error: 'Type DELETE to confirm.' }
   }
 
-  const user = await requireUser()
+  const result = await deleteCurrentAccount({
+    via: 'web',
+    appleAcknowledged: formData.get('appleAcknowledged') === 'yes',
+  })
+  if (!result.ok) return { error: result.message }
+
   const supabase = await createClient()
-
-  // Photos first, through the Storage API. storage.objects refuses direct
-  // SQL deletes, so the database function cannot take the folder with it.
-  // Best effort: an orphaned image is a lesser failure than a record that
-  // would not delete.
-  try {
-    const { AVATAR_BUCKET } = await import('@/lib/conversations/avatars')
-    const bucket = supabase.storage.from(AVATAR_BUCKET)
-    const folders = [`${user.id}/people`, user.id]
-    for (const folder of folders) {
-      const { data: objects } = await bucket.list(folder, { limit: 1000 })
-      const paths = (objects ?? []).filter((o) => o.id).map((o) => `${folder}/${o.name}`)
-      if (paths.length > 0) await bucket.remove(paths)
-    }
-  } catch (storageError) {
-    logger.warn('account.delete_photos_failed', {
-      error: storageError instanceof Error ? storageError.name : 'unknown',
-    })
-  }
-
-  const { error } = await supabase.rpc('delete_my_data')
-  if (error) {
-    logger.error('account.delete_data_failed', { code: error.code })
-    return { error: 'Your data could not be deleted. Contact support and nothing will be lost.' }
-  }
-
-  await track('account_deleted')
-
-  if (features.serviceRole) {
-    try {
-      const admin = createServiceRoleClient()
-      await admin.auth.admin.deleteUser(user.id)
-    } catch (adminError) {
-      // Data is already gone; only the login record remains.
-      logger.warn('account.delete_auth_failed', {
-        error: adminError instanceof Error ? adminError.name : 'unknown',
-      })
-    }
-  }
-
   await supabase.auth.signOut()
   redirect('/?deleted=1')
 }

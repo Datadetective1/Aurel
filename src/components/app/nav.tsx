@@ -47,11 +47,41 @@ export const NAV_ITEMS = [
 ] as const
 
 /**
- * Items that earn a slot in the mobile tab bar. Five is the limit a thumb can
- * reach: Atlas is desktop-first, and Open Loops is reached from Today, which
- * shows them, rather than from a sixth tab.
+ * The phone's five places, the same five as the native app: what is happening
+ * today, the people, capturing a conversation, the map of who knows whom, and
+ * asking. Capture sits in the middle because it is what you do during and
+ * just after a meeting.
+ *
+ * Meetings, Conversations and Open Loops are one tap from Today (its shortcut
+ * row and its sections). Prepare stays in the header, as a quiet icon rather
+ * than a second primary button competing with the tab bar.
  */
-const MOBILE_ITEMS = NAV_ITEMS.filter((i) => i.href !== '/atlas' && i.href !== '/loops')
+type NavHref = (typeof NAV_ITEMS)[number]['href']
+const MOBILE_SLOTS: Partial<
+  Record<NavHref, { href?: string; label: string; match?: string[]; primary?: boolean }>
+> = {
+  '/today': { label: 'Today', match: ['/today', '/meetings', '/loops'] },
+  '/people': { label: 'People', match: ['/people', '/prepare'] },
+  '/conversations': {
+    href: '/conversations/new',
+    label: 'Capture',
+    match: ['/conversations'],
+    primary: true,
+  },
+  '/atlas': { label: 'Atlas' },
+  '/coach': { label: 'Ask' },
+}
+// Still a filtered view of the one definition, so the two cannot drift.
+const MOBILE_ITEMS = NAV_ITEMS.filter((i) => i.href in MOBILE_SLOTS).map((i) => {
+  const slot = MOBILE_SLOTS[i.href]!
+  return {
+    icon: i.icon,
+    href: slot.href ?? i.href,
+    label: slot.label,
+    match: slot.match ?? [i.href],
+    primary: slot.primary ?? false,
+  }
+})
 
 function useIsActive() {
   const pathname = usePathname()
@@ -152,23 +182,18 @@ export function MobileTopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
         <Wordmark name={brand.name} className="text-base" />
       </Link>
       <div className="flex items-center gap-1">
-        {/* Prepare, on the phone.
-
-            The desktop rail has carried this as a standing primary action all
-            along; mobile had none. Today offers it per meeting and Meetings
-            offers it in its header, so it was reachable — but only if the
-            thing you wanted to prepare for happened to be on the screen you
-            landed on. This product is opened in the ten minutes before a
-            conversation, which is precisely when hunting for the action is
-            worst.
-
-            A header action rather than a fifth tab or a floating button: it
-            costs no navigation slot, sits where the desktop equivalent sits,
-            and does not hover over content. */}
-        <Button asChild size="sm" className="min-h-11">
+        {/* Prepare, on the phone: opened in the ten minutes before a
+            conversation, so it stays one tap away on every screen -- as a
+            quiet icon, so it no longer competes with the tab bar. */}
+        <Button
+          asChild
+          variant="ghost"
+          size="icon"
+          className="text-accent size-11"
+          aria-label="Prepare for a conversation"
+        >
           <Link href="/prepare">
-            <Sparkles className="size-3.5" aria-hidden="true" />
-            Prepare
+            <Sparkles className="size-[1.125rem]" aria-hidden="true" />
           </Link>
         </Button>
         {/* size-11, not the size-10 icon variant. Its comment claimed 44px and
@@ -209,31 +234,41 @@ export function MobileTabBar() {
           silently re-introduced the same drift. `grid-flow-col auto-cols-fr`
           gives each item an equal share of the row whatever the count. */}
       <ul className="grid auto-cols-fr grid-flow-col">
-        {MOBILE_ITEMS.map((item) => (
-          <li key={item.href}>
-            <Link
-              href={item.href}
-              aria-current={isActive(item.href) ? 'page' : undefined}
-              className={cn(
-                // 56px tall: comfortably above the 44px minimum touch target.
-                'flex h-14 flex-col items-center justify-center gap-1 text-[0.625rem] transition-colors',
-                isActive(item.href) ? 'text-ink' : 'text-ink-faint',
-              )}
-            >
-              <item.icon
-                className={cn('size-[1.125rem]', isActive(item.href) && 'text-accent')}
-                aria-hidden="true"
-              />
-              <span className="max-w-full truncate px-1">
-                {item.label === brand.assistantName
-                  ? 'Ask'
-                  : item.label === 'Conversations'
-                    ? 'Talks'
-                    : item.label}
-              </span>
-            </Link>
-          </li>
-        ))}
+        {MOBILE_ITEMS.map((item) => {
+          const active = item.match.some((m) => isActive(m))
+          const primary = item.primary
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  // 56px tall: comfortably above the 44px minimum touch target.
+                  'flex h-14 flex-col items-center justify-center gap-0.5 text-[0.6875rem] transition-colors',
+                  active ? 'text-ink' : 'text-ink-muted',
+                )}
+              >
+                {primary ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'flex h-7 w-11 items-center justify-center rounded-full',
+                      active ? 'bg-surface-inverse text-ink-inverse' : 'bg-accent-wash text-accent',
+                    )}
+                  >
+                    <item.icon className="size-4" />
+                  </span>
+                ) : (
+                  <item.icon
+                    className={cn('size-[1.125rem]', active && 'text-accent')}
+                    aria-hidden="true"
+                  />
+                )}
+                <span className="max-w-full truncate px-1">{item.label}</span>
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     </nav>
   )

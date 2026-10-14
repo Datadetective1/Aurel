@@ -13,6 +13,8 @@
  * =============================================================================
  */
 
+import { brand } from '@/lib/brand'
+
 export type PlanId = 'free' | 'pro' | 'team'
 
 /** Everything the app can gate on. Add here, never inline. */
@@ -46,6 +48,8 @@ export type MeterKind =
   | 'message_adaptation'
   | 'source_ingest'
   | 'voice_transcription'
+  /** Seconds of audio transcribed. Measured on every plan; no allowance yet. */
+  | 'transcription_seconds'
 
 export interface PlanDefinition {
   id: PlanId
@@ -96,6 +100,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       ...NO_CAPABILITIES,
       // Free must demonstrate the actual product, not a crippled preview.
       researchPerson: true,
+      // Calendar is how meetings arrive without typing them in. Free already
+      // gets three briefs a month; without the calendar it would be hard to
+      // find the meetings to spend them on.
+      calendarIntegration: true,
       meetingBrief: true,
       quickBrief: true,
       debrief: true,
@@ -112,7 +120,9 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     quotas: {
       person_research: 3,
       meeting_brief: 3,
-      quick_brief: 10,
+      // Quick Brief is composed from the record without a model call, so it
+      // costs nothing to run and is not metered on any plan.
+      quick_brief: null,
       ai_coach_message: 20,
       message_adaptation: 5,
       // Conversations are the loop the product now closes -- keep one, see
@@ -122,13 +132,18 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       document_analysis: 2,
       source_ingest: 15,
       deep_research: 0,
+      // Seconds of audio. 60 minutes a month.
+      transcription_seconds: 60 * 60,
     },
     limits: { people: 5 },
     highlights: [
       'Your Interaction Profile',
       'Up to 5 people',
       '3 researched people and 3 meeting briefs a month',
+      'Connect your calendar',
       'Keep 10 conversations a month and confirm what they left open',
+      '60 minutes of voice transcription a month',
+      `20 questions to ${brand.assistantName} a month`,
       'Export or delete everything, any time',
     ],
   },
@@ -137,8 +152,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     id: 'pro',
     name: 'Pro',
     tagline: 'The full relationship record, and preparation for every room.',
-    monthlyPriceCents: 4900,
-    yearlyPriceCents: 42000,
+    // $29 a month, monthly only: there is no annual plan in this launch. The
+    // Stripe price is checked against this before checkout (PRO_PRICE).
+    monthlyPriceCents: 2900,
+    yearlyPriceCents: null,
     capabilities: {
       researchPerson: true,
       deepResearch: true,
@@ -169,14 +186,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       transcript_analysis: 60,
       document_analysis: 100,
       source_ingest: 500,
+      // Seconds of audio. 600 minutes a month.
+      transcription_seconds: 600 * 60,
     },
     limits: { people: null },
     highlights: [
       'Unlimited people and relationship memory',
       'Research a person’s public professional footprint',
       'Meeting briefs, Quick Brief and debriefs',
-      'Calendar integration and the Relationship Atlas',
-      'Weekly relationship intelligence',
+      'Keep up to 60 conversations a month',
+      '600 minutes of voice transcription a month',
+      'The Relationship Atlas',
     ],
   },
 
@@ -210,25 +230,47 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
       'Everything in Pro, per seat',
       'Shared account and stakeholder context',
       'Your private notes stay private',
-      'Shared meetings and commitments',
     ],
   },
 }
 
-/**
- * Founding-customer promotion. Configuration, not a promotions engine.
- * Enable by setting `enabled` and providing a Stripe price id in env.
- */
-export const FOUNDING_OFFER = {
-  enabled: true,
-  label: 'Founding',
-  /** Promotion closes once this many founding subscriptions exist. */
-  maxCustomers: 250,
-  monthlyPriceCents: 2900,
-  /** How long the founding price is honoured. Not lifetime. */
-  priceProtectionMonths: 12,
-  blurb: 'Founding price held for 12 months.',
+/** What Stripe must bill for Pro, checked before every checkout. */
+export const PRO_PRICE = {
+  monthlyPriceCents: PLANS.pro.monthlyPriceCents as number,
+  currency: 'usd',
 } as const
+
+/**
+ * FOUNDING OFFER -- OFF
+ * =============================================================================
+ * Pro is sold as Pro, at $29 a month. There is no founding-member benefit
+ * defined, so nothing is shown, assigned or stored as "founding".
+ *
+ * The switch and its terms stay as configuration so an approved offer is a
+ * config change, not a rebuild. Each field is a public promise; none may be
+ * set without approval in writing: a cap on places, a reference ("was") price,
+ * a price-lock duration.
+ * =============================================================================
+ */
+export const FOUNDING_OFFER: {
+  enabled: boolean
+  label: string
+  maxCustomers: number | null
+  referencePriceCents: number | null
+  priceProtectionMonths: number | null
+} = {
+  enabled: false,
+  label: 'Founding',
+  maxCustomers: null,
+  referencePriceCents: null,
+  priceProtectionMonths: null,
+}
+
+/** The sentence about the price lock, only when one has been approved. */
+export function foundingProtectionBlurb(): string | null {
+  const months = FOUNDING_OFFER.priceProtectionMonths
+  return months ? `Founding price held for ${months} months.` : null
+}
 
 /** Human-readable price, e.g. "$49". */
 export function formatPrice(cents: number | null, currency = 'USD'): string {

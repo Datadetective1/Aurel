@@ -58,7 +58,10 @@ const meetingSchema = z.object({
   importance: z.coerce.number().int().min(1).max(5).catch(3),
 })
 
-export async function createMeeting(_prev: MeetingState, formData: FormData): Promise<MeetingState> {
+export async function createMeeting(
+  _prev: MeetingState,
+  formData: FormData,
+): Promise<MeetingState> {
   const parsed = meetingSchema.safeParse({
     title: formData.get('title'),
     kind: formData.get('kind') ?? 'other',
@@ -336,7 +339,10 @@ const debriefSchema = z.object({
  * remembering about each person. Proposals are written as `proposed`
  * observations — inert until the user accepts them.
  */
-export async function debriefMeeting(_prev: MeetingState, formData: FormData): Promise<MeetingState> {
+export async function debriefMeeting(
+  _prev: MeetingState,
+  formData: FormData,
+): Promise<MeetingState> {
   const raw = formData.get('wentWell')?.toString()
   const parsed = debriefSchema.safeParse({
     meetingId: formData.get('meetingId'),

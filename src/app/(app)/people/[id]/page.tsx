@@ -3,35 +3,42 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import {
   ArrowRight,
-  CalendarClock,
+  Globe,
   MessageSquare,
   MessagesSquare,
   Mic,
-  Scale,
   Settings2,
   Sparkles,
 } from 'lucide-react'
 import { AddContext } from '@/components/app/add-context'
 import { AddDocument } from '@/components/app/add-document'
-import { AddLoop } from '@/components/app/add-loop'
 import { ConversationCard } from '@/components/app/conversation-card'
-import { Illustration } from '@/components/brand/illustrations'
 import { PersonHero, type HeroFact } from '@/components/app/person-hero'
-import { LoopList } from '@/components/app/loop-list'
-import { EvidenceBadge, EvidenceLine } from '@/components/app/evidence'
+import { EvidenceBadge } from '@/components/app/evidence'
 import { ProvenanceLabel, provenanceFor } from '@/components/app/provenance'
 import { MemoryReview, type Proposal } from '@/components/app/memory-review'
 import { ResearchPanel } from '@/components/app/research-panel'
 import { SourceRow, type SourceRowData } from '@/components/app/source-controls'
+import { RelationshipMap } from '@/components/visual/relationship-map'
+import { PersonRelationshipSections } from '@/components/app/person-sections'
+import {
+  FindPhotoButton,
+  PhotoSuggestionCard,
+  type PhotoSuggestionView,
+} from '@/components/visual/photo-suggestion'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
-import { resolveFace } from '@/lib/conversations/avatars'
-import { listConversations, listDecisions, listLoops } from '@/lib/conversations/queries'
-import { formatDate, formatPublishedDate, isFuture, relativeDay, pluralise } from '@/lib/format'
-import { brand } from '@/lib/brand'
+import { resolveFace, resolveFaces } from '@/lib/conversations/avatars'
+import { loadPersonRecordVisual } from '@/lib/visual/person.server'
+import { countDirections } from '@/lib/visual/relationship-actions'
+import { relevanceChip } from '@/lib/visual/relevance'
+import { pendingSuggestion, photoSuggestionsAvailable } from '@/lib/photos/suggestions'
+import { AVATAR_BUCKET } from '@/lib/conversations/avatars'
+import { track } from '@/lib/analytics'
+import { formatPublishedDate, pluralise } from '@/lib/format'
 
 export async function generateMetadata({
   params,
@@ -100,7 +107,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, first_interaction_at, last_interaction_at, last_researched_at, is_demo, organizations(name)',
+      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, first_interaction_at, last_interaction_at, last_researched_at, is_demo, organization_id, organizations(name)',
     )
     .eq('user_id', user.id)
     .eq('id', id)
@@ -111,19 +118,17 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
 
   const name = person.preferred_name || person.full_name
 
+  const firstName = name.split(' ')[0] ?? name
+
   const [
     { data: observations },
     { data: facts },
     { data: sourceLinks },
-    { data: commitments },
     { data: participations },
-    { data: notes },
-    { data: pulse },
     face,
-    loops,
-    conversations,
-    decisions,
-    { data: upcoming },
+    record,
+    { data: organization },
+    { data: colleagueRows },
   ] = await Promise.all([
     supabase
       .from('observations')
@@ -151,42 +156,78 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       .eq('user_id', user.id)
       .eq('person_id', id),
     supabase
-      .from('commitments')
-      .select('id, description, owner, due_on, status')
-      .eq('user_id', user.id)
-      .eq('person_id', id)
-      .eq('review_status', 'confirmed')
-      .order('status', { ascending: true })
-      .order('due_on', { ascending: true, nullsFirst: false }),
-    supabase
       .from('interaction_participants')
-      .select('interactions(id, title, occurred_at, kind, summary, outcome, went_well)')
+      .select('interaction_id')
       .eq('user_id', user.id)
       .eq('person_id', id),
-    supabase
-      .from('notes')
-      .select('id, body, created_at')
-      .eq('user_id', user.id)
-      .eq('person_id', id)
-      .order('created_at', { ascending: false })
-      .limit(10),
-    supabase.rpc('relationship_pulse', { target_person: id }).maybeSingle(),
     resolveFace(supabase, person),
-    listLoops(supabase, user.id, { personId: id, scope: 'active', timeZone, now }),
-    listConversations(supabase, user.id, { personId: id, limit: 6 }),
-    listDecisions(supabase, user.id, { personId: id, limit: 8 }),
-    supabase
-      .from('meeting_attendees')
-      .select('meetings!inner(id, title, scheduled_at, status)')
-      .eq('user_id', user.id)
-      .eq('person_id', id)
-      .eq('meetings.status', 'upcoming')
-      .gte('meetings.scheduled_at', now.toISOString())
-      .order('scheduled_at', { referencedTable: 'meetings', ascending: true })
-      .limit(1),
+    loadPersonRecordVisual(supabase, user.id, id, { firstName, timeZone, now }),
+    person.organization_id
+      ? supabase
+          .from('organizations')
+          .select('domain')
+          .eq('id', person.organization_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Others in the user's own record at the same organisation -- the one
+    // "who else" the map draws, and only from people the user added.
+    person.organization_id
+      ? supabase
+          .from('people')
+          .select('id, full_name, preferred_name, avatar_url, avatar_path')
+          .eq('user_id', user.id)
+          .eq('organization_id', person.organization_id)
+          .neq('id', id)
+          .is('archived_at', null)
+          .order('last_interaction_at', { ascending: false, nullsFirst: false })
+          .limit(6)
+      : Promise.resolve({
+          data: [] as {
+            id: string
+            full_name: string
+            preferred_name: string | null
+            avatar_url: string | null
+            avatar_path: string | null
+          }[],
+        }),
   ])
+  const colleagueFaces = await resolveFaces(supabase, colleagueRows ?? [], (p) => p.id)
 
-  const nextMeeting = upcoming?.[0]?.meetings ?? null
+  const { activeLoops: loops, conversations, nextMeeting } = record
+
+  // --- a face suggestion waiting on the user (migration 0020) ----------------
+  // Absent table, absent suggestion: the flow simply does not appear.
+  let photoSuggestion: PhotoSuggestionView | null = null
+  let canFindPhoto = false
+  if (!face) {
+    const pending = await pendingSuggestion(supabase, user.id, id)
+    if (pending?.storage_path) {
+      const { data: signed } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .createSignedUrl(pending.storage_path, 60 * 60)
+      if (signed?.signedUrl) {
+        photoSuggestion = {
+          id: pending.id,
+          src: signed.signedUrl,
+          sourceUrl: pending.source_url,
+          sourceLabel: pending.source_label,
+        }
+        await track('profile_photo_suggestion_shown', { provider: pending.provider })
+      }
+    } else if (
+      (sourceLinks ?? []).some((l) => l.identity_match_status === 'confirmed') &&
+      (await photoSuggestionsAvailable(supabase))
+    ) {
+      canFindPhoto = true
+    }
+  }
+  const interactionCount = (participations ?? []).length
+  const directions = countDirections(loops)
+  const closedCount = record.allLoops.filter(
+    (l) =>
+      l.reviewStatus === 'confirmed' &&
+      (l.status === 'done' || l.status === 'cancelled' || l.status === 'dropped'),
+  ).length
 
   // --- sources, with what each one is actually holding up --------------------
   const sourceRows = (sourceLinks ?? [])
@@ -281,50 +322,24 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     byCategory.set(o.category, [...(byCategory.get(o.category) ?? []), o])
   }
 
-  const interactions = (participations ?? [])
-    .map((p) => p.interactions)
-    .filter((i): i is NonNullable<typeof i> => Boolean(i))
-    .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
-
-  const openCommitments = (commitments ?? []).filter((c) => c.status === 'open')
-  const closedLoops = (commitments ?? []).filter(
-    (c) => c.status === 'done' || c.status === 'cancelled' || c.status === 'dropped',
-  )
   const capability = researchCapability()
   const currentFacts = (facts ?? []).filter((f) => f.is_current)
   const hasFootprint = currentFacts.length > 0
 
-  // The facts beside the portrait: what they are to you, how much they
-  // matter, when you last spoke. Both write paths now refuse a future date,
-  // but rows created before they did still carry one, and "Last spoke
-  // tomorrow" is a past-tense claim about something that has not happened.
+  // Beside the portrait: what they are to you and how much they matter. When
+  // you last spoke and when you next meet moved to the glance below, where
+  // they read as facts rather than as badges.
   const heroFacts: HeroFact[] = [
     ...(person.is_demo ? [{ label: 'Demo', tone: 'outline' as const }] : []),
     { label: RELATIONSHIP_LABEL[person.relationship_type] ?? 'Colleague' },
-    { label: `Importance ${person.relevance}/5`, tone: 'outline' },
-    person.last_interaction_at
-      ? {
-          label: isFuture(person.last_interaction_at)
-            ? `Logged for ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`
-            : `Last spoke ${relativeDay(person.last_interaction_at, timeZone, now).toLowerCase()}`,
-        }
-      : { label: 'No interactions yet', tone: 'outline' },
-    ...(nextMeeting
-      ? [
-          {
-            label: nextMeeting.scheduled_at
-              ? `Next ${relativeDay(nextMeeting.scheduled_at, timeZone, now).toLowerCase()}`
-              : 'Meeting planned',
-            tone: 'info' as const,
-            href: `/meetings/${nextMeeting.id}/brief`,
-          },
-        ]
+    ...(relevanceChip(person.relevance)
+      ? [{ label: relevanceChip(person.relevance)!, tone: 'accent' as const, hint: 'You set this' }]
       : []),
   ]
 
   return (
     <Container size="default" className="py-8 sm:py-12">
-      {/* --- header ----------------------------------------------------------- */}
+      {/* --- who ------------------------------------------------------------- */}
       {/* "This is Jonathan." before anything about Jonathan. The portrait is
           the anchor of the page; the facts that place the relationship sit
           beside it and the actions sit beneath the name. */}
@@ -335,6 +350,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         src={face}
         title={person.job_title}
         company={person.organizations?.name ?? null}
+        companyDomain={organization?.domain ?? null}
         facts={heroFacts}
         actions={
           <>
@@ -345,24 +361,35 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               </Link>
             </Button>
             <Button asChild variant="secondary">
-              <Link href={`/coach?person=${id}`}>
-                <MessagesSquare className="size-4" aria-hidden="true" />
-                Ask about {name.split(' ')[0]}
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href={`/coach?person=${id}&mode=adapt`}>
-                <MessageSquare className="size-4" aria-hidden="true" />
-                Draft a message
-              </Link>
-            </Button>
-            <Button asChild variant="secondary">
               <Link href={`/conversations/new?person=${id}`}>
                 <Mic className="size-4" aria-hidden="true" />
-                Keep a conversation
+                Capture
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="icon" aria-label={`Edit ${name}`}>
+            <Button asChild variant="secondary">
+              <Link href={`/coach?person=${id}`}>
+                <MessagesSquare className="size-4" aria-hidden="true" />
+                Ask
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label={`Draft a message to ${firstName}`}
+            >
+              <Link href={`/coach?person=${id}&mode=adapt`}>
+                <MessageSquare className="size-4" aria-hidden="true" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label={`Edit ${name}`}
+            >
               <Link href={`/people/${id}/edit`}>
                 <Settings2 className="size-4" aria-hidden="true" />
               </Link>
@@ -371,134 +398,118 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         }
       />
 
-      {/* --- what is between you right now ------------------------------------ */}
-      {nextMeeting || loops.length > 0 ? (
-        <div className="mt-8 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          {nextMeeting ? (
-            <Link
-              href={`/meetings/${nextMeeting.id}/brief`}
-              className="group border-line bg-surface hover:border-line-strong rounded-[var(--radius-lg)] border p-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
-            >
-              <Eyebrow>Next up</Eyebrow>
-              <p className="font-display text-ink group-hover:text-accent mt-2 text-lg">
-                {nextMeeting.title}
-              </p>
-              <p className="text-ink-muted mt-1 flex items-center gap-1.5 text-xs">
-                <CalendarClock className="size-3.5" aria-hidden="true" />
-                {nextMeeting.scheduled_at
-                  ? relativeDay(nextMeeting.scheduled_at, timeZone, now)
-                  : 'Unscheduled'}
-              </p>
-            </Link>
-          ) : null}
-          {loops.length > 0 ? (
-            <div className="border-line bg-surface rounded-[var(--radius-lg)] border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <Eyebrow>Open between you</Eyebrow>
-                <Link
-                  href="/loops"
-                  className="text-ink-muted hover:text-ink text-xs underline-offset-4 hover:underline"
-                >
-                  All loops
-                </Link>
-              </div>
-              <ul className="mt-2.5 grid gap-1.5">
-                {loops.slice(0, 3).map((l) => (
-                  <li key={l.id} className="text-ink flex items-start gap-2 text-sm leading-snug">
-                    <span
-                      aria-hidden="true"
-                      className={`mt-2 h-px w-3 shrink-0 ${l.owner === 'user' ? 'bg-accent-graphic' : 'bg-line-strong'}`}
-                    />
-                    <span className="min-w-0">
-                      <span className="text-ink-muted">
-                        {l.kind === 'question'
-                          ? 'Unanswered: '
-                          : l.owner === 'user'
-                            ? 'You: '
-                            : l.owner === 'person'
-                              ? `${name.split(' ')[0]}: `
-                              : ''}
-                      </span>
-                      {l.description}
-                    </span>
-                  </li>
-                ))}
-                {loops.length > 3 ? (
-                  <li className="text-ink-muted text-xs">and {loops.length - 3} more below</li>
-                ) : null}
-              </ul>
-            </div>
-          ) : null}
-        </div>
+      {canFindPhoto ? <FindPhotoButton personId={id} className="mt-3" /> : null}
+
+      {photoSuggestion ? (
+        <PhotoSuggestionCard
+          className="mt-4"
+          personId={id}
+          personName={person.full_name}
+          suggestion={photoSuggestion}
+        />
       ) : null}
 
+      {/* --- what matters now ---------------------------------------------------- */}
+      <RelationshipMap
+        className="mt-5"
+        you={{ name: profile.preferred_name || profile.full_name || 'You', src: null }}
+        person={{ name, fullName: person.full_name, src: face }}
+        organization={
+          person.organizations?.name
+            ? {
+                name: person.organizations.name,
+                domain: organization?.domain ?? null,
+                title: person.job_title,
+                colleagues: (colleagueRows ?? []).map((c) => ({
+                  id: c.id,
+                  name: c.preferred_name || c.full_name,
+                  src: colleagueFaces.get(c.id) ?? null,
+                })),
+              }
+            : null
+        }
+        meetings={{ held: record.meetingsHeld, next: nextMeeting }}
+        conversations={{
+          count: interactionCount,
+          lastAt: person.last_interaction_at,
+          firstAt: person.first_interaction_at,
+          lastId: conversations[0]?.id ?? null,
+        }}
+        directions={directions}
+        // Sourced background, at confirmed or observed only, and only when the
+        // fact is a name rather than a sentence -- a chip is not a quote.
+        background={(facts ?? [])
+          .filter(
+            (f) =>
+              (f.kind === 'education' || f.kind === 'prior_role') &&
+              (f.evidence_level === 'confirmed' || f.evidence_level === 'observed') &&
+              f.value.length <= 48 &&
+              !f.has_conflict,
+          )
+          .map((f) => ({ label: f.value, kind: f.kind as 'education' | 'prior_role' }))}
+        themes={record.themes}
+        timeZone={timeZone}
+        now={now}
+      />
+
       {/* --- memory review gate ----------------------------------------------- */}
-      {/* Anchored so the research panel's "N to review" can point at it. The
-          count and the queue were on the same page all along, several sections
-          apart, with nothing connecting them -- a number that told you work
-          existed and not where. */}
+      {/* Anchored so the research panel's "N to review" can point at it. */}
       {proposals.length > 0 ? (
         <div id="proposals" className="mt-9 scroll-mt-6">
           <MemoryReview proposals={proposals} personName={name} />
         </div>
       ) : null}
 
-      {/* --- relationship snapshot -------------------------------------------- */}
-      <Rule />
+      <PersonRelationshipSections
+        personId={id}
+        name={name}
+        firstName={firstName}
+        loops={loops}
+        closedCount={closedCount}
+        learned={[...byCategory.entries()].map(([category, items]) => ({
+          category,
+          label: CATEGORY_LABEL[category] ?? category,
+          items: items.map((o) => ({
+            id: o.id,
+            content: o.content,
+            level: o.evidence_level,
+            provenance: provenanceFor(o.source_kind, o.evidence_level),
+            reinforcementCount: o.reinforcement_count,
+          })),
+        }))}
+        interactionCount={interactionCount}
+        timeline={record.timeline}
+        timeZone={timeZone}
+        now={now}
+      />
 
-      <section>
-        <Eyebrow>Your relationship</Eyebrow>
-        <p className="text-ink-secondary mt-3 max-w-2xl text-sm leading-relaxed">
-          {interactions.length === 0 ? (
-            <>
-              No interactions recorded yet. {brand.name} has nothing to tell you about working with{' '}
-              {name} until you log one — that is where this starts compounding.
-            </>
-          ) : (
-            <>
-              {pluralise(interactions.length, 'recorded interaction')}
-              {person.first_interaction_at
-                ? `, first on ${formatDate(person.first_interaction_at, timeZone)}`
-                : ''}
-              . {active.length > 0 ? `${pluralise(active.length, 'thing')} learned so far.` : ''}
-            </>
-          )}
-        </p>
-
-        {pulse ? <RelationshipPulse pulse={pulse} /> : null}
-      </section>
-
-      {/* --- what you have learned -------------------------------------------- */}
-      {active.length > 0 ? (
+      {/* --- conversations waiting on the user, or the last few ------------------- */}
+      {conversations.length > 0 ? (
         <>
           <Rule />
           <section>
-            <Eyebrow>What you have learned</Eyebrow>
-            <div className="mt-5 grid gap-8">
-              {[...byCategory.entries()].map(([category, items]) => (
-                <div key={category}>
-                  <h3 className="text-ink text-sm font-medium">
-                    {CATEGORY_LABEL[category] ?? category}
-                  </h3>
-                  <ul className="mt-3 grid gap-3.5">
-                    {items.map((o) => (
-                      <EvidenceLine
-                        key={o.id}
-                        content={o.content}
-                        level={o.evidence_level}
-                        provenance={provenanceFor(o.source_kind, o.evidence_level)}
-                        reinforcementCount={o.reinforcement_count}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ))}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <Eyebrow>Recent conversations</Eyebrow>
+              <Button asChild variant="ghost" size="sm">
+                <Link href={`/conversations/new?person=${id}`}>
+                  Capture another
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              </Button>
             </div>
+            <ul className="mt-4 grid gap-3">
+              {conversations.slice(0, 3).map((c) => (
+                <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} />
+              ))}
+            </ul>
           </section>
         </>
       ) : null}
 
-      {/* --- public footprint -------------------------------------------------- */}
+      {/* --- public footprint ------------------------------------------------------ */}
+      {/* Who they are professionally, from public material. Behind a disclosure:
+          it is reference, not what you act on, and it is the longest block on
+          the page. The research controls stay in view. */}
       <Rule />
 
       <ResearchPanel
@@ -510,12 +521,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         timeZone={timeZone}
         lastResearchedAt={person.last_researched_at}
         // Sources actually standing behind a claim: something rests on them,
-        // and they have not been marked as somebody else. A run that stores
-        // five and derives facts from two was reporting "Built from 5 sources"
-        // above a list where three said "No facts rest on this" -- the summary
-        // contradicting the detail directly beneath it. A source the user has
-        // rejected keeps its citations on facts that other sources corroborate,
-        // which is right, but it must not still be counted as evidence.
+        // and they have not been marked as somebody else.
         sourceCount={
           sources.filter((source) => source.factCount > 0 && source.identityStatus !== 'no_match')
             .length
@@ -523,293 +529,104 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         storedSourceCount={sources.length}
       />
 
-      {hasFootprint ? (
-        <section className="mt-8 grid gap-8">
-          {FACT_GROUPS.map((group) => {
-            const groupFacts = currentFacts.filter((f) => group.kinds.includes(f.kind))
-            if (groupFacts.length === 0) return null
+      {hasFootprint || sources.length > 0 ? (
+        <details className="group mt-6">
+          <summary className="border-line bg-surface text-ink hover:border-line-strong flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-[var(--radius-lg)] border px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
+            <span className="flex flex-wrap items-center gap-2">
+              <Globe className="text-ink-muted size-4" aria-hidden="true" />
+              Public professional footprint
+              <span className="text-ink-muted text-xs">
+                {pluralise(currentFacts.length, 'fact')} · {pluralise(sources.length, 'source')}
+              </span>
+            </span>
+            <span aria-hidden="true" className="text-ink-muted text-xs group-open:hidden">
+              Show
+            </span>
+            <span aria-hidden="true" className="text-ink-muted hidden text-xs group-open:inline">
+              Hide
+            </span>
+          </summary>
 
-            return (
-              <div key={group.label}>
-                <h3 className="text-ink text-sm font-medium">{group.label}</h3>
-                <ul className="mt-3 grid gap-3.5">
-                  {groupFacts.map((fact) => (
-                    <li key={fact.id} className="flex gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="bg-line-strong mt-2.5 h-px w-3 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm leading-relaxed">
-                          {fact.value}
-                          {fact.detail ? (
-                            <span className="text-ink-muted"> — {fact.detail}</span>
-                          ) : null}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <EvidenceBadge level={fact.evidence_level} />
-                          <ProvenanceLabel
-                            provenance={
-                              fact.evidence_level === 'inferred' ? 'inference' : 'public_research'
-                            }
+          {hasFootprint ? (
+            <div className="mt-6 grid gap-8">
+              {FACT_GROUPS.map((group) => {
+                const groupFacts = currentFacts.filter((f) => group.kinds.includes(f.kind))
+                if (groupFacts.length === 0) return null
+
+                return (
+                  <div key={group.label}>
+                    <h3 className="text-ink text-sm font-medium">{group.label}</h3>
+                    <ul className="mt-3 grid gap-3.5">
+                      {groupFacts.map((fact) => (
+                        <li key={fact.id} className="flex gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="bg-line-strong mt-2.5 h-px w-3 shrink-0"
                           />
-                          {/* Freshness. Phrased as the SOURCE's date, not the
-                              fact's: a page can predate the thing it describes,
-                              and "CEO as of 2013" would simply be false. */}
-                          {fact.as_of ? (
-                            <span className="text-ink-faint text-[0.6875rem]">
-                              source published {formatPublishedDate(fact.as_of)}
-                            </span>
-                          ) : (
-                            <span className="text-ink-faint text-[0.6875rem]">
-                              source gave no date
-                            </span>
-                          )}
-                          {fact.has_conflict ? (
-                            <Badge tone="caution">Sources disagree</Badge>
-                          ) : null}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </section>
-      ) : null}
+                          <div className="min-w-0">
+                            <p className="text-ink text-sm leading-relaxed">
+                              {fact.value}
+                              {fact.detail ? (
+                                <span className="text-ink-muted"> — {fact.detail}</span>
+                              ) : null}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <EvidenceBadge level={fact.evidence_level} />
+                              <ProvenanceLabel
+                                provenance={
+                                  fact.evidence_level === 'inferred'
+                                    ? 'inference'
+                                    : 'public_research'
+                                }
+                              />
+                              {/* Freshness. Phrased as the SOURCE's date, not the
+                                  fact's: a page can predate the thing it describes. */}
+                              {fact.as_of ? (
+                                <span className="text-ink-faint text-xs">
+                                  source published {formatPublishedDate(fact.as_of)}
+                                </span>
+                              ) : (
+                                <span className="text-ink-faint text-xs">source gave no date</span>
+                              )}
+                              {fact.has_conflict ? (
+                                <Badge tone="caution">Sources disagree</Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
 
-      {/* --- sources ----------------------------------------------------------- */}
-      {sources.length > 0 ? (
-        <section className="mt-8">
-          <Eyebrow>Sources</Eyebrow>
-          <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
-            Everything above that came from public material rests on these. Correct any of them —
-            what they alone supported is withdrawn with them.
-          </p>
-          <ul className="mt-3 grid gap-2">
-            {sources.map((source) => (
-              <SourceRow key={source.id} source={source} personId={id} personName={name} />
-            ))}
-          </ul>
-        </section>
+          {sources.length > 0 ? (
+            <section className="mt-8">
+              <Eyebrow>Sources</Eyebrow>
+              <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
+                Everything above that came from public material rests on these. Correct any of them
+                — what they alone supported is withdrawn with them.
+              </p>
+              <ul className="mt-3 grid gap-2">
+                {sources.map((source) => (
+                  <SourceRow key={source.id} source={source} personId={id} personName={name} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </details>
       ) : null}
 
       {/* --- add context -------------------------------------------------------- */}
-      <div className="border-line bg-bg-sunken mt-8 rounded-[var(--radius-lg)] border p-5 sm:p-6">
+      <div
+        id="add-context"
+        className="border-line bg-bg-sunken mt-8 scroll-mt-20 rounded-[var(--radius-lg)] border p-5 sm:p-6"
+      >
         <AddContext personId={id} personName={person.full_name} />
         <AddDocument personId={id} />
       </div>
-
-      {/* --- open loops ---------------------------------------------------------- */}
-      <Rule />
-      <section>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <Eyebrow>Open loops</Eyebrow>
-            <h2 className="font-display text-ink mt-2 text-xl">
-              {loops.length === 0
-                ? `Nothing open with ${name.split(' ')[0]}`
-                : `${loops.length} open with ${name.split(' ')[0]}`}
-            </h2>
-          </div>
-          <AddLoop people={[{ id, name }]} defaultPersonId={id} />
-        </div>
-        {loops.length > 0 ? (
-          <LoopList
-            className="mt-5"
-            loops={loops}
-            timeZone={timeZone}
-            now={now}
-            showPerson={false}
-          />
-        ) : (
-          <p className="text-ink-muted mt-3 max-w-lg text-sm leading-relaxed">
-            Promises, follow-ups and unanswered questions from your conversations with {name} will
-            collect here, and {brand.name} will raise them before you next speak.
-          </p>
-        )}
-        {closedLoops.length > 0 ? (
-          <p className="text-ink-muted mt-3 text-xs">
-            {pluralise(closedLoops.length, 'loop')} closed with {name.split(' ')[0]}.
-          </p>
-        ) : null}
-      </section>
-
-      {/* --- decisions ------------------------------------------------------------ */}
-      {decisions.length > 0 ? (
-        <>
-          <Rule />
-          <section>
-            <Eyebrow>Decided together</Eyebrow>
-            <ul className="mt-4 grid gap-3">
-              {decisions.map((d) => (
-                <li
-                  key={d.id}
-                  className="border-line bg-surface flex gap-3 rounded-[var(--radius-md)] border p-4"
-                >
-                  <Scale className="text-positive mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-ink text-sm leading-relaxed">{d.description}</p>
-                    {d.context ? (
-                      <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-                        <span className="text-ink-muted">Because — </span>
-                        {d.context}
-                      </p>
-                    ) : null}
-                    <p className="text-ink-muted mt-2 text-xs">
-                      {formatDate(d.decidedOn, timeZone)}
-                      {d.interactionId ? (
-                        <>
-                          {' · '}
-                          <Link
-                            href={`/conversations/${d.interactionId}`}
-                            className="hover:text-ink underline-offset-4 hover:underline"
-                          >
-                            {d.interactionTitle ?? 'the conversation'}
-                          </Link>
-                        </>
-                      ) : null}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      ) : null}
-
-      {/* --- conversations --------------------------------------------------------- */}
-      <Rule />
-      <section>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <Eyebrow>Conversations</Eyebrow>
-            <h2 className="font-display text-ink mt-2 text-xl">
-              {interactions.length === 0
-                ? 'None kept yet'
-                : pluralise(interactions.length, 'conversation')}
-            </h2>
-          </div>
-          {interactions.length > 0 ? (
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`/conversations/new?person=${id}`}>
-                Keep another
-                <ArrowRight className="size-3.5" aria-hidden="true" />
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-
-        {conversations.length > 0 ? (
-          <ul className="mt-5 grid gap-3">
-            {conversations.map((c) => (
-              <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} />
-            ))}
-          </ul>
-        ) : (
-          <div className="border-line bg-accent-wash/40 mt-4 flex flex-col items-center gap-5 rounded-[var(--radius-lg)] border border-dashed px-5 py-8 text-center sm:flex-row sm:text-left">
-            <Illustration subject="history" className="w-40 shrink-0 sm:w-44" />
-            <div className="min-w-0 flex-1">
-              <p className="text-ink-secondary text-sm leading-relaxed">
-                After you next speak with {name.split(' ')[0]}, keep the conversation: a voice note,
-                a pasted transcript, or a few typed lines. That is where this record starts
-                compounding.
-              </p>
-              <Button asChild size="sm" className="mt-3">
-                <Link href={`/conversations/new?person=${id}`}>
-                  <Mic className="size-3.5" aria-hidden="true" />
-                  Keep a conversation
-                </Link>
-              </Button>
-            </div>
-          </div>
-        )}
-        {interactions.length > conversations.length ? (
-          <p className="text-ink-muted mt-3 text-xs">
-            Showing the most recent {conversations.length}.
-          </p>
-        ) : null}
-      </section>
-
-      {/* --- notes ---------------------------------------------------------------- */}
-      {(notes ?? []).length > 0 ? (
-        <>
-          <Rule />
-          <section>
-            <Eyebrow>Notes</Eyebrow>
-            <ul className="mt-4 grid gap-3">
-              {(notes ?? []).map((note) => (
-                <li
-                  key={note.id}
-                  className="border-line bg-surface rounded-[var(--radius-md)] border p-4"
-                >
-                  <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">
-                    {note.body}
-                  </p>
-                  <p className="text-ink-faint mt-2 text-xs">
-                    {formatDate(note.created_at, timeZone)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      ) : null}
-
-      {openCommitments.length === 0 && interactions.length === 0 && active.length === 0 ? (
-        <p className="text-ink-muted mt-10 max-w-xl text-xs leading-relaxed">
-          This page fills in as you use it. Research their public footprint, paste a link or a note
-          above, or log your next conversation — after a few interactions {brand.name} will be
-          briefing you on your actual relationship rather than on general principles.
-        </p>
-      ) : null}
     </Container>
-  )
-}
-
-/**
- * Relationship Pulse.
- * Measures the user's own follow-through and contact cadence. It deliberately
- * does NOT claim to measure how the other person feels, and every input is
- * shown so the number is inspectable rather than mysterious.
- */
-function RelationshipPulse({
-  pulse,
-}: {
-  pulse: {
-    score: number
-    days_since_contact: number
-    open_commitments: number
-    overdue_commitments: number
-    interaction_count: number
-    has_upcoming: boolean
-  }
-}) {
-  const tone = pulse.score >= 70 ? 'positive' : pulse.score >= 40 ? 'caution' : 'critical'
-
-  return (
-    <div className="border-line bg-surface mt-6 rounded-[var(--radius-md)] border p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Eyebrow>Relationship pulse</Eyebrow>
-        <Badge tone={tone}>{pulse.score}/100</Badge>
-      </div>
-      <ul className="text-ink-secondary mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
-        <li>
-          {pulse.days_since_contact >= 0
-            ? `${pulse.days_since_contact} days since contact`
-            : 'No contact recorded'}
-        </li>
-        <li>{pluralise(pulse.interaction_count, 'interaction')}</li>
-        <li>{pluralise(pulse.open_commitments, 'open commitment')}</li>
-        {pulse.overdue_commitments > 0 ? (
-          <li className="text-critical">{pulse.overdue_commitments} overdue</li>
-        ) : null}
-        <li>{pulse.has_upcoming ? 'Meeting scheduled' : 'Nothing scheduled'}</li>
-      </ul>
-      <p className="text-ink-faint mt-3 text-[0.6875rem] leading-relaxed">
-        This reflects your contact cadence and follow-through — not how the other person feels.
-      </p>
-    </div>
   )
 }

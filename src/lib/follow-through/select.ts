@@ -131,7 +131,8 @@ export function selectFollowThrough(
       source: sourceFor(loop, input.formatDay),
     })),
     more: qualifying.length - shown.length,
-    yours: qualifying.filter((row) => row.loop.owner === 'user' && row.loop.kind !== 'question').length,
+    yours: qualifying.filter((row) => row.loop.owner === 'user' && row.loop.kind !== 'question')
+      .length,
   }
 }
 
@@ -205,7 +206,8 @@ export function timingFor(loop: DigestLoop, today: string): { label: string; ton
 export function sourceFor(loop: DigestLoop, formatDay: (day: string) => string): string | null {
   if (!loop.interactionTitle) return null
   const when = loop.interactionDay ? `, ${formatDay(loop.interactionDay)}` : ''
-  const verb = loop.kind === 'question' ? 'Came up in' : loop.owner === 'person' ? 'Said in' : 'Promised in'
+  const verb =
+    loop.kind === 'question' ? 'Came up in' : loop.owner === 'person' ? 'Said in' : 'Promised in'
   return `${verb} ${loop.interactionTitle}${when}`
 }
 

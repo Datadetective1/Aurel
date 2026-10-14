@@ -158,8 +158,11 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
 
   const kind = detectInputKind(parsed.data.input)
 
+  // A pasted transcript is read the same way, and against the same monthly
+  // allowance, as a conversation kept from the Capture screen -- so Free can
+  // do here exactly what it can do there.
   const capability = await checkCapability(
-    kind === 'transcript' ? 'transcriptAnalysis' : 'researchPerson',
+    kind === 'transcript' ? 'debrief' : 'researchPerson',
     kind === 'transcript' ? 'transcript_analysis' : 'source_ingest',
   )
   if (!capability.allowed) return { error: capability.message }

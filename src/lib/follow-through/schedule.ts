@@ -86,7 +86,10 @@ export function clampHour(hour: number | null | undefined): number {
  * failing that, the schedule header Vercel sends tells us whether it fires
  * every hour or once a day.
  */
-export function modeFor(input: { query: string | null; scheduleHeader: string | null }): ScheduleMode {
+export function modeFor(input: {
+  query: string | null
+  scheduleHeader: string | null
+}): ScheduleMode {
   if (input.query === 'hourly' || input.query === 'daily') return input.query
   if (input.scheduleHeader && /^\s*\S+\s+\*\s+\*\s+\*\s+\*\s*$/.test(input.scheduleHeader)) {
     // "0 * * * *": the hour field is a wildcard, so it fires every hour.

@@ -1,0 +1,206 @@
+import * as React from 'react'
+import { Linking, TextInput, View } from 'react-native'
+import Feather from '@expo/vector-icons/Feather'
+import type { AccountResponse } from '@atturel/web/lib/mobile/contracts'
+import { api, ApiError, useApi } from '~/lib/api'
+import { useAuth } from '~/lib/auth'
+import { config } from '~/lib/config'
+import { Failure, Loading, Screen, Section, Card } from '~/components/screen'
+import { Button } from '~/components/button'
+import { T } from '~/components/text'
+import { TOUCH, useTheme } from '~/theme'
+
+/**
+ * ACCOUNT
+ * =============================================================================
+ * Who is signed in, the plan and where it is managed, the legal pages, sign
+ * out, and deletion -- reachable from inside the app, as App Review requires
+ * and as anyone deserves.
+ *
+ * Deletion asks twice: once to open the confirmation, once with the word
+ * typed. It runs the same server workflow as the web, which stops billing
+ * before anything is deleted. An App Store subscription is the one thing the
+ * app cannot stop for you; if there is one, the screen says so and asks the
+ * person to confirm they have cancelled it.
+ * =============================================================================
+ */
+export default function Account() {
+  const { c } = useTheme()
+  const { signOut } = useAuth()
+  const { data, error, loading, refresh } = useApi<AccountResponse>('/api/mobile/account')
+  const [confirming, setConfirming] = React.useState(false)
+
+  if (loading) return <Screen topInset={false}><Loading /></Screen>
+  if (error || !data) {
+    return <Screen topInset={false}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
+  }
+
+  const billingLine =
+    data.billing === 'web'
+      ? 'Billed on the web. Change or cancel it from Settings › Plan at atturel.com.'
+      : data.billing === 'apple'
+        ? 'Billed by Apple. Change or cancel it in Settings › Apple ID › Subscriptions.'
+        : data.billing === 'included'
+          ? 'Included with your access. Nothing is billed.'
+          : 'Nothing is billed.'
+
+  return (
+    <Screen topInset={false}>
+      <Card>
+        <T variant="title" accessibilityRole="header">{data.name}</T>
+        {data.email ? <T variant="small" tone="secondary" style={{ marginTop: 2 }}>{data.email}</T> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
+          <Feather name="award" size={14} color={c.accent} />
+          <T variant="small">{data.planLabel}</T>
+        </View>
+        <T variant="meta" tone="muted" style={{ marginTop: 4 }}>{billingLine}</T>
+      </Card>
+
+      <Section label="Privacy and terms" icon="shield">
+        <LinkRow icon="lock" label="Privacy" onPress={() => void Linking.openURL(data.legal.privacyUrl)} />
+        <LinkRow icon="file-text" label="Terms" onPress={() => void Linking.openURL(data.legal.termsUrl)} />
+        <LinkRow
+          icon="mail"
+          label={`Contact ${data.legal.supportEmail}`}
+          onPress={() => void Linking.openURL(`mailto:${data.legal.supportEmail}`)}
+        />
+      </Section>
+
+      <Section label="Session" icon="log-out">
+        <Button label="Sign out" variant="secondary" icon="log-out" onPress={() => void signOut()} />
+      </Section>
+
+      <Section label="Delete account" icon="trash-2">
+        {confirming ? (
+          <DeleteAccount onCancel={() => setConfirming(false)} />
+        ) : (
+          <>
+            <T variant="small" tone="secondary">
+              Permanently deletes every person, conversation, commitment and note in your account. This cannot be undone.
+            </T>
+            <View style={{ marginTop: 12 }}>
+              <Button label="Delete account…" variant="danger" icon="trash-2" onPress={() => setConfirming(true)} />
+            </View>
+          </>
+        )}
+      </Section>
+
+      {config.previewData ? null : (
+        <T variant="meta" tone="muted" style={{ marginTop: 24, textAlign: 'center' }}>
+          Signed in to {config.apiUrl.replace(/^https?:\/\//, '')}
+        </T>
+      )}
+    </Screen>
+  )
+}
+
+function LinkRow({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Feather>['name']
+  label: string
+  onPress: () => void
+}) {
+  return (
+    <View style={{ alignItems: 'flex-start' }}>
+      <Button label={label} variant="ghost" icon={icon} onPress={onPress} accessibilityHint="Opens outside the app" />
+    </View>
+  )
+}
+
+/**
+ * The confirmation. Typed, not tapped: a stray tap must never delete a
+ * relationship record.
+ */
+function DeleteAccount({ onCancel }: { onCancel: () => void }) {
+  const { c } = useTheme()
+  const { signOut } = useAuth()
+  const [typed, setTyped] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+  const [message, setMessage] = React.useState<string | null>(null)
+  const [needsAppleAck, setNeedsAppleAck] = React.useState(false)
+
+  const ready = typed.trim().toLowerCase() === 'delete'
+
+  async function run(appleAcknowledged: boolean) {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = await api.deleteAccount({ confirmation: typed, appleAcknowledged })
+      if (result.deleted) {
+        // The account is gone; clear the Keychain whatever the server says.
+        await signOut()
+        return
+      }
+      if (result.stage === 'apple_acknowledgement') setNeedsAppleAck(true)
+      setMessage(result.error)
+    } catch (e) {
+      setMessage(
+        e instanceof ApiError && e.failure.kind === 'offline'
+          ? 'You appear to be offline. Nothing was deleted.'
+          : 'Something went wrong. Nothing was deleted.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card tone="critical">
+      <T variant="small">
+        This deletes your whole record, permanently. A paid plan billed on the web is cancelled first, and you will not be charged again.
+      </T>
+      <T variant="meta" tone="secondary" style={{ marginTop: 12 }}>Type DELETE to confirm</T>
+      <TextInput
+        value={typed}
+        onChangeText={setTyped}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        accessibilityLabel="Type DELETE to confirm"
+        placeholder="DELETE"
+        placeholderTextColor={c.inkFaint}
+        style={{
+          marginTop: 6,
+          minHeight: TOUCH,
+          borderWidth: 1,
+          borderColor: c.lineStrong,
+          borderRadius: 10,
+          paddingHorizontal: 12,
+          color: c.ink,
+          backgroundColor: c.surface,
+          fontFamily: 'InstrumentSans_400Regular',
+          fontSize: 16,
+        }}
+      />
+      {message ? (
+        <T variant="small" tone="critical" style={{ marginTop: 10 }} accessibilityLiveRegion="polite">
+          {message}
+        </T>
+      ) : null}
+      <View style={{ marginTop: 14, gap: 8 }}>
+        {needsAppleAck ? (
+          <Button
+            label="I have cancelled it — delete my account"
+            variant="danger"
+            icon="trash-2"
+            busy={busy}
+            disabled={!ready}
+            onPress={() => void run(true)}
+          />
+        ) : (
+          <Button
+            label="Permanently delete"
+            variant="danger"
+            icon="trash-2"
+            busy={busy}
+            disabled={!ready}
+            onPress={() => void run(false)}
+          />
+        )}
+        <Button label="Cancel" variant="ghost" onPress={onCancel} disabled={busy} />
+      </View>
+    </Card>
+  )
+}

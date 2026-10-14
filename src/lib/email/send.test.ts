@@ -173,11 +173,9 @@ describe('a provider failure never reaches the caller', () => {
   })
 
   it('resolves rather than throwing when the request never completes', async () => {
-    const result = await sendWithStub(
-      (async () => {
-        throw new TypeError('fetch failed')
-      }) as typeof fetch,
-    )
+    const result = await sendWithStub((async () => {
+      throw new TypeError('fetch failed')
+    }) as typeof fetch)
     expect(result.ok).toBe(false)
   })
 

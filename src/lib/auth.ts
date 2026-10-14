@@ -1,7 +1,7 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { bearerToken, createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -25,10 +25,13 @@ type Profile = Database['public']['Tables']['profiles']['Row']
  */
 export const getOptionalUser = cache(async () => {
   const supabase = await createClient()
+  // On a bearer route the session is the token itself, verified here against
+  // the auth server exactly as a cookie session is.
+  const token = await bearerToken()
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser(token ?? undefined)
   if (error || !user) return null
   return user
 })

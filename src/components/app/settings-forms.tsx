@@ -170,8 +170,8 @@ export function PreferencesSettingsForm({
             Send me useful {brand.name} email
           </span>
           <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">
-            The daily follow-through below, meeting reminders when something is unprepared, and your
-            weekly relationship summary. Never marketing.
+            The daily follow-through below, and notices about your account and plan. Never
+            marketing.
           </span>
         </span>
       </label>
@@ -216,7 +216,7 @@ export function PreferencesSettingsForm({
               <span>where you are.</span>
               {!followThrough.scheduled ? (
                 <span className="text-ink-muted">
-                  This deployment sends once a day, so the hour is a preference for now.
+                  It arrives once a day; the hour is a preference for now.
                 </span>
               ) : null}
             </span>
@@ -256,9 +256,7 @@ function SendNowRow({ configured }: { configured: boolean }) {
         Send today&rsquo;s to me now
       </Button>
       {!configured ? (
-        <span className="text-ink-muted text-xs">
-          Email delivery is not configured on this deployment.
-        </span>
+        <span className="text-ink-muted text-xs">Email is not available yet.</span>
       ) : null}
       {result?.message ? (
         <span role="status" className="text-positive text-xs">

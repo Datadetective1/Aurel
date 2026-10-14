@@ -18,24 +18,62 @@
  * user can always find a zone that keeps the right time even on an old browser.
  */
 const FALLBACK_ZONES = [
-  'Africa/Abidjan', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos', 'Africa/Nairobi',
-  'America/Anchorage', 'America/Argentina/Buenos_Aires', 'America/Bogota', 'America/Chicago',
-  'America/Denver', 'America/Halifax', 'America/Los_Angeles', 'America/Mexico_City',
-  'America/New_York', 'America/Phoenix', 'America/Sao_Paulo', 'America/Toronto',
-  'Asia/Bangkok', 'Asia/Dubai', 'Asia/Hong_Kong', 'Asia/Jakarta', 'Asia/Jerusalem',
-  'Asia/Kolkata', 'Asia/Karachi', 'Asia/Manila', 'Asia/Seoul', 'Asia/Shanghai',
-  'Asia/Singapore', 'Asia/Tokyo', 'Australia/Adelaide', 'Australia/Brisbane',
-  'Australia/Perth', 'Australia/Sydney', 'Europe/Amsterdam', 'Europe/Athens',
-  'Europe/Berlin', 'Europe/Brussels', 'Europe/Dublin', 'Europe/Istanbul', 'Europe/Lisbon',
-  'Europe/London', 'Europe/Madrid', 'Europe/Moscow', 'Europe/Paris', 'Europe/Stockholm',
-  'Europe/Warsaw', 'Europe/Zurich', 'Pacific/Auckland', 'Pacific/Honolulu', 'UTC',
+  'Africa/Abidjan',
+  'Africa/Cairo',
+  'Africa/Johannesburg',
+  'Africa/Lagos',
+  'Africa/Nairobi',
+  'America/Anchorage',
+  'America/Argentina/Buenos_Aires',
+  'America/Bogota',
+  'America/Chicago',
+  'America/Denver',
+  'America/Halifax',
+  'America/Los_Angeles',
+  'America/Mexico_City',
+  'America/New_York',
+  'America/Phoenix',
+  'America/Sao_Paulo',
+  'America/Toronto',
+  'Asia/Bangkok',
+  'Asia/Dubai',
+  'Asia/Hong_Kong',
+  'Asia/Jakarta',
+  'Asia/Jerusalem',
+  'Asia/Kolkata',
+  'Asia/Karachi',
+  'Asia/Manila',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Australia/Adelaide',
+  'Australia/Brisbane',
+  'Australia/Perth',
+  'Australia/Sydney',
+  'Europe/Amsterdam',
+  'Europe/Athens',
+  'Europe/Berlin',
+  'Europe/Brussels',
+  'Europe/Dublin',
+  'Europe/Istanbul',
+  'Europe/Lisbon',
+  'Europe/London',
+  'Europe/Madrid',
+  'Europe/Moscow',
+  'Europe/Paris',
+  'Europe/Stockholm',
+  'Europe/Warsaw',
+  'Europe/Zurich',
+  'Pacific/Auckland',
+  'Pacific/Honolulu',
+  'UTC',
 ]
 
 /** Every zone this runtime knows about, or the fallback list. */
 export function allTimezones(): string[] {
-  const supported = (
-    Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
-  ).supportedValuesOf
+  const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
+    .supportedValuesOf
 
   if (typeof supported === 'function') {
     try {
@@ -165,7 +203,9 @@ export function timezoneConfirmation(zone: string, at: Date = new Date()): strin
 }
 
 /** Zones grouped by continent, each group sorted west to east then by name. */
-export function groupedTimezones(at: Date = new Date()): Array<{ region: string; zones: string[] }> {
+export function groupedTimezones(
+  at: Date = new Date(),
+): Array<{ region: string; zones: string[] }> {
   const groups = new Map<string, string[]>()
 
   for (const zone of allTimezones()) {

@@ -216,11 +216,12 @@ export async function processConversation(
       decisionsProposed++
 
       // A decision with nobody named still concerns everyone who was there.
-      const linked = decision.personIds.length > 0 ? decision.personIds : participants.map((p) => p.id)
+      const linked =
+        decision.personIds.length > 0 ? decision.personIds : participants.map((p) => p.id)
       if (linked.length > 0) {
-        await supabase.from('decision_people').insert(
-          linked.map((personId) => ({ ...own, decision_id: row.id, person_id: personId })),
-        )
+        await supabase
+          .from('decision_people')
+          .insert(linked.map((personId) => ({ ...own, decision_id: row.id, person_id: personId })))
       }
     }
 

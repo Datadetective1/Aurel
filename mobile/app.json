@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Atturel",
+    "slug": "atturel",
+    "scheme": "atturel",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#fbf9f6",
+    "ios": {
+      "bundleIdentifier": "com.atturel.app",
+      "supportsTablet": false,
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Atturel records a conversation only while you hold it open on screen, so it can turn what was said into notes you review. Recording always shows on screen and pauses when you leave the app."
+      }
+    },
+    "android": {
+      "package": "com.atturel.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Atturel records a conversation only while you hold it open on screen, so it can turn what was said into notes you review. Recording always shows on screen and pauses when you leave the app.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#fbf9f6",
+          "dark": {
+            "backgroundColor": "#0d0d0f"
+          },
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

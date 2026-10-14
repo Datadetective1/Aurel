@@ -1,8 +1,9 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { publicEnv, serverEnv } from '@/lib/env'
 import type { Database } from '@/lib/supabase/types'
+import { BEARER_FLAG, bearerFlagValue } from '@/lib/bearer-routes'
 
 /**
  * Request-scoped Supabase client bound to the user's session cookies.
@@ -11,6 +12,21 @@ import type { Database } from '@/lib/supabase/types'
  * touch user data.
  */
 export async function createClient() {
+  const token = await bearerToken()
+  if (token) {
+    // The native app: the user's own access token, so every query still runs
+    // as that user under row level security. Nothing is stored server-side.
+    return createServerClient<Database>(
+      publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+      publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: { getAll: () => [], setAll: () => {} },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      },
+    )
+  }
+
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
@@ -34,6 +50,28 @@ export async function createClient() {
       },
     },
   )
+}
+
+const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+
+/**
+ * The Supabase access token the native app sent, or null.
+ *
+ * Honoured only on routes the middleware flagged as bearer routes (the
+ * /api/mobile handlers and the transcription route), and only when it has the
+ * shape of a JWT. Everywhere else -- every page and every server action --
+ * authentication stays cookie-only, exactly as before. The token is verified
+ * by `auth.getUser(token)` in lib/auth; this function only finds it.
+ */
+export async function bearerToken(): Promise<string | null> {
+  const h = await headers()
+  const mark = h.get(BEARER_FLAG)
+  if (!mark || mark !== (await bearerFlagValue())) return null
+  const token = h
+    .get('authorization')
+    ?.match(/^Bearer\s+(.+)$/i)?.[1]
+    ?.trim()
+  return token && JWT_SHAPE.test(token) ? token : null
 }
 
 /**

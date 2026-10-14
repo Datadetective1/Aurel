@@ -20,18 +20,18 @@ export default function TermsPage() {
   return (
     <Container size="narrow" className="py-16 sm:py-24">
       <Eyebrow>Terms</Eyebrow>
-      <h1 className="mt-4 font-display text-4xl leading-tight text-ink">Terms of service</h1>
-      <p className="mt-6 leading-relaxed text-ink-secondary">
+      <h1 className="font-display text-ink mt-4 text-4xl leading-tight">Terms of service</h1>
+      <p className="text-ink-secondary mt-6 leading-relaxed">
         The arrangement between you and {brand.legalEntity}, in plain language.
       </p>
 
       {!brand.legal.policiesLegallyReviewed ? (
-        <p className="mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3.5 text-sm leading-relaxed text-ink-secondary">
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden="true" />
+        <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
+          <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="font-medium text-ink">Draft.</strong> These terms describe the intended
-            arrangement but have not been reviewed by a lawyer and are not yet a binding legal
-            document.
+            <strong className="text-ink font-medium">Draft.</strong> These terms describe the
+            intended arrangement but have not been reviewed by a lawyer and are not yet a binding
+            legal document.
           </span>
         </p>
       ) : null}
@@ -39,9 +39,9 @@ export default function TermsPage() {
       <div className="mt-12 grid gap-10">
         <Section title="What the service is">
           <p>
-            {brand.name} helps you prepare for professional conversations by keeping a private record
-            of your working relationships and turning it into guidance. It is a personalization and
-            preparation tool.
+            {brand.name} helps you prepare for professional conversations by keeping a private
+            record of your working relationships and turning it into guidance. It is a
+            personalization and preparation tool.
           </p>
         </Section>
 
@@ -80,9 +80,9 @@ export default function TermsPage() {
 
         <Section title="Accuracy">
           <p>
-            Guidance is generated or composed from records you supply and from public sources. It can
-            be wrong. {brand.name} labels the evidence behind every claim precisely so you can judge
-            it, and you remain responsible for what you say and do in your own conversations.
+            Guidance is generated or composed from records you supply and from public sources. It
+            can be wrong. {brand.name} labels the evidence behind every claim precisely so you can
+            judge it, and you remain responsible for what you say and do in your own conversations.
           </p>
         </Section>
 
@@ -96,9 +96,12 @@ export default function TermsPage() {
 
         <Section title="Payment">
           <p>
-            Paid plans are billed in advance for the period you choose. You can cancel at any time
-            from Settings and keep access until the end of that period. Fair-use limits apply to
-            computationally expensive operations and are published on the pricing page.
+            Pro is billed monthly, in advance, through our payment processor; we never see or store
+            your card number. You can cancel at any time from Settings &rarr; Plan and keep access
+            until the end of the month you have paid for. Deleting your account ends a paid plan
+            immediately and stops all future charges. Fair-use limits apply to computationally
+            expensive operations; your plan&rsquo;s current monthly limits and usage are shown under
+            Settings &rarr; Plan.
           </p>
         </Section>
 
@@ -120,13 +123,18 @@ export default function TermsPage() {
 
         <Section title="Contact">
           <p>
-            <a href={`mailto:${brand.email.support}`} className="text-accent underline underline-offset-2 decoration-accent/40 hover:decoration-accent">
+            <a
+              href={`mailto:${brand.email.support}`}
+              className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
+            >
               {brand.email.support}
             </a>
           </p>
-          <p className="text-xs text-ink-muted">
-            {brand.legalEntity}, {brand.legal.entityAddress}. Governing law:{' '}
-            {brand.legal.jurisdiction}. Last updated {brand.legal.policiesLastUpdated}.
+          <p className="text-ink-muted text-xs">
+            {brand.legalEntity}
+            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}.
+            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
+            updated {brand.legal.policiesLastUpdated}.
           </p>
         </Section>
       </div>
@@ -137,8 +145,8 @@ export default function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="font-display text-xl text-ink">{title}</h2>
-      <div className="mt-3 grid gap-3 leading-relaxed text-ink-secondary">{children}</div>
+      <h2 className="font-display text-ink text-xl">{title}</h2>
+      <div className="text-ink-secondary mt-3 grid gap-3 leading-relaxed">{children}</div>
     </section>
   )
 }

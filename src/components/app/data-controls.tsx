@@ -2,7 +2,12 @@
 
 import * as React from 'react'
 import { CircleAlert, Download, Loader2, Trash2 } from 'lucide-react'
-import { clearDemoData, deleteAccount, exportMyData, type SettingsState } from '@/app/(app)/settings/actions'
+import {
+  clearDemoData,
+  deleteAccount,
+  exportMyData,
+  type SettingsState,
+} from '@/app/(app)/settings/actions'
 import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/field'
@@ -55,10 +60,10 @@ export function DataControls({ hasDemoData }: { hasDemoData: boolean }) {
   return (
     <div className="grid gap-4">
       {/* Export */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3.5">
+      <div className="border-line bg-surface flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border px-4 py-3.5">
         <div className="min-w-0">
-          <p className="text-sm text-ink">Export everything</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+          <p className="text-ink text-sm">Export everything</p>
+          <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">
             Every person, observation, interaction, source and generation, as JSON.
           </p>
         </div>
@@ -73,17 +78,17 @@ export function DataControls({ hasDemoData }: { hasDemoData: boolean }) {
       </div>
 
       {exportError ? (
-        <p role="alert" className="text-xs text-critical">
+        <p role="alert" className="text-critical text-xs">
           {exportError}
         </p>
       ) : null}
 
       {/* Demo data */}
       {hasDemoData ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3.5">
+        <div className="border-line bg-surface flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border px-4 py-3.5">
           <div className="min-w-0">
-            <p className="text-sm text-ink">Remove demo data</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+            <p className="text-ink text-sm">Remove demo data</p>
+            <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">
               Deletes the sample people and meetings. Anything you added yourself is untouched.
             </p>
           </div>
@@ -95,17 +100,17 @@ export function DataControls({ hasDemoData }: { hasDemoData: boolean }) {
       ) : null}
 
       {clearMessage ? (
-        <p role="status" className="text-xs text-ink-muted">
+        <p role="status" className="text-ink-muted text-xs">
           {clearMessage}
         </p>
       ) : null}
 
       {/* Delete account */}
-      <div className="rounded-[var(--radius-md)] border border-critical/25 bg-critical-wash px-4 py-3.5">
+      <div className="border-critical/25 bg-critical-wash rounded-[var(--radius-md)] border px-4 py-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm text-ink">Delete your account</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-ink-secondary">
+            <p className="text-ink text-sm">Delete your account</p>
+            <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">
               Permanently destroys your relationship record. This cannot be undone.
             </p>
           </div>
@@ -127,18 +132,19 @@ function DeleteForm({ onCancel }: { onCancel: () => void }) {
   const [state, formAction] = useActionState<SettingsState, FormData>(deleteAccount, {})
 
   return (
-    <form action={formAction} className="mt-5 border-t border-critical/20 pt-4">
-      <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-secondary">
-        <CircleAlert className="mt-px size-3.5 shrink-0 text-critical" aria-hidden="true" />
+    <form action={formAction} className="border-critical/20 mt-5 border-t pt-4">
+      <p className="text-ink-secondary flex items-start gap-2 text-xs leading-relaxed">
+        <CircleAlert className="text-critical mt-px size-3.5 shrink-0" aria-hidden="true" />
         <span>
           This deletes every person, observation, interaction, note, commitment, source and
-          generation in your account, along with your {brand.assessmentName.toLowerCase()}. Export
-          first if you want a copy.
+          generation in your account, along with your {brand.assessmentName.toLowerCase()}. A paid
+          plan is cancelled first, immediately, and you will not be charged again. Export first if
+          you want a copy.
         </span>
       </p>
 
-      <label htmlFor="delete-confirm" className="mt-4 block text-xs text-ink-secondary">
-        Type <span className="font-medium text-ink">DELETE</span> to confirm
+      <label htmlFor="delete-confirm" className="text-ink-secondary mt-4 block text-xs">
+        Type <span className="text-ink font-medium">DELETE</span> to confirm
       </label>
       <Input
         id="delete-confirm"
@@ -149,7 +155,7 @@ function DeleteForm({ onCancel }: { onCancel: () => void }) {
       />
 
       {state.error ? (
-        <p role="alert" className="mt-3 text-xs text-critical">
+        <p role="alert" className="text-critical mt-3 text-xs">
           {state.error}
         </p>
       ) : null}

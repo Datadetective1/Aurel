@@ -2,7 +2,14 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 import { resolveFaces } from './avatars'
-import { compareLoops, loopIsActive, type LoopKind, type LoopOwner, type LoopStatus, type ReviewStatus } from './loops'
+import {
+  compareLoops,
+  loopIsActive,
+  type LoopKind,
+  type LoopOwner,
+  type LoopStatus,
+  type ReviewStatus,
+} from './loops'
 
 type Client = SupabaseClient<Database>
 
@@ -199,9 +206,18 @@ async function hydrateConversations(
   for (const loop of loops ?? []) {
     if (!loop.interaction_id) continue
     if (loop.review_status === 'proposed') {
-      pendingByConversation.set(loop.interaction_id, (pendingByConversation.get(loop.interaction_id) ?? 0) + 1)
-    } else if (loop.review_status === 'confirmed' && (loop.status === 'open' || loop.status === 'later')) {
-      openByConversation.set(loop.interaction_id, (openByConversation.get(loop.interaction_id) ?? 0) + 1)
+      pendingByConversation.set(
+        loop.interaction_id,
+        (pendingByConversation.get(loop.interaction_id) ?? 0) + 1,
+      )
+    } else if (
+      loop.review_status === 'confirmed' &&
+      (loop.status === 'open' || loop.status === 'later')
+    ) {
+      openByConversation.set(
+        loop.interaction_id,
+        (openByConversation.get(loop.interaction_id) ?? 0) + 1,
+      )
     }
   }
 
@@ -209,9 +225,15 @@ async function hydrateConversations(
   for (const d of decisions ?? []) {
     if (!d.interaction_id) continue
     if (d.review_status === 'proposed') {
-      pendingByConversation.set(d.interaction_id, (pendingByConversation.get(d.interaction_id) ?? 0) + 1)
+      pendingByConversation.set(
+        d.interaction_id,
+        (pendingByConversation.get(d.interaction_id) ?? 0) + 1,
+      )
     } else if (d.review_status === 'confirmed') {
-      decisionsByConversation.set(d.interaction_id, (decisionsByConversation.get(d.interaction_id) ?? 0) + 1)
+      decisionsByConversation.set(
+        d.interaction_id,
+        (decisionsByConversation.get(d.interaction_id) ?? 0) + 1,
+      )
     }
   }
 
@@ -267,7 +289,8 @@ export async function listLoops(
   if (options.personId) query = query.eq('person_id', options.personId)
   if (options.interactionId) query = query.eq('interaction_id', options.interactionId)
   if (options.scope === 'proposed') query = query.eq('review_status', 'proposed')
-  else if (options.scope !== 'all') query = query.eq('review_status', 'confirmed').in('status', ['open', 'later'])
+  else if (options.scope !== 'all')
+    query = query.eq('review_status', 'confirmed').in('status', ['open', 'later'])
 
   const { data } = await query
   const rows = data ?? []
@@ -329,7 +352,12 @@ export async function listLoops(
 export async function listDecisions(
   supabase: Client,
   userId: string,
-  options: { personId?: string; interactionId?: string; scope?: 'confirmed' | 'all' | 'proposed'; limit?: number } = {},
+  options: {
+    personId?: string
+    interactionId?: string
+    scope?: 'confirmed' | 'all' | 'proposed'
+    limit?: number
+  } = {},
 ): Promise<DecisionRecord[]> {
   let ids: string[] | null = null
   if (options.personId) {
@@ -369,7 +397,9 @@ export async function listDecisions(
       rows.map((r) => r.id),
     )
 
-  const people = (links ?? []).map((l) => l.people).filter((p): p is NonNullable<typeof p> => Boolean(p))
+  const people = (links ?? [])
+    .map((l) => l.people)
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
   const faces = await resolveFaces(supabase, people, (p) => p.id)
 
   const peopleByDecision = new Map<string, Face[]>()

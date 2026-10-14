@@ -21,16 +21,6 @@ import { cn } from '@/lib/utils'
  * =============================================================================
  */
 
-const LABEL_SIZE: Record<AvatarSize, string> = {
-  xs: 'hidden',
-  sm: 'hidden',
-  md: 'size-5 text-[0.5rem]',
-  lg: 'h-6 px-1.5 text-[0.625rem]',
-  xl: 'h-7 px-2 text-[0.6875rem]',
-  '2xl': 'h-7 px-2.5 text-xs',
-  '3xl': 'h-8 px-3 text-xs',
-}
-
 export function Portrait({
   personId,
   name,
@@ -85,8 +75,10 @@ export function Portrait({
     return <Avatar name={name} src={shown} size={size} className={className} />
   }
 
-  const labelClass = LABEL_SIZE[size]
-  const compact = size === 'md'
+  // A small camera on the face, not a label across it: the person stays the
+  // subject, and the affordance is there for whoever looks for it. The
+  // visible badge is 28-32px; its hit area is extended to 44px.
+  const badge = size === 'md' || size === 'lg' ? 'size-6' : 'size-8'
 
   return (
     <span className={cn('group relative inline-block shrink-0', className)}>
@@ -98,19 +90,18 @@ export function Portrait({
         aria-label={`Add a photo of ${name}`}
         title="Add photo"
         className={cn(
-          'border-line bg-surface text-ink-secondary hover:text-ink absolute -right-0.5 -bottom-0.5 inline-flex items-center justify-center gap-1 rounded-full border font-medium shadow-[0_1px_2px_rgb(26_24_21/0.08)] transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]',
-          labelClass,
+          "border-line bg-surface text-ink-secondary hover:text-ink absolute -right-0.5 -bottom-0.5 inline-flex items-center justify-center rounded-full border shadow-[0_1px_2px_rgb(26_24_21/0.08)] transition-opacity before:absolute before:-inset-2 before:content-[''] focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
+          badge,
           persistent
             ? 'opacity-100'
             : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
         )}
       >
         {pending ? (
-          <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
         ) : (
-          <Camera className="size-3" aria-hidden="true" />
+          <Camera className="size-3.5" aria-hidden="true" />
         )}
-        {compact ? null : <span>Add photo</span>}
       </button>
       <input
         ref={inputRef}

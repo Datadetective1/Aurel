@@ -181,9 +181,7 @@ export function scoreResponses(responses: readonly Response[]): ScoredProfile {
   const covered = dimensions.filter((d) => d.contributions >= MIN_CONTRIBUTIONS_FOR_COVERAGE)
   const coverage = covered.length / DIMENSIONS.length
 
-  const consistencyValues = covered
-    .map((d) => d.consistency)
-    .filter((c): c is number => c !== null)
+  const consistencyValues = covered.map((d) => d.consistency).filter((c): c is number => c !== null)
   const consistency =
     consistencyValues.length > 0
       ? consistencyValues.reduce((a, b) => a + b, 0) / consistencyValues.length
@@ -216,7 +214,11 @@ function round3(n: number) {
  * consistently — never about how sure a model is. A short or self-contradictory
  * run stays "provisional" no matter how extreme the scores look.
  */
-function confidenceFrom(coverage: number, consistency: number, answered: number): ScoredProfile['confidence'] {
+function confidenceFrom(
+  coverage: number,
+  consistency: number,
+  answered: number,
+): ScoredProfile['confidence'] {
   if (answered < 12 || coverage < 0.75) return 'provisional'
   if (coverage === 1 && consistency >= 0.6 && answered >= 20) return 'strong'
   if (coverage >= 0.875 && consistency >= 0.4) return 'moderate'
@@ -243,7 +245,11 @@ function archetypeFrom(ranked: readonly DimensionScore[]): string {
 }
 
 /** Human-readable summary of a single dimension, used in the reveal and briefs. */
-export function describeDimension(d: DimensionScore): { pole: string; blurb: string; label: string } {
+export function describeDimension(d: DimensionScore): {
+  pole: string
+  blurb: string
+  label: string
+} {
   const dim = DIMENSION_BY_ID[d.dimension]
   if (d.lean === null) {
     return {

@@ -43,7 +43,12 @@ describe('transitionLoop', () => {
 
   it('reopens cleanly', () => {
     const t = transitionLoop('reopen', chicago)
-    expect(t).toEqual({ status: 'open', completed_at: null, cancelled_at: null, deferred_until: null })
+    expect(t).toEqual({
+      status: 'open',
+      completed_at: null,
+      cancelled_at: null,
+      deferred_until: null,
+    })
   })
 })
 
@@ -61,15 +66,28 @@ describe('loopIsActive', () => {
   })
 
   it('hides a deferred loop until its date, then brings it back', () => {
-    const loop = { status: 'later' as const, deferred_until: '2026-09-17', review_status: 'confirmed' as const }
+    const loop = {
+      status: 'later' as const,
+      deferred_until: '2026-09-17',
+      review_status: 'confirmed' as const,
+    }
     expect(loopIsActive(loop, 'UTC', new Date('2026-09-16T12:00:00Z'))).toBe(false)
     expect(loopIsActive(loop, 'UTC', new Date('2026-09-17T00:00:00Z'))).toBe(true)
   })
 
   it('never shows a done or cancelled loop', () => {
-    expect(loopIsActive({ status: 'done', deferred_until: null, review_status: 'confirmed' }, 'UTC')).toBe(false)
-    expect(loopIsActive({ status: 'cancelled', deferred_until: null, review_status: 'confirmed' }, 'UTC')).toBe(false)
-    expect(loopIsActive({ status: 'dropped', deferred_until: null, review_status: 'confirmed' }, 'UTC')).toBe(false)
+    expect(
+      loopIsActive({ status: 'done', deferred_until: null, review_status: 'confirmed' }, 'UTC'),
+    ).toBe(false)
+    expect(
+      loopIsActive(
+        { status: 'cancelled', deferred_until: null, review_status: 'confirmed' },
+        'UTC',
+      ),
+    ).toBe(false)
+    expect(
+      loopIsActive({ status: 'dropped', deferred_until: null, review_status: 'confirmed' }, 'UTC'),
+    ).toBe(false)
   })
 })
 

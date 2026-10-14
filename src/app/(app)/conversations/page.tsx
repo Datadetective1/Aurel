@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { CircleCheck, Mic, Plus } from 'lucide-react'
-import { ConversationCard } from '@/components/app/conversation-card'
+import { ConversationsList } from '@/components/app/conversations-list'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { Button } from '@/components/ui/button'
-import { Container, Eyebrow, SectionHeader } from '@/components/ui/primitives'
+import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { listConversations } from '@/lib/conversations/queries'
@@ -33,10 +33,6 @@ export default async function ConversationsPage({
   const supabase = await createClient()
 
   const conversations = await listConversations(supabase, user.id, { limit: 100 })
-  const needsReview = conversations.filter(
-    (c) => c.processingStatus === 'ready' && c.pendingReview > 0 && !c.reviewedAt,
-  )
-  const rest = conversations.filter((c) => !needsReview.includes(c))
 
   return (
     <Container size="default" className="py-8 sm:py-12">
@@ -92,42 +88,9 @@ export default async function ConversationsPage({
           }
         />
       ) : (
-        <>
-          {needsReview.length > 0 ? (
-            <section className="mt-9">
-              <div className="flex items-baseline gap-3">
-                <Eyebrow className="text-accent">Waiting on you</Eyebrow>
-                <span className="text-xs text-ink-faint">{needsReview.length}</span>
-              </div>
-              <p className="mt-1 text-xs text-ink-muted">
-                Read, but not yet confirmed. Nothing from these is in your loops until you say so.
-              </p>
-              <ul className="mt-4 grid gap-3">
-                {needsReview.map((c) => (
-                  <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} />
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {rest.length > 0 ? (
-            <section className="mt-10">
-              {needsReview.length > 0 ? <Eyebrow>Everything else</Eyebrow> : null}
-              <ul className={needsReview.length > 0 ? 'mt-4 grid gap-3' : 'grid gap-3'}>
-                {rest.map((c) => (
-                  <ConversationCard key={c.id} conversation={c} timeZone={timeZone} now={now} />
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </>
+        <ConversationsList conversations={conversations} timeZone={timeZone} now={now} />
       )}
 
-      <p className="mt-12 max-w-xl text-xs leading-relaxed text-ink-muted">
-        Audio is transcribed and then dropped; only the words are kept. Delete any conversation
-        and everything it proposed goes with it. What you had already confirmed into a person&rsquo;s
-        record stays, because you chose it.
-      </p>
     </Container>
   )
 }

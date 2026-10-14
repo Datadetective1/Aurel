@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { transcribeAudio } from '@/lib/ai/transcribe'
-import { recordUsage } from '@/lib/billing/entitlements'
+import { SINGLE_UPLOAD_MAX_BYTES } from '@/lib/capture/limits'
+import { transcribeAndMeter, transcriptionFailureMessage } from '@/lib/capture/transcribe.server'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -28,11 +28,12 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * The provider's own ceiling is 25 MB. The platform accepts a good deal more
- * than it used to, so the provider is the constraint now, and refusing here
- * gives a sentence instead of a provider error.
+ * The platform's request-body ceiling (4.5 MB) is the constraint on this
+ * path; refusing here gives a sentence instead of a platform error. Longer
+ * recordings go through segmented, storage-backed upload -- see
+ * lib/capture/limits and /api/capture/segments.
  */
-const MAX_BYTES = 24 * 1024 * 1024
+const MAX_BYTES = SINGLE_UPLOAD_MAX_BYTES
 const MIN_BYTES = 1_000
 
 const ACCEPTED: Record<string, string> = {
@@ -111,7 +112,10 @@ export async function POST(request: NextRequest) {
 
   if (audio.size > MAX_BYTES) {
     return NextResponse.json(
-      { error: 'That recording is larger than 24 MB. Split it, or paste the transcript instead.' },
+      {
+        error:
+          'That recording is too large to send in one piece. Split it, or paste the transcript instead.',
+      },
       { status: 413 },
     )
   }
@@ -151,7 +155,15 @@ export async function POST(request: NextRequest) {
     surface: 'conversation',
   })
 
-  const result = await transcribeAudio({ audio, extension, keywords })
+  const result = await transcribeAndMeter({ audio, extension, keywords, declaredSeconds })
+
+  // The monthly allowance: said in product language, before any audio left.
+  if (!result.ok && result.reason === 'allowance') {
+    return NextResponse.json(
+      { error: result.message, code: 'allowance' },
+      { status: 403, headers: { 'cache-control': 'no-store' } },
+    )
+  }
 
   if (!result.ok) {
     await track('voice_debrief_transcription_failed', {
@@ -165,31 +177,16 @@ export async function POST(request: NextRequest) {
       sizeBucket: sizeBucket(audio.size),
     })
 
-    const message =
-      result.reason === 'empty_result'
-        ? "We couldn't make out any speech in that recording. Try again, or type what happened."
-        : result.reason === 'not_configured'
-          ? 'Transcription is not available on this deployment. You can paste a transcript instead.'
-          : result.reason === 'too_large'
-            ? 'That recording is too long for the transcription service. Split it and try again.'
-            : "We couldn't transcribe that recording. You can try again or paste a transcript."
+    const message = transcriptionFailureMessage(result.reason)
 
     return NextResponse.json({ error: message }, { status: 502 })
   }
-
-  await recordUsage({
-    meter: 'voice_transcription',
-    provider: 'openai',
-    model: result.model,
-    inputTokens: result.inputTokens ?? undefined,
-    outputTokens: result.outputTokens ?? undefined,
-  })
 
   await track('voice_debrief_transcription_completed', {
     latencyMs: result.latencyMs,
     model: result.model,
     provider: 'openai',
-    durationBucket: durationBucket(declaredSeconds),
+    durationBucket: durationBucket(result.duration.seconds),
     sizeBucket: sizeBucket(audio.size),
     surface: 'conversation',
   })
@@ -201,5 +198,8 @@ export async function POST(request: NextRequest) {
     durationBucket: durationBucket(declaredSeconds),
   })
 
-  return NextResponse.json({ text: result.text }, { headers: { 'cache-control': 'no-store' } })
+  return NextResponse.json(
+    { text: result.text, notice: result.notice },
+    { headers: { 'cache-control': 'no-store' } },
+  )
 }

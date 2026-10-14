@@ -1,22 +1,16 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { ArrowRight } from 'lucide-react'
-import { GlanceBriefView, type GlanceAlert } from '@/components/app/meeting-brief'
-import type { PersonChoice } from '@/components/app/add-participants'
+import { AddParticipants, type PersonChoice } from '@/components/app/add-participants'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
-import { LiveCountdown } from '@/components/app/meeting-countdown'
-import { RoomStrip } from '@/components/app/room-strip'
-import { Button } from '@/components/ui/button'
+import { MeetingCockpit } from '@/components/visual/meeting-cockpit'
+import { GlanceBrief } from '@/components/visual/glance-brief'
 import { Container } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
-import { formatTime, relativeDay } from '@/lib/format'
-import { loadMeetingRoom } from '@/lib/conversations/room'
-import { isOverdueIn } from '@/lib/tz'
-import { normalizeBrief, startProximity } from '@/lib/brief'
-
+import { startProximity } from '@/lib/brief'
+import { loadMeetingVisual } from '@/lib/visual/meeting.server'
+import { brand } from '@/lib/brand'
 export const metadata: Metadata = {
   title: 'What you need',
   robots: { index: false, follow: false },
@@ -29,8 +23,10 @@ export const metadata: Metadata = {
  * Today. A person walking into a room needs four things: who is in it, what
  * they want out of it, the first sentence, and anything overdue between them.
  *
- * Nothing here is generated. Every field is read from the stored artifact, so
- * this renders instantly and renders briefs written before it existed.
+ * Nothing here is generated. Every field is read from the stored artifact or
+ * the record, so this renders instantly and renders briefs written before it
+ * existed. The cockpit says who and when; the glance says what to hold in
+ * mind; everything else is one tap down.
  */
 export default async function GlancePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,51 +35,14 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
   const now = new Date()
   const supabase = await createClient()
 
-  const { data: meeting } = await supabase
-    .from('meetings')
-    .select('id, title, scheduled_at')
-    .eq('user_id', user.id)
-    .eq('id', id)
-    .maybeSingle()
-
-  if (!meeting) notFound()
-
-  const { data: artifact } = await supabase
-    .from('ai_artifacts')
-    .select('content')
-    .eq('user_id', user.id)
-    .eq('kind', 'meeting_brief')
-    .eq('subject_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const visual = await loadMeetingVisual(supabase, user.id, id, { timeZone, now })
+  if (!visual) notFound()
 
   // There is nothing to glance at before the brief exists. Preparing is the
   // honest next step, and the brief page is where that happens.
-  if (!artifact) redirect(`/meetings/${id}/brief`)
+  if (!visual.artifact) redirect(`/meetings/${id}/brief`)
 
-  const brief = normalizeBrief(artifact.content)
-
-  const [{ data: attendees }, roomPeople] = await Promise.all([
-    supabase
-      .from('meeting_attendees')
-      .select('person_id, people(full_name, preferred_name)')
-      .eq('user_id', user.id)
-      .eq('meeting_id', id),
-    loadMeetingRoom(supabase, user.id, id),
-  ])
-
-  // The brief's own participant list is the better room: it is ordered by the
-  // composer and carries the names as briefed. The attendee table is the
-  // fallback for a brief generated before anyone was added to the room.
-  const room =
-    brief.participants.length > 0
-      ? brief.participants.map((p) => ({ id: p.personId, name: p.name }))
-      : (attendees ?? []).flatMap((a) =>
-          a.people
-            ? [{ id: a.person_id, name: a.people.preferred_name || a.people.full_name }]
-            : [],
-        )
+  const { meeting, people, glance } = visual
 
   // --- who the invite carried that resolves to nobody ------------------------
   // Read from the synced calendar row, where every attendee is stored with the
@@ -93,139 +52,86 @@ export default async function GlancePage({ params }: { params: Promise<{ id: str
   // the two, because claiming matching failed when nothing was invited would
   // describe an event that did not happen.
   let unmatchedAttendees = 0
-  if (room.length === 0) {
-    const { data: calendarEvent } = await supabase
-      .from('external_calendar_events')
-      .select('attendees')
-      .eq('user_id', user.id)
-      .eq('meeting_id', id)
-      .maybeSingle()
+  let addablePeople: PersonChoice[] = []
+  if (people.length === 0) {
+    const [{ data: calendarEvent }, { data: allPeople }] = await Promise.all([
+      supabase
+        .from('external_calendar_events')
+        .select('attendees')
+        .eq('user_id', user.id)
+        .eq('meeting_id', id)
+        .maybeSingle(),
+      supabase
+        .from('people')
+        .select('id, full_name, preferred_name, job_title, organizations(name)')
+        .eq('user_id', user.id)
+        .is('archived_at', null)
+        .order('full_name', { ascending: true })
+        .limit(200),
+    ])
 
     const invited = (calendarEvent?.attendees ?? []) as unknown as { personId?: string | null }[]
     unmatchedAttendees = Array.isArray(invited) ? invited.filter((a) => !a?.personId).length : 0
+    addablePeople = (allPeople ?? []).map((p) => ({
+      id: p.id,
+      name: p.preferred_name || p.full_name,
+      subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
+    }))
   }
 
-  // --- the one warning worth interrupting for -------------------------------
-  const attendeeIds = (attendees ?? []).map((a) => a.person_id)
-  const { data: commitments } = attendeeIds.length
-    ? await supabase
-        .from('commitments')
-        .select('id, description, owner, due_on')
-        .eq('user_id', user.id)
-        .eq('status', 'open')
-        .in('person_id', attendeeIds)
-        .order('due_on', { ascending: true, nullsFirst: false })
-    : { data: [] as { id: string; description: string; owner: string; due_on: string | null }[] }
-
-  const open = commitments ?? []
-  // Overdue outranks merely open, and a dated promise outranks an undated one.
-  // The list is already sorted by date, so the first overdue row is the most
-  // overdue and the first row overall is the next one due.
-  const overdue = open.find((c) => isOverdueIn(c.due_on, timeZone, now))
-  const chosen = overdue ?? open[0]
-
-  const alert: GlanceAlert | null = chosen
-    ? {
-        text: chosen.description,
-        note: [
-          overdue ? 'Overdue' : 'Still open',
-          chosen.owner === 'user'
-            ? 'you owe this'
-            : chosen.owner === 'person'
-              ? 'they owe this'
-              : 'between you',
-          chosen.due_on ? relativeDay(chosen.due_on, timeZone, now).toLowerCase() : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        tone: overdue ? 'critical' : 'caution',
-      }
-    : null
-
-  // People the user could still attach, for the empty-room control. Only
-  // fetched when the room is empty -- the glance does not otherwise need them.
-  // Excludes anyone already in the room, so the picker never offers somebody
-  // who is already there.
-  let addablePeople: PersonChoice[] = []
-  if (room.length === 0) {
-    const { data: allPeople } = await supabase
-      .from('people')
-      .select('id, full_name, preferred_name, job_title, organizations(name)')
-      .eq('user_id', user.id)
-      .is('archived_at', null)
-      .order('full_name', { ascending: true })
-      .limit(200)
-
-    addablePeople = (allPeople ?? [])
-      .filter((p) => !attendeeIds.includes(p.id))
-      .map((p) => ({
-        id: p.id,
-        name: p.preferred_name || p.full_name,
-        subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
-      }))
-  }
+  const owe = visual.visualLoops.filter((l) => l.direction === 'owe').length
 
   // Bucket only. See lib/brief: a duration next to an event timestamp is a
   // reconstruction of when a named person was in a specific meeting.
   await track('brief_glance_viewed', {
-    proximity: startProximity(meeting.scheduled_at, now),
-    participants: room.length,
-    has_alert: Boolean(alert),
+    proximity: startProximity(meeting.scheduledAt, now),
+    participants: people.length,
+    has_alert: Boolean(glance.openLoop),
+    remember_lines: glance.remember.length,
   })
 
   return (
     <Container size="narrow" className="py-6 sm:py-10">
-      <header>
-        <p className="text-ink-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] tracking-[0.14em] uppercase">
-          {meeting.scheduled_at ? (
-            <>
-              <LiveCountdown
-                startsAt={meeting.scheduled_at}
-                nowIso={now.toISOString()}
-                className="text-accent"
-              />
-              <span aria-hidden="true">·</span>
-              <span>{formatTime(meeting.scheduled_at, timeZone)}</span>
-            </>
-          ) : (
-            <span>Unscheduled</span>
-          )}
-        </p>
-        <h1 className="font-display text-ink mt-2 text-2xl leading-tight sm:text-3xl">
-          {meeting.title}
-        </h1>
-        <RoomStrip people={roomPeople} className="mt-5" />
-      </header>
+      <MeetingCockpit
+        title={meeting.title}
+        scheduledAt={meeting.scheduledAt}
+        people={people}
+        prep={visual.prep}
+        openLoops={visual.visualLoops.length}
+        owe={owe}
+        timeZone={timeZone}
+        now={now}
+      />
 
-      <BriefDepthNav meetingId={id} current="glance" className="mt-5" />
+      <BriefDepthNav meetingId={id} current="glance" className="mt-6" />
 
-      <div className="mt-7">
-        <GlanceBriefView
-          brief={brief}
-          room={room}
-          alert={alert}
-          meetingId={id}
-          unmatchedAttendees={unmatchedAttendees}
-          addablePeople={addablePeople}
-          faces={Object.fromEntries(roomPeople.map((p) => [p.id, p.src]))}
-        />
-      </div>
+      {people.length === 0 ? (
+        /* Silence used to be the answer here, on the one screen whose job is
+           to say who you are about to meet. It distinguishes the two
+           conditions the data model can actually tell apart, and never
+           asserts that an invitee IS someone in the record: turning an email
+           address into a person is a decision only the user can make. */
+        <section className="border-line bg-bg-sunken mt-6 rounded-[var(--radius-lg)] border p-4">
+          <h2 className="label">In the room</h2>
+          <p className="text-ink mt-2 text-sm leading-relaxed">
+            {unmatchedAttendees > 0
+              ? 'No participants have been matched to this meeting yet.'
+              : 'No one has been added to this meeting yet.'}
+          </p>
+          {unmatchedAttendees > 0 ? (
+            <p className="text-ink-muted mt-1.5 text-xs leading-relaxed">
+              Its invite carries{' '}
+              {unmatchedAttendees === 1 ? 'one attendee' : `${unmatchedAttendees} attendees`}{' '}
+              {brand.name} does not recognise.
+            </p>
+          ) : null}
+          <div className="mt-4">
+            <AddParticipants meetingId={id} people={addablePeople} />
+          </div>
+        </section>
+      ) : null}
 
-      <Button asChild size="lg" className="mt-8 w-full">
-        <Link href={`/meetings/${id}/quick`}>
-          Sixty seconds
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Link>
-      </Button>
-
-      <p className="mt-6 text-center">
-        <Link
-          href={`/meetings/${id}/debrief`}
-          className="text-ink-muted hover:text-ink inline-flex min-h-11 items-center text-xs"
-        >
-          Debrief after the meeting
-        </Link>
-      </p>
+      <GlanceBrief glance={glance} meetingId={id} timeZone={timeZone} now={now} className="mt-7" />
     </Container>
   )
 }

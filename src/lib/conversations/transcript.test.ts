@@ -36,7 +36,9 @@ describe('cleanTranscript', () => {
       'Alex: Thanks.',
     ].join('\r\n')
 
-    expect(cleanTranscript(srt, 'srt')).toBe("Jason: I'll get you the questionnaire.\nAlex: Thanks.")
+    expect(cleanTranscript(srt, 'srt')).toBe(
+      "Jason: I'll get you the questionnaire.\nAlex: Thanks.",
+    )
   })
 
   it('leaves plain text alone apart from bracketed timestamps', () => {

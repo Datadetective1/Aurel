@@ -137,11 +137,12 @@ export function scoreScenarios(responses: readonly ScenarioResponse[]): Scenario
     const directional = answers[dimension]
     const declined = dependsCount[dimension]
 
-    const lean = directional === 0 || Math.abs(delta) < NEUTRAL_BAND
-      ? null
-      : delta > 0
-        ? ('high' as const)
-        : ('low' as const)
+    const lean =
+      directional === 0 || Math.abs(delta) < NEUTRAL_BAND
+        ? null
+        : delta > 0
+          ? ('high' as const)
+          : ('low' as const)
 
     // They said it varies, and nothing they said since contradicts that.
     const contextDependent = declined > 0 && lean === null
@@ -230,7 +231,8 @@ export function describeScenarioDimension(score: ScenarioDimensionScore) {
     return {
       label: poles.label,
       pole: 'Context-dependent',
-      blurb: 'Your approach here varies with the situation, so treat guidance on it as a starting point rather than a rule.',
+      blurb:
+        'Your approach here varies with the situation, so treat guidance on it as a starting point rather than a rule.',
     }
   }
 

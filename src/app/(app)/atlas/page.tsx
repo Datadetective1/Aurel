@@ -1,12 +1,18 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Building2, TrendingDown, UserPlus } from 'lucide-react'
+import { TrendingDown, UserPlus } from 'lucide-react'
+import { CompanyMark } from '@/components/visual/company-mark'
+import { AtlasConnections, AtlasLegend } from '@/components/visual/atlas-connections'
+import { loadAtlasConnections } from '@/lib/visual/atlas.server'
+import type { VisualConnection } from '@/lib/visual/types'
 import { Avatar } from '@/components/ui/avatar'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { PersonNode, type PersonNodeData } from '@/components/app/person-node'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Panel, Rule, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
+import { checkCapability } from '@/lib/billing/entitlements'
+import { PlanRequired } from '@/components/app/plan-required'
 import { createClient } from '@/lib/supabase/server'
 import { daysSince, pluralise, relativeDay } from '@/lib/format'
 import { isOverdueIn } from '@/lib/tz'
@@ -32,13 +38,23 @@ export default async function AtlasPage() {
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
 
+  // A Pro capability. Checked before any of the record is read for it.
+  const access = await checkCapability('relationshipAtlas')
+  if (!access.allowed) {
+    return (
+      <Container size="default" className="py-8 sm:py-12">
+        <PlanRequired capability="relationshipAtlas" />
+      </Container>
+    )
+  }
+
   const supabase = await createClient()
 
   const [{ data: people }, { data: commitments }] = await Promise.all([
     supabase
       .from('people')
       .select(
-        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, avatar_path, organizations(id, name)',
+        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, avatar_path, organization_id, organizations(id, name, domain)',
       )
       .eq('user_id', user.id)
       .is('archived_at', null)
@@ -68,7 +84,7 @@ export default async function AtlasPage() {
 
   // Group by organisation; people with none are collected separately rather
   // than dropped.
-  const byOrg = new Map<string, { name: string; people: typeof list }>()
+  const byOrg = new Map<string, { name: string; domain: string | null; people: typeof list }>()
   const unaffiliated: typeof list = []
   for (const person of list) {
     const org = person.organizations
@@ -76,10 +92,27 @@ export default async function AtlasPage() {
       unaffiliated.push(person)
       continue
     }
-    const bucket = byOrg.get(org.id) ?? { name: org.name, people: [] }
+    const bucket = byOrg.get(org.id) ?? { name: org.name, domain: org.domain, people: [] }
     bucket.people.push(person)
     byOrg.set(org.id, bucket)
   }
+
+  // --- connections on record ------------------------------------------------
+  // Same-organisation pairs are already visible in the grouping below, so the
+  // list shows the connections the grouping cannot: shared history, and
+  // sourced facts in common.
+  const connections: VisualConnection[] = await loadAtlasConnections(supabase, user.id, list)
+  const atlasPeople = new Map(
+    list.map((p) => [
+      p.id,
+      {
+        id: p.id,
+        name: p.preferred_name || p.full_name,
+        fullName: p.full_name,
+        src: faces.get(p.id) ?? null,
+      },
+    ]),
+  )
 
   const organisations = [...byOrg.values()].sort((a, b) => b.people.length - a.people.length)
 
@@ -222,6 +255,29 @@ export default async function AtlasPage() {
             </section>
           )}
 
+          {/* --- connections on record ---------------------------------------- */}
+          <Rule />
+          <section>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <Eyebrow>Connections on record</Eyebrow>
+                <p className="text-ink-muted mt-2 max-w-xl text-xs leading-relaxed">
+                  Only what your record holds at both ends: meetings and conversations you kept
+                  together, and past employers or schools in sourced facts. Nothing is guessed.
+                </p>
+              </div>
+              <AtlasLegend />
+            </div>
+            {connections.length > 0 ? (
+              <AtlasConnections className="mt-5" connections={connections} people={atlasPeople} />
+            ) : (
+              <p className="text-ink-muted mt-4 text-sm">
+                No connections between people on record yet. They appear once two people share a
+                meeting, a conversation, or a sourced fact.
+              </p>
+            )}
+          </section>
+
           <Rule />
 
           {/* --- by organisation ------------------------------------------------ */}
@@ -231,7 +287,7 @@ export default async function AtlasPage() {
               {organisations.map((org) => (
                 <div key={org.name}>
                   <div className="flex items-center gap-2">
-                    <Building2 className="text-ink-faint size-4" aria-hidden="true" />
+                    <CompanyMark name={org.name} domain={org.domain} size="md" />
                     <h2 className="font-display text-ink text-lg">{org.name}</h2>
                     <span className="text-ink-muted text-xs">
                       {pluralise(org.people.length, 'person', 'people')}

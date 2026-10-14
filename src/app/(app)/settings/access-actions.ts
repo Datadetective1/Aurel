@@ -81,6 +81,9 @@ export async function redeemInvitation(
     expired: { error: 'That invitation has expired.' },
     revoked: { error: 'That invitation is no longer valid.' },
     exhausted: { error: 'That invitation has already been used.' },
+    // This account redeemed this invitation before; a revoked grant is never
+    // restored by the same code (migration 0024).
+    already_redeemed: { error: 'This invitation has already been used on this account.' },
     unauthenticated: { error: 'Sign in first.' },
   }
 
@@ -127,9 +130,11 @@ export async function createInvitation(
   const code = generateCode()
   const supabase = await createClient()
 
-  // Service-role write, because the table refuses the caller by design. The
-  // owner check above is the gate; RLS is the backstop that means a missing
-  // check cannot be exploited from a browser.
+  // The signed-in user's own client, not the service role. The table refuses
+  // the caller by design; the only write path is the database function, which
+  // re-checks for an active owner grant against auth.uid() (migration 0023
+  // moved it out of the API schema and removed anon's EXECUTE). The check
+  // above is the first gate, the function the second.
   const { error } = await supabase.rpc('create_pilot_invitation', {
     code_hash_input: hashCode(code),
     // The generated types mark every RPC argument required and non-null; the

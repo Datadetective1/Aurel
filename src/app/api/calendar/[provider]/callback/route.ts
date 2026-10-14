@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { requireOnboardedUser } from '@/lib/auth'
+import { checkCapability } from '@/lib/billing/entitlements'
 import { createClient } from '@/lib/supabase/server'
 import { calendarProvider, CALENDAR_PROVIDERS } from '@/lib/calendar'
 import type { CalendarProviderId } from '@/lib/calendar'
@@ -62,6 +63,11 @@ export async function GET(
     logger.warn('calendar.state_mismatch', { provider: id })
     await track('calendar_connect_failed', { provider: id, reason: 'state_mismatch' })
     return NextResponse.redirect(settings('invalid'))
+  }
+
+  // Checked again here: the consent link outlives the moment it was issued.
+  if (!(await checkCapability('calendarIntegration')).allowed) {
+    return NextResponse.redirect(`${origin}/settings/billing?upgrade=calendar`)
   }
 
   const provider = calendarProvider(id)

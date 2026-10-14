@@ -95,7 +95,6 @@ export function daysSince(value: string | Date | null | undefined): number | nul
   return Math.floor((Date.now() - date.getTime()) / 86_400_000)
 }
 
-
 /** Truncate on a word boundary, appending an ellipsis. */
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text

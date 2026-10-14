@@ -1,5 +1,6 @@
 'use client'
 
+import { RELEVANCE_LABELS } from '@/lib/visual/relevance'
 import * as React from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
@@ -26,14 +27,6 @@ const RELATIONSHIP_OPTIONS = [
   { value: 'mentor', label: 'My mentor' },
   { value: 'external', label: 'External contact' },
   { value: 'other', label: 'Other' },
-]
-
-const RELEVANCE_LABELS = [
-  'Occasional contact',
-  'Works with me sometimes',
-  'Regular working relationship',
-  'Important to my work',
-  'Critical relationship',
 ]
 
 export interface PersonDefaults {
@@ -81,11 +74,11 @@ export function PersonForm({
     <form action={formAction} noValidate>
       {defaults.id ? <input type="hidden" name="personId" value={defaults.id} /> : null}
 
-      <div className="flex items-center gap-4 rounded-[var(--radius-lg)] border border-line bg-surface p-4">
+      <div className="border-line bg-surface flex items-center gap-4 rounded-[var(--radius-lg)] border p-4">
         <Avatar name={name || '?'} size="lg" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-ink">{name || 'Their initials'}</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+          <p className="text-ink text-sm font-medium">{name || 'Their initials'}</p>
+          <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">
             Only professional context. {brand.name} never asks for, and never infers, personal
             characteristics.
           </p>
@@ -157,7 +150,12 @@ export function PersonForm({
           )}
         </FormField>
 
-        <FormField id="email" label="Email" description="Optional." error={state.fieldErrors?.email?.[0]}>
+        <FormField
+          id="email"
+          label="Email"
+          description="Optional."
+          error={state.fieldErrors?.email?.[0]}
+        >
           {(props) => (
             <Input
               {...props}
@@ -201,10 +199,10 @@ export function PersonForm({
         </FormField>
 
         <div className="grid gap-1.5">
-          <label htmlFor="relevance" className="text-[0.8125rem] font-medium text-ink-secondary">
+          <label htmlFor="relevance" className="text-ink-secondary text-[0.8125rem] font-medium">
             How much does this relationship matter?
           </label>
-          <p className="text-xs text-ink-muted">
+          <p className="text-ink-muted text-xs">
             Your call, never inferred. Used to order what {brand.name} puts in front of you.
           </p>
           <input
@@ -219,7 +217,7 @@ export function PersonForm({
             className="mt-1 w-full accent-[var(--accent)]"
             aria-describedby="relevance-value"
           />
-          <p id="relevance-value" className="text-xs text-ink">
+          <p id="relevance-value" className="text-ink text-xs">
             {RELEVANCE_LABELS[relevance - 1]}
           </p>
         </div>
@@ -246,7 +244,7 @@ export function PersonForm({
       {state.error ? (
         <p
           role="alert"
-          className="mt-5 flex items-start gap-2 rounded-[var(--radius-md)] border border-critical/25 bg-critical-wash px-3 py-2.5 text-xs leading-relaxed text-critical"
+          className="border-critical/25 bg-critical-wash text-critical mt-5 flex items-start gap-2 rounded-[var(--radius-md)] border px-3 py-2.5 text-xs leading-relaxed"
         >
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           {state.error}
@@ -254,18 +252,18 @@ export function PersonForm({
       ) : null}
 
       {state.message ? (
-        <p role="status" className="mt-5 text-xs text-positive">
+        <p role="status" className="text-positive mt-5 text-xs">
           {state.message}
         </p>
       ) : null}
 
       {mode === 'create' ? (
-        <div className="mt-8 rounded-[var(--radius-md)] border border-line bg-bg-sunken p-4">
+        <div className="border-line bg-bg-sunken mt-8 rounded-[var(--radius-md)] border p-4">
           <Eyebrow className="flex items-center gap-1.5">
-            <Sparkles className="size-3 text-accent" aria-hidden="true" />
+            <Sparkles className="text-accent size-3" aria-hidden="true" />
             What happens next
           </Eyebrow>
-          <p className="mt-2 text-xs leading-relaxed text-ink-secondary">
+          <p className="text-ink-secondary mt-2 text-xs leading-relaxed">
             {canResearch
               ? `If you gave a link, ${brand.name} will read it and build a source-backed professional footprint. Everything it finds shows where it came from, and nothing enters your relationship memory until you accept it.`
               : (discoveryHint ??

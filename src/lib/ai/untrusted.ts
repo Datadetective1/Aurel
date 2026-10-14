@@ -65,11 +65,7 @@ export interface UntrustedBlock {
  * `label` describes the provenance to the model (e.g. "web page at example.com")
  * so it can weigh the source without treating it as authoritative.
  */
-export function fenceUntrusted(
-  content: string,
-  label: string,
-  maxChars = 12_000,
-): UntrustedBlock {
+export function fenceUntrusted(content: string, label: string, maxChars = 12_000): UntrustedBlock {
   let hits = 0
   let text = content ?? ''
 
