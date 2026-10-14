@@ -118,6 +118,10 @@ describe('checkout charges exactly what the page shows', () => {
   it('offers no annual plan', () => {
     expect(actions).not.toMatch(/yearly|annual/i)
   })
+
+  it('accepts no promotion codes until one is approved', () => {
+    expect(actions).toContain('allow_promotion_codes: false')
+  })
 })
 
 describe('the webhook', () => {

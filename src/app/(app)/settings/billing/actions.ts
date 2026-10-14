@@ -86,7 +86,8 @@ export async function startCheckout(
         subscription_data: { metadata: { user_id: user.id } },
         metadata: { user_id: user.id },
 
-        allow_promotion_codes: true,
+        // No promotion is approved; Checkout shows no code field.
+        allow_promotion_codes: false,
         billing_address_collection: 'auto',
         automatic_tax: { enabled: false },
 
