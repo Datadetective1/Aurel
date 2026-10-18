@@ -1,12 +1,9 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ArrowRight, Check, CircleCheck, Download, Eye, Lock } from 'lucide-react'
+import { ArrowRight, CircleCheck, Download, Eye, Lock } from 'lucide-react'
 import { ApertureField } from '@/components/brand/aperture'
-import { AtlasVisual } from '@/components/marketing/home/atlas'
-import { FollowThroughVisual } from '@/components/marketing/home/follow-through'
 import { HeroBrief } from '@/components/marketing/home/hero-brief'
-import { MemoryTimeline } from '@/components/marketing/home/memory-timeline'
-import { RoomVisual } from '@/components/marketing/home/room'
+import { RelationshipVisual } from '@/components/marketing/home/relationship'
 import { Stages } from '@/components/marketing/home/stages'
 import { Button } from '@/components/ui/button'
 import { Container, Eyebrow } from '@/components/ui/primitives'
@@ -24,34 +21,28 @@ export const metadata: Metadata = {
 /**
  * THE HOMEPAGE
  * =============================================================================
- * Shown, not told. Each section leads with the product itself -- compositions
- * built from the app's own interface pieces and invented people (see
- * `components/marketing/home/fixtures`) -- and carries one short heading and
- * at most a line of copy. The order is the loop the product closes:
+ * Five sections, each led by the product itself -- compositions built from the
+ * app's own interface pieces and invented people (see
+ * `components/marketing/home/fixtures`) -- with one heading and at most a line
+ * of copy:
  *
- *   hero          the brief you open on the way in
- *   the room      who you are meeting, and what connects you
- *   how           before, during, after
- *   memory        the relationship over time
- *   connections   the Atlas: every line traced
- *   follow-up     every promise, in both directions
- *   pricing       Free, and Pro at the price in lib/billing/plans
- *   trust         the four commitments that make it safe to use
+ *   hero            the brief at a glance
+ *   how             before, during, after
+ *   relationships   who is connected, what happened, what is owed
+ *   pricing+trust   Free and Pro from lib/billing/plans; four principles
+ *   final CTA
  *
- * Section ids are the ones the marketing header links to.
+ * Sized so a phone reaches the closing call to action in about six screens.
+ * Section ids are the ones the marketing header and older links point at.
  * =============================================================================
  */
 export default function LandingPage() {
   return (
     <>
       <Hero />
-      <Room />
       <HowItWorks />
-      <Memory />
-      <Connections />
-      <FollowThrough />
-      <Pricing />
-      <Trust />
+      <Relationships />
+      <PricingAndTrust />
       <FinalCta />
       <StructuredData />
     </>
@@ -78,12 +69,14 @@ function SectionHeading({
       <Eyebrow>{eyebrow}</Eyebrow>
       <h2
         id={id}
-        className="font-display text-ink mt-3 text-[1.875rem] leading-tight text-balance sm:text-[2.5rem]"
+        className="font-display text-ink mt-2.5 text-[1.75rem] leading-tight text-balance sm:text-[2.5rem]"
       >
         {title}
       </h2>
       {line ? (
-        <p className="text-ink-secondary mt-3 text-base leading-relaxed sm:text-lg">{line}</p>
+        <p className="text-ink-secondary mt-2.5 text-[0.9375rem] leading-relaxed sm:text-lg">
+          {line}
+        </p>
       ) : null}
     </div>
   )
@@ -96,24 +89,24 @@ function Hero() {
       {/* A single warm lift behind the product, so it sits above the page. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-10 right-0 hidden h-[40rem] w-[44rem] rounded-full opacity-[0.55] blur-3xl lg:block"
+        className="pointer-events-none absolute top-10 right-0 hidden h-[36rem] w-[40rem] rounded-full opacity-[0.55] blur-3xl lg:block"
         style={{
           background: 'radial-gradient(closest-side, var(--accent-wash), transparent 70%)',
         }}
       />
 
       <Container size="wide">
-        <div className="relative grid items-center gap-10 pt-10 pb-16 sm:pt-14 lg:grid-cols-[1fr_1.05fr] lg:gap-16 lg:py-20">
+        <div className="relative grid items-center gap-8 pt-8 pb-12 sm:pt-12 lg:grid-cols-[1fr_1fr] lg:gap-16 lg:py-20">
           <div>
-            <h1 className="font-display text-ink text-[2.5rem] leading-[1.04] tracking-[-0.02em] text-balance sm:text-6xl">
+            <h1 className="font-display text-ink text-[2.375rem] leading-[1.04] tracking-[-0.02em] text-balance sm:text-6xl">
               Walk into every room prepared.
             </h1>
-            <p className="text-ink-secondary mt-5 max-w-lg text-base leading-relaxed sm:text-lg">
+            <p className="text-ink-secondary mt-4 max-w-lg text-base leading-relaxed sm:text-lg">
               Who you&rsquo;re meeting, what matters to them, and what you owe &mdash; in one
               glance, before you walk in.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
                 <Link href="/sign-up">
                   Start free
@@ -125,33 +118,11 @@ function Hero() {
               </Button>
             </div>
 
-            <p className="text-ink-muted mt-4 text-xs">Free to start. No card required.</p>
+            <p className="text-ink-muted mt-3 text-xs">Free to start. No card required.</p>
           </div>
 
-          <HeroBrief className="mx-auto w-full max-w-[34rem] lg:max-w-none" />
+          <HeroBrief className="mx-auto w-full max-w-[30rem] lg:max-w-[32rem]" />
         </div>
-      </Container>
-    </section>
-  )
-}
-
-function Room() {
-  return (
-    <section
-      aria-labelledby="room-title"
-      className="border-line bg-bg-sunken scroll-mt-20 border-y py-16 sm:py-24"
-    >
-      {/* The header used to link to a public-research section; the anchor
-          stays so an old link lands on the closest thing, the room. */}
-      <span id="research" className="block scroll-mt-20" />
-      <Container size="wide">
-        <SectionHeading
-          id="room-title"
-          eyebrow="See the room"
-          title="Know who you're meeting before you walk in."
-          center
-        />
-        <RoomVisual className="mx-auto mt-10 max-w-4xl sm:mt-12" />
       </Container>
     </section>
   )
@@ -159,10 +130,14 @@ function Room() {
 
 function HowItWorks() {
   return (
-    <section id="how" aria-labelledby="how-title" className="scroll-mt-20 py-16 sm:py-24">
+    <section
+      id="how"
+      aria-labelledby="how-title"
+      className="border-line bg-bg-sunken scroll-mt-20 border-y py-12 sm:py-20"
+    >
       <Container size="wide">
         <SectionHeading id="how-title" eyebrow="How it works" title="Before. During. After." />
-        <div className="mt-10 sm:mt-12">
+        <div className="mt-7 sm:mt-10">
           <Stages />
         </div>
       </Container>
@@ -170,158 +145,20 @@ function HowItWorks() {
   )
 }
 
-function Memory() {
+function Relationships() {
   return (
-    <section
-      id="memory"
-      aria-labelledby="memory-title"
-      className="border-line bg-bg-sunken scroll-mt-20 border-y py-16 sm:py-24"
-    >
-      <Container size="wide">
-        <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-          <div>
-            <SectionHeading
-              id="memory-title"
-              eyebrow="Relationship memory"
-              title="It remembers what happened last time."
-              line="Every meeting, decision and promise, in order — ready when you meet again."
-            />
-            <ul className="mt-7 grid gap-2.5">
-              {['What they asked for', 'What was decided', 'What was promised, and kept'].map(
-                (item) => (
-                  <li key={item} className="text-ink flex items-center gap-2.5 text-sm">
-                    <Check className="text-accent size-4 shrink-0" aria-hidden="true" />
-                    {item}
-                  </li>
-                ),
-              )}
-            </ul>
-          </div>
-          <MemoryTimeline className="mx-auto w-full max-w-xl lg:max-w-none" />
-        </div>
-      </Container>
-    </section>
-  )
-}
-
-const NOT_THIS = [
-  { tool: 'A notes app', keeps: 'what was said' },
-  { tool: 'A task manager', keeps: 'what to do' },
-  { tool: brand.name, keeps: 'who, why, and what is owed between you', ours: true },
-]
-
-function Connections() {
-  return (
-    <section aria-labelledby="atlas-title" className="scroll-mt-20 py-16 sm:py-24">
-      <Container size="wide">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
-          <AtlasVisual className="order-2 lg:order-1" />
-          <div className="order-1 lg:order-2">
-            <SectionHeading
-              id="atlas-title"
-              eyebrow="Relationship intelligence"
-              title="Every connection, traced."
-              line="Drawn only from your meetings, your conversations and sources you approve. No scraping, no hidden profiles."
-            />
-            <dl className="border-line mt-7 grid gap-px overflow-hidden rounded-[var(--radius-lg)] border">
-              {NOT_THIS.map((row) => (
-                <div
-                  key={row.tool}
-                  className={cn(
-                    'flex flex-wrap items-baseline gap-x-2 px-4 py-3 text-sm',
-                    row.ours ? 'bg-accent-wash' : 'bg-surface',
-                  )}
-                >
-                  <dt className={row.ours ? 'text-ink font-medium' : 'text-ink-secondary'}>
-                    {row.tool}
-                  </dt>
-                  <dd className={row.ours ? 'text-ink' : 'text-ink-muted'}>keeps {row.keeps}.</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-      </Container>
-    </section>
-  )
-}
-
-function FollowThrough() {
-  return (
-    <section
-      id="follow"
-      aria-labelledby="follow-title"
-      className="border-line bg-bg-sunken scroll-mt-20 border-y py-16 sm:py-24"
-    >
+    <section id="memory" aria-labelledby="memory-title" className="scroll-mt-20 py-12 sm:py-20">
+      {/* Older links pointed at sections this one now holds. */}
+      <span id="research" className="block scroll-mt-20" />
+      <span id="follow" className="block scroll-mt-20" />
       <Container size="wide">
         <SectionHeading
-          id="follow-title"
-          eyebrow="Follow through"
-          title="Every promise, in both directions."
-          line="What you owe, what you're waiting on, and what to bring up next time."
+          id="memory-title"
+          eyebrow="Relationship intelligence"
+          title={`${brand.name} remembers the relationship, not just the meeting.`}
+          line="Who's connected, what happened last time, and what's owed — each with its source."
         />
-        <FollowThroughVisual className="mt-10 sm:mt-12" />
-      </Container>
-    </section>
-  )
-}
-
-function Pricing() {
-  const plans = [PLANS.free, PLANS.pro]
-  return (
-    <section aria-labelledby="pricing-title" className="py-16 sm:py-24">
-      <Container size="default">
-        <SectionHeading
-          id="pricing-title"
-          eyebrow="Pricing"
-          title="Start free. Upgrade when it earns it."
-          center
-        />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {plans.map((plan) => {
-            const pro = plan.id === 'pro'
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  'flex flex-col rounded-[var(--radius-xl)] border p-6 sm:p-7',
-                  pro ? 'border-accent/30 bg-accent-wash' : 'border-line bg-surface',
-                )}
-              >
-                <h3 className="font-display text-ink text-2xl">{plan.name}</h3>
-                <p className="mt-3 flex items-baseline gap-2">
-                  <span className="font-display text-ink text-4xl">
-                    {pro ? formatPrice(plan.monthlyPriceCents) : '$0'}
-                  </span>
-                  <span className="text-ink-muted text-sm">
-                    {pro ? 'per month' : 'no card required'}
-                  </span>
-                </p>
-                <p className="text-ink-secondary mt-3 text-sm leading-relaxed">{plan.tagline}</p>
-                <ul className="mt-5 grid gap-2">
-                  {plan.highlights.slice(pro ? 0 : 1, pro ? 4 : 5).map((h) => (
-                    <li key={h} className="text-ink-secondary flex gap-2.5 text-sm">
-                      <CircleCheck
-                        className="text-accent mt-0.5 size-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      {h}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
-        <p className="mt-6 text-center">
-          <Link
-            href="/pricing"
-            className="text-accent decoration-accent/40 hover:decoration-accent inline-flex min-h-11 items-center gap-1.5 text-sm underline underline-offset-2"
-          >
-            Compare plans in full
-            <ArrowRight className="size-3.5" aria-hidden="true" />
-          </Link>
-        </p>
+        <RelationshipVisual className="mt-7 sm:mt-10" />
       </Container>
     </section>
   )
@@ -350,35 +187,104 @@ const TRUST = [
   },
 ]
 
-function Trust() {
+/** How many plan highlights the homepage summary shows; /pricing has them all. */
+const HIGHLIGHTS = 3
+
+function PricingAndTrust() {
+  // Free leads with the Interaction Profile, which is not a plan difference
+  // worth a summary line; Pro's first three are its headline additions.
+  const plans = [
+    { plan: PLANS.free, highlights: PLANS.free.highlights.slice(1, 1 + HIGHLIGHTS) },
+    { plan: PLANS.pro, highlights: PLANS.pro.highlights.slice(0, HIGHLIGHTS) },
+  ]
   return (
     <section
-      id="trust"
-      aria-labelledby="trust-title"
-      className="border-line bg-bg-sunken scroll-mt-20 border-y py-16 sm:py-20"
+      aria-labelledby="pricing-title"
+      className="border-line bg-bg-sunken border-y py-12 sm:py-20"
     >
-      <Container size="wide">
+      <Container size="default">
         <SectionHeading
-          id="trust-title"
-          eyebrow="Evidence and privacy"
-          title="Notes about real colleagues, treated carefully."
+          id="pricing-title"
+          eyebrow="Pricing"
+          title="Start free. Upgrade when it earns it."
+          center
         />
-        <ul className="mt-10 grid gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
-          {TRUST.map((item) => (
-            <li key={item.title}>
-              <item.icon className="text-accent size-5" aria-hidden="true" />
-              <h3 className="text-ink mt-3 text-[0.9375rem] font-medium">{item.title}</h3>
-              <p className="text-ink-muted mt-1 text-sm leading-relaxed">{item.body}</p>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href="/privacy"
-          className="text-accent decoration-accent/40 hover:decoration-accent mt-8 inline-flex min-h-11 items-center gap-1.5 text-sm underline underline-offset-2"
-        >
-          Read the privacy approach
-          <ArrowRight className="size-3.5" aria-hidden="true" />
-        </Link>
+        <div className="mt-7 grid gap-3 sm:mt-10 sm:grid-cols-2 sm:gap-4">
+          {plans.map(({ plan, highlights }) => {
+            const pro = plan.id === 'pro'
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  'rounded-[var(--radius-xl)] border p-5 sm:p-6',
+                  pro ? 'border-accent/30 bg-accent-wash' : 'border-line bg-surface',
+                )}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-display text-ink text-2xl">{plan.name}</h3>
+                  <p className="flex items-baseline gap-1.5">
+                    <span className="font-display text-ink text-3xl">
+                      {plan.monthlyPriceCents === 0 ? '$0' : formatPrice(plan.monthlyPriceCents)}
+                    </span>
+                    <span className="text-ink-secondary text-xs">
+                      {plan.monthlyPriceCents === 0 ? 'no card' : 'per month'}
+                    </span>
+                  </p>
+                </div>
+                <ul className="mt-4 grid gap-1.5">
+                  {highlights.map((h) => (
+                    <li key={h} className="text-ink-secondary flex gap-2.5 text-sm">
+                      <CircleCheck
+                        className="text-accent mt-0.5 size-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+        <p className="mt-3 text-center">
+          <Link
+            href="/pricing"
+            className="text-accent decoration-accent/40 hover:decoration-accent inline-flex min-h-11 items-center gap-1.5 text-sm underline underline-offset-2"
+          >
+            Compare plans in full
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        </p>
+
+        <div id="trust" className="border-line mt-8 scroll-mt-20 border-t pt-8 sm:mt-12 sm:pt-10">
+          <h2 className="font-display text-ink text-center text-xl leading-snug text-balance sm:text-2xl">
+            Say what is known, and say what isn&rsquo;t.
+          </h2>
+          <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 sm:mt-7 lg:grid-cols-4">
+            {TRUST.map((item) => (
+              <li key={item.title} className="flex gap-2.5">
+                <item.icon className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="text-ink block text-sm leading-snug font-medium">
+                    {item.title}
+                  </span>
+                  <span className="text-ink-muted mt-1 hidden text-[0.8125rem] leading-relaxed sm:block">
+                    {item.body}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-center">
+            <Link
+              href="/privacy"
+              className="text-accent decoration-accent/40 hover:decoration-accent inline-flex min-h-11 items-center gap-1.5 text-sm underline underline-offset-2"
+            >
+              Read the privacy approach
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Link>
+          </p>
+        </div>
       </Container>
     </section>
   )
@@ -386,20 +292,20 @@ function Trust() {
 
 function FinalCta() {
   return (
-    <section className="relative overflow-hidden py-20 sm:py-24">
+    <section className="relative overflow-hidden py-14 sm:py-20">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <ApertureField
-          className="text-ink absolute -bottom-40 left-1/2 h-[30rem] w-[34rem] -translate-x-1/2"
+          className="text-ink absolute -bottom-44 left-1/2 h-[26rem] w-[30rem] -translate-x-1/2"
           rings={5}
           accentRing={1}
           intensity={1.1}
         />
       </div>
       <Container size="narrow" className="relative text-center">
-        <h2 className="font-display text-ink text-[1.875rem] leading-tight text-balance sm:text-[2.75rem]">
+        <h2 className="font-display text-ink text-[1.75rem] leading-tight text-balance sm:text-[2.75rem]">
           Your next important meeting is already on the calendar.
         </h2>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
             <Link href="/sign-up">
               Start free

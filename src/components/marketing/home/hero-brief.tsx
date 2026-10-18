@@ -1,102 +1,87 @@
-import { brand } from '@/lib/brand'
-import { CalendarClock, CircleCheck, Target } from 'lucide-react'
+import { CalendarClock, Target } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
-import { Chip, ChipRow } from '@/components/visual/chip'
 import { DIRECTION_ICON } from '@/components/visual/direction'
+import { brand } from '@/lib/brand'
 import { MEETING, OPEN_LOOP, REMEMBER, ROOM, firstName } from './fixtures'
-import { OrgMark, ProductFrame } from './frame'
+import { ProductFrame } from './frame'
 
 /**
- * HERO: THE BRIEFING COCKPIT
+ * HERO: THE BRIEF, AT A GLANCE
  * =============================================================================
- * The meeting view a user opens on the way in, recomposed from the app's own
- * pieces (Avatar, Chip, the direction icons, the Glance's three blocks). It
- * answers the three questions the product is built around, in the order the
- * eye takes them:
+ * Not the whole brief -- the five things that make the point in a second:
  *
- *   who am I meeting?      faces, first names, organisations
- *   what matters?          objective, three things to remember
- *   what do I need to do?  the one open loop, in the user's direction
+ *   when             the countdown and the time
+ *   who              faces and first names
+ *   what for         the objective
+ *   what to recall   one thing to remember, with where it came from
+ *   what you owe     the one open loop
+ *
+ * Built from the app's own pieces (Avatar, the direction icons, the Glance's
+ * blocks) so the promise is the product, at a size that leaves the hero short
+ * on a phone.
  * =============================================================================
  */
 export function HeroBrief({ className }: { className?: string }) {
-  const orgs = [...new Set(ROOM.map((p) => p.org))]
   const OweIcon = DIRECTION_ICON.owe
+  const remember = REMEMBER[0]!
 
   return (
     <ProductFrame
       className={className}
-      description={`An ${brand.name} meeting brief for "${MEETING.title}", starting in about two hours. It shows the three people attending — ${ROOM.map((p) => `${p.name}, ${p.role} at ${p.org}`).join('; ')} — marks the brief as ready, and notes one thing you owe. The objective is to ${MEETING.objective.charAt(0).toLowerCase()}${MEETING.objective.slice(1)} It lists three things to remember: ${REMEMBER.map((r) => r.text).join(' ')} The open loop: ${OPEN_LOOP.text}, due today.`}
+      description={`An ${brand.name} meeting brief for "${MEETING.title}", starting in about two hours, with ${ROOM.map((p) => `${p.name}, ${p.role} at ${p.org}`).join('; ')}. Objective: ${MEETING.objective} Remember: ${remember.text} (${remember.basis.toLowerCase()}). Open loop: ${OPEN_LOOP.text}, due today.`}
     >
-      <div className="px-5 pt-5 pb-4 sm:px-6">
+      <div className="px-5 pt-4 pb-4 sm:px-6 sm:pt-5">
         <p className="text-ink-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] tracking-[0.12em] uppercase">
           <CalendarClock className="text-accent size-3.5" />
           <span className="text-accent">{MEETING.countdown}</span>
           <span>·</span>
           <span>{MEETING.when}</span>
         </p>
-        <p className="font-display text-ink mt-2 text-[1.375rem] leading-tight sm:text-2xl">
-          {MEETING.title}
+        <div className="mt-2 flex items-center justify-between gap-4">
+          <p className="font-display text-ink min-w-0 text-xl leading-tight sm:text-2xl">
+            {MEETING.title}
+          </p>
+          <ul className="flex shrink-0 -space-x-2">
+            {ROOM.map((p) => (
+              <li key={p.id}>
+                <Avatar name={p.name} size="md" className="ring-surface ring-2" />
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="text-ink-muted mt-1 text-xs">
+          {ROOM.map((p) => firstName(p)).join(', ')} · {ROOM[0]!.org}
         </p>
-
-        <ul className="mt-4 flex gap-4">
-          {ROOM.map((p) => (
-            <li key={p.id} className="flex w-16 flex-col items-center gap-1.5 text-center">
-              <Avatar name={p.name} size="lg" />
-              <span className="text-ink w-full truncate text-xs">{firstName(p)}</span>
-            </li>
-          ))}
-        </ul>
-
-        <ChipRow className="mt-4">
-          <Chip icon={CircleCheck} tone="positive">
-            Brief ready
-          </Chip>
-          <Chip icon={OweIcon} tone="accent">
-            You owe 1
-          </Chip>
-          {orgs.map((org) => (
-            <Chip key={org} tone="quiet" className="gap-1">
-              <OrgMark name={org} size="xs" />
-              {org}
-            </Chip>
-          ))}
-        </ChipRow>
       </div>
 
-      <div className="border-line grid gap-5 border-t px-5 py-5 sm:px-6">
+      <div className="border-line grid gap-4 border-t px-5 py-4 sm:px-6 sm:py-5">
         <div>
           <p className="label flex items-center gap-1.5">
             <Target className="text-accent size-3.5" />
             Objective
           </p>
-          <p className="font-display text-ink mt-2 text-lg leading-snug text-balance sm:text-[1.25rem]">
+          <p className="font-display text-ink mt-1.5 text-lg leading-snug text-balance">
             {MEETING.objective}
           </p>
         </div>
 
-        <div>
-          <p className="label">Remember</p>
-          <ul className="mt-3 grid gap-3">
-            {REMEMBER.map((item) => (
-              <li key={item.text} className="flex gap-3">
-                <span className="bg-accent-graphic mt-[0.5625rem] size-1.5 shrink-0 rounded-full" />
-                <span className="min-w-0">
-                  <span className="text-ink block text-[0.9375rem] leading-snug">{item.text}</span>
-                  <span className="text-ink-muted mt-0.5 block text-xs">{item.basis}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="flex gap-3">
+          <span className="bg-accent-graphic mt-[0.5625rem] size-1.5 shrink-0 rounded-full" />
+          <span className="min-w-0">
+            <span className="label block">Remember</span>
+            <span className="text-ink mt-1 block text-[0.9375rem] leading-snug">
+              {remember.text}
+            </span>
+            <span className="text-ink-muted mt-0.5 block text-xs">{remember.basis}</span>
+          </span>
         </div>
 
-        <div className="border-accent/25 bg-accent-wash rounded-[var(--radius-lg)] border px-4 py-3.5">
-          <p className="label text-accent flex items-center gap-1.5">
-            <OweIcon className="size-3.5" />
-            Open loop
-          </p>
-          <p className="text-ink mt-2 text-[0.9375rem] leading-snug">{OPEN_LOOP.text}</p>
-          <p className="text-ink-muted mt-1 text-xs">{OPEN_LOOP.meta}</p>
+        <div className="border-accent/25 bg-accent-wash flex items-start gap-3 rounded-[var(--radius-lg)] border px-4 py-3">
+          <OweIcon className="text-accent mt-0.5 size-4 shrink-0" />
+          <span className="min-w-0">
+            <span className="text-ink block text-[0.9375rem] leading-snug">{OPEN_LOOP.text}</span>
+            <span className="text-ink-muted mt-0.5 block text-xs">{OPEN_LOOP.meta}</span>
+          </span>
         </div>
       </div>
     </ProductFrame>
