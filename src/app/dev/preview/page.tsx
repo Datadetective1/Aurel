@@ -13,11 +13,25 @@ import { RelationshipMap } from '@/components/visual/relationship-map'
 import { MeetingCard } from '@/components/visual/meeting-card'
 import { AtlasConnections, AtlasLegend } from '@/components/visual/atlas-connections'
 import { PhotoSuggestionCard } from '@/components/visual/photo-suggestion'
-import { Container, Eyebrow } from '@/components/ui/primitives'
+import { Container, Eyebrow, SectionHeader } from '@/components/ui/primitives'
 import { AppShell } from '@/components/app/app-shell'
 import { ConversationDetailView } from '@/components/app/conversation-detail'
 import { PersonRelationshipSections } from '@/components/app/person-sections'
-import { ResearchPanel } from '@/components/app/research-panel'
+import { IdentityRecovery, ResearchPanel } from '@/components/app/research-panel'
+import { AboutForm } from '@/components/onboarding/about-form'
+import { FirstRun } from '@/components/app/first-run'
+import { CalendarReturnNotice } from '@/components/app/calendar-return-notice'
+import { ProfileInvite } from '@/components/app/profile-invite'
+import { MeetingForm } from '@/components/app/meeting-form'
+import { GenerateBriefPanel } from '@/components/app/generate-brief'
+import { PersonForm } from '@/components/app/person-form'
+import { ScenarioRunner } from '@/components/onboarding/scenario-runner'
+import { RevealView } from '@/components/onboarding/reveal-view'
+import { CORE_SCENARIOS } from '@/lib/assessment/scenarios'
+import { scoreScenarios } from '@/lib/assessment/scenario-scoring'
+import { firstRead } from '@/lib/assessment/first-read'
+import { brand } from '@/lib/brand'
+import { describeZone } from '@/lib/tz'
 import { PeopleList } from './preview-people'
 import { ConversationsListView } from './preview-conversations'
 import { PersonHeroView } from './preview-person'
@@ -77,6 +91,15 @@ const SCREENS = [
   'person-empty',
   'conversations',
   'atlas',
+  // The new-user activation path. Fictional people only.
+  'onboarding',
+  'activate',
+  'meeting-new',
+  'brief-prepare',
+  'add-person',
+  'research-recovery',
+  'profile-question',
+  'profile-result',
 ] as const
 type Screen = (typeof SCREENS)[number]
 
@@ -419,6 +442,157 @@ export default async function VisualPreview({
                 now={now}
               />
             </section>
+          </Container>
+        ) : null}
+
+        {screen === 'onboarding' ? (
+          <Container size="narrow" className="py-6 sm:py-10">
+            <AboutForm
+              defaults={{
+                fullName: '',
+                preferredName: '',
+                jobTitle: '',
+                company: '',
+                jobFunction: '',
+                seniority: '',
+                pronouns: '',
+                timezone: 'America/Chicago',
+              }}
+            />
+          </Container>
+        ) : null}
+
+        {screen === 'activate' ? (
+          <Container size="default" className="py-6 sm:py-12">
+            <h1 className="font-display text-ink text-[1.75rem] sm:text-4xl">
+              Good morning, Dana.
+            </h1>
+            <CalendarReturnNotice reason="connected" upcomingCount={0} className="mt-6" />
+            <CalendarReturnNotice reason="denied" upcomingCount={0} className="mt-4" />
+            <FirstRun
+              className="mt-9"
+              state={{
+                calendarConnected: true,
+                calendarAvailable: true,
+                upcomingCount: 0,
+                unknownAttendees: 0,
+                researchedCount: 0,
+                peopleCount: 0,
+                preparedCount: 0,
+                meetingCount: 0,
+              }}
+            />
+            <FirstRun
+              className="mt-9"
+              state={{
+                calendarConnected: false,
+                calendarAvailable: true,
+                upcomingCount: 0,
+                unknownAttendees: 0,
+                researchedCount: 0,
+                peopleCount: 0,
+                preparedCount: 0,
+                meetingCount: 0,
+              }}
+            />
+            <ProfileInvite className="mt-9" />
+          </Container>
+        ) : null}
+
+        {screen === 'meeting-new' ? (
+          <Container size="narrow" className="py-8 sm:py-12">
+            <SectionHeader
+              as="h1"
+              eyebrow="Prepare"
+              title="What are you preparing for?"
+              description="What you need from it, and who is in the room. Then a brief, straight away."
+            />
+            <div className="mt-8">
+              <MeetingForm
+                people={[
+                  { id: 'p-1', name: 'Maya Chen', subtitle: 'VP Engineering · Northwind' },
+                  { id: 'p-2', name: 'Theo Lindqvist', subtitle: 'Finance Director · Northwind' },
+                ]}
+                preselectedPersonId="p-1"
+                timeZoneLabel={describeZone('America/Chicago')}
+              />
+            </div>
+          </Container>
+        ) : null}
+
+        {screen === 'brief-prepare' ? (
+          <Container size="narrow" className="py-8 sm:py-12">
+            <h1 className="font-display text-ink text-3xl">Northwind renewal</h1>
+            <GenerateBriefPanel
+              meetingId="00000000-0000-4000-8000-000000000000"
+              objective="Get approval to move two engineers onto the migration before the quarter closes."
+              attendeeCount={1}
+              addablePeople={[]}
+            />
+          </Container>
+        ) : null}
+
+        {screen === 'add-person' ? (
+          <Container size="narrow" className="py-8 sm:py-12">
+            <SectionHeader
+              as="h1"
+              eyebrow="New relationship"
+              title="Add a person"
+              description="Start with who they are. Add depth over time."
+            />
+            <div className="mt-8">
+              <PersonForm canResearch discoveryHint={null} />
+            </div>
+          </Container>
+        ) : null}
+
+        {screen === 'research-recovery' ? (
+          <Container size="narrow" className="py-8 sm:py-12">
+            <h1 className="font-display text-ink text-3xl">Maya Chen</h1>
+            <div className="mt-6">
+              <IdentityRecovery
+                message="I couldn't confidently identify Maya Chen. I reviewed 6 sources and could not confirm any of them were about this person, so none were used."
+                missing={['organization', 'jobTitle', 'profileUrl']}
+                onRetry={async () => {
+                  'use server'
+                }}
+              />
+            </div>
+          </Container>
+        ) : null}
+
+        {screen === 'profile-question' ? (
+          <Container size="narrow" className="py-6 sm:py-10">
+            <ScenarioRunner
+              assessmentId="00000000-0000-4000-8000-000000000000"
+              scenarios={CORE_SCENARIOS}
+              initialAnswers={[]}
+              finishHref="/dev/preview?screen=profile-result"
+              finishLabel={`See my ${brand.assessmentName}`}
+            />
+          </Container>
+        ) : null}
+
+        {screen === 'profile-result' ? (
+          <Container size="narrow" className="py-6 sm:py-10">
+            {(() => {
+              const scored = scoreScenarios(
+                CORE_SCENARIOS.map((scenario, i) => ({
+                  scenarioId: scenario.id,
+                  optionId: scenario.options[[1, 0, 0, 1, 2, 1][i]!]!.id,
+                })),
+              )
+              const read = firstRead(scored, brand.name)
+              return (
+                <RevealView
+                  assessmentId="00000000-0000-4000-8000-000000000000"
+                  archetype={scored.archetype}
+                  confidence={scored.confidence}
+                  tendencies={read.tendencies}
+                  explanation={read.explanation}
+                />
+              )
+            })()}
           </Container>
         ) : null}
       </div>

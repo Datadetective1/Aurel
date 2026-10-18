@@ -88,8 +88,8 @@ export function TimezoneField({
       </FormField>
 
       {confirmation ? (
-        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-muted">
-          <Clock className="size-3 shrink-0 text-ink-faint" aria-hidden="true" />
+        <p className="text-ink-muted mt-1.5 flex items-center gap-1.5 text-xs">
+          <Clock className="text-ink-faint size-3 shrink-0" aria-hidden="true" />
           {confirmation}
         </p>
       ) : null}
@@ -98,7 +98,7 @@ export function TimezoneField({
         <button
           type="button"
           onClick={() => setOverride(device)}
-          className="mt-1.5 flex w-fit items-center gap-1.5 rounded-[var(--radius-sm)] text-xs text-accent-text underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+          className="text-accent-text mt-1 flex min-h-11 w-fit items-center gap-1.5 rounded-[var(--radius-sm)] text-xs underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
         >
           <Check className="size-3 shrink-0" aria-hidden="true" />
           Use {timezoneLabel(device)}, detected from this device

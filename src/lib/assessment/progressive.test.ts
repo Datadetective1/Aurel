@@ -273,10 +273,11 @@ describe('the shown event is countable', () => {
 })
 
 describe('a six-question profile is not presented as broken', () => {
-  const reveal = readFileSync(
-    join(process.cwd(), 'src', 'app', 'onboarding', 'reveal', 'page.tsx'),
-    'utf8',
-  )
+  // The page computes; the view renders. Both are read so a regression in
+  // either is caught.
+  const reveal =
+    readFileSync(join(process.cwd(), 'src', 'app', 'onboarding', 'reveal', 'page.tsx'), 'utf8') +
+    readFileSync(join(process.cwd(), 'src', 'components', 'onboarding', 'reveal-view.tsx'), 'utf8')
 
   it('never renders a raw coverage or consistency number', () => {
     // These are engineering metrics. 0.000 next to somebody's profile reads as

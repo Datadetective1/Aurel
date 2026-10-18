@@ -298,7 +298,7 @@ const DETAIL_FIELDS: Record<
  * This asks for the details not yet on record -- any one is enough -- and runs
  * research again with them. The rejected sources stay recorded as rejected.
  */
-function IdentityRecovery({
+export function IdentityRecovery({
   message,
   missing,
   onRetry,
