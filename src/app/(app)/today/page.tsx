@@ -13,6 +13,7 @@ import { actionDirection } from '@/lib/visual/relationship-actions'
 import { Container, Eyebrow, Panel } from '@/components/ui/primitives'
 import { TodayShortcuts } from '@/components/app/today-shortcuts'
 import { WelcomeBanner } from '@/components/app/welcome-banner'
+import { CalendarReturnNotice } from '@/components/app/calendar-return-notice'
 import { MeetingCountdownCard } from '@/components/app/meeting-countdown'
 import {
   UpcomingMeetings,
@@ -28,7 +29,8 @@ import { runPrompt } from '@/lib/ai/provider'
 import { getFirstRunState } from '@/lib/first-run'
 import { FirstRun, firstRunComplete } from '@/components/app/first-run'
 import { ProfilePrompt } from '@/components/app/profile-prompt'
-import { getNextProfileQuestion } from '@/lib/assessment/next-question'
+import { ProfileInvite } from '@/components/app/profile-invite'
+import { getNextProfileQuestion, shouldInviteToProfile } from '@/lib/assessment/next-question'
 import { dailyFocusPrompt, type DailyFocus, type DailyFocusInput } from '@/lib/ai/prompts/coaching'
 import { minutesUntil } from '@/lib/brief'
 import { formatDayLabel, formatTime, relativeDay } from '@/lib/format'
@@ -48,9 +50,9 @@ export const metadata: Metadata = { title: 'Today', robots: { index: false, foll
 export default async function TodayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ welcome?: string }>
+  searchParams: Promise<{ welcome?: string; calendar?: string }>
 }) {
-  const { welcome } = await searchParams
+  const { welcome, calendar } = await searchParams
   const { user, profile } = await requireOnboardedUser()
   const supabase = await createClient()
 
@@ -217,6 +219,9 @@ export default async function TodayPage({
   // At most one, only on Today, only once a brief exists, and not if dismissed
   // in the last week. Usually null -- see lib/assessment/next-question.
   const profileQuestion = await getNextProfileQuestion(supabase, user.id)
+  // Mutually exclusive with the question above: that one needs a profile to
+  // refine, this one only appears when there is none.
+  const inviteToProfile = profileQuestion ? false : await shouldInviteToProfile(supabase, user.id)
 
   // Nothing recorded means nothing to reason about. Sending an empty record to
   // a model costs a request and a few seconds to be told, at length, that the
@@ -345,6 +350,13 @@ export default async function TodayPage({
       </header>
 
       <TodayShortcuts className="mt-4" />
+
+      {/* Back from connecting a calendar on the activation path. */}
+      <CalendarReturnNotice
+        reason={calendar}
+        upcomingCount={firstRun.upcomingCount}
+        className="mt-6"
+      />
 
       {/* Above everything, including the focus card, because it is the only
           thing on this page with a deadline. It renders from data already
@@ -583,6 +595,7 @@ export default async function TodayPage({
       {/* Below the day's real content on purpose: refinement is never the most
           important thing on this screen. */}
       {profileQuestion ? <ProfilePrompt block={profileQuestion} /> : null}
+      {inviteToProfile ? <ProfileInvite className="mt-9" /> : null}
 
       {/* Honest attribution of how this page was produced. Absent when nothing
           was produced -- an empty account has nothing to attribute. It waits

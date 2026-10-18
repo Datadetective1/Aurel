@@ -13,7 +13,7 @@ export const Label = React.forwardRef<
     <LabelPrimitive.Root
       ref={ref}
       className={cn(
-        'text-[0.8125rem] font-medium text-ink-secondary peer-disabled:opacity-50',
+        'text-ink-secondary text-[0.8125rem] font-medium peer-disabled:opacity-50',
         className,
       )}
       {...props}
@@ -33,14 +33,20 @@ const controlStyles = [
 
 export const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
   function Input({ className, ...props }, ref) {
-    return <input ref={ref} className={cn(controlStyles, 'h-10', className)} {...props} />
+    // 44px, the minimum tap target, at every width: tablets are touch devices
+    // too, and a breakpoint cannot tell a pointer from a finger.
+    return <input ref={ref} className={cn(controlStyles, 'h-11', className)} {...props} />
   },
 )
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'textarea'>>(
   function Textarea({ className, ...props }, ref) {
     return (
-      <textarea ref={ref} className={cn(controlStyles, 'min-h-24 leading-relaxed', className)} {...props} />
+      <textarea
+        ref={ref}
+        className={cn(controlStyles, 'min-h-24 leading-relaxed', className)}
+        {...props}
+      />
     )
   },
 )
@@ -50,7 +56,7 @@ export const Select = React.forwardRef<HTMLSelectElement, React.ComponentProps<'
     return (
       <select
         ref={ref}
-        className={cn(controlStyles, 'h-10 appearance-none pr-8', className)}
+        className={cn(controlStyles, 'h-11 appearance-none pr-8', className)}
         {...props}
       >
         {children}
@@ -98,13 +104,13 @@ export function FormField({
       <Label htmlFor={id}>
         {label}
         {required ? (
-          <span className="ml-1 text-critical" aria-hidden="true">
+          <span className="text-critical ml-1" aria-hidden="true">
             *
           </span>
         ) : null}
       </Label>
       {description ? (
-        <p id={descriptionId} className="text-xs leading-relaxed text-ink-muted">
+        <p id={descriptionId} className="text-ink-muted text-xs leading-relaxed">
           {description}
         </p>
       ) : null}
@@ -115,7 +121,7 @@ export function FormField({
         required: required || undefined,
       })}
       {error ? (
-        <p id={errorId} role="alert" className="text-xs text-critical">
+        <p id={errorId} role="alert" className="text-critical text-xs">
           {error}
         </p>
       ) : null}
@@ -152,8 +158,8 @@ export function OptionCard({
   return (
     <label
       className={cn(
-        'group relative flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border border-line bg-surface p-4',
-        'transition-colors duration-150 hover:border-line-strong hover:bg-bg-sunken',
+        'group border-line bg-surface relative flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border p-4',
+        'hover:border-line-strong hover:bg-bg-sunken transition-colors duration-150',
         'has-[:checked]:border-accent has-[:checked]:bg-accent-wash',
         'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus-ring)]',
         className,
@@ -167,16 +173,16 @@ export function OptionCard({
         defaultChecked={defaultChecked}
         onChange={(e) => onChange?.(e.currentTarget.checked)}
         className={cn(
-          'mt-0.5 size-4 shrink-0 appearance-none border border-line-strong bg-surface',
+          'border-line-strong bg-surface mt-0.5 size-4 shrink-0 appearance-none border',
           type === 'radio' ? 'rounded-full' : 'rounded-[3px]',
           'checked:border-accent checked:bg-accent',
           'focus-visible:outline-none',
         )}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-ink">{title}</span>
+        <span className="text-ink block text-sm font-medium">{title}</span>
         {description ? (
-          <span className="mt-0.5 block text-xs leading-relaxed text-ink-muted">{description}</span>
+          <span className="text-ink-muted mt-0.5 block text-xs leading-relaxed">{description}</span>
         ) : null}
       </span>
     </label>

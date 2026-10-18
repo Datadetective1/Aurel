@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { requireUser } from '@/lib/auth'
+import { resolveOrganization } from '@/lib/organizations'
+import { wallTimeToInstant } from '@/lib/tz'
+import { getProfile, requireUser } from '@/lib/auth'
 import { ownership, ownershipNoVisibility } from '@/lib/workspace'
 import { checkPersonLimit } from '@/lib/billing/entitlements'
 import { track } from '@/lib/analytics'
@@ -55,37 +57,6 @@ const personSchema = z.object({
   relevance: z.coerce.number().int().min(1).max(5).catch(3),
   notes: z.string().trim().max(4000).optional(),
 })
-
-/** Find or create the organisation by name, scoped to the workspace. */
-async function resolveOrganization(name: string | undefined): Promise<string | null> {
-  const trimmed = name?.trim()
-  if (!trimmed) return null
-
-  const supabase = await createClient()
-  const own = await ownership()
-
-  const { data: existing } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('workspace_id', own.workspace_id)
-    .ilike('name', trimmed)
-    .limit(1)
-    .maybeSingle()
-
-  if (existing) return existing.id
-
-  const { data: created, error } = await supabase
-    .from('organizations')
-    .insert({ ...own, name: trimmed })
-    .select('id')
-    .single()
-
-  if (error) {
-    logger.warn('organization.create_failed', { code: error.code })
-    return null
-  }
-  return created.id
-}
 
 export async function createPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = personSchema.safeParse({
@@ -423,8 +394,9 @@ export async function addInteraction(_prev: ActionState, formData: FormData): Pr
   const supabase = await createClient()
   const own = await ownership()
   const v = parsed.data
-  const occurredAt = new Date(v.occurredAt)
-  if (Number.isNaN(occurredAt.getTime())) {
+  // A datetime-local reading: read in the account's zone, not the server's.
+  const occurredAt = wallTimeToInstant(v.occurredAt, (await getProfile())?.timezone)
+  if (!occurredAt) {
     return { fieldErrors: { occurredAt: ['That date is not valid.'] } }
   }
 

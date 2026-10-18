@@ -6,18 +6,17 @@
  */
 
 /**
- * What a new account is asked before it can use the product.
+ * Every onboarding stage this build knows.
+ *
+ * Kept whole because `onboarding_stage` is a stored text column: accounts that
+ * signed up under the longer flow can be parked on any of these, and each must
+ * still resolve to a real route. What is *required* is a separate, much shorter
+ * list -- see REQUIRED_STEPS.
  *
  * `appearance` used to sit here, between coaching and the assessment. It asked
  * for a theme and a coaching style — a preference about screens the user had
- * not seen yet — and it was the only step in the flow with no way past it.
- * Both fields default sensibly in the database and both are fully editable at
- * Settings → Appearance & voice, so asking up front bought nothing and cost a
- * screen on the path to first value.
- *
- * `intent`, `frameworks` and `coaching` stay because each already offers Skip,
- * and because nothing else in the product collects them — removing them would
- * strand the configuration rather than defer it.
+ * not seen yet. Both fields default sensibly in the database and both are
+ * editable at Settings → Appearance & voice.
  */
 export const ONBOARDING_STEPS = [
   'welcome',
@@ -30,20 +29,56 @@ export const ONBOARDING_STEPS = [
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 
+/**
+ * What a new account must do before it reaches the product: one screen.
+ *
+ * A fresh-user walkthrough counted seven screens and six questions between
+ * confirming an email and seeing Today -- goals, past assessments, coaching
+ * history, the Interaction Profile and a long result -- before the user had
+ * prepared for a single meeting. The welcome screen now *is* the identity
+ * step: a name and a time zone (detected), with role and company optional.
+ * Everything after it is enrichment.
+ */
+export const REQUIRED_STEPS = ['welcome'] as const satisfies readonly OnboardingStep[]
+
+/**
+ * Optional tailoring, offered after the product has done something useful and
+ * skippable as a group at every step ("Finish later").
+ *
+ * Not deleted: nothing else in the product collects goals, prior frameworks or
+ * coaching context, and the Interaction Profile is a real capability. Answers
+ * already given are kept exactly as they are.
+ */
+export const ENRICHMENT_STEPS = [
+  'intent',
+  'frameworks',
+  'coaching',
+  'assessment',
+] as const satisfies readonly OnboardingStep[]
+
+export type EnrichmentStep = (typeof ENRICHMENT_STEPS)[number]
+
+export function isEnrichmentStep(step: string): step is EnrichmentStep {
+  return (ENRICHMENT_STEPS as readonly string[]).includes(step)
+}
+
+/** The next tailoring step, or null once the group is done. */
+export function nextEnrichmentStep(current: EnrichmentStep): EnrichmentStep | null {
+  const index = ENRICHMENT_STEPS.indexOf(current)
+  return ENRICHMENT_STEPS[index + 1] ?? null
+}
+
 /** Route for a given stage. */
 export function stepPath(step: OnboardingStep): string {
   return step === 'welcome' ? '/onboarding' : `/onboarding/${step}`
 }
 
 /**
- * The step after this one.
+ * The step after this one, in the full historical sequence.
  *
- * `onboarding_stage` is a text column, so it can hold a stage this build no
- * longer knows about — an account parked on `appearance` when that step was
- * retired, or any future rename. `indexOf` returns -1 for those, and the old
- * arithmetic turned that into index 0: the user was sent back to the welcome
- * screen and made to walk the whole flow again. A retired stage is a stage the
- * user already passed, so it advances to the last one instead.
+ * Retained for resuming accounts parked mid-way through the old flow. A retired
+ * or unknown stage is a stage the user already passed, so it advances to the
+ * last one rather than back to the welcome screen.
  */
 export function nextStep(current: OnboardingStep): OnboardingStep {
   const index = ONBOARDING_STEPS.indexOf(current)

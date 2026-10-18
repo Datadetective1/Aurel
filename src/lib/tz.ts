@@ -110,17 +110,32 @@ export function hourIn(timeZone: string, now: Date = new Date()): number {
  * midnight as hour 24 on some engines, which silently lands the whole
  * calculation a day out.
  */
+/**
+ * One numeric formatter per zone. Constructing an Intl.DateTimeFormat is the
+ * expensive part of every call here, and the zones in play are a handful.
+ */
+const NUMERIC_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
+
+function numericFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = NUMERIC_FORMATTERS.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+    NUMERIC_FORMATTERS.set(timeZone, formatter)
+  }
+  return formatter
+}
+
 function offsetMsAt(instant: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(instant)
+  const parts = numericFormatter(timeZone).formatToParts(instant)
 
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0')
 
@@ -180,6 +195,109 @@ export function startOfDayUtc(dayKey: string, timeZone: string): Date {
 /** The UTC instant a calendar day ends — exclusive, so it is the next day's start. */
 export function endOfDayUtc(dayKey: string, timeZone: string): Date {
   return startOfDayUtc(addDays(dayKey, 1), timeZone)
+}
+
+/**
+ * WALL-CLOCK TIME IN A NAMED ZONE → INSTANT
+ *
+ * A `datetime-local` input submits `2026-10-21T08:53` — a wall-clock reading
+ * with no zone attached. `new Date('2026-10-21T08:53')` resolves that against
+ * whatever zone the *runtime* is in, and a server action runs on Vercel in UTC.
+ * So a meeting a Chicago user entered for 8:53 AM was stored as 08:53Z and shown
+ * back to them as 3:53 AM: five hours early in summer, six in winter, and the
+ * other way for anyone east of Greenwich.
+ *
+ * The convention: a wall-clock time a user types is read in their account's
+ * IANA zone — the same zone every time is displayed in — so what they typed is
+ * what they see. Stored values stay instants.
+ *
+ * Same two-pass offset settle as `startOfDayUtc`. A time a spring-forward night
+ * skips (02:30 on the second Sunday of March in Chicago) lands on the instant
+ * the clock jumps to; an hour a fall-back night repeats resolves to its first
+ * occurrence. A value that already names its offset (`…Z`, `…-05:00`) is an
+ * instant and is parsed as one. Anything else is refused rather than guessed.
+ */
+const WALL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/
+const EXPLICIT_OFFSET = /(?:[zZ]|[+-]\d{2}:?\d{2})$/
+
+export function wallTimeToInstant(
+  value: string | null | undefined,
+  timeZone: string | null | undefined,
+): Date | null {
+  const text = value?.trim()
+  if (!text) return null
+
+  const match = WALL_TIME.exec(text)
+  if (!match) {
+    if (!EXPLICIT_OFFSET.test(text)) return null
+    const absolute = new Date(text)
+    return Number.isNaN(absolute.getTime()) ? null : absolute
+  }
+
+  const [year, month, day, hour, minute, second] = match.slice(1).map((part) => Number(part ?? 0))
+  const wallClock = Date.UTC(year!, month! - 1, day!, hour!, minute!, second ?? 0)
+
+  // Date.UTC rolls 2026-02-31 over into March; a value that does not survive
+  // the round trip was never a real date.
+  const check = new Date(wallClock)
+  if (
+    check.getUTCFullYear() !== year ||
+    check.getUTCMonth() !== month! - 1 ||
+    check.getUTCDate() !== day ||
+    check.getUTCHours() !== hour ||
+    check.getUTCMinutes() !== minute
+  ) {
+    return null
+  }
+
+  const zone = safeZone(timeZone)
+  // The offsets a day either side cover any transition near this wall time.
+  // Each gives a candidate instant; a candidate is real when the zone, at that
+  // instant, really is on the offset that produced it.
+  const before = offsetMsAt(new Date(wallClock - 86_400_000), zone)
+  const after = offsetMsAt(new Date(wallClock + 86_400_000), zone)
+  const valid = [...new Set([before, after])]
+    .map((offset) => ({ offset, instant: wallClock - offset }))
+    .filter(({ offset, instant }) => offsetMsAt(new Date(instant), zone) === offset)
+    .map(({ instant }) => instant)
+
+  // One candidate: an ordinary time. Two: a fall-back hour that happens twice,
+  // and the earlier is the first occurrence, which is what a person means by
+  // "1:30" before the clocks change. None: a spring-forward gap; reading it on
+  // the pre-transition offset moves it forward by the skipped hour, so 02:30
+  // becomes 03:30 -- the same answer a phone's calendar gives.
+  if (valid.length > 0) return new Date(Math.min(...valid))
+  return new Date(wallClock - before)
+}
+
+/** "Central Time (America/Chicago)": a zone's everyday name and its identifier. */
+export function describeZone(timeZone: string | null | undefined): string {
+  const zone = safeZone(timeZone)
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })
+      .formatToParts(new Date(0))
+      .find((part) => part.type === 'timeZoneName')?.value
+    return name && name !== zone ? `${name} (${zone})` : zone
+  } catch {
+    return zone
+  }
+}
+
+/**
+ * INSTANT → WALL-CLOCK TIME IN A NAMED ZONE, as `yyyy-mm-ddThh:mm`.
+ *
+ * The inverse, for pre-filling a `datetime-local` input with a stored time or
+ * with "now" in the account's zone rather than the device's.
+ */
+export function instantToWallTime(
+  value: string | Date | null | undefined,
+  timeZone: string | null | undefined,
+): string {
+  const date = toDate(value)
+  if (!date) return ''
+  const parts = numericFormatter(safeZone(timeZone)).formatToParts(date)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00'
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
 }
 
 /**

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { wallTimeToInstant } from '@/lib/tz'
 import type { Database } from '@/lib/supabase/types'
 import { getProfile, requireUser } from '@/lib/auth'
 import { ownership, ownershipNoVisibility } from '@/lib/workspace'
@@ -160,10 +161,12 @@ export async function createConversationCore(
   }
 
   // --- when ----------------------------------------------------------------------
+  // A datetime-local reading, so it is read in the account's zone and never the
+  // server's (UTC on Vercel). See wallTimeToInstant.
   let occurredAt = new Date()
   if (v.occurredAt) {
-    const parsedDate = new Date(v.occurredAt)
-    if (Number.isNaN(parsedDate.getTime())) {
+    const parsedDate = wallTimeToInstant(v.occurredAt, (await getProfile())?.timezone)
+    if (!parsedDate) {
       return { fieldErrors: { occurredAt: ['That date is not valid.'] } }
     }
     if (parsedDate.getTime() > Date.now() + 60_000) {

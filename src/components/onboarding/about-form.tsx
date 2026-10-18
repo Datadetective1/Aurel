@@ -6,7 +6,6 @@ import { saveAbout } from '@/app/onboarding/actions'
 import { type StepState } from '@/lib/onboarding'
 import { FormField, Input, Select } from '@/components/ui/field'
 import { StepShell } from './step-shell'
-import { Avatar } from '@/components/ui/avatar'
 import { TimezoneField } from '@/components/app/timezone-field'
 import { brand } from '@/lib/brand'
 
@@ -56,24 +55,23 @@ export function AboutForm({
   const [name, setName] = React.useState(defaults.fullName)
   const [preferred, setPreferred] = React.useState(defaults.preferredName)
 
+  // Open the optional section when it already holds something, or when one of
+  // its fields came back with an error, so nothing typed is hidden.
+  const roleOpen =
+    Boolean(defaults.jobTitle || defaults.company || defaults.jobFunction || defaults.seniority) ||
+    Boolean(
+      state.fieldErrors?.jobTitle || state.fieldErrors?.company || state.fieldErrors?.pronouns,
+    )
+
   return (
     <form action={formAction} noValidate>
       <StepShell
-        title="Tell us about you"
-        description="Only what makes the guidance specific to your role. Nothing here is shared with anyone."
+        title="Walk into the room knowing what matters."
+        description={`First, what to call you. Then ${brand.name} helps you prepare for one real meeting. Nothing here is shared with anyone.`}
+        submitLabel="Continue to Today"
         note={`${brand.name} never asks for anything about your colleagues' personal characteristics, and it will not infer them.`}
       >
-        <div className="border-line bg-surface flex items-center gap-4 rounded-[var(--radius-lg)] border p-4">
-          <Avatar name={preferred || name || '?'} size="lg" />
-          <div className="min-w-0">
-            <p className="text-ink text-sm font-medium">{preferred || name || 'Your initials'}</p>
-            <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">
-              Your avatar is generated from your name. You can upload a photo later in Settings.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormField
             id="fullName"
             label="Full name"
@@ -96,7 +94,7 @@ export function AboutForm({
           <FormField
             id="preferredName"
             label="Preferred name"
-            description={`What ${brand.name} calls you.`}
+            description={`Optional. What ${brand.name} calls you.`}
             error={state.fieldErrors?.preferredName?.[0]}
           >
             {(props) => (
@@ -112,75 +110,106 @@ export function AboutForm({
             )}
           </FormField>
 
-          <FormField
-            id="pronouns"
-            label="Pronouns"
-            description="Optional."
-            error={state.fieldErrors?.pronouns?.[0]}
-          >
-            {(props) => <Input {...props} name="pronouns" placeholder="they/them" maxLength={40} />}
-          </FormField>
-
-          <FormField id="jobTitle" label="Job title" error={state.fieldErrors?.jobTitle?.[0]}>
-            {(props) => (
-              <Input
-                {...props}
-                name="jobTitle"
-                autoComplete="organization-title"
-                placeholder="Director of Engineering"
-                defaultValue={defaults.jobTitle}
-                maxLength={120}
-              />
-            )}
-          </FormField>
-
-          <FormField id="company" label="Company" error={state.fieldErrors?.company?.[0]}>
-            {(props) => (
-              <Input
-                {...props}
-                name="company"
-                autoComplete="organization"
-                placeholder="Northwind"
-                defaultValue={defaults.company}
-                maxLength={160}
-              />
-            )}
-          </FormField>
-
-          <FormField id="jobFunction" label="Function">
-            {(props) => (
-              <Select {...props} name="jobFunction" defaultValue={defaults.jobFunction}>
-                <option value="">Select…</option>
-                {FUNCTIONS.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-
-          <FormField id="seniority" label="Level" description="Optional.">
-            {(props) => (
-              <Select {...props} name="seniority" defaultValue={defaults.seniority}>
-                <option value="">Select…</option>
-                {SENIORITY.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-
           <TimezoneField
             id="timezone"
             name="timezone"
             defaultValue={defaults.timezone}
-            description="Used to order your day correctly."
-            className="sm:col-span-2"
+            description="Detected from this device. Meeting times are read and shown in it."
           />
         </div>
+
+        {/* Optional, and folded away so the required step is two fields. A
+            native <details> keeps its inputs in the form while closed, so
+            collapsing it never discards what was typed. */}
+        <details
+          className="group border-line mt-6 rounded-[var(--radius-md)] border"
+          open={roleOpen}
+        >
+          <summary className="text-ink-secondary flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm [&::-webkit-details-marker]:hidden">
+            Your role
+            <span className="text-ink-muted text-xs">
+              Optional
+              <span
+                aria-hidden="true"
+                className="ml-2 inline-block transition-transform group-open:rotate-90"
+              >
+                ›
+              </span>
+            </span>
+          </summary>
+
+          <div className="border-line grid gap-4 border-t px-4 pt-4 pb-5 sm:grid-cols-2">
+            <FormField id="jobTitle" label="Job title" error={state.fieldErrors?.jobTitle?.[0]}>
+              {(props) => (
+                <Input
+                  {...props}
+                  name="jobTitle"
+                  autoComplete="organization-title"
+                  placeholder="e.g. Director of Engineering"
+                  defaultValue={defaults.jobTitle}
+                  maxLength={120}
+                />
+              )}
+            </FormField>
+
+            <FormField id="company" label="Company" error={state.fieldErrors?.company?.[0]}>
+              {(props) => (
+                <Input
+                  {...props}
+                  name="company"
+                  autoComplete="organization"
+                  placeholder="e.g. Northwind"
+                  defaultValue={defaults.company}
+                  maxLength={160}
+                />
+              )}
+            </FormField>
+
+            <FormField id="jobFunction" label="Function">
+              {(props) => (
+                <Select {...props} name="jobFunction" defaultValue={defaults.jobFunction}>
+                  <option value="">Select…</option>
+                  {FUNCTIONS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+
+            <FormField id="seniority" label="Level">
+              {(props) => (
+                <Select {...props} name="seniority" defaultValue={defaults.seniority}>
+                  <option value="">Select…</option>
+                  {SENIORITY.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </FormField>
+
+            <FormField id="pronouns" label="Pronouns" error={state.fieldErrors?.pronouns?.[0]}>
+              {(props) => (
+                <Input
+                  {...props}
+                  name="pronouns"
+                  placeholder="e.g. they/them"
+                  defaultValue={defaults.pronouns}
+                  maxLength={40}
+                />
+              )}
+            </FormField>
+          </div>
+        </details>
+
+        {state.error ? (
+          <p role="alert" className="text-critical mt-4 text-xs">
+            {state.error}
+          </p>
+        ) : null}
       </StepShell>
     </form>
   )

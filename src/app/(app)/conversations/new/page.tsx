@@ -120,6 +120,7 @@ export default async function NewConversationPage({
         initialMeetingId={linkedMeeting?.id ?? null}
         initialMode={initialMode}
         userNames={[profile.full_name, profile.preferred_name]}
+        timeZone={profile.timezone ?? 'UTC'}
       />
     </Container>
   )

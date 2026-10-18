@@ -1,12 +1,19 @@
 'use server'
 
+import { after } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
-import { SCENARIO_BY_ID, SCENARIO_VERSION, TOTAL_COUNT, CORE_COUNT } from '@/lib/assessment/scenarios'
+import {
+  SCENARIO_BY_ID,
+  SCENARIO_VERSION,
+  TOTAL_COUNT,
+  CORE_COUNT,
+} from '@/lib/assessment/scenarios'
 import { scoreScenarios } from '@/lib/assessment/scenario-scoring'
+import { writeProfileNarrative } from '@/lib/assessment/narrative'
 
 /**
  * Scenario instrument: start, answer, score.
@@ -139,6 +146,20 @@ export async function scoreScenarioAssessment(assessmentId: string) {
   if (error) {
     logger.error('scenario.score_failed', { code: error.code })
     return { ok: false as const }
+  }
+
+  // The long-form narrative, written after the response so the user is not
+  // held on "Scoring…" for a model call. Only when there is none yet: this runs
+  // after every refinement sitting too, which makes it the retry for a first
+  // attempt that failed. The first read on screen never waits for it.
+  const { data: current } = await supabase
+    .from('assessments')
+    .select('narrative')
+    .eq('user_id', user.id)
+    .eq('id', assessmentId)
+    .maybeSingle()
+  if (!current?.narrative) {
+    after(() => writeProfileNarrative(supabase, user.id, assessmentId, scored))
   }
 
   await track('interaction_profile_updated', {

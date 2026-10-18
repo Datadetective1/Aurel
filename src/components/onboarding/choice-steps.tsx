@@ -2,17 +2,8 @@
 
 import * as React from 'react'
 import { useActionState } from 'react'
-import {
-  saveCoaching,
-  saveFrameworks,
-  saveIntent,
-} from '@/app/onboarding/actions'
-import {
-  COACHING_CONTEXTS,
-  FRAMEWORKS,
-  INTENTS,
-  type StepState,
-} from '@/lib/onboarding'
+import { saveCoaching, saveFrameworks, saveIntent } from '@/app/onboarding/actions'
+import { COACHING_CONTEXTS, FRAMEWORKS, INTENTS, type StepState } from '@/lib/onboarding'
 import { Input, OptionCard } from '@/components/ui/field'
 import { SkipButton, StepShell } from './step-shell'
 import { brand } from '@/lib/brand'
@@ -32,6 +23,7 @@ export function IntentStep({ defaults }: { defaults: string[] }) {
   return (
     <form action={formAction}>
       <StepShell
+        optionalStep="intent"
         title="What brought you here?"
         description={`Pick up to three. This decides what ${brand.name} puts in front of you first — it does not lock anything.`}
         skipAction={<SkipButton />}
@@ -55,7 +47,7 @@ export function IntentStep({ defaults }: { defaults: string[] }) {
           })}
         </div>
         {state.error ? (
-          <p role="alert" className="mt-4 text-xs text-critical">
+          <p role="alert" className="text-critical mt-4 text-xs">
             {state.error}
           </p>
         ) : null}
@@ -84,6 +76,7 @@ export function FrameworksStep({ defaults }: { defaults: Record<string, { result
   return (
     <form action={formAction}>
       <StepShell
+        optionalStep="frameworks"
         title="Taken anything like this before?"
         description={`Optional. If you already know your results, ${brand.name} will keep them alongside your profile as context.`}
         skipAction={<SkipButton />}
@@ -119,7 +112,7 @@ export function FrameworksStep({ defaults }: { defaults: Record<string, { result
           })}
         </div>
         {state.error ? (
-          <p role="alert" className="mt-4 text-xs text-critical">
+          <p role="alert" className="text-critical mt-4 text-xs">
             {state.error}
           </p>
         ) : null}
@@ -144,6 +137,7 @@ export function CoachingStep({ defaults }: { defaults: string[] }) {
   return (
     <form action={formAction}>
       <StepShell
+        optionalStep="coaching"
         title="Have you worked with a coach?"
         description="Optional, and only used to pitch the tone. Select anything that applies."
         skipAction={<SkipButton />}
@@ -162,7 +156,7 @@ export function CoachingStep({ defaults }: { defaults: string[] }) {
           ))}
         </div>
         {state.error ? (
-          <p role="alert" className="mt-4 text-xs text-critical">
+          <p role="alert" className="text-critical mt-4 text-xs">
             {state.error}
           </p>
         ) : null}

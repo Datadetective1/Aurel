@@ -67,7 +67,7 @@ export function AddParticipants({
         Everyone you track is already in this meeting.
         <Link
           href="/people/new"
-          className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          className="text-accent decoration-accent/40 hover:decoration-accent inline-flex min-h-11 items-center underline underline-offset-2"
         >
           Add someone new
         </Link>
@@ -126,7 +126,7 @@ export function AddParticipants({
         Not on the list?{' '}
         <Link
           href="/people/new"
-          className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
         >
           Record them first
         </Link>

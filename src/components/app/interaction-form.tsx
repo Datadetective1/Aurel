@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { instantToWallTime } from '@/lib/tz'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { CircleAlert, CircleCheck, Loader2 } from 'lucide-react'
@@ -52,7 +53,11 @@ const RATINGS = [
  * This is the one place the browser's own clock is the right clock: the input
  * is local by definition, and the server never sees this value unconverted.
  */
-export function localNow(): string {
+export function localNow(timeZone?: string): string {
+  // With the account's zone, "now" is read in the same zone the server reads
+  // the submitted value in, so the two cannot disagree when the device is set
+  // to a different zone from the account.
+  if (timeZone) return instantToWallTime(new Date(), timeZone)
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60_000
   return new Date(now.getTime() - offset).toISOString().slice(0, 16)

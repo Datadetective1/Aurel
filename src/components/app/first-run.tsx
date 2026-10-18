@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarPlus, Check, Search, Sparkles } from 'lucide-react'
+import { CalendarPlus, Check, Sparkles, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Eyebrow, Panel } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
@@ -7,14 +7,16 @@ import { brand } from '@/lib/brand'
 /**
  * FIRST RUN
  * =============================================================================
- * The three things that turn an empty account into a useful one, in the order
- * that makes each one easier than the last.
+ * The one activation sequence, in the same words the welcome email uses:
  *
- * It exists because a new account said nothing about the calendar. Today read
- * "add one person you work with often", People said the same, Meetings said
- * "tell Atturel who is in the room" — and the one mechanism that finds the
- * meetings AND the people for you was reachable only by guessing at
- * Settings → Capabilities. The product's best path was its least visible one.
+ *   1. Find the meeting      connect your calendar, OR create one by hand
+ *   2. Choose who it's with  pick or add the person; research happens here
+ *   3. Prepare it            say what you need, get the brief
+ *
+ * It exists because a new account said nothing about the calendar, and later
+ * because the panel and the welcome email taught two different journeys. Now
+ * there is one, and research is part of choosing the person rather than a
+ * separate concept a first-time user has to understand.
  *
  * Deliberately not a tour. No modal, no overlay, no tooltips, no dismiss state
  * to remember. It is a panel that reads the account and disappears on its own
@@ -41,21 +43,36 @@ export interface FirstRunState {
   peopleCount: number
   /** Briefs generated. */
   preparedCount: number
+  /** Meetings of any origin, calendar or manual. */
+  meetingCount: number
+}
+
+/** Step one is having a meeting to prepare; the calendar is one way, not the only one. */
+function meetingStepDone(state: FirstRunState): boolean {
+  return state.calendarConnected || state.meetingCount > 0
 }
 
 export function firstRunComplete(state: FirstRunState): boolean {
-  // Calendar counts as settled either way on a deployment that cannot offer it,
-  // so an operator without an OAuth app does not get a permanent checklist.
-  const calendarDone = state.calendarConnected || !state.calendarAvailable
-  return calendarDone && state.researchedCount > 0 && state.preparedCount > 0
+  return meetingStepDone(state) && state.peopleCount > 0 && state.preparedCount > 0
 }
+
+/** The OAuth start, returning to Today rather than Settings. */
+export const CALENDAR_CONNECT_HREF = '/api/calendar/microsoft/connect?return=today'
 
 export function FirstRun({ state, className }: { state: FirstRunState; className?: string }) {
   if (firstRunComplete(state)) return null
 
-  const calendarDone = state.calendarConnected || !state.calendarAvailable
-  const researchDone = state.researchedCount > 0
+  const meetingDone = meetingStepDone(state)
+  const personDone = state.peopleCount > 0
   const prepareDone = state.preparedCount > 0
+
+  const meetingActions: { label: string; href: string }[] = []
+  if (!state.calendarConnected && state.calendarAvailable) {
+    meetingActions.push({ label: 'Connect Microsoft 365', href: CALENDAR_CONNECT_HREF })
+  }
+  if (!meetingDone || (state.calendarConnected && state.upcomingCount === 0)) {
+    meetingActions.push({ label: 'Create a meeting manually', href: '/meetings/new' })
+  }
 
   return (
     <Panel className={className}>
@@ -65,69 +82,70 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
           <div className="min-w-0 flex-1">
             <Eyebrow>Getting started</Eyebrow>
             <p className="text-ink font-display mt-3 text-xl leading-snug">
-              You&rsquo;re ready. Let&rsquo;s make {brand.name} useful.
+              Let&rsquo;s prepare for one real conversation.
             </p>
             <p className="text-ink-secondary mt-2 text-sm leading-relaxed">
-              Three steps, in this order. Each one makes the next easier.
+              Three steps. Each one makes the next easier.
             </p>
 
             <ol className="border-line mt-6 grid gap-5 border-t pt-5">
               <Step
                 index={1}
-                done={calendarDone}
+                done={meetingDone}
                 icon={<CalendarPlus className="size-4" aria-hidden="true" />}
-                title="Connect your calendar"
+                title="Find the meeting"
                 // Says what it does and what it will not do, in the same
                 // breath. Read-only is the thing a person hesitates over.
                 body={
                   state.calendarConnected
                     ? state.upcomingCount > 0
-                      ? `${state.upcomingCount} upcoming ${state.upcomingCount === 1 ? 'meeting' : 'meetings'} in the next two weeks.`
-                      : 'Connected. Nothing scheduled in the next two weeks yet.'
-                    : state.calendarAvailable
-                      ? `${brand.name} reads your next two weeks so it can find the meetings and the people for you. Read-only — it never creates, edits or answers anything.`
-                      : 'Add meetings by hand — preparation works the same way.'
+                      ? `Calendar connected. ${state.upcomingCount} upcoming ${state.upcomingCount === 1 ? 'meeting' : 'meetings'} in the next two weeks.`
+                      : 'Calendar connected. Nothing scheduled in the next two weeks — create the meeting by hand.'
+                    : state.meetingCount > 0
+                      ? 'You have a meeting to prepare.'
+                      : state.calendarAvailable
+                        ? `Connect your calendar and ${brand.name} finds the meetings and the people for you. Read-only — it never creates, edits or answers anything. Or create one meeting by hand.`
+                        : 'Create the meeting by hand — preparation works the same way.'
                 }
-                action={
-                  !state.calendarConnected && state.calendarAvailable
-                    ? { label: 'Connect Microsoft 365', href: '/api/calendar/microsoft/connect' }
-                    : undefined
-                }
+                actions={meetingActions}
               />
 
               <Step
                 index={2}
-                done={researchDone}
-                icon={<Search className="size-4" aria-hidden="true" />}
-                title="Research someone you're meeting"
+                done={personDone}
+                icon={<UserRound className="size-4" aria-hidden="true" />}
+                title="Choose who it’s with"
                 body={
-                  researchDone
-                    ? `${state.researchedCount} ${state.researchedCount === 1 ? 'person' : 'people'} researched.`
+                  personDone
+                    ? state.researchedCount > 0
+                      ? `${state.peopleCount} ${state.peopleCount === 1 ? 'person' : 'people'} added, ${state.researchedCount} researched.`
+                      : `${state.peopleCount} ${state.peopleCount === 1 ? 'person' : 'people'} added. Research from their page to confirm who they are.`
                     : state.unknownAttendees > 0
-                      ? `${state.unknownAttendees} ${state.unknownAttendees === 1 ? 'person' : 'people'} on your calendar ${state.unknownAttendees === 1 ? 'is' : 'are'} not in ${brand.name} yet. A name, a company and a role is enough — it searches legitimate public professional sources and checks each one is genuinely about them.`
-                      : `A name, a company and a role is enough. ${brand.name} searches legitimate public professional sources and checks each one is genuinely about them before accepting anything.`
+                      ? `${state.unknownAttendees} ${state.unknownAttendees === 1 ? 'person' : 'people'} on your calendar ${state.unknownAttendees === 1 ? 'is' : 'are'} not in ${brand.name} yet. A name, a company and a role is enough — it then checks legitimate public professional sources to confirm who they are.`
+                      : `A name, a company and a role is enough. ${brand.name} then checks legitimate public professional sources to confirm who they are, and accepts nothing it cannot match.`
                 }
-                action={
-                  researchDone
-                    ? undefined
-                    : {
-                        label: state.peopleCount > 0 ? 'Go to People' : 'Add a person',
-                        href: state.peopleCount > 0 ? '/people' : '/people/new',
-                      }
-                }
+                actions={personDone ? [] : [{ label: 'Add the person', href: '/people/new' }]}
               />
 
               <Step
                 index={3}
                 done={prepareDone}
                 icon={<Sparkles className="size-4" aria-hidden="true" />}
-                title="Prepare for your next meeting"
+                title="Prepare the meeting"
                 body={
                   prepareDone
                     ? `${state.preparedCount} ${state.preparedCount === 1 ? 'brief' : 'briefs'} built. After the meeting, debrief it — that is what makes the next one sharper.`
-                    : `Say what you need out of the conversation, and ${brand.name} turns everything it knows into how to open, what to emphasize and what to leave with.`
+                    : `Say what you need from the conversation, and ${brand.name} turns everything it knows into how to open, what to emphasize and what to leave with.`
                 }
-                action={prepareDone ? undefined : { label: 'Go to Meetings', href: '/meetings' }}
+                actions={
+                  prepareDone
+                    ? []
+                    : [
+                        state.calendarConnected && state.upcomingCount > 0
+                          ? { label: 'Pick a meeting', href: '/meetings' }
+                          : { label: 'Prepare a meeting', href: '/meetings/new' },
+                      ]
+                }
               />
             </ol>
           </div>
@@ -143,14 +161,14 @@ function Step({
   icon,
   title,
   body,
-  action,
+  actions,
 }: {
   index: number
   done: boolean
   icon: React.ReactNode
   title: string
   body: string
-  action?: { label: string; href: string }
+  actions: { label: string; href: string }[]
 }) {
   return (
     <li className="flex gap-3">
@@ -178,20 +196,30 @@ function Step({
         </p>
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{body}</p>
 
-        {action ? (
-          <Button asChild size="sm" variant="secondary" className="mt-2.5">
-            {/* A plain anchor for the OAuth start, never next/link.
-                Link prefetches its href, and prefetching this one executed the
-                connect route on page load: it minted OAuth state, fired
-                calendar_connect_started, and redirected to Microsoft -- so
-                every visit to Today counted as a connection attempt nobody
-                made, and the funnel said connection almost never converts. */}
-            {action.href.startsWith('/api/') ? (
-              <a href={action.href}>{action.label}</a>
-            ) : (
-              <Link href={action.href}>{action.label}</Link>
-            )}
-          </Button>
+        {actions.length > 0 ? (
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {actions.map((action, i) => (
+              <Button
+                key={action.href}
+                asChild
+                size="sm"
+                variant={i === 0 ? 'secondary' : 'ghost'}
+                className="h-11"
+              >
+                {/* A plain anchor for the OAuth start, never next/link.
+                    Link prefetches its href, and prefetching this one executed
+                    the connect route on page load: it minted OAuth state, fired
+                    calendar_connect_started, and redirected to Microsoft -- so
+                    every visit to Today counted as a connection attempt nobody
+                    made, and the funnel said connection almost never converts. */}
+                {action.href.startsWith('/api/') ? (
+                  <a href={action.href}>{action.label}</a>
+                ) : (
+                  <Link href={action.href}>{action.label}</Link>
+                )}
+              </Button>
+            ))}
+          </div>
         ) : null}
       </div>
     </li>

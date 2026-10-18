@@ -22,6 +22,7 @@ function state(overrides: Partial<FirstRunState> = {}): FirstRunState {
     researchedCount: 0,
     peopleCount: 0,
     preparedCount: 0,
+    meetingCount: 0,
     ...overrides,
   }
 }
@@ -32,31 +33,39 @@ describe('firstRunComplete', () => {
   })
 
   it('needs all three, not two', () => {
-    expect(firstRunComplete(state({ calendarConnected: true, researchedCount: 1 }))).toBe(false)
+    expect(firstRunComplete(state({ calendarConnected: true, peopleCount: 1 }))).toBe(false)
     expect(firstRunComplete(state({ calendarConnected: true, preparedCount: 1 }))).toBe(false)
-    expect(firstRunComplete(state({ researchedCount: 1, preparedCount: 1 }))).toBe(false)
+    expect(firstRunComplete(state({ peopleCount: 1, preparedCount: 1 }))).toBe(false)
   })
 
-  it('is complete once the calendar, research and a brief exist', () => {
+  it('is complete once there is a meeting, a person and a brief', () => {
     expect(
-      firstRunComplete(state({ calendarConnected: true, researchedCount: 1, preparedCount: 1 })),
+      firstRunComplete(state({ calendarConnected: true, peopleCount: 1, preparedCount: 1 })),
     ).toBe(true)
   })
 
-  it('does not demand a calendar the deployment cannot offer', () => {
-    // Otherwise an install with no OAuth app shows a checklist that can never
-    // be finished, on every visit, forever.
+  it('treats a manual meeting as step one done: the calendar is one route, not the only one', () => {
+    // The canonical journey is "connect your calendar OR create a meeting".
+    // Demanding the calendar would leave a manual user with a checklist that
+    // never finishes, which is also what an install with no OAuth app saw.
+    expect(firstRunComplete(state({ meetingCount: 1, peopleCount: 1, preparedCount: 1 }))).toBe(
+      true,
+    )
     expect(
-      firstRunComplete(state({ calendarAvailable: false, researchedCount: 1, preparedCount: 1 })),
+      firstRunComplete(
+        state({ calendarAvailable: false, meetingCount: 1, peopleCount: 1, preparedCount: 1 }),
+      ),
     ).toBe(true)
   })
 
-  it('counts people as researched only when evidence was accepted', () => {
-    // A run that legitimately found nothing has not researched anybody, and
-    // saying otherwise would tick a step the user did not complete.
+  it('does not count research as its own step', () => {
+    // Research is part of choosing the person, so an account with a person, a
+    // meeting and a brief is done whether or not a source was accepted.
     expect(
-      firstRunComplete(state({ calendarConnected: true, peopleCount: 5, preparedCount: 1 })),
-    ).toBe(false)
+      firstRunComplete(
+        state({ meetingCount: 1, peopleCount: 1, preparedCount: 1, researchedCount: 0 }),
+      ),
+    ).toBe(true)
   })
 })
 
@@ -75,5 +84,17 @@ describe('what the panel is allowed to say', () => {
 
   it('states the calendar is read-only where the user decides to connect', () => {
     expect(source).toMatch(/never creates, edits or answers/)
+  })
+
+  it('returns a calendar connection to Today, not Settings', () => {
+    expect(source).toContain("'/api/calendar/microsoft/connect?return=today'")
+  })
+
+  it('teaches the same sequence as the welcome email', () => {
+    const email = readFileSync(join(process.cwd(), 'src', 'lib', 'email', 'templates.ts'), 'utf8')
+    for (const step of ['Find the meeting', 'Choose who it', 'Prepare the meeting']) {
+      expect(source).toContain(step)
+      expect(email).toContain(step)
+    }
   })
 })

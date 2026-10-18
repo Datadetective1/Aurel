@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CircleAlert, Loader2, Sparkles } from 'lucide-react'
 import { generateBrief, updateMeetingObjective } from '@/app/(app)/meetings/actions'
@@ -28,16 +28,26 @@ const STAGES = [
 
 export function GenerateBriefPanel({
   meetingId,
-  hasObjective,
+  objective: savedObjective,
+  autoStart = false,
   attendeeCount,
   addablePeople,
 }: {
   meetingId: string
-  hasObjective: boolean
+  /** The stored objective, shown so the user can see what the brief is built for. */
+  objective: string | null
+  /**
+   * Start generating on arrival. Set by "Create and prepare", so the button
+   * does what it says: the meeting is created and the brief is built, with
+   * the same progress, failure and retry states as pressing Generate.
+   */
+  autoStart?: boolean
   attendeeCount: number
   addablePeople: PersonChoice[]
 }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const hasObjective = Boolean(savedObjective?.trim())
   const [objective, setObjective] = React.useState('')
   const [savingObjective, setSavingObjective] = React.useState(false)
 
@@ -76,33 +86,49 @@ export function GenerateBriefPanel({
     return () => window.clearInterval(timer)
   }, [running])
 
-  const run = async () => {
+  const run = React.useCallback(async () => {
     setRunning(true)
     setStage(0)
     setError(null)
     setUpgrade(false)
 
-    const result = await generateBrief(meetingId)
-    if (result.ok) {
-      router.refresh()
-    } else {
-      setRunning(false)
+    try {
+      const result = await generateBrief(meetingId)
+      if (result.ok) {
+        router.refresh()
+        return
+      }
       setError(result.error ?? 'Something went wrong.')
       setUpgrade('upgrade' in result && Boolean(result.upgrade))
+    } catch {
+      // A dropped connection or a timed-out function arrives here, not as a
+      // result. It must land on the same honest, retryable state.
+      setError('The brief did not finish building. Nothing was lost — try again.')
     }
-  }
+    setRunning(false)
+  }, [meetingId, router])
+
+  // Once per mount. The flag is stripped from the URL first, so a refresh
+  // mid-generation does not start a second, billable run.
+  const started = React.useRef(false)
+  React.useEffect(() => {
+    if (!autoStart || started.current) return
+    started.current = true
+    router.replace(pathname, { scroll: false })
+    void run()
+  }, [autoStart, pathname, router, run])
 
   return (
     <Panel className="mt-8 p-6 sm:p-8">
       {running ? (
         <div role="status" aria-live="polite">
-          <div className="flex items-center gap-2.5 text-sm text-ink">
-            <Loader2 className="size-4 animate-spin text-accent" aria-hidden="true" />
+          <div className="text-ink flex items-center gap-2.5 text-sm">
+            <Loader2 className="text-accent size-4 animate-spin" aria-hidden="true" />
             {STAGES[stage]}
           </div>
-          <div className="mt-4 h-px w-full overflow-hidden bg-line">
+          <div className="bg-line mt-4 h-px w-full overflow-hidden">
             <div
-              className="h-full bg-accent-graphic transition-[width] duration-700 ease-[var(--ease-out-quint)]"
+              className="bg-accent-graphic h-full transition-[width] duration-700 ease-[var(--ease-out-quint)]"
               style={{ width: `${((stage + 1) / STAGES.length) * 100}%` }}
             />
           </div>
@@ -110,23 +136,30 @@ export function GenerateBriefPanel({
       ) : (
         <>
           <Eyebrow className="flex items-center gap-1.5">
-            <Sparkles className="size-3 text-accent" aria-hidden="true" />
+            <Sparkles className="text-accent size-3" aria-hidden="true" />
             Prepare
           </Eyebrow>
-          <h2 className="mt-3 font-display text-2xl text-ink">Build your brief</h2>
-          <p className="mt-3 max-w-lg text-sm leading-relaxed text-ink-secondary">
+          <h2 className="font-display text-ink mt-3 text-2xl">Build your brief</h2>
+          <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">
             {brand.name} will pull together everyone in the room, what you have recorded about
             working with them, what is still open between you, and turn it into how to approach this
             conversation.
           </p>
 
+          {hasObjective ? (
+            <p className="border-line text-ink mt-5 border-l-2 pl-3 text-sm leading-relaxed">
+              <span className="label text-ink-muted block">Objective</span>
+              {savedObjective}
+            </p>
+          ) : null}
+
           {(!hasObjective || attendeeCount === 0) && (
             <ul className="mt-5 grid gap-2">
               {!hasObjective ? (
-                <li className="grid gap-2 text-xs text-ink-muted">
+                <li className="text-ink-muted grid gap-2 text-xs">
                   <span className="flex gap-2">
                     <CircleAlert
-                      className="mt-px size-3.5 shrink-0 text-caution"
+                      className="text-caution mt-px size-3.5 shrink-0"
                       aria-hidden="true"
                     />
                     No objective recorded. The brief will be much sharper with one.
@@ -140,12 +173,13 @@ export function GenerateBriefPanel({
                       value={objective}
                       onChange={(event) => setObjective(event.target.value)}
                       placeholder="What do you need out of this conversation?"
-                      className="border-line bg-surface text-ink min-w-0 flex-1 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-xs"
+                      className="border-line bg-surface text-ink min-h-11 min-w-0 flex-1 rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-sm"
                     />
                     <Button
                       type="button"
                       size="sm"
                       variant="secondary"
+                      className="h-11"
                       onClick={saveObjective}
                       disabled={savingObjective || objective.trim().length === 0}
                     >
@@ -155,9 +189,9 @@ export function GenerateBriefPanel({
                 </li>
               ) : null}
               {attendeeCount === 0 ? (
-                <li className="flex gap-2 text-xs text-ink-muted">
+                <li className="text-ink-muted flex gap-2 text-xs">
                   <CircleAlert
-                    className="mt-px size-3.5 shrink-0 text-caution"
+                    className="text-caution mt-px size-3.5 shrink-0"
                     aria-hidden="true"
                   />
                   Nobody is added to this meeting yet.
@@ -175,12 +209,12 @@ export function GenerateBriefPanel({
           </div>
 
           <Button size="lg" onClick={run} className="mt-7">
-            Generate brief
+            {error ? 'Try again' : 'Generate brief'}
           </Button>
 
           {error ? (
-            <div className="mt-5 rounded-[var(--radius-md)] border border-caution/25 bg-caution-wash px-4 py-3">
-              <p className="text-sm leading-relaxed text-ink-secondary">{error}</p>
+            <div className="border-caution/25 bg-caution-wash mt-5 rounded-[var(--radius-md)] border px-4 py-3">
+              <p className="text-ink-secondary text-sm leading-relaxed">{error}</p>
               {upgrade ? (
                 <Button asChild size="sm" className="mt-3">
                   <Link href="/settings/billing">See plans</Link>

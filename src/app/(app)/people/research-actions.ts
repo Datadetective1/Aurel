@@ -18,6 +18,7 @@ import {
   planQueries,
 } from '@/lib/research/queries'
 import { canonicalUrl, detectInputKind } from '@/lib/sources/url'
+import { resolveOrganization } from '@/lib/organizations'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 
@@ -43,6 +44,28 @@ export interface ResearchState {
   factsCreated?: number
   observationsProposed?: number
   needsReview?: boolean
+  /**
+   * Set when research ran but could not confidently identify the person --
+   * as opposed to a provider outage or a quota. Names the identifying details
+   * not yet on record, so the user is asked for the one thing most likely to
+   * resolve it instead of being told only that nothing was found. Confidence
+   * thresholds are untouched; this is recovery, not a lower bar.
+   */
+  identity?: { missing: IdentityDetail[] }
+}
+
+export type IdentityDetail = 'organization' | 'jobTitle' | 'profileUrl'
+
+function missingIdentity(person: {
+  job_title: string | null
+  profile_url: string | null
+  organizations: { name: string } | null
+}): IdentityDetail[] {
+  const missing: IdentityDetail[] = []
+  if (!person.organizations?.name) missing.push('organization')
+  if (!person.job_title) missing.push('jobTitle')
+  if (!person.profile_url) missing.push('profileUrl')
+  return missing
 }
 
 const addContextSchema = z.object({
@@ -376,8 +399,11 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
             ? 'Professional research has hit its rate limit for the moment. You can still paste a source.'
             : 'Professional research is temporarily unavailable. You can still paste a source.'
           : capabilities.canDiscover
-            ? `I could not find enough reliable professional information about ${person.full_name}.`
+            ? `I couldn't confidently identify ${person.full_name}.`
             : (capabilities.discoveryHint ?? 'Add a link to research from.'),
+        ...(!searchFailure && capabilities.canDiscover
+          ? { identity: { missing: missingIdentity(person) } }
+          : {}),
       }
     }
 
@@ -484,8 +510,9 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     if (accepted === 0) {
       return {
         ok: false,
-        error: `I reviewed ${considered} source${considered === 1 ? '' : 's'} but could not confirm any of them were about ${person.full_name}.`,
+        error: `I couldn't confidently identify ${person.full_name}. I reviewed ${considered} source${considered === 1 ? '' : 's'} and could not confirm any of them were about this person, so none were used.`,
         sourcesConsidered: considered,
+        identity: { missing: missingIdentity(person) },
       }
     }
 
@@ -722,4 +749,90 @@ async function removeOrphanedFacts(
         .eq('person_id', personId)
     }
   }
+}
+
+const refineSchema = z.object({
+  personId: z.string().uuid(),
+  organizationName: z.string().trim().max(160).optional(),
+  jobTitle: z.string().trim().max(120).optional(),
+  profileUrl: z
+    .union([z.string().trim().url('Enter a full web address, including https://'), z.literal('')])
+    .optional(),
+})
+
+/**
+ * IDENTITY RECOVERY: add one identifying detail, then research again.
+ *
+ * Reached from "I couldn't confidently identify this person". The thresholds
+ * that refused the earlier sources are unchanged -- what changes is what the
+ * search and the identity check have to go on: an employer, a title, or a page
+ * the user vouches for. Only details actually entered are written; nothing on
+ * record is cleared.
+ *
+ * A page the user has already marked as somebody else is refused outright,
+ * because "not them" must never be undone by typing the link back in.
+ */
+export async function refineIdentityAndResearch(
+  input: z.input<typeof refineSchema>,
+): Promise<ResearchState> {
+  const parsed = refineSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      error: z.flattenError(parsed.error).fieldErrors.profileUrl?.[0] ?? 'Check those details.',
+    }
+  }
+
+  const { personId, organizationName, jobTitle, profileUrl } = parsed.data
+  if (!organizationName && !jobTitle && !profileUrl) {
+    return { error: 'Add a company, a role or a profile link first.' }
+  }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+
+  if (profileUrl) {
+    const { data: rejected } = await supabase
+      .from('source_person_links')
+      .select('sources(source_url)')
+      .eq('user_id', user.id)
+      .eq('person_id', personId)
+      .eq('identity_match_status', 'no_match')
+      .eq('reviewed_by_user', true)
+
+    const target = canonicalUrl(profileUrl) ?? profileUrl
+    const wasRejected = (rejected ?? []).some((row) => {
+      const url = row.sources?.source_url
+      return url ? (canonicalUrl(url) ?? url) === target : false
+    })
+    if (wasRejected) {
+      return {
+        error:
+          'You marked that page as being about someone else, so it will not be used for this person. Add a different link.',
+      }
+    }
+  }
+
+  const patch: Database['public']['Tables']['people']['Update'] = {}
+  if (organizationName) patch.organization_id = await resolveOrganization(organizationName)
+  if (jobTitle) patch.job_title = jobTitle
+  if (profileUrl) patch.profile_url = profileUrl
+
+  const { error } = await supabase
+    .from('people')
+    .update(patch)
+    .eq('id', personId)
+    .eq('user_id', user.id)
+
+  if (error) {
+    logger.warn('research.refine_identity_failed', { code: error.code })
+    return { error: 'We could not save those details. Try again.' }
+  }
+
+  await track('person_identity_refined', {
+    organization: Boolean(organizationName),
+    jobTitle: Boolean(jobTitle),
+    profileUrl: Boolean(profileUrl),
+  })
+  revalidatePath(`/people/${personId}`)
+  return researchPerson(personId)
 }

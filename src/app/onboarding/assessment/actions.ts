@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { requireUser } from '@/lib/auth'
+import { getProfile, requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import {
@@ -80,7 +80,11 @@ export async function startOrResumeAssessment() {
 
 const responseSchema = z.object({
   assessmentId: z.string().uuid(),
-  roundIndex: z.number().int().min(0).max(BLOCK_COUNT - 1),
+  roundIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(BLOCK_COUNT - 1),
   blockId: z.string().min(1).max(16),
   mostItemId: z.string().min(1).max(16),
   leastItemId: z.string().min(1).max(16),
@@ -255,7 +259,11 @@ export async function completeAssessment(assessmentId: string) {
 
 const calibrationSchema = z.object({
   assessmentId: z.string().uuid(),
-  rating: z.enum(['very_accurate', 'mostly_accurate', 'partly_accurate', 'not_accurate']),
+  // Optional: the reveal's Continue must work without a verdict. Asked, never
+  // demanded -- but when given, it is weighted above the scores.
+  rating: z
+    .enum(['very_accurate', 'mostly_accurate', 'partly_accurate', 'not_accurate'])
+    .optional(),
   note: z.string().trim().max(1000).optional(),
 })
 
@@ -269,36 +277,42 @@ const calibrationSchema = z.object({
 export async function calibrateAssessment(_prev: unknown, formData: FormData) {
   const parsed = calibrationSchema.safeParse({
     assessmentId: formData.get('assessmentId'),
-    rating: formData.get('rating'),
+    rating: formData.get('rating') || undefined,
     note: formData.get('note')?.toString() || undefined,
   })
 
   if (!parsed.success) {
-    return { error: 'Choose how accurate that felt.' }
+    return { error: 'We could not read that. Try again.' }
   }
 
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('assessments')
-    .update({ calibration: parsed.data.rating, calibration_note: parsed.data.note ?? null })
-    .eq('user_id', user.id)
-    .eq('id', parsed.data.assessmentId)
+  if (parsed.data.rating) {
+    const { error } = await supabase
+      .from('assessments')
+      .update({ calibration: parsed.data.rating, calibration_note: parsed.data.note ?? null })
+      .eq('user_id', user.id)
+      .eq('id', parsed.data.assessmentId)
 
-  if (error) {
-    logger.warn('assessment.calibration_failed', { code: error.code })
-    return { error: 'We could not save that. Try again.' }
+    if (error) {
+      logger.warn('assessment.calibration_failed', { code: error.code })
+      return { error: 'We could not save that. Try again.' }
+    }
+    await track('assessment_calibrated', { rating: parsed.data.rating })
   }
 
-  await supabase
-    .from('profiles')
-    .update({ onboarding_stage: 'done', onboarding_completed_at: new Date().toISOString() })
-    .eq('id', user.id)
-
-  await track('assessment_calibrated', { rating: parsed.data.rating })
-  await track('onboarding_completed', { skippedAssessment: false })
+  // The profile is optional tailoring now, usually reached after onboarding.
+  // Complete onboarding only for an account still parked in the old flow.
+  const profile = await getProfile()
+  if (!profile?.onboarding_completed_at) {
+    await supabase
+      .from('profiles')
+      .update({ onboarding_stage: 'done', onboarding_completed_at: new Date().toISOString() })
+      .eq('id', user.id)
+    await track('onboarding_completed', { skippedAssessment: false })
+  }
 
   revalidatePath('/', 'layout')
-  redirect('/today?welcome=1')
+  redirect('/today')
 }

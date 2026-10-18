@@ -3,6 +3,7 @@ import { MeetingForm, type PersonOption } from '@/components/app/meeting-form'
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { describeZone } from '@/lib/tz'
 
 export const metadata: Metadata = { title: 'Prepare', robots: { index: false, follow: false } }
 
@@ -12,7 +13,7 @@ export default async function NewMeetingPage({
   searchParams: Promise<{ person?: string }>
 }) {
   const { person } = await searchParams
-  const { user } = await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
   const supabase = await createClient()
 
   const { data } = await supabase
@@ -36,10 +37,14 @@ export default async function NewMeetingPage({
         as="h1"
         eyebrow="Prepare"
         title="What are you preparing for?"
-        description="The objective and who is in the room are what turn a record into useful guidance."
+        description="What you need from it, and who is in the room. Then a brief, straight away."
       />
       <div className="mt-8">
-        <MeetingForm people={people} preselectedPersonId={person} />
+        <MeetingForm
+          people={people}
+          preselectedPersonId={person}
+          timeZoneLabel={describeZone(profile.timezone)}
+        />
       </div>
     </Container>
   )

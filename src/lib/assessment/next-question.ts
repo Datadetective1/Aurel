@@ -135,3 +135,38 @@ export async function getNextProfileQuestion(
     totalCount: TOTAL_COUNT,
   }
 }
+
+/**
+ * Whether to invite someone to the opening questions they skipped.
+ *
+ * The other half of making the Interaction Profile optional: an account that
+ * went straight to Today has no profile to refine, so the refinement prompt
+ * above never appears for it. This offers the opening six instead -- under the
+ * same rules: only after a brief exists, never while snoozed, and never when
+ * any completed profile already exists.
+ */
+export async function shouldInviteToProfile(supabase: Client, userId: string): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('profile_prompt_snoozed_until')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const snoozedUntil = profile?.profile_prompt_snoozed_until
+  if (snoozedUntil && new Date(snoozedUntil).getTime() > Date.now()) return false
+
+  const [{ count: completed }, { count: briefs }] = await Promise.all([
+    supabase
+      .from('assessments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed'),
+    supabase
+      .from('ai_artifacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('kind', 'meeting_brief'),
+  ])
+
+  return (completed ?? 0) === 0 && (briefs ?? 0) > 0
+}

@@ -210,6 +210,11 @@ MICROSOFT_CLIENT_SECRET=<the secret Value>
 users from any organization to connect. Set it to a tenant ID only if you want
 to restrict Atturel to one organization.
 
+**Consent-screen trust.** Before a broad launch, set the terms, privacy,
+logo and publisher domain on the registration and complete publisher
+verification. Otherwise Microsoft shows the app as _unverified_, with no terms
+link. Step-by-step: [MICROSOFT_PUBLISHER_VERIFICATION.md](./MICROSOFT_PUBLISHER_VERIFICATION.md).
+
 **Admin consent.** Many organizations disable user consent. Those users will see
 _"Your organization requires administrator approval"_ rather than a failure, and
 their administrator can grant it from _Enterprise applications → Atturel →
@@ -370,6 +375,16 @@ Verified 26 Aug 2026 with a fresh signup and a password reset:
   `www.atturel.com` and started onboarding; following the reset link reached
   the change-password screen.
 - Both landed in the inbox rather than spam.
+
+**Confirmation email template, a manual step.** The default Supabase
+template carries no branding and repeats "Confirm your email address". A
+branded, single-heading version is in
+[`supabase/templates/confirm-signup.html`](../supabase/templates/confirm-signup.html).
+Apply it in Supabase → **Authentication → Emails → Confirm signup**: set the
+subject to `Confirm your Atturel account` and paste the file's contents into the
+message body. It uses Supabase's own `{{ .ConfirmationURL }}`, so the
+confirmation flow and its security are unchanged. Send yourself a test signup
+afterwards.
 
 **If this ever regresses,** the symptom is the From header reverting to
 `noreply@mail.app.supabase.io`. The two usual causes: the SMTP settings were

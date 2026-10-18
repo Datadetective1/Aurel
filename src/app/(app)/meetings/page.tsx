@@ -178,7 +178,7 @@ export default async function MeetingsPage() {
                 <Button asChild>
                   {/* Anchor, not Link -- Link would prefetch and start the
                       OAuth flow on page load. See components/app/first-run. */}
-                  <a href="/api/calendar/microsoft/connect">Connect Microsoft 365</a>
+                  <a href="/api/calendar/microsoft/connect?return=today">Connect Microsoft 365</a>
                 </Button>
               ) : null}
               <Button

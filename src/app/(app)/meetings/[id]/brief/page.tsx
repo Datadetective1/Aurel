@@ -32,10 +32,10 @@ export default async function BriefPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ debriefed?: string }>
+  searchParams: Promise<{ debriefed?: string; prepare?: string }>
 }) {
   const { id } = await params
-  const { debriefed } = await searchParams
+  const { debriefed, prepare } = await searchParams
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
@@ -278,7 +278,10 @@ export default async function BriefPage({
       ) : (
         <GenerateBriefPanel
           meetingId={id}
-          hasObjective={Boolean(meeting.objective)}
+          objective={meeting.objective}
+          // Arriving from "Create and prepare": build the brief now, which is
+          // what the button said it would do.
+          autoStart={prepare === '1'}
           attendeeCount={roomPeople.length}
           addablePeople={addablePeople}
         />
