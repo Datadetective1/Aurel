@@ -3,11 +3,11 @@ import { ApertureMark, Wordmark } from '@/components/brand/aperture'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/primitives'
 import { ThemeToggle } from '@/components/theme-provider'
+import { CompactHeader } from '@/components/marketing/compact-header'
 import { brand } from '@/lib/brand'
 
 const NAV = [
   { href: '/#how', label: 'How it works' },
-  { href: '/#follow', label: 'Follow-through' },
   { href: '/#memory', label: 'Relationship memory' },
   { href: '/#trust', label: 'Evidence' },
   { href: '/pricing', label: 'Pricing' },
@@ -16,12 +16,15 @@ const NAV = [
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md">
+      {/* Sticky from lg. Below it the header scrolls away with the page and
+          CompactHeader takes over, so a phone does not give 64px of every
+          screen to navigation. */}
+      <header className="border-line/70 bg-bg/85 z-40 border-b backdrop-blur-md lg:sticky lg:top-0">
         <Container size="wide">
           <div className="flex h-16 items-center justify-between gap-6">
             <Link
               href="/"
-              className="rounded-sm text-ink transition-opacity hover:opacity-70"
+              className="text-ink inline-flex min-h-11 items-center rounded-sm transition-opacity hover:opacity-70"
               aria-label={`${brand.name} home`}
             >
               <Wordmark name={brand.name} className="text-lg" />
@@ -40,7 +43,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-sm text-sm text-ink-secondary transition-colors hover:text-ink"
+                  className="text-ink-secondary hover:text-ink inline-flex min-h-11 items-center rounded-sm text-sm transition-colors"
                 >
                   {item.label}
                 </Link>
@@ -62,11 +65,13 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 anchors stay desktop-only because someone signing in does not
                 need them. */}
             <div className="flex items-center gap-1 sm:gap-3">
-              <ThemeToggle className="hidden sm:inline-flex" />
-              <Button asChild variant="ghost" size="sm">
+              {/* 44px targets: the toggle's own buttons are sized for dense
+                  app chrome, so the marketing header enlarges them here. */}
+              <ThemeToggle className="hidden sm:inline-flex [&_button]:size-11" />
+              <Button asChild variant="ghost" size="sm" className="h-11 px-3">
                 <Link href="/sign-in">Sign in</Link>
               </Button>
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="h-11 px-4">
                 <Link href="/sign-up">Start free</Link>
               </Button>
             </div>
@@ -74,26 +79,61 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </Container>
       </header>
 
+      <CompactHeader />
+
       <main id="main" className="flex-1">
         {children}
       </main>
 
-      <footer className="border-t border-line bg-bg-sunken">
+      <footer className="border-line bg-bg-sunken border-t">
         <Container size="wide">
-          <div className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Below sm the footer is one wrapped row of links, not three
+              stacked columns: it is the end of the page, not another section. */}
+          <div className="py-6 sm:hidden">
+            <Wordmark name={brand.name} className="text-ink text-base" />
+            <ul className="mt-2 flex flex-wrap gap-x-5 text-sm">
+              {[
+                ...NAV,
+                { href: '/privacy', label: 'Privacy' },
+                { href: '/terms', label: 'Terms' },
+              ].map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <a
+                  href={`mailto:${brand.email.support}`}
+                  className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
+                >
+                  {brand.email.support}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="hidden gap-10 py-14 sm:grid sm:grid-cols-2 lg:grid-cols-4">
             <div className="lg:col-span-2">
-              <Wordmark name={brand.name} className="text-base text-ink" />
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-muted">
+              <Wordmark name={brand.name} className="text-ink text-base" />
+              <p className="text-ink-muted mt-3 max-w-xs text-sm leading-relaxed">
                 {brand.description}
               </p>
             </div>
 
             <div>
               <p className="label">Product</p>
-              <ul className="mt-4 space-y-2.5 text-sm">
+              <ul className="mt-3 text-sm">
                 {NAV.map((item) => (
                   <li key={item.href}>
-                    <Link href={item.href} className="text-ink-secondary hover:text-ink">
+                    <Link
+                      href={item.href}
+                      className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
+                    >
                       {item.label}
                     </Link>
                   </li>
@@ -103,21 +143,27 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
             <div>
               <p className="label">Company</p>
-              <ul className="mt-4 space-y-2.5 text-sm">
+              <ul className="mt-3 text-sm">
                 <li>
-                  <Link href="/privacy" className="text-ink-secondary hover:text-ink">
+                  <Link
+                    href="/privacy"
+                    className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
+                  >
                     Privacy
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="text-ink-secondary hover:text-ink">
+                  <Link
+                    href="/terms"
+                    className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
+                  >
                     Terms
                   </Link>
                 </li>
                 <li>
                   <a
                     href={`mailto:${brand.email.support}`}
-                    className="text-ink-secondary hover:text-ink"
+                    className="text-ink-secondary hover:text-ink inline-flex min-h-11 min-w-11 items-center"
                   >
                     {brand.email.support}
                   </a>
@@ -126,11 +172,11 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-line py-6 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-ink-faint">
+          <div className="border-line flex flex-col gap-2 border-t py-4 sm:flex-row sm:items-center sm:justify-between sm:py-6">
+            <p className="text-ink-faint text-xs">
               &copy; {new Date().getFullYear()} {brand.legalEntity}. All rights reserved.
             </p>
-            <p className="flex items-center gap-2 text-xs text-ink-faint">
+            <p className="text-ink-faint hidden items-center gap-2 text-xs sm:flex">
               <ApertureMark className="size-3.5" />
               {brand.tagline}
             </p>
