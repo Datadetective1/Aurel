@@ -47,38 +47,37 @@ function count(n: number, singular: string, plural = `${singular}s`): string {
 export function welcomeEmail({ firstName }: { firstName: string }): BuiltEmail {
   const name = firstName.trim() || 'there'
 
+  // The same three steps, in the same words, as Getting Started on Today. The
+  // email used to teach its own sequence -- add a person, press Research, open
+  // the brief -- while the product taught another, and a new user cannot tell
+  // which one is right. Research is part of step two here as it is there.
   return {
-    subject: `${brand.name}: start with the meeting that matters most`,
+    subject: `${brand.name}: prepare for one real conversation`,
     html: renderEmail({
-      preheader: 'Add one person, then prepare for one conversation.',
+      preheader: 'Find the meeting, choose who it is with, prepare it.',
       unsubscribeUrl: preferencesUrl,
       body: [
         eyebrow('Welcome'),
-        heading(`${name}, one meeting is enough to start`),
+        heading(`${name}, start with one meeting`),
         paragraph(
-          `${escapeHtml(brand.name)} is not a CRM and it will not ask you to fill in a database. It becomes useful the moment there is one real conversation to prepare for.`,
+          `${escapeHtml(brand.name)} becomes useful the moment there is one real conversation to prepare for. Three steps:`,
         ),
-        paragraph('The fastest path is three steps, and none of them take long:'),
         card(
           [
-            step(1, 'Add the person you are meeting next', 'A name, a company and a role.'),
-            // Step two used to be "paste one public link", which was the right
-            // first action until automatic research shipped and made it the
-            // fallback. The first email a new user gets should not send them
-            // hunting for a URL the product will find on its own.
-            step(2, 'Press Research', 'It finds and checks the public sources itself.'),
+            step(1, 'Find the meeting', 'Connect your calendar (read-only), or create it by hand.'),
+            step(
+              2,
+              'Choose who it’s with',
+              'A name, a company and a role. It checks public professional sources to confirm who they are.',
+            ),
             step(
               3,
-              'Open the brief before the meeting',
-              'Every line cites where it came from, and says what is still unknown.',
+              'Prepare the meeting',
+              'Say what you need from it. Every line of the brief shows where it came from.',
             ),
           ].join(''),
         ),
-        button('Prepare for a meeting', absoluteUrl('/prepare')),
-        rule(),
-        paragraph(
-          `<strong style="color:${palette.ink};font-weight:500;">What ${escapeHtml(brand.name)} will never do:</strong> guess at anyone's personal characteristics, score people for hiring or promotion, or present an inference as a fact. Anything it is unsure about is labeled, every time.`,
-        ),
+        button('Open Today', absoluteUrl('/today')),
       ].join(''),
       footerNote: `You are receiving this because you created an ${escapeHtml(brand.name)} account.`,
     }),

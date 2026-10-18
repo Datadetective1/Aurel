@@ -1,0 +1,62 @@
+<!--
+  Supabase Auth → Email Templates → "Confirm signup"
+
+  Subject:  Confirm your Atturel account
+
+  Paste this file's contents into the Message body field. Only the copy and the
+  styling change: the link is Supabase's own {{ .ConfirmationURL }}, so the
+  confirmation flow, its expiry and its security are exactly as before.
+
+  One heading, one sentence, one button, a short footer. The default template
+  repeated "Confirm your email address" as both heading and link text and
+  carried no branding. Palette: the Pearl tokens from src/lib/email/theme.ts.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Confirm your Atturel account</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f0ea;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f0ea;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+            <tr>
+              <td style="padding:0 4px 20px;font-family:Georgia,'Times New Roman',Times,serif;font-size:20px;color:#1a1815;">
+                Atturel
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border:1px solid #e7e2d9;border-radius:12px;padding:32px 28px;">
+                <h1 style="margin:0;font-family:Georgia,'Times New Roman',Times,serif;font-size:24px;font-weight:400;line-height:1.25;color:#1a1815;">
+                  Confirm your email
+                </h1>
+                <p style="margin:12px 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;line-height:1.6;color:#4a4741;">
+                  One tap and you can prepare for your first meeting.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
+                  <tr>
+                    <td style="border-radius:8px;background:#1a1815;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:500;color:#f7f4ee;text-decoration:none;border-radius:8px;">
+                        Confirm and continue
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 4px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:12px;line-height:1.6;color:#6b6862;">
+                If you did not create an Atturel account, ignore this email and nothing will happen.
+                The link works once and expires.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

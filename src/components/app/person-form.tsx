@@ -99,7 +99,7 @@ export function PersonForm({
               name="fullName"
               value={name}
               onChange={(e) => setName(e.currentTarget.value)}
-              placeholder="Maya Chen"
+              placeholder="e.g. Maya Chen"
               maxLength={160}
               autoComplete="off"
             />
@@ -107,70 +107,37 @@ export function PersonForm({
         </FormField>
 
         <FormField
-          id="preferredName"
-          label="Preferred name"
-          description="What you actually call them."
-        >
-          {(props) => (
-            <Input
-              {...props}
-              name="preferredName"
-              defaultValue={defaults.preferredName}
-              placeholder={name.split(' ')[0] || 'Maya'}
-              maxLength={80}
-            />
-          )}
-        </FormField>
-
-        <FormField id="jobTitle" label="Job title">
-          {(props) => (
-            <Input
-              {...props}
-              name="jobTitle"
-              defaultValue={defaults.jobTitle}
-              placeholder="VP Engineering"
-              maxLength={120}
-            />
-          )}
-        </FormField>
-
-        <FormField
           id="organizationName"
           label="Company"
-          description="Also helps confirm the right person during research."
+          description="Helps confirm the right person during research."
         >
           {(props) => (
             <Input
               {...props}
               name="organizationName"
               defaultValue={defaults.organizationName}
-              placeholder="Acme Corporation"
+              placeholder="e.g. Acme Corporation"
               maxLength={160}
             />
           )}
         </FormField>
 
-        <FormField
-          id="email"
-          label="Email"
-          description="Optional."
-          error={state.fieldErrors?.email?.[0]}
-        >
+        <FormField id="jobTitle" label="Role or title">
           {(props) => (
             <Input
               {...props}
-              name="email"
-              type="email"
-              defaultValue={defaults.email}
-              placeholder="maya.chen@acme.com"
+              name="jobTitle"
+              defaultValue={defaults.jobTitle}
+              placeholder="e.g. VP Engineering"
+              maxLength={120}
             />
           )}
         </FormField>
 
         <FormField
           id="profileUrl"
-          label="Professional profile or website"
-          description={`A company bio, personal site, talk page or article. ${brand.name} can read this.`}
+          label="Profile or company page"
+          description={`Optional. A company bio, personal site or talk page. ${brand.name} reads it first.`}
           error={state.fieldErrors?.profileUrl?.[0]}
           className="sm:col-span-2"
         >
@@ -185,61 +152,112 @@ export function PersonForm({
             />
           )}
         </FormField>
-
-        <FormField id="relationshipType" label="Relationship">
-          {(props) => (
-            <Select {...props} name="relationshipType" defaultValue={defaults.relationshipType}>
-              {RELATIONSHIP_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </FormField>
-
-        <div className="grid gap-1.5">
-          <label htmlFor="relevance" className="text-ink-secondary text-[0.8125rem] font-medium">
-            How much does this relationship matter?
-          </label>
-          <p className="text-ink-muted text-xs">
-            Your call, never inferred. Used to order what {brand.name} puts in front of you.
-          </p>
-          <input
-            id="relevance"
-            name="relevance"
-            type="range"
-            min={1}
-            max={5}
-            step={1}
-            value={relevance}
-            onChange={(e) => setRelevance(Number(e.currentTarget.value))}
-            className="mt-1 w-full accent-[var(--accent)]"
-            aria-describedby="relevance-value"
-          />
-          <p id="relevance-value" className="text-ink text-xs">
-            {RELEVANCE_LABELS[relevance - 1]}
-          </p>
-        </div>
-
-        <FormField
-          id="notes"
-          label={`What should ${brand.name} know?`}
-          description="Anything you already know about working with them. You can add more later."
-          className="sm:col-span-2"
-        >
-          {(props) => (
-            <Textarea
-              {...props}
-              name="notes"
-              rows={4}
-              defaultValue={defaults.notes}
-              maxLength={4000}
-              placeholder="Runs the platform org. Wants the recommendation before the reasoning. We disagreed about the migration timeline in March."
-            />
-          )}
-        </FormField>
       </div>
+
+      {/* Depth, folded away for a first add so it does not read as a CRM
+          record. Every field is still here; <details> keeps them in the form
+          while closed. Open when editing, or when one of them has an error. */}
+      <details
+        className="group border-line mt-6 rounded-[var(--radius-md)] border"
+        open={mode === 'edit' || Boolean(state.fieldErrors?.email)}
+      >
+        <summary className="text-ink-secondary flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm [&::-webkit-details-marker]:hidden">
+          More about them
+          <span className="text-ink-muted text-xs">
+            Optional
+            <span
+              aria-hidden="true"
+              className="ml-2 inline-block transition-transform group-open:rotate-90"
+            >
+              ›
+            </span>
+          </span>
+        </summary>
+
+        <div className="border-line grid gap-4 border-t px-4 pt-4 pb-5 sm:grid-cols-2">
+          <FormField
+            id="preferredName"
+            label="Preferred name"
+            description="What you actually call them."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                name="preferredName"
+                defaultValue={defaults.preferredName}
+                placeholder={name.split(' ')[0] || 'Maya'}
+                maxLength={80}
+              />
+            )}
+          </FormField>
+
+          <FormField id="email" label="Email" error={state.fieldErrors?.email?.[0]}>
+            {(props) => (
+              <Input
+                {...props}
+                name="email"
+                type="email"
+                defaultValue={defaults.email}
+                placeholder="maya.chen@acme.com"
+              />
+            )}
+          </FormField>
+
+          <FormField id="relationshipType" label="Relationship">
+            {(props) => (
+              <Select {...props} name="relationshipType" defaultValue={defaults.relationshipType}>
+                {RELATIONSHIP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+
+          <div className="grid gap-1.5">
+            <label htmlFor="relevance" className="text-ink-secondary text-[0.8125rem] font-medium">
+              How much does this relationship matter?
+            </label>
+            <p className="text-ink-muted text-xs">
+              Your call, never inferred. Used to order what {brand.name} puts in front of you.
+            </p>
+            <input
+              id="relevance"
+              name="relevance"
+              type="range"
+              min={1}
+              max={5}
+              step={1}
+              value={relevance}
+              onChange={(e) => setRelevance(Number(e.currentTarget.value))}
+              className="mt-1 h-11 w-full accent-[var(--accent)]"
+              aria-describedby="relevance-value"
+            />
+            <p id="relevance-value" className="text-ink text-xs">
+              {RELEVANCE_LABELS[relevance - 1]}
+            </p>
+          </div>
+
+          <FormField
+            id="notes"
+            label={`What should ${brand.name} know?`}
+            description="Anything you already know about working with them. You can add more later."
+            className="sm:col-span-2"
+          >
+            {(props) => (
+              <Textarea
+                {...props}
+                name="notes"
+                rows={4}
+                defaultValue={defaults.notes}
+                maxLength={4000}
+                placeholder="e.g. Runs the platform org. Wants the recommendation before the reasoning."
+              />
+            )}
+          </FormField>
+        </div>
+      </details>
 
       {state.error ? (
         <p
@@ -265,7 +283,7 @@ export function PersonForm({
           </Eyebrow>
           <p className="text-ink-secondary mt-2 text-xs leading-relaxed">
             {canResearch
-              ? `If you gave a link, ${brand.name} will read it and build a source-backed professional footprint. Everything it finds shows where it came from, and nothing enters your relationship memory until you accept it.`
+              ? `Start with who they are; add depth over time. If you gave a link, ${brand.name} reads it straight away. Everything it finds shows where it came from, and nothing enters your relationship memory until you accept it.`
               : (discoveryHint ??
                 `${brand.name} will read any link you provide and build a source-backed professional footprint.`)}
           </p>

@@ -97,7 +97,15 @@ const FACT_GROUPS: { kinds: string[]; label: string }[] = [
   { kinds: ['communication_signal'], label: 'Public communication signals' },
 ]
 
-export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PersonPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  /** `research=1`: just added with a profile URL -- read it now. */
+  searchParams: Promise<{ research?: string }>
+}) {
+  const { research } = await searchParams
   const { id } = await params
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
@@ -519,6 +527,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
         timeZone={timeZone}
+        // createPerson has always added `research=1` when a profile URL was
+        // given, and nothing read it -- so the user pointed at the page to
+        // read and was then left to find a second button to read it.
+        autoStart={research === '1' && Boolean(person.profile_url)}
         lastResearchedAt={person.last_researched_at}
         // Sources actually standing behind a claim: something rests on them,
         // and they have not been marked as somebody else.

@@ -170,6 +170,6 @@ describe('transactional templates', () => {
   })
 
   it('falls back to a greeting when no name is stored', () => {
-    expect(welcomeEmail({ firstName: '   ' }).html).toContain('there, one meeting is enough')
+    expect(welcomeEmail({ firstName: '   ' }).html).toContain('there, start with one meeting')
   })
 })

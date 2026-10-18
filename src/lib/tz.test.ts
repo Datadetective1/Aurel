@@ -8,11 +8,13 @@ import {
   formatDayLabelIn,
   formatTimeIn,
   hourIn,
+  instantToWallTime,
   isOverdueIn,
   relativeDayIn,
   safeZone,
   startOfDayUtc,
   todayIn,
+  wallTimeToInstant,
 } from './tz'
 
 /**
@@ -247,5 +249,97 @@ describe('robustness', () => {
         expect(dayKeyIn(startOfDayUtc(key, zone), zone)).toBe(key)
       }
     }
+  })
+})
+
+/**
+ * The second reported defect: a meeting entered for 8:53 AM in Chicago was
+ * shown back as 3:53 AM, because the datetime-local value was parsed by a UTC
+ * server. Typed wall time must survive storage and come back unchanged.
+ */
+describe('wallTimeToInstant: typed wall time is read in the account zone', () => {
+  it('reproduces the walkthrough: 8:53 AM Chicago is 13:53Z and displays as 8:53 AM', () => {
+    const instant = wallTimeToInstant('2026-10-21T08:53', 'America/Chicago')!
+    expect(instant.toISOString()).toBe('2026-10-21T13:53:00.000Z')
+    expect(formatTimeIn(instant, 'America/Chicago')).toBe('8:53 AM')
+    expect(formatDateIn(instant, 'America/Chicago')).toBe('21 Oct 2026')
+    // The defect itself, pinned so it cannot come back: the naive parse on a
+    // UTC runtime is what produced 3:53 AM.
+    expect(formatTimeIn(new Date('2026-10-21T08:53:00Z'), 'America/Chicago')).toBe('3:53 AM')
+  })
+
+  it('Chicago in winter is six hours behind, not five', () => {
+    const instant = wallTimeToInstant('2026-12-03T08:53', 'America/Chicago')!
+    expect(instant.toISOString()).toBe('2026-12-03T14:53:00.000Z')
+    expect(formatTimeIn(instant, 'America/Chicago')).toBe('8:53 AM')
+  })
+
+  it('non-US zones: Tokyo, Kolkata (half-hour offset), London', () => {
+    expect(wallTimeToInstant('2026-10-21T08:53', 'Asia/Tokyo')!.toISOString()).toBe(
+      '2026-10-20T23:53:00.000Z',
+    )
+    expect(wallTimeToInstant('2026-10-21T08:53', 'Asia/Kolkata')!.toISOString()).toBe(
+      '2026-10-21T03:23:00.000Z',
+    )
+    expect(wallTimeToInstant('2026-07-01T09:00', 'Europe/London')!.toISOString()).toBe(
+      '2026-07-01T08:00:00.000Z',
+    )
+    expect(wallTimeToInstant('2026-12-01T09:00', 'Europe/London')!.toISOString()).toBe(
+      '2026-12-01T09:00:00.000Z',
+    )
+  })
+
+  it('DST: the morning after spring-forward is on the new offset', () => {
+    // 2026-03-08 is the US spring-forward date; 05:00 that morning is CDT.
+    expect(wallTimeToInstant('2026-03-08T05:00', 'America/Chicago')!.toISOString()).toBe(
+      '2026-03-08T10:00:00.000Z',
+    )
+  })
+
+  it('DST: a skipped time moves forward by the skipped hour', () => {
+    const instant = wallTimeToInstant('2026-03-08T02:30', 'America/Chicago')!
+    expect(formatTimeIn(instant, 'America/Chicago')).toBe('3:30 AM')
+  })
+
+  it('DST: a repeated time resolves to its first occurrence', () => {
+    const instant = wallTimeToInstant('2026-11-01T01:30', 'America/Chicago')!
+    expect(instant.toISOString()).toBe('2026-11-01T06:30:00.000Z')
+    expect(formatTimeIn(instant, 'America/Chicago')).toBe('1:30 AM')
+  })
+
+  it('round-trips every 90 minutes of a year in several zones', () => {
+    // 90 minutes walks every hour of the day across a year, through both
+    // transitions in each hemisphere, at a cost a unit suite can carry.
+    for (const zone of ['America/Chicago', 'Europe/Berlin', 'Australia/Sydney', 'Asia/Kolkata']) {
+      for (let t = Date.UTC(2026, 0, 1); t < Date.UTC(2027, 0, 1); t += 90 * 60_000) {
+        const wall = instantToWallTime(new Date(t), zone)
+        const back = wallTimeToInstant(wall, zone)!
+        // The repeated fall-back hour legitimately maps both instants to the
+        // first; everywhere else the round trip is exact.
+        expect(instantToWallTime(back, zone)).toBe(wall)
+      }
+    }
+  }, 30_000)
+
+  it('a value that names its own offset is an instant', () => {
+    expect(wallTimeToInstant('2026-10-21T13:53:00Z', 'Asia/Tokyo')!.toISOString()).toBe(
+      '2026-10-21T13:53:00.000Z',
+    )
+    expect(wallTimeToInstant('2026-10-21T08:53-05:00', 'Asia/Tokyo')!.toISOString()).toBe(
+      '2026-10-21T13:53:00.000Z',
+    )
+  })
+
+  it('refuses what it cannot read rather than guessing', () => {
+    expect(wallTimeToInstant('', 'America/Chicago')).toBeNull()
+    expect(wallTimeToInstant('tomorrow', 'America/Chicago')).toBeNull()
+    expect(wallTimeToInstant('2026-02-31T09:00', 'America/Chicago')).toBeNull()
+    expect(wallTimeToInstant('2026-10-21', 'America/Chicago')).toBeNull()
+  })
+
+  it('falls back to UTC for an unusable zone instead of throwing', () => {
+    expect(wallTimeToInstant('2026-10-21T08:53', 'Not/AZone')!.toISOString()).toBe(
+      '2026-10-21T08:53:00.000Z',
+    )
   })
 })

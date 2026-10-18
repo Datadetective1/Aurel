@@ -5,7 +5,6 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { researchCapability } from '@/lib/research/providers'
 import { checkPersonLimit } from '@/lib/billing/entitlements'
 import { Badge } from '@/components/ui/primitives'
-import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = { title: 'Add a person', robots: { index: false, follow: false } }
 
@@ -20,7 +19,7 @@ export default async function NewPersonPage() {
         as="h1"
         eyebrow="New relationship"
         title="Add a person"
-        description={`Start with who they are. ${brand.name} will help you build the rest.`}
+        description="Start with who they are. Add depth over time."
       />
 
       {!limit.allowed ? (

@@ -5,36 +5,52 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { isValidTimezone } from '@/lib/timezones'
 import { createClient } from '@/lib/supabase/server'
-import { requireUser } from '@/lib/auth'
+import type { Database } from '@/lib/supabase/types'
+import { getProfile, requireUser } from '@/lib/auth'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import {
   COACHING_CONTEXTS,
   FRAMEWORKS,
   INTENTS,
-  nextStep,
+  nextEnrichmentStep,
   stepPath,
-  type OnboardingStep,
+  type EnrichmentStep,
   type StepState,
 } from '@/lib/onboarding'
 
 /**
  * Onboarding server actions.
  *
- * Each step writes what it collected and advances `onboarding_stage`, so a user
- * who closes the tab halfway through resumes exactly where they stopped rather
- * than starting again.
+ * One required step -- who you are -- and it ends onboarding. Everything after
+ * it is optional tailoring (see ENRICHMENT_STEPS), reachable from Today and
+ * Settings, skippable as a group, and saved step by step so nothing answered
+ * is lost by stopping.
  */
 
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
-async function advance(current: OnboardingStep, patch: Record<string, unknown> = {}) {
+/** The patch that marks onboarding done, applied only if it is not already. */
+async function completionPatch(): Promise<ProfileUpdate> {
+  const profile = await getProfile()
+  return profile?.onboarding_completed_at
+    ? {}
+    : { onboarding_stage: 'done', onboarding_completed_at: new Date().toISOString() }
+}
+
+/**
+ * Save a tailoring step and move to the next one, or back to Today after the
+ * last. An account still parked in the old flow is completed on the way: it
+ * has necessarily passed the identity step already.
+ */
+async function advanceEnrichment(current: EnrichmentStep, patch: ProfileUpdate = {}) {
   const user = await requireUser()
   const supabase = await createClient()
-  const next = nextStep(current)
+  const next = nextEnrichmentStep(current)
 
   const { error } = await supabase
     .from('profiles')
-    .update({ ...patch, onboarding_stage: next })
+    .update({ ...patch, ...(await completionPatch()) })
     .eq('id', user.id)
 
   if (error) {
@@ -42,19 +58,25 @@ async function advance(current: OnboardingStep, patch: Record<string, unknown> =
     return { error: 'We could not save that. Try again.' } satisfies StepState
   }
 
-  revalidatePath('/onboarding', 'layout')
-  redirect(stepPath(next))
+  revalidatePath('/', 'layout')
+  redirect(next ? stepPath(next) : '/today')
 }
 
-// --- Step: welcome ------------------------------------------------------------
-
 /**
- * Plain form action, so it must resolve to void. A failure here is logged by
- * `advance` and simply leaves the user on the welcome screen to retry — there
- * is no field state to render on this step.
+ * Leave the tailoring steps from wherever you are. Nothing already answered is
+ * touched; the steps stay available from Settings.
  */
-export async function startOnboarding(): Promise<void> {
-  await advance('welcome')
+export async function finishOnboardingLater(): Promise<void> {
+  const user = await requireUser()
+  const patch = await completionPatch()
+  if (Object.keys(patch).length > 0) {
+    const supabase = await createClient()
+    await supabase.from('profiles').update(patch).eq('id', user.id)
+    await track('onboarding_completed', { path: 'deferred' })
+  }
+  await track('onboarding_enrichment_deferred', {})
+  revalidatePath('/', 'layout')
+  redirect('/today')
 }
 
 // --- Step: about you ----------------------------------------------------------
@@ -95,17 +117,40 @@ export async function saveAbout(_prev: StepState, formData: FormData): Promise<S
   }
 
   const v = parsed.data
-  const result = await advance('about', {
-    full_name: v.fullName,
-    preferred_name: v.preferredName || null,
-    job_title: v.jobTitle || null,
-    company: v.company || null,
-    job_function: v.jobFunction || null,
-    seniority: v.seniority || null,
-    pronouns: v.pronouns || null,
-    timezone: v.timezone || 'UTC',
-  })
-  return result ?? {}
+  const user = await requireUser()
+  const supabase = await createClient()
+  const completion = await completionPatch()
+
+  // The one required step, so it is also the last. The account goes straight
+  // to Today; goals, past assessments, coaching context and the Interaction
+  // Profile are offered later, once there is something to tailor.
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: v.fullName,
+      preferred_name: v.preferredName || null,
+      job_title: v.jobTitle || null,
+      company: v.company || null,
+      job_function: v.jobFunction || null,
+      seniority: v.seniority || null,
+      pronouns: v.pronouns || null,
+      timezone: v.timezone || 'UTC',
+      ...completion,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    logger.error('onboarding.update_failed', { step: 'about', code: error.code })
+    return { error: 'We could not save that. Try again.' }
+  }
+
+  if (Object.keys(completion).length > 0) {
+    await track('onboarding_profile_completed')
+    await track('onboarding_completed', { path: 'fast' })
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/today?welcome=1')
 }
 
 // --- Step: intent -------------------------------------------------------------
@@ -115,7 +160,7 @@ const intentValues = INTENTS.map((i) => i.value)
 export async function saveIntent(_prev: StepState, formData: FormData): Promise<StepState> {
   const raw = formData.getAll('intents').map(String)
   const intents = raw.filter((v) => (intentValues as readonly string[]).includes(v)).slice(0, 4)
-  const result = await advance('intent', { intents })
+  const result = await advanceEnrichment('intent', { intents })
   return result ?? {}
 }
 
@@ -138,7 +183,7 @@ export async function saveFrameworks(_prev: StepState, formData: FormData): Prom
     known[value] = result ? { selected: true, result } : { selected: true }
   }
 
-  const result = await advance('frameworks', { known_frameworks: known })
+  const result = await advanceEnrichment('frameworks', { known_frameworks: known })
   return result ?? {}
 }
 
@@ -152,11 +197,7 @@ export async function saveCoaching(_prev: StepState, formData: FormData): Promis
     .map(String)
     .filter((v) => (coachingValues as readonly string[]).includes(v))
 
-  // Fired here since `appearance` was retired from the flow. This is the last
-  // step before the assessment, so it is where the profile questions end.
-  await track('onboarding_profile_completed')
-
-  const result = await advance('coaching', { coaching_context: context })
+  const result = await advanceEnrichment('coaching', { coaching_context: context })
   return result ?? {}
 }
 
@@ -170,13 +211,12 @@ export async function saveCoaching(_prev: StepState, formData: FormData): Promis
 /** Let a user skip the assessment and enter the app; they can run it later. */
 export async function skipAssessment() {
   const user = await requireUser()
-  const supabase = await createClient()
-  await supabase
-    .from('profiles')
-    .update({ onboarding_stage: 'done', onboarding_completed_at: new Date().toISOString() })
-    .eq('id', user.id)
-
-  await track('onboarding_completed', { skippedAssessment: true })
+  const patch = await completionPatch()
+  if (Object.keys(patch).length > 0) {
+    const supabase = await createClient()
+    await supabase.from('profiles').update(patch).eq('id', user.id)
+    await track('onboarding_completed', { skippedAssessment: true })
+  }
   revalidatePath('/', 'layout')
-  redirect('/today?welcome=1')
+  redirect('/today')
 }

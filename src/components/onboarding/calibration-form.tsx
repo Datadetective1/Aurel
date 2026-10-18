@@ -61,10 +61,13 @@ export function CalibrationForm({
         )}
       >
         <div className="overflow-hidden">
-          <label htmlFor="calibration-note" className="text-[0.8125rem] font-medium text-ink-secondary">
+          <label
+            htmlFor="calibration-note"
+            className="text-ink-secondary text-[0.8125rem] font-medium"
+          >
             What did it get wrong?
           </label>
-          <p className="mt-1 text-xs text-ink-muted">
+          <p className="text-ink-muted mt-1 text-xs">
             Optional, but this is the correction {brand.name} will weight above the score.
           </p>
           <Textarea
@@ -79,21 +82,21 @@ export function CalibrationForm({
       </div>
 
       {state?.error ? (
-        <p role="alert" className="mt-4 text-xs text-critical">
+        <p role="alert" className="text-critical mt-4 text-xs">
           {state.error}
         </p>
       ) : null}
 
-      <Submit disabled={!rating} />
+      <Submit />
     </form>
   )
 }
 
-function Submit({ disabled }: { disabled: boolean }) {
+function Submit() {
   const { pending } = useFormStatus()
   return (
     <div className="mt-7">
-      <Button type="submit" size="lg" disabled={disabled || pending}>
+      <Button type="submit" size="lg" disabled={pending}>
         {pending ? (
           <>
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -101,14 +104,11 @@ function Submit({ disabled }: { disabled: boolean }) {
           </>
         ) : (
           <>
-            Enter {brand.name}
+            Continue
             <ArrowRight className="size-4" aria-hidden="true" />
           </>
         )}
       </Button>
-      {disabled ? (
-        <p className="mt-2 text-xs text-ink-muted">Choose an answer to continue.</p>
-      ) : null}
     </div>
   )
 }

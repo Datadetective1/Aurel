@@ -77,6 +77,7 @@ export function ConversationCapture({
   initialMeetingId = null,
   initialMode = 'voice',
   userNames = [],
+  timeZone,
   className,
 }: {
   people: CapturePerson[]
@@ -86,6 +87,8 @@ export function ConversationCapture({
   initialMode?: Mode
   /** The account holder's names, so their own lines are never suggested as a new person. */
   userNames?: (string | null | undefined)[]
+  /** The account's IANA zone; "when" is entered and read in it. */
+  timeZone?: string
   className?: string
 }) {
   const [state, formAction] = useActionState<ConversationState, FormData>(createConversation, {})
@@ -107,7 +110,7 @@ export function ConversationCapture({
   const sourceRef = React.useRef<HTMLTextAreaElement | null>(null)
 
   const mounted = useHasMounted()
-  const defaultWhen = mounted ? localNow() : ''
+  const defaultWhen = mounted ? localNow(timeZone) : ''
 
   const fieldError = (name: string) => state.fieldErrors?.[name]?.[0] ?? null
 

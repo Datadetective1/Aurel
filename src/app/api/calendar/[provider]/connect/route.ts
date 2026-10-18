@@ -9,6 +9,7 @@ import { serverEnv } from '@/lib/env'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import { absoluteUrl } from '@/lib/brand'
+import { calendarReturnUrl, parseCalendarReturn } from '@/lib/calendar/return-path'
 
 /**
  * Start the OAuth dance.
@@ -51,14 +52,15 @@ export function calendarRedirectUri(provider: CalendarProviderId): string {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider: raw } = await params
   const origin = absoluteUrl('').replace(/\/$/, '')
+  const returnTo = parseCalendarReturn(request.nextUrl.searchParams.get('return'))
 
   if (!CALENDAR_PROVIDERS.includes(raw as CalendarProviderId)) {
-    return NextResponse.redirect(`${origin}/settings/capabilities?calendar=unknown_provider`)
+    return NextResponse.redirect(calendarReturnUrl(origin, returnTo, 'unknown_provider'))
   }
   const id = raw as CalendarProviderId
 
@@ -69,7 +71,7 @@ export async function GET(
   // permission we never use.
   if (!providerConfigured(id) || !canStoreSecrets()) {
     logger.warn('calendar.connect_unconfigured', { provider: id })
-    return NextResponse.redirect(`${origin}/settings/capabilities?calendar=not_configured`)
+    return NextResponse.redirect(calendarReturnUrl(origin, returnTo, 'not_configured'))
   }
 
   // A Pro capability, refused before the consent screen for the same reason.
@@ -80,7 +82,9 @@ export async function GET(
   await track('calendar_connect_started', { provider: id })
 
   const nonce = randomBytes(16).toString('base64url')
-  const state = signState(`${id}:${user.id}:${nonce}`)
+  // The return destination travels inside the signed state, so the callback can
+  // honour it without trusting anything the provider echoes back unsigned.
+  const state = signState(`${id}:${user.id}:${nonce}:${returnTo}`)
 
   return NextResponse.redirect(
     calendarProvider(id).authorizationUrl({

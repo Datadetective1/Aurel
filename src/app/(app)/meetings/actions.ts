@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { requireUser } from '@/lib/auth'
+import { getProfile, requireUser } from '@/lib/auth'
+import { wallTimeToInstant } from '@/lib/tz'
 import { ownership, ownershipNoVisibility } from '@/lib/workspace'
 import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
 import { getMeetingContext, getUserContext } from '@/lib/ai/context'
@@ -18,7 +19,28 @@ export interface MeetingState {
   error?: string
   message?: string
   fieldErrors?: Record<string, string[]>
+  /**
+   * What was submitted, echoed back on a refusal.
+   *
+   * React resets an uncontrolled form once its action settles. Without this, a
+   * single validation error wiped the title, the time and the objective -- and
+   * the objective's placeholder then sat in the empty box looking exactly like
+   * an answer, so the next submit sent nothing and the meeting said "No
+   * objective recorded". Fields take these as their defaults, so the reset
+   * restores what the user typed instead of erasing it.
+   */
+  values?: Record<string, string>
 }
+
+/** The text fields the meeting form echoes back on a refusal. */
+const ECHOED_FIELDS = [
+  'title',
+  'kind',
+  'scheduledAt',
+  'objective',
+  'stakes',
+  'extraContext',
+] as const
 
 const MEETING_KINDS = [
   'one_on_one',
@@ -52,7 +74,14 @@ const meetingSchema = z.object({
   kind: z.enum(MEETING_KINDS).catch('other'),
   scheduledAt: z.string().trim().optional(),
   durationMinutes: z.coerce.number().int().min(1).max(1440).optional(),
-  objective: z.string().trim().max(2000).optional(),
+  // Required. "Create and prepare" builds the brief straight away, and a brief
+  // with no objective cannot say what to optimize for -- so an empty one is
+  // refused here rather than discovered on the next screen.
+  objective: z
+    .string({ error: 'Say what you need from this meeting. One sentence is enough.' })
+    .trim()
+    .min(1, 'Say what you need from this meeting. One sentence is enough.')
+    .max(2000),
   stakes: z.string().trim().max(2000).optional(),
   extraContext: z.string().trim().max(4000).optional(),
   importance: z.coerce.number().int().min(1).max(5).catch(3),
@@ -73,19 +102,27 @@ export async function createMeeting(
     importance: formData.get('importance') ?? 3,
   })
 
+  const values = Object.fromEntries(
+    ECHOED_FIELDS.map((field) => [field, formData.get(field)?.toString() ?? '']),
+  )
+
   if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values }
   }
 
   const supabase = await createClient()
   const own = await ownership()
   const v = parsed.data
 
+  // The input is a wall-clock reading with no zone. It is read in the account's
+  // zone -- the one every meeting time is displayed in -- never the server's,
+  // which on Vercel is UTC and moved a Chicago 8:53 AM to 3:53 AM.
   let scheduledAt: string | null = null
   if (v.scheduledAt) {
-    const date = new Date(v.scheduledAt)
-    if (Number.isNaN(date.getTime())) {
-      return { fieldErrors: { scheduledAt: ['That date is not valid.'] } }
+    const profile = await getProfile()
+    const date = wallTimeToInstant(v.scheduledAt, profile?.timezone)
+    if (!date) {
+      return { fieldErrors: { scheduledAt: ['That date is not valid.'] }, values }
     }
     scheduledAt = date.toISOString()
   }
@@ -108,7 +145,7 @@ export async function createMeeting(
 
   if (error || !meeting) {
     logger.error('meeting.create_failed', { code: error?.code })
-    return { error: 'We could not create that meeting.' }
+    return { error: 'We could not create that meeting.', values }
   }
 
   // Attendees arrive as repeated `attendee` fields, each "personId:role".
@@ -145,7 +182,11 @@ export async function createMeeting(
 
   revalidatePath('/meetings')
   revalidatePath('/today')
-  redirect(`/meetings/${meeting.id}/brief`)
+  // `prepare=1` is the "and prepare" half of the button: the brief page starts
+  // generation on arrival, with the same progress, failure and retry states as
+  // pressing Generate. It is done there rather than here so the user is not
+  // left on a frozen form for the length of a model call.
+  redirect(`/meetings/${meeting.id}/brief?prepare=1`)
 }
 
 export async function updateMeetingObjective(

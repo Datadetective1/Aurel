@@ -57,6 +57,8 @@ export type AnalyticsEvent =
   | 'signup_completed'
   | 'onboarding_profile_completed'
   | 'onboarding_completed'
+  | 'onboarding_enrichment_deferred'
+  | 'person_identity_refined'
   | 'assessment_started'
   | 'assessment_completed'
   | 'assessment_calibrated'

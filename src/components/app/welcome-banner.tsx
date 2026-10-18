@@ -22,7 +22,7 @@ export function WelcomeBanner({ name, className }: { name: string; className?: s
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[var(--radius-lg)] border border-accent/25 bg-accent-wash p-6',
+        'border-accent/25 bg-accent-wash relative overflow-hidden rounded-[var(--radius-lg)] border p-6',
         className,
       )}
     >
@@ -31,19 +31,20 @@ export function WelcomeBanner({ name, className }: { name: string; className?: s
         size="icon-sm"
         onClick={dismiss}
         aria-label="Dismiss welcome message"
-        className="absolute right-2 top-2"
+        className="absolute top-1 right-1 size-11"
       >
         <X className="size-3.5" aria-hidden="true" />
       </Button>
 
-      <ApertureMark className="size-5 text-accent" />
-      <h2 className="mt-3 font-display text-xl text-ink">
-        Your profile is saved, {name}.
+      <ApertureMark className="text-accent size-5" />
+      <h2 className="font-display text-ink mt-3 pr-8 text-xl">
+        Welcome to {brand.name}, {name}.
       </h2>
-      <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-secondary">
-        {brand.name} is nearly empty right now, and that is expected. Add one person you work with
-        often, then prepare for your next conversation with them — that is where this starts paying
-        off.
+      {/* Points at Getting Started rather than restating it: one sequence,
+          told once, in the same words as the welcome email. */}
+      <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
+        It is empty right now, and that is expected. Find one meeting, choose who it is with, and
+        prepare it — the steps are just below.
       </p>
     </div>
   )

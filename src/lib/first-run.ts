@@ -22,7 +22,7 @@ export async function getFirstRunState(supabase: Client, userId: string): Promis
   const horizon = new Date()
   horizon.setDate(horizon.getDate() + 14)
 
-  const [integration, events, people, researched, briefs] = await Promise.all([
+  const [integration, events, people, researched, briefs, meetings] = await Promise.all([
     supabase
       .from('integration_accounts')
       .select('id')
@@ -47,6 +47,9 @@ export async function getFirstRunState(supabase: Client, userId: string): Promis
       .eq('user_id', userId)
       .eq('kind', 'meeting_brief')
       .limit(1),
+    // Any meeting at all, from the calendar or by hand. Step one is "have a
+    // meeting to prepare", and either route satisfies it.
+    supabase.from('meetings').select('id').eq('user_id', userId).limit(1),
   ])
 
   const eventRows = events.data ?? []
@@ -63,5 +66,6 @@ export async function getFirstRunState(supabase: Client, userId: string): Promis
     peopleCount: (people.data ?? []).length,
     researchedCount: new Set((researched.data ?? []).map((f) => f.person_id)).size,
     preparedCount: (briefs.data ?? []).length,
+    meetingCount: (meetings.data ?? []).length,
   }
 }

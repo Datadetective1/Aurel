@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowDown,
   CircleAlert,
@@ -12,7 +12,12 @@ import {
   Search,
   Telescope,
 } from 'lucide-react'
-import { researchPerson, type ResearchState } from '@/app/(app)/people/research-actions'
+import {
+  refineIdentityAndResearch,
+  researchPerson,
+  type IdentityDetail,
+  type ResearchState,
+} from '@/app/(app)/people/research-actions'
 import { Button } from '@/components/ui/button'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
@@ -53,6 +58,7 @@ export function ResearchPanel({
   sourceCount,
   storedSourceCount,
   timeZone,
+  autoStart = false,
 }: {
   personId: string
   personName: string
@@ -69,8 +75,15 @@ export function ResearchPanel({
    * differs between the two.
    */
   timeZone: string
+  /**
+   * Run once on arrival. Set when the person was just added with a profile
+   * URL: the user has already pointed at the page to read, so making them find
+   * and press a second button to read it was a second workflow for one intent.
+   */
+  autoStart?: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [running, setRunning] = React.useState(false)
   const [stage, setStage] = React.useState(0)
   const [result, setResult] = React.useState<ResearchState | null>(null)
@@ -84,15 +97,47 @@ export function ResearchPanel({
     return () => window.clearInterval(timer)
   }, [running])
 
-  const run = async () => {
-    setRunning(true)
-    setStage(0)
-    setResult(null)
-    const outcome = await researchPerson(personId)
+  const settle = (outcome: ResearchState) => {
     setRunning(false)
     setResult(outcome)
     if (outcome.ok) router.refresh()
   }
+
+  const run = React.useCallback(async () => {
+    setRunning(true)
+    setStage(0)
+    setResult(null)
+    try {
+      settle(await researchPerson(personId))
+    } catch {
+      settle({ error: 'Research did not complete. Nothing was saved — try again.' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personId])
+
+  const retryWith = async (details: {
+    organizationName?: string
+    jobTitle?: string
+    profileUrl?: string
+  }) => {
+    setRunning(true)
+    setStage(0)
+    try {
+      settle(await refineIdentityAndResearch({ personId, ...details }))
+    } catch {
+      settle({ error: 'Research did not complete. Nothing was saved — try again.' })
+    }
+  }
+
+  // Once per mount; the flag is stripped first so a refresh does not run a
+  // second, metered research job.
+  const started = React.useRef(false)
+  React.useEffect(() => {
+    if (!autoStart || started.current) return
+    started.current = true
+    router.replace(pathname, { scroll: false })
+    void run()
+  }, [autoStart, pathname, router, run])
 
   // Nothing to research from, and no way to discover sources.
   const blocked = !canDiscover && !hasProfileUrl
@@ -192,6 +237,12 @@ export function ResearchPanel({
                 </a>
               ) : null}
             </div>
+          ) : result.identity ? (
+            <IdentityRecovery
+              message={result.error ?? `I couldn't confidently identify ${personName}.`}
+              missing={result.identity.missing}
+              onRetry={retryWith}
+            />
           ) : (
             <p className="border-caution/25 bg-caution-wash text-ink-secondary flex items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
               <CircleAlert className="text-caution mt-px size-3.5 shrink-0" aria-hidden="true" />
@@ -213,6 +264,103 @@ export function ResearchPanel({
         </p>
       ) : null}
     </section>
+  )
+}
+
+const DETAIL_FIELDS: Record<
+  IdentityDetail,
+  {
+    name: 'organizationName' | 'jobTitle' | 'profileUrl'
+    label: string
+    placeholder: string
+    type?: string
+  }
+> = {
+  organization: {
+    name: 'organizationName',
+    label: 'Employer or company',
+    placeholder: 'e.g. Ansys',
+  },
+  jobTitle: { name: 'jobTitle', label: 'Role or title', placeholder: 'e.g. VP Engineering' },
+  profileUrl: {
+    name: 'profileUrl',
+    label: 'Professional or company profile URL',
+    placeholder: 'https://',
+    type: 'url',
+  },
+}
+
+/**
+ * "I couldn't confidently identify this person" -- with a way forward.
+ *
+ * The refusal was right: the sources it saw could have been somebody else, and
+ * nothing uncertain is ever turned into a fact. What was missing was recovery.
+ * This asks for the details not yet on record -- any one is enough -- and runs
+ * research again with them. The rejected sources stay recorded as rejected.
+ */
+function IdentityRecovery({
+  message,
+  missing,
+  onRetry,
+}: {
+  message: string
+  missing: IdentityDetail[]
+  onRetry: (details: { organizationName?: string; jobTitle?: string; profileUrl?: string }) => void
+}) {
+  // When every detail is already on record, a page the user vouches for is the
+  // only thing left that can settle it.
+  const asked: IdentityDetail[] = missing.length > 0 ? missing : ['profileUrl']
+
+  return (
+    <form
+      className="border-caution/25 bg-caution-wash rounded-[var(--radius-md)] border px-4 py-3.5"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const data = new FormData(event.currentTarget)
+        const value = (key: string) => data.get(key)?.toString().trim() || undefined
+        onRetry({
+          organizationName: value('organizationName'),
+          jobTitle: value('jobTitle'),
+          profileUrl: value('profileUrl'),
+        })
+      }}
+    >
+      <p className="text-ink flex items-start gap-2 text-sm font-medium">
+        <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        {message}
+      </p>
+      <p className="text-ink-secondary mt-1.5 text-xs leading-relaxed">
+        {asked.length > 1 ? 'Add one of these and try again:' : 'Add this and try again:'}
+      </p>
+
+      <div className="mt-3 grid gap-3">
+        {asked.map((detail) => {
+          const field = DETAIL_FIELDS[detail]
+          return (
+            <label key={detail} className="grid gap-1.5">
+              <span className="text-ink-secondary text-[0.8125rem] font-medium">{field.label}</span>
+              <input
+                name={field.name}
+                type={field.type ?? 'text'}
+                inputMode={field.type === 'url' ? 'url' : undefined}
+                placeholder={field.placeholder}
+                className="border-line-strong bg-surface text-ink min-h-11 w-full rounded-[var(--radius-md)] border px-3 text-sm"
+              />
+            </label>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Button type="submit" size="sm" className="h-11">
+          <Search className="size-3.5" aria-hidden="true" />
+          Save and research again
+        </Button>
+        <span className="text-ink-muted text-xs">
+          Or paste a link, a bio or your own notes below.
+        </span>
+      </div>
+    </form>
   )
 }
 

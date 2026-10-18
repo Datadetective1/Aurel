@@ -8,10 +8,8 @@ import {
   scoreScenarioAssessment,
 } from '@/app/onboarding/assessment/scenario-actions'
 import { Button } from '@/components/ui/button'
-import { Eyebrow } from '@/components/ui/primitives'
 import { cn } from '@/lib/utils'
 import type { Scenario } from '@/lib/assessment/scenarios'
-import { brand } from '@/lib/brand'
 
 /**
  * SCENARIO RUNNER
@@ -89,7 +87,8 @@ export function ScenarioRunner({
 
     // Advance on its own so the flow keeps moving, but not so fast that the
     // choice cannot be seen registering.
-    if (!isLast) window.setTimeout(() => setIndex((i) => Math.min(i + 1, scenarios.length - 1)), 260)
+    if (!isLast)
+      window.setTimeout(() => setIndex((i) => Math.min(i + 1, scenarios.length - 1)), 260)
   }
 
   async function finish() {
@@ -105,14 +104,23 @@ export function ScenarioRunner({
 
   return (
     <div className="py-4">
-      {isOpeningSitting ? (
+      {/* Said once, on the first question, instead of on every screen. The old
+          runner repeated "there is no right answer" under all six prompts and
+          closed each one with a paragraph about "It depends" and Skip -- the
+          same three ideas, read six times, on a phone. */}
+      {index === 0 ? (
         <div className="border-line bg-bg-sunken mb-6 rounded-[var(--radius-md)] border px-4 py-3">
-          <p className="text-ink text-sm font-medium">
-            {scenarios.length} quick questions · about a minute
-          </p>
-          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            {brand.name} uses these to personalize its first suggestions, and refines them as you
-            use it. There is nothing to finish later unless you want to.
+          {isOpeningSitting ? (
+            <p className="text-ink text-sm font-medium">
+              {scenarios.length} quick questions · about a minute
+            </p>
+          ) : null}
+          <p
+            className={cn('text-ink-secondary text-xs leading-relaxed', isOpeningSitting && 'mt-1')}
+          >
+            There is no right answer — every option is something good people do. &ldquo;It
+            depends&rdquo; is a real answer, recorded as such. Skip leaves a question blank, and
+            nothing is inferred from it.
           </p>
         </div>
       ) : null}
@@ -142,10 +150,6 @@ export function ScenarioRunner({
         <legend className="text-ink font-display max-w-xl text-xl leading-snug sm:text-2xl">
           {scenario.prompt}
         </legend>
-
-        <p className="text-ink-muted mt-3 text-xs">
-          There is no right answer here — both are things good people do.
-        </p>
 
         <div className="mt-6 grid gap-2.5">
           {scenario.options.map((option) => (
@@ -215,15 +219,6 @@ export function ScenarioRunner({
           {error}
         </p>
       ) : null}
-
-      <p className="text-ink-faint mt-10 text-xs leading-relaxed">
-        <Eyebrow className="mb-1 block">About these questions</Eyebrow>
-        {/* These are genuinely different and the copy used to say they were the
-            same, which made the honest answer feel like a wasted one. */}
-        &ldquo;It depends&rdquo; is a real answer — {brand.name} records that your approach there
-        varies with the situation, and says so rather than guessing a side. Skipping leaves the
-        question unanswered, and nothing is inferred from it either way.
-      </p>
     </div>
   )
 }
