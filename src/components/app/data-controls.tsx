@@ -62,7 +62,7 @@ export function DataControls({ hasDemoData }: { hasDemoData: boolean }) {
       {/* Export */}
       <div className="border-line bg-surface flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border px-4 py-3.5">
         <div className="min-w-0">
-          <p className="text-ink text-sm">Export everything</p>
+          <p className="text-ink text-sm">Export your record</p>
           <p className="text-ink-muted mt-0.5 text-xs leading-relaxed">
             Every person, observation, interaction, source and generation, as JSON.
           </p>

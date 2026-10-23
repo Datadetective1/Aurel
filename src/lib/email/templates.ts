@@ -77,6 +77,11 @@ export function welcomeEmail({ firstName }: { firstName: string }): BuiltEmail {
             ),
           ].join(''),
         ),
+        // Sent at sign-up, before the address is confirmed: say so, or the
+        // button lands on a sign-in that refuses with "confirm your email".
+        paragraph(
+          'First, confirm your email address using the separate confirmation message we just sent.',
+        ),
         button('Open Today', absoluteUrl('/today')),
       ].join(''),
       footerNote: `You are receiving this because you created an ${escapeHtml(brand.name)} account.`,
@@ -224,7 +229,7 @@ export function weeklySummaryEmail(input: WeeklySummaryInput): BuiltEmail {
 
         input.pendingMemoryCount > 0
           ? paragraph(
-              `${escapeHtml(count(input.pendingMemoryCount, 'observation'))} waiting for you to confirm or reject. Nothing enters your relationship record until you say so.`,
+              `${escapeHtml(count(input.pendingMemoryCount, 'observation'))} waiting for you to confirm or reject. None of them is kept until you say so.`,
             )
           : '',
 

@@ -150,3 +150,28 @@ create table public.billing_events (            -- idempotency for both webhooks
 - App Store guideline 3.1: digital subscriptions sold inside an iOS app go through In-App Purchase, and the app must not steer users to buy elsewhere. Today the iOS app sells nothing, shows no prices and has no purchase call to action — it signs existing accounts in. Whether that is acceptable for this app before StoreKit exists is Apple's call under the guideline text current at submission (the multiplatform provisions in 3.1.3 are the relevant section); check it before the first review rather than assume it. The one link out is "Create an account on the web" on the sign-in screen, which may need to go for review.
 - Account deletion is required in-app for apps with sign-in (5.1.1(v)). The app currently sends users to the web; an in-app deletion entry point that calls the existing `deleteAccount` path is needed before submission.
 - Apple subscribers deleting their account must be told to cancel in iOS Settings — Atturel cannot cancel an Apple subscription.
+
+---
+
+## First-customer manual checklist (October 2026)
+
+Only what code cannot do. Each item was checked against the implementation.
+
+1. **Stripe → Settings → Billing → Customer portal.**
+   - **Cancellations:** "Cancel at end of billing period". The app, Pricing and Terms all promise Pro until the end of the paid period. The webhook honours `cancel_at_period_end`, but whether the portal cancels at period end or immediately is a dashboard setting.
+   - **Subscriptions → Switch plans:** off. A price the app does not know maps to Free (`planForPrice`), so a portal plan switch could charge without granting Pro.
+2. **Stripe → Settings → Billing → Subscriptions and emails.**
+   - Turn on "Send emails about failed payments" (with the card-update link) and successful-payment receipts.
+   - The app deliberately relies on these for payment problems. It shows a past-due notice on Settings → Plan.
+3. **Supabase → Authentication → Emails → Confirm signup.**
+   - Subject: `Confirm your Atturel account`.
+   - Body: the contents of `supabase/templates/confirm-signup.html`.
+4. **Microsoft Entra → App registrations → Atturel → Branding & properties.**
+   - Set the terms URL, privacy URL and logo, then verify the publisher domain `www.atturel.com`. The association file is live.
+   - Publisher verification needs Microsoft AI Cloud Partner Program business verification.
+   - Full steps: `docs/MICROSOFT_PUBLISHER_VERIFICATION.md`.
+5. **Cloudflare → DNS → `_dmarc.atturel.com`.**
+   - Currently `p=none` with Cloudflare reporting, which is correct for now.
+   - After about two weeks of clean reports, change to `p=quarantine`, keeping the same `rua`.
+   - SPF (root and `send.`), DKIM (`resend._domainkey`) and MX (Cloudflare Email Routing) are already published.
+6. **Cloudflare → Email → Email Routing.** Confirm that `support@atturel.com` and `privacy@atturel.com` forward to a monitored inbox. Every Reply-To and support link points at them.

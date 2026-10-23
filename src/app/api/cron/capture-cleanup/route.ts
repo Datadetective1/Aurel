@@ -1,3 +1,4 @@
+import { cronAuthorized } from '@/lib/cron-auth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { serverEnv, features } from '@/lib/env'
 import { logger } from '@/lib/logger'
@@ -15,7 +16,7 @@ export const maxDuration = 120
 
 export async function GET(request: NextRequest) {
   const secret = serverEnv.CRON_SECRET
-  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request.headers.get('authorization'), secret)) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
   if (!features.captureStorage) return NextResponse.json({ ok: true, removed: 0, enabled: false })

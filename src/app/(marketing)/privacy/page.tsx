@@ -55,6 +55,46 @@ export default function PrivacyPage() {
             It also holds your own account details and your {brand.assessmentName}, which is built
             from answers you give.
           </p>
+          <p>Depending on what you use, it can also hold:</p>
+          <ul className="grid gap-2 pl-5">
+            <li className="list-disc">
+              Meetings you prepare for, who attends them, your objective, and the briefs generated
+              for them.
+            </li>
+            <li className="list-disc">
+              Conversations you capture: text you type or paste, and transcripts of audio you record
+              or upload. Audio is used only to produce the transcript and is deleted once it has
+              been transcribed; anything left behind by an interrupted upload is removed within
+              about a day.
+            </li>
+            <li className="list-disc">
+              Documents you upload to read (such as a PDF), and the text extracted from them.
+            </li>
+            <li className="list-disc">
+              If you connect a calendar: a read-only copy of your upcoming events — title, time,
+              location, description, organizer, attendees and meeting link — for the next two weeks.{' '}
+              {brand.name} never creates, changes or answers calendar events.
+            </li>
+            <li className="list-disc">
+              Public web pages fetched when you research someone, kept as the cited source for any
+              fact taken from them.
+            </li>
+            <li className="list-disc">
+              Photos you upload, or suggested photos you choose to keep.
+            </li>
+            <li className="list-disc">
+              Basic product events, such as &ldquo;a brief was generated&rdquo;, recorded by{' '}
+              {brand.name} itself as counts — never the content of your notes or conversations.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="Cookies">
+          <p>
+            {brand.name} uses only the cookies needed to keep you signed in. There are no
+            advertising cookies and no third-party trackers. Your light or dark theme choice is
+            remembered on your own device.
+          </p>
         </Section>
 
         <Section title="Who can see it">
@@ -186,7 +226,10 @@ export default function PrivacyPage() {
             <li className="list-disc">
               Mark a source as the wrong person, which removes what it supported
             </li>
-            <li className="list-disc">Export everything you have stored as JSON</li>
+            <li className="list-disc">
+              Export your whole record — people, meetings, conversations, commitments, sources and
+              what was generated from them — as one JSON file. Photos are not included in the file.
+            </li>
             <li className="list-disc">
               Delete your account and destroy the entire record, from the web or inside the iPhone
               app. A paid plan billed on the web is cancelled first, so you are not charged again.

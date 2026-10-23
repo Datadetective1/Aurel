@@ -52,6 +52,13 @@ export interface ResearchState {
    * thresholds are untouched; this is recovery, not a lower bar.
    */
   identity?: { missing: IdentityDetail[] }
+  /** Refused by the plan: the way forward is a plan change, not a retry. */
+  upgrade?: boolean
+}
+
+/** A plan refusal, with an upgrade path only where a plan change would help. */
+function refused(capability: { message?: string; plan?: string }): ResearchState {
+  return { error: capability.message, upgrade: capability.plan === 'free' }
 }
 
 export type IdentityDetail = 'organization' | 'jobTitle' | 'profileUrl'
@@ -96,7 +103,7 @@ export async function addDocument(
   if (!(file instanceof File) || file.size === 0) return { error: 'Choose a file first.' }
 
   const capability = await checkCapability('documentAnalysis', 'document_analysis')
-  if (!capability.allowed) return { error: capability.message }
+  if (!capability.allowed) return refused(capability)
 
   const user = await requireUser()
   const { workspaceId } = await getWorkspace()
@@ -188,7 +195,7 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
     kind === 'transcript' ? 'debrief' : 'researchPerson',
     kind === 'transcript' ? 'transcript_analysis' : 'source_ingest',
   )
-  if (!capability.allowed) return { error: capability.message }
+  if (!capability.allowed) return refused(capability)
 
   const user = await requireUser()
   const { workspaceId } = await getWorkspace()
@@ -272,7 +279,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     // The analytics event measures how often this happens; this line is what an
     // operator sees when a pilot user says research "stopped working".
     logger.info('research.quota_exhausted', { reason: capability.reason })
-    return { error: capability.message }
+    return refused(capability)
   }
 
   const startedAt = Date.now()

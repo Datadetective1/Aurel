@@ -11,6 +11,10 @@ import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-act
 import { InvitationPanel } from '@/components/app/invitation-panel'
 import { hasFullAccess } from '@/lib/billing/access'
 import { features } from '@/lib/env'
+import { createClient } from '@/lib/supabase/server'
+import { formatDate } from '@/lib/format'
+import { brand } from '@/lib/brand'
+import { CheckoutPending } from '@/components/app/checkout-pending'
 
 export const metadata: Metadata = { title: 'Plan', robots: { index: false, follow: false } }
 
@@ -33,9 +37,24 @@ export default async function BillingSettingsPage({
 }: {
   searchParams: Promise<{ checkout?: string }>
 }) {
-  await requireOnboardedUser()
+  const { user, profile } = await requireOnboardedUser()
+  const timeZone = profile.timezone ?? 'UTC'
   const { checkout } = await searchParams
   const entitlements = await getEntitlements()
+
+  // The subscription as the account sees it (owner-readable under RLS): what
+  // the plan is doing next, and whether there is a Stripe customer to manage.
+  const supabase = await createClient()
+  const { data: billing } = await supabase
+    .from('subscriptions')
+    .select('status, cancel_at_period_end, current_period_end, stripe_customer_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  const periodEnd = billing?.current_period_end
+    ? formatDate(billing.current_period_end, timeZone)
+    : null
+  const pastDue = billing?.status === 'past_due'
+  const hasBillingAccount = Boolean(billing?.stripe_customer_id)
   const plan = PLANS[entitlements.plan]
   const founding = await foundingPlacesRemaining()
   const protection = foundingProtectionBlurb()
@@ -69,8 +88,23 @@ export default async function BillingSettingsPage({
           className="border-positive/25 bg-positive-wash text-positive mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
         >
           <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          Thank you. Your plan changes as soon as the payment is confirmed — usually within seconds.
-          Reload if this page still shows the old plan.
+          {entitlements.plan === 'pro'
+            ? 'Thank you. Pro is on.'
+            : 'Thank you. Your plan changes as soon as Stripe confirms the payment — usually within seconds. This page checks for you.'}
+        </p>
+      ) : null}
+      {/* Refreshes the page a few times while the webhook lands, so the
+          customer does not have to reload to see what they paid for. */}
+      {checkout === 'success' && entitlements.plan !== 'pro' ? <CheckoutPending /> : null}
+
+      {pastDue ? (
+        <p
+          role="alert"
+          className="border-caution/25 bg-caution-wash text-ink-secondary mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
+        >
+          <CircleAlert className="text-caution mt-px size-3.5 shrink-0" aria-hidden="true" />
+          Your last payment did not go through. Pro stays on while Stripe retries; update your card
+          in Manage billing to keep it.
         </p>
       ) : null}
 
@@ -89,6 +123,14 @@ export default async function BillingSettingsPage({
           </span>
         ) : null}
       </div>
+
+      {entitlements.plan === 'pro' && periodEnd ? (
+        <p className="text-ink mt-2 text-sm">
+          {billing?.cancel_at_period_end
+            ? `Canceled — Pro stays on until ${periodEnd}, then the account moves to Free. Nothing is deleted.`
+            : `Renews on ${periodEnd}.`}
+        </p>
+      ) : null}
 
       <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">{plan.tagline}</p>
 
@@ -163,7 +205,10 @@ export default async function BillingSettingsPage({
       {/* Anyone paying can always reach billing to change or cancel it -- an
           owner or pilot grant included. Hiding this row for full-access
           accounts also hid the only way a paying pilot could cancel. */}
-      {features.billing && entitlements.plan !== 'free' ? (
+      {/* Whenever there is a Stripe customer, not only while on Pro: an unpaid
+          or ended subscription is exactly when someone needs to fix a card,
+          pay an invoice or find a receipt. */}
+      {features.billing && (hasBillingAccount || entitlements.plan !== 'free') ? (
         <div className={fullAccess ? 'mt-10' : 'mt-2'}>
           <ManageBillingButton />
         </div>
@@ -190,6 +235,18 @@ export default async function BillingSettingsPage({
           Upgrading is not available yet. Everything else works normally.
         </p>
       ) : null}
+
+      <p className="text-ink-muted mt-8 max-w-lg text-xs leading-relaxed">
+        Cancel any time from Manage billing; Pro stays on until the end of the period you paid for.
+        Billing questions:{' '}
+        <a
+          href={`mailto:${brand.email.support}`}
+          className="text-accent underline underline-offset-2"
+        >
+          {brand.email.support}
+        </a>
+        .
+      </p>
 
       {/* Quiet by design -- see components/app/invitation-panel. */}
       <InvitationPanel tier={entitlements.tier} />

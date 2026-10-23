@@ -249,9 +249,18 @@ export function ResearchPanel({
               <span>
                 {result.error}
                 <br />
-                <span className="text-ink-muted">
-                  You can paste a link, a bio or your own notes below instead.
-                </span>
+                {result.upgrade ? (
+                  <a
+                    href="/settings/billing"
+                    className="text-accent inline-flex min-h-11 items-center underline underline-offset-2"
+                  >
+                    See plans
+                  </a>
+                ) : (
+                  <span className="text-ink-muted">
+                    You can paste a link, a bio or your own notes below instead.
+                  </span>
+                )}
               </span>
             </p>
           )}

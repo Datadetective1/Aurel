@@ -1,3 +1,4 @@
+import { cronAuthorized } from '@/lib/cron-auth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { serverEnv, features } from '@/lib/env'
@@ -29,8 +30,7 @@ export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   const secret = serverEnv.CRON_SECRET
-  const header = request.headers.get('authorization')
-  if (!secret || header !== `Bearer ${secret}`) {
+  if (!cronAuthorized(request.headers.get('authorization'), secret)) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
 

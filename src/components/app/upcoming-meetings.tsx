@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, Loader2, Lock, Sparkles, UserPlus, Video } from 'lucide-react'
@@ -79,10 +80,7 @@ function dayLabel(iso: string, timeZone: string, nowIso: string): string {
   // `now` comes from the server rather than the client clock, so the two
   // renders agree about which day "Today" is even across a midnight boundary.
   const today = dayKey(nowIso, timeZone)
-  const tomorrow = dayKey(
-    new Date(new Date(nowIso).getTime() + 86_400_000).toISOString(),
-    timeZone,
-  )
+  const tomorrow = dayKey(new Date(new Date(nowIso).getTime() + 86_400_000).toISOString(), timeZone)
   const day = dayKey(iso, timeZone)
 
   if (day === today) return 'Today'
@@ -96,7 +94,10 @@ function dayLabel(iso: string, timeZone: string, nowIso: string): string {
 }
 
 /** The single most useful thing to say about a meeting at a glance. */
-function readiness(event: UpcomingEvent): { label: string; tone: 'positive' | 'accent' | 'outline' | 'neutral' } {
+function readiness(event: UpcomingEvent): {
+  label: string
+  tone: 'positive' | 'accent' | 'outline' | 'neutral'
+} {
   if (event.status === 'cancelled') return { label: 'Cancelled', tone: 'outline' }
   if (event.hasBrief) return { label: 'Prepared', tone: 'positive' }
 
@@ -117,14 +118,37 @@ export function UpcomingMeetings({
   events,
   timeZone = 'UTC',
   nowIso,
+  connected = false,
 }: {
   events: UpcomingEvent[]
   /** The account holder's zone, from their profile. */
   timeZone?: string
   /** Server render time, so both renders agree on which day is "Today". */
   nowIso: string
+  /**
+   * A calendar is connected. With no events, that is worth saying: an empty
+   * calendar and a broken sync otherwise look exactly the same.
+   */
+  connected?: boolean
 }) {
-  if (events.length === 0) return null
+  if (events.length === 0) {
+    if (!connected) return null
+    return (
+      <section className="mt-10">
+        <Eyebrow className="flex items-center gap-1.5">
+          <CalendarClock className="text-accent size-3" aria-hidden="true" />
+          From your calendar
+        </Eyebrow>
+        <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">
+          Nothing on your calendar in the next few days. Meetings appear here as they are added — or{' '}
+          <Link href="/meetings/new" className="text-accent underline underline-offset-2">
+            create one by hand
+          </Link>
+          .
+        </p>
+      </section>
+    )
+  }
 
   return (
     <section className="mt-10">
@@ -226,7 +250,12 @@ function EventCard({
         </div>
 
         {!cancelled ? (
-          <Button size="sm" variant={event.hasBrief ? 'secondary' : 'primary'} onClick={prepare} disabled={pending}>
+          <Button
+            size="sm"
+            variant={event.hasBrief ? 'secondary' : 'primary'}
+            onClick={prepare}
+            disabled={pending}
+          >
             {pending ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
@@ -246,8 +275,8 @@ function EventCard({
         <p className="border-line text-ink-muted mt-3 flex items-start gap-2 border-t pt-3 text-[0.6875rem] leading-relaxed">
           <UserPlus className="mt-px size-3 shrink-0" aria-hidden="true" />
           <span>
-            {unknown.length === 1 ? 'One attendee is' : `${unknown.length} attendees are`} unknown to{' '}
-            {brand.name}. Add them from the brief to research their public footprint —{' '}
+            {unknown.length === 1 ? 'One attendee is' : `${unknown.length} attendees are`} unknown
+            to {brand.name}. Add them from the brief to research their public footprint —{' '}
             {brand.name} will not research anyone without you asking.
           </span>
         </p>

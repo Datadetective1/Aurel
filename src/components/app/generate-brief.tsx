@@ -67,10 +67,15 @@ export function GenerateBriefPanel({
     const form = new FormData()
     form.set('meetingId', meetingId)
     form.set('objective', text)
-    const result = await updateMeetingObjective({}, form)
-    setSavingObjective(false)
-    if (result?.error) setError(result.error)
-    else router.refresh()
+    try {
+      const result = await updateMeetingObjective({}, form)
+      if (result?.error) setError(result.error)
+      else router.refresh()
+    } catch {
+      setError('That did not save — check your connection and try again. Your text is still here.')
+    } finally {
+      setSavingObjective(false)
+    }
   }
   const [running, setRunning] = React.useState(false)
   const [stage, setStage] = React.useState(0)
@@ -99,7 +104,7 @@ export function GenerateBriefPanel({
         return
       }
       setError(result.error ?? 'Something went wrong.')
-      setUpgrade('upgrade' in result && Boolean(result.upgrade))
+      setUpgrade(Boolean(result.upgrade))
     } catch {
       // A dropped connection or a timed-out function arrives here, not as a
       // result. It must land on the same honest, retryable state.
@@ -208,9 +213,13 @@ export function GenerateBriefPanel({
             <AddParticipants meetingId={meetingId} people={addablePeople} />
           </div>
 
-          <Button size="lg" onClick={run} className="mt-7">
-            {error ? 'Try again' : 'Generate brief'}
-          </Button>
+          {/* No retry button after a plan refusal: trying again cannot succeed,
+              and the way forward is the "See plans" link below. */}
+          {upgrade ? null : (
+            <Button size="lg" onClick={run} className="mt-7">
+              {error ? 'Try again' : 'Generate brief'}
+            </Button>
+          )}
 
           {error ? (
             <div className="border-caution/25 bg-caution-wash mt-5 rounded-[var(--radius-md)] border px-4 py-3">

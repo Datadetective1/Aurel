@@ -15,7 +15,12 @@ const USER = '22222222-2222-4222-8222-222222222222'
 
 function harness(
   billing: Partial<BillingSnapshot>,
-  opts: { stripe?: Partial<StripeOps> | null; failData?: boolean; failAudit?: boolean } = {},
+  opts: {
+    stripe?: Partial<StripeOps> | null
+    failData?: boolean
+    failLogin?: boolean
+    failAudit?: boolean
+  } = {},
 ) {
   const calls: string[] = []
   const audits: unknown[] = []
@@ -69,7 +74,7 @@ function harness(
     },
     async deleteLogin() {
       calls.push('delete_login')
-      return true
+      return !opts.failLogin
     },
   }
   return { deps, calls, audits }
@@ -197,5 +202,14 @@ describe('an App Store subscriber (future)', () => {
       billing_provider: 'apple',
       billing_outcome: 'apple_user_managed',
     })
+  })
+})
+
+describe('a login that cannot be deleted', () => {
+  it('is reported as unfinished, with the support address, never as success', async () => {
+    const { deps } = harness({}, { failLogin: true })
+    const result = await deleteAccountCore({ userId: USER, via: 'web' }, deps)
+    expect(result).toMatchObject({ ok: false, stage: 'login' })
+    expect(result.ok ? '' : result.message).toMatch(/support@/)
   })
 })

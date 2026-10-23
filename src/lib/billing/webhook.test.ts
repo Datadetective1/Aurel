@@ -359,3 +359,63 @@ describe('subscriptionIdOf', () => {
     )
   })
 })
+
+describe('one row, several subscriptions', () => {
+  it('a late event for an old, canceled subscription cannot drop an active one to Free', async () => {
+    const remote = { current: subscription() }
+    const { store, deps } = setup(remote)
+    await processStripeEvent(checkout('evt_new_active'), deps)
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', stripeSubscriptionId: 'sub_1' })
+
+    // A retried deletion for a previous subscription arrives afterwards.
+    remote.current = subscription({ id: 'sub_old', status: 'canceled' })
+    const out = await processStripeEvent(
+      event('evt_old_deleted', 'customer.subscription.deleted', {
+        id: 'sub_old',
+        customer: 'cus_1',
+      }),
+      deps,
+    )
+    expect(out.status).toBe(200)
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', stripeSubscriptionId: 'sub_1' })
+  })
+
+  it('an abandoned second checkout cannot replace the live subscription', async () => {
+    const remote = { current: subscription() }
+    const { store, deps } = setup(remote)
+    await processStripeEvent(checkout('evt_live'), deps)
+    remote.current = subscription({ id: 'sub_incomplete', status: 'incomplete' })
+    await processStripeEvent(
+      event('evt_incomplete', 'customer.subscription.created', {
+        id: 'sub_incomplete',
+        customer: 'cus_1',
+      }),
+      deps,
+    )
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', stripeSubscriptionId: 'sub_1' })
+  })
+
+  it('still moves to a new subscription that is itself entitled', async () => {
+    const remote = { current: subscription() }
+    const { store, deps } = setup(remote)
+    await processStripeEvent(checkout('evt_first'), deps)
+    remote.current = subscription({ id: 'sub_2' })
+    await processStripeEvent(
+      event('evt_second', 'customer.subscription.created', { id: 'sub_2', customer: 'cus_1' }),
+      deps,
+    )
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', stripeSubscriptionId: 'sub_2' })
+  })
+
+  it('still ends Pro when the live subscription itself is canceled', async () => {
+    const remote = { current: subscription() }
+    const { store, deps } = setup(remote)
+    await processStripeEvent(checkout('evt_on'), deps)
+    remote.current = subscription({ status: 'canceled' })
+    await processStripeEvent(
+      event('evt_off', 'customer.subscription.deleted', { id: 'sub_1', customer: 'cus_1' }),
+      deps,
+    )
+    expect(store.rows.get(USER)?.plan).toBe('free')
+  })
+})

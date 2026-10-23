@@ -202,6 +202,21 @@ export async function exportMyData(): Promise<
       reflections,
       decisions,
       decisionPeople,
+      meetingAttendees,
+      interactionParticipants,
+      factSources,
+      artifactSources,
+      sourcePersonLinks,
+      topics,
+      personTopics,
+      weeklyReflections,
+      scenarioResponses,
+      calendarEvents,
+      identityCandidates,
+      researchJobs,
+      feedback,
+      subscription,
+      calendarConnections,
     ] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('assessments').select('*').eq('user_id', user.id),
@@ -220,28 +235,75 @@ export async function exportMyData(): Promise<
       supabase.from('daily_reflections').select('*').eq('user_id', user.id),
       supabase.from('decisions').select('*').eq('user_id', user.id),
       supabase.from('decision_people').select('*').eq('user_id', user.id),
+      // The joins and evidence links that make the rows above mean anything:
+      // who was in which meeting, which source backs which fact.
+      supabase.from('meeting_attendees').select('*').eq('user_id', user.id),
+      supabase.from('interaction_participants').select('*').eq('user_id', user.id),
+      supabase.from('fact_sources').select('*').eq('user_id', user.id),
+      supabase.from('artifact_sources').select('*').eq('user_id', user.id),
+      supabase.from('source_person_links').select('*').eq('user_id', user.id),
+      supabase.from('topics').select('*').eq('user_id', user.id),
+      supabase.from('person_topics').select('*').eq('user_id', user.id),
+      supabase.from('weekly_reflections').select('*').eq('user_id', user.id),
+      supabase.from('scenario_responses').select('*').eq('user_id', user.id),
+      supabase.from('external_calendar_events').select('*').eq('user_id', user.id),
+      supabase.from('identity_candidates').select('*').eq('user_id', user.id),
+      supabase.from('research_jobs').select('*').eq('user_id', user.id),
+      supabase.from('ai_feedback').select('*').eq('user_id', user.id),
+      supabase
+        .from('subscriptions')
+        .select('plan, status, current_period_end, cancel_at_period_end, created_at')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      // Which calendars are connected -- never the tokens, which are secrets
+      // of the connection rather than data about the account holder.
+      supabase
+        .from('integration_accounts')
+        .select('provider, status, external_account_email, scopes, last_synced_at, created_at')
+        .eq('user_id', user.id),
     ])
 
     const payload = {
       exportedAt: new Date().toISOString(),
       account: { id: user.id, email: user.email },
       profile: profile.data,
-      interactionProfile: { assessments: assessments.data, responses: responses.data },
+      interactionProfile: {
+        assessments: assessments.data,
+        responses: responses.data,
+        scenarioResponses: scenarioResponses.data,
+      },
       relationships: {
         organizations: organizations.data,
         people: people.data,
+        topics: topics.data,
+        personTopics: personTopics.data,
         observations: observations.data,
         observationSources: observationSources.data,
         interactions: interactions.data,
+        interactionParticipants: interactionParticipants.data,
         meetings: meetings.data,
+        meetingAttendees: meetingAttendees.data,
         commitments: commitments.data,
         decisions: decisions.data,
         decisionPeople: decisionPeople.data,
         notes: notes.data,
       },
-      sources: { sources: sources.data, professionalFacts: facts.data },
-      generated: artifacts.data,
-      reflections: reflections.data,
+      sources: {
+        sources: sources.data,
+        sourcePersonLinks: sourcePersonLinks.data,
+        professionalFacts: facts.data,
+        factSources: factSources.data,
+        identityCandidates: identityCandidates.data,
+        researchJobs: researchJobs.data,
+      },
+      generated: {
+        artifacts: artifacts.data,
+        artifactSources: artifactSources.data,
+        feedback: feedback.data,
+      },
+      reflections: { daily: reflections.data, weekly: weeklyReflections.data },
+      calendar: { connections: calendarConnections.data, events: calendarEvents.data },
+      plan: subscription.data,
     }
 
     await track('data_exported')

@@ -67,6 +67,11 @@ export function PersonForm({
 }) {
   const action = mode === 'create' ? createPerson : updatePerson
   const [state, formAction] = useActionState<ActionState, FormData>(action, {})
+  // After a refusal, what was typed; otherwise the stored defaults. Keyed on
+  // the state so React re-applies them when the form resets.
+  const v = state.values
+  const field = (name: keyof PersonDefaults & string): string =>
+    v?.[name] ?? String(defaults[name] ?? '')
   const [name, setName] = React.useState(defaults.fullName)
   const [relevance, setRelevance] = React.useState(defaults.relevance)
 
@@ -115,7 +120,7 @@ export function PersonForm({
             <Input
               {...props}
               name="organizationName"
-              defaultValue={defaults.organizationName}
+              defaultValue={field('organizationName')}
               placeholder="e.g. Acme Corporation"
               maxLength={160}
             />
@@ -127,7 +132,7 @@ export function PersonForm({
             <Input
               {...props}
               name="jobTitle"
-              defaultValue={defaults.jobTitle}
+              defaultValue={field('jobTitle')}
               placeholder="e.g. VP Engineering"
               maxLength={120}
             />
@@ -147,7 +152,7 @@ export function PersonForm({
               name="profileUrl"
               type="url"
               inputMode="url"
-              defaultValue={defaults.profileUrl}
+              defaultValue={field('profileUrl')}
               placeholder="https://acme.com/leadership/maya-chen"
             />
           )}
@@ -159,7 +164,11 @@ export function PersonForm({
           while closed. Open when editing, or when one of them has an error. */}
       <details
         className="group border-line mt-6 rounded-[var(--radius-md)] border"
-        open={mode === 'edit' || Boolean(state.fieldErrors?.email)}
+        open={
+          mode === 'edit' ||
+          Boolean(state.fieldErrors?.email) ||
+          Boolean(v?.preferredName || v?.email || v?.notes)
+        }
       >
         <summary className="text-ink-secondary flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm [&::-webkit-details-marker]:hidden">
           More about them
@@ -184,7 +193,7 @@ export function PersonForm({
               <Input
                 {...props}
                 name="preferredName"
-                defaultValue={defaults.preferredName}
+                defaultValue={field('preferredName')}
                 placeholder={name.split(' ')[0] || 'Maya'}
                 maxLength={80}
               />
@@ -197,7 +206,7 @@ export function PersonForm({
                 {...props}
                 name="email"
                 type="email"
-                defaultValue={defaults.email}
+                defaultValue={field('email')}
                 placeholder="maya.chen@acme.com"
               />
             )}
@@ -205,7 +214,7 @@ export function PersonForm({
 
           <FormField id="relationshipType" label="Relationship">
             {(props) => (
-              <Select {...props} name="relationshipType" defaultValue={defaults.relationshipType}>
+              <Select {...props} name="relationshipType" defaultValue={field('relationshipType')}>
                 {RELATIONSHIP_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -250,7 +259,7 @@ export function PersonForm({
                 {...props}
                 name="notes"
                 rows={4}
-                defaultValue={defaults.notes}
+                defaultValue={field('notes')}
                 maxLength={4000}
                 placeholder="e.g. Runs the platform org. Wants the recommendation before the reasoning."
               />

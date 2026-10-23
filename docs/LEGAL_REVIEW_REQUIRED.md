@@ -1,0 +1,21 @@
+# Legal review required
+
+Only what genuinely needs founder or legal judgment. Everything else on the
+Privacy and Terms pages either describes implemented behaviour (and was
+checked against the code) or is already marked as a draft on the page.
+
+Both pages currently show a "draft — not yet reviewed by a lawyer" banner,
+because `policiesLegallyReviewed` is `false` in `src/lib/brand/index.ts`.
+Set it to `true` only after the review below.
+
+| # | Item | Where | Decision needed |
+| --- | --- | --- | --- |
+| 1 | **Refund policy** | Terms → Billing; Pricing FAQ | Nothing says whether a cancelled month is refunded. The product cancels at period end, with no proration in code. Decide: "no refunds for partial periods" or a stated refund window. |
+| 2 | **Governing law and jurisdiction** | `brand.legal.jurisdiction` (currently unset, so not shown) | Choose the governing law and venue. |
+| 3 | **Registered address of Atturel Labs** | `brand.legal.entityAddress` (unset, so not shown) | Supply the legal address shown on Privacy and Terms. |
+| 4 | **"Never used to train a shared model"** | Homepage, Pricing FAQ, Privacy, Terms | Atturel itself never trains models. The claim also depends on the AI vendors' API terms (OpenAI's API data is not used for training by default). Confirm those terms, and the vendor's retention period, before keeping the absolute wording. |
+| 5 | **Subprocessor list stays current** | Privacy → Service providers | It lists OpenAI and Exa. The code can also use Anthropic, Brave or Serper if those keys are configured. Decide whether to list every possible provider or keep a "currently used" list updated with configuration changes. |
+| 6 | **Liability cap and warranty disclaimer** | Terms → Liability | "As-is" with an unspecified cap. Needs proper drafting for paid customers. |
+| 7 | **Data protection role** | Privacy | Users store notes about identifiable third parties (their colleagues and customers). Decide how Atturel describes its role for that third-party data (processor for the user, or controller), and whether a DPA is offered. This matters most for EU and UK customers. |
+| 8 | **Retention after cancellation** | Pricing FAQ ("Nothing is deleted") | Data is kept indefinitely on Free after cancellation until the user deletes it. Confirm this is the intended policy, and whether inactive accounts should ever be removed. |
+| 9 | **Recording consent** | Privacy → Voice recordings; capture flow | The product asks users to confirm others know they are being recorded. Consent rules differ by jurisdiction (two-party consent states). Confirm the wording is sufficient. |
