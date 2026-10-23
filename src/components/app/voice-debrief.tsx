@@ -33,17 +33,9 @@ const MAX_BYTES = 4 * 1024 * 1024
  * what Safari will give us. The empty string is the browser's own default,
  * tried last so that a browser we have not anticipated still works.
  */
-const CANDIDATE_TYPES = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/mp4',
-  'audio/mpeg',
-  '',
-]
+const CANDIDATE_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/mpeg', '']
 
-export function pickMimeType(
-  isSupported?: (type: string) => boolean,
-): string | null {
+export function pickMimeType(isSupported?: (type: string) => boolean): string | null {
   // No probe available (older Safari): let the browser decide by passing
   // nothing, rather than naming a type it may reject outright.
   if (typeof isSupported !== 'function') return null
@@ -61,9 +53,7 @@ export function formatElapsed(seconds: number): string {
 }
 
 /** True when this browser can record at all. */
-export function recordingSupported(nav?: {
-  mediaDevices?: { getUserMedia?: unknown }
-}): boolean {
+export function recordingSupported(nav?: { mediaDevices?: { getUserMedia?: unknown } }): boolean {
   if (typeof MediaRecorder === 'undefined') return false
   return typeof nav?.mediaDevices?.getUserMedia === 'function'
 }
@@ -134,6 +124,9 @@ export function VoiceDebrief({
     return () => window.removeEventListener('beforeunload', warn)
   }, [phase])
 
+  // Kept on failure so "try again" resends the same recording.
+  const [failed, setFailed] = React.useState<{ blob: Blob; seconds: number } | null>(null)
+
   async function send(blob: Blob, seconds: number) {
     if (blob.size > MAX_BYTES) {
       setPhase('error')
@@ -142,7 +135,7 @@ export function VoiceDebrief({
     }
     if (blob.size < 1_000) {
       setPhase('error')
-      setError("That recording was empty. Try again, or type your debrief.")
+      setError('That recording was empty. Try again, or type your debrief.')
       return
     }
 
@@ -163,12 +156,14 @@ export function VoiceDebrief({
 
       if (!response.ok || !payload?.text) {
         setPhase('error')
+        setFailed({ blob, seconds })
         setError(
-          payload?.error ?? "We couldn't transcribe that recording. You can try again or type your debrief.",
+          `${payload?.error ?? "We couldn't transcribe that recording."} Your recording is still here — try again, or download it to keep a copy.`,
         )
         return
       }
 
+      setFailed(null)
       onTranscript(payload.text)
       setPhase('idle')
       setElapsed(0)
@@ -177,7 +172,10 @@ export function VoiceDebrief({
       startButtonRef.current?.focus()
     } catch {
       setPhase('error')
-      setError("We couldn't reach the transcription service. You can try again or type your debrief.")
+      setFailed({ blob, seconds })
+      setError(
+        "We couldn't reach the transcription service. Your recording is still here — try again when you're back online, or download it to keep a copy.",
+      )
     }
   }
 
@@ -305,7 +303,13 @@ export function VoiceDebrief({
                 <Square className="size-3.5" aria-hidden="true" />
                 Stop
               </Button>
-              <Button type="button" size="sm" variant="quiet" className="min-h-11" onClick={discard}>
+              <Button
+                type="button"
+                size="sm"
+                variant="quiet"
+                className="min-h-11"
+                onClick={discard}
+              >
                 <X className="size-3.5" aria-hidden="true" />
                 Discard
               </Button>
@@ -370,6 +374,38 @@ export function VoiceDebrief({
           {error}
         </p>
       ) : null}
+      {failed && phase === 'error' ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="min-h-11"
+            onClick={() => void send(failed.blob, failed.seconds)}
+          >
+            Try again
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="min-h-11"
+            onClick={() => downloadBlob(failed.blob, 'atturel-debrief.webm')}
+          >
+            Download recording
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
+}
+
+/** Save a blob through a temporary link, revoked straight after the click. */
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

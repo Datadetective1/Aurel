@@ -70,6 +70,14 @@ export function VoiceRecorder({
   const discardedRef = React.useRef(false)
   const startButtonRef = React.useRef<HTMLButtonElement | null>(null)
   const fileRef = React.useRef<HTMLInputElement | null>(null)
+  // The last recording that failed to transcribe, kept so "try again" resends
+  // it instead of asking someone to re-record a meeting that is over.
+  const [failed, setFailed] = React.useState<{
+    blob: Blob
+    seconds: number
+    origin: 'recorded' | 'file'
+    fileName?: string
+  } | null>(null)
 
   const cleanup = React.useCallback(() => {
     if (tickRef.current) {
@@ -123,12 +131,14 @@ export function VoiceRecorder({
 
       if (!response.ok || !payload?.text) {
         setPhase('error')
+        setFailed({ blob, seconds, origin, fileName })
         setError(
-          payload?.error ?? "We couldn't transcribe that. You can try again or paste a transcript.",
+          `${payload?.error ?? "We couldn't transcribe that."} Your recording is still here — try again, or download it to keep a copy.`,
         )
         return
       }
 
+      setFailed(null)
       setNotice(payload.notice ?? null)
       onTranscript(payload.text, seconds, origin)
       setPhase('idle')
@@ -136,7 +146,10 @@ export function VoiceRecorder({
       startButtonRef.current?.focus()
     } catch {
       setPhase('error')
-      setError("We couldn't reach the transcription service. You can paste a transcript instead.")
+      setFailed({ blob, seconds, origin, fileName })
+      setError(
+        "We couldn't reach the transcription service. Your recording is still here — try again when you're back online, or download it to keep a copy.",
+      )
     }
   }
 
@@ -154,7 +167,7 @@ export function VoiceRecorder({
         (cause.name === 'NotAllowedError' || cause.name === 'SecurityError')
       setError(
         denied
-          ? "Microphone access wasn't allowed. You can upload audio or type what happened."
+          ? "Microphone access wasn't allowed. Allow the microphone for this site in your browser's settings and try again, or upload audio or type what happened."
           : "We couldn't start recording. You can upload audio or type what happened.",
       )
       return
@@ -343,6 +356,38 @@ export function VoiceRecorder({
           {error}
         </p>
       ) : null}
+      {failed && phase === 'error' ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="min-h-11"
+            onClick={() => void send(failed.blob, failed.seconds, failed.origin, failed.fileName)}
+          >
+            Try again
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="min-h-11"
+            onClick={() => downloadBlob(failed.blob, failed.fileName ?? 'atturel-recording.webm')}
+          >
+            Download recording
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
+}
+
+/** Save a blob through a temporary link, revoked straight after the click. */
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

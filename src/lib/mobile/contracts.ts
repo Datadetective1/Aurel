@@ -80,7 +80,7 @@ export type DeleteAccountResponse =
   | { deleted: true }
   | {
       deleted: false
-      stage: 'billing' | 'apple_acknowledgement' | 'data' | 'confirmation'
+      stage: 'billing' | 'apple_acknowledgement' | 'data' | 'login' | 'confirmation'
       error: string
     }
 

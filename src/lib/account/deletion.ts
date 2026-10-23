@@ -1,3 +1,5 @@
+import { brand } from '@/lib/brand'
+
 /**
  * ACCOUNT DELETION, IN THE ORDER THAT CANNOT GO WRONG
  * =============================================================================
@@ -70,9 +72,12 @@ export type DeletionResult =
   | { ok: true; loginDeleted: boolean }
   | {
       ok: false
-      stage: 'billing' | 'apple_acknowledgement' | 'data'
+      stage: 'billing' | 'apple_acknowledgement' | 'data' | 'login'
       message: string
     }
+
+/** Where people are told to write when deletion cannot finish on its own. */
+const SUPPORT = brand.email.support
 
 const BILLABLE = new Set(['trialing', 'active', 'past_due', 'unpaid', 'incomplete', 'paused'])
 
@@ -109,8 +114,7 @@ export async function deleteAccountCore(
       return {
         ok: false,
         stage: 'billing',
-        message:
-          'We could not confirm your subscription is stopped, so nothing was deleted. Try again in a moment, or contact support.',
+        message: `We could not confirm your subscription is stopped, so nothing was deleted. Try again in a moment, or email ${SUPPORT}.`,
       }
     }
     try {
@@ -134,8 +138,7 @@ export async function deleteAccountCore(
       return {
         ok: false,
         stage: 'billing',
-        message:
-          'We could not stop your subscription, so nothing was deleted. Try again in a moment, or contact support.',
+        message: `We could not stop your subscription, so nothing was deleted. Try again in a moment, or email ${SUPPORT}.`,
       }
     }
   }
@@ -176,8 +179,8 @@ export async function deleteAccountCore(
       stage: 'data',
       message:
         canceled.length > 0
-          ? 'Your subscription is cancelled, but your data could not be deleted. Contact support and it will be removed.'
-          : 'Your data could not be deleted. Contact support and nothing will be lost.',
+          ? `Your subscription is cancelled, but your data could not be deleted. Email ${SUPPORT} and it will be removed.`
+          : `Your data could not be deleted. Email ${SUPPORT} and nothing will be lost.`,
     }
   }
   if (auditId) await deps.audit.mark(auditId, 'data_deleted_at').catch(() => {})
@@ -185,6 +188,18 @@ export async function deleteAccountCore(
   // --- 4. delete login -------------------------------------------------------
   const loginDeleted = await deps.deleteLogin().catch(() => false)
   if (auditId && loginDeleted) await deps.audit.mark(auditId, 'auth_deleted_at').catch(() => {})
+
+  // Deleting the login is what removes the rest -- fetched sources, facts and
+  // their links go with it by cascade. Reporting success without it would
+  // tell someone their record is gone while part of it remains.
+  if (!loginDeleted) {
+    log('account.login_delete_failed', {})
+    return {
+      ok: false,
+      stage: 'login',
+      message: `Your record has been deleted, but we could not close your sign-in and remove the last of it. Email ${SUPPORT} and we will finish it.`,
+    }
+  }
 
   return { ok: true, loginDeleted }
 }

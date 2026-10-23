@@ -24,6 +24,27 @@ export interface ActionState {
   error?: string
   message?: string
   fieldErrors?: Record<string, string[]>
+  /**
+   * The person form's fields, echoed back on a refusal. React resets an
+   * uncontrolled form when its action settles, so without this a validation
+   * error or a plan limit wiped company, title, link and notes.
+   */
+  values?: Record<string, string>
+}
+
+const PERSON_FIELDS = [
+  'fullName',
+  'preferredName',
+  'jobTitle',
+  'organizationName',
+  'email',
+  'profileUrl',
+  'relationshipType',
+  'notes',
+] as const
+
+function personValues(formData: FormData): Record<string, string> {
+  return Object.fromEntries(PERSON_FIELDS.map((f) => [f, formData.get(f)?.toString() ?? '']))
 }
 
 const RELATIONSHIP_TYPES = [
@@ -72,12 +93,12 @@ export async function createPerson(_prev: ActionState, formData: FormData): Prom
   })
 
   if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values: personValues(formData) }
   }
 
   const limit = await checkPersonLimit()
   if (!limit.allowed) {
-    return { error: limit.message }
+    return { error: limit.message, values: personValues(formData) }
   }
 
   const supabase = await createClient()
@@ -115,7 +136,7 @@ export async function createPerson(_prev: ActionState, formData: FormData): Prom
 
   if (error || !person) {
     logger.error('person.create_failed', { code: error?.code })
-    return { error: 'We could not add that person. Try again.' }
+    return { error: 'We could not add that person. Try again.', values: personValues(formData) }
   }
 
   await track('person_added', {
@@ -146,7 +167,7 @@ export async function updatePerson(_prev: ActionState, formData: FormData): Prom
   })
 
   if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values: personValues(formData) }
   }
 
   const user = await requireUser()
@@ -172,7 +193,7 @@ export async function updatePerson(_prev: ActionState, formData: FormData): Prom
 
   if (error) {
     logger.warn('person.update_failed', { code: error.code })
-    return { error: 'We could not save those changes.' }
+    return { error: 'We could not save those changes.', values: personValues(formData) }
   }
 
   revalidatePath(`/people/${personId}`)

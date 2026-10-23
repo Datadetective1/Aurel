@@ -74,10 +74,7 @@ export default function GlobalError({
             {brand.name} didn&rsquo;t start.
           </h1>
 
-          <p
-            style={{ margin: '1rem 0 0', fontSize: '0.875rem' }}
-            className="atturel-muted"
-          >
+          <p style={{ margin: '1rem 0 0', fontSize: '0.875rem' }} className="atturel-muted">
             Something failed before the page could load. Your relationship record has not been
             changed or lost. Reloading usually fixes it.
           </p>
@@ -106,12 +103,23 @@ export default function GlobalError({
 
           {error.digest ? (
             <p
-              style={{ margin: '2rem 0 0', fontSize: '0.75rem', fontFamily: 'ui-monospace, monospace' }}
+              style={{
+                margin: '2rem 0 0',
+                fontSize: '0.75rem',
+                fontFamily: 'ui-monospace, monospace',
+              }}
               className="atturel-muted"
             >
               Reference {error.digest}
             </p>
           ) : null}
+          <p style={{ margin: '1rem 0 0', fontSize: '0.75rem' }} className="atturel-muted">
+            Still broken? Email{' '}
+            <a href={`mailto:${brand.email.support}`} style={{ color: 'inherit' }}>
+              {brand.email.support}
+            </a>
+            .
+          </p>
         </main>
       </body>
     </html>

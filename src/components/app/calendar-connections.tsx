@@ -122,14 +122,23 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
   async function run(kind: 'sync' | 'disconnect') {
     setBusy(kind)
     setMessage(null)
-    const result =
-      kind === 'sync'
-        ? await syncCalendarNow(connection.provider)
-        : await disconnectCalendar(connection.provider)
-    setBusy(null)
-    if (result.error) setMessage({ text: result.error, ok: false })
-    else if (result.message) setMessage({ text: result.message, ok: true })
-    router.refresh()
+    try {
+      const result =
+        kind === 'sync'
+          ? await syncCalendarNow(connection.provider)
+          : await disconnectCalendar(connection.provider)
+      if (result.error) setMessage({ text: result.error, ok: false })
+      else if (result.message) setMessage({ text: result.message, ok: true })
+      router.refresh()
+    } catch {
+      // A dropped connection, not a refusal: say so, and leave the button usable.
+      setMessage({
+        text: 'That did not reach the server. Nothing was changed — try again.',
+        ok: false,
+      })
+    } finally {
+      setBusy(null)
+    }
   }
 
   return (

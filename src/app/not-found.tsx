@@ -28,22 +28,31 @@ export default function NotFound() {
     <div className="flex min-h-dvh flex-col justify-center">
       <Container size="narrow" className="py-20">
         <Eyebrow>Not found</Eyebrow>
-        <h1 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-4xl">
+        <h1 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-4xl">
           This page isn&rsquo;t here.
         </h1>
-        <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-secondary">
-          The link may be out of date, or the person or meeting it pointed to may have been
-          deleted. Nothing in your record has changed.
+        <p className="text-ink-secondary mt-4 max-w-md text-sm leading-relaxed">
+          The link may be out of date, or the person or meeting it pointed to may have been deleted.
+          Nothing in your record has changed.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-2.5">
-          <Button asChild>
+          <Button asChild className="h-11">
             <Link href="/today">Go to Today</Link>
           </Button>
-          <Button asChild variant="secondary">
+          <Button asChild variant="secondary" className="h-11">
             <Link href="/">{brand.name} home</Link>
           </Button>
         </div>
+        <p className="text-ink-muted mt-8 text-xs">
+          Expected something here?{' '}
+          <a
+            href={`mailto:${brand.email.support}`}
+            className="text-accent underline underline-offset-2"
+          >
+            {brand.email.support}
+          </a>
+        </p>
       </Container>
     </div>
   )

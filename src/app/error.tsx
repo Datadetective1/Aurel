@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Container, Eyebrow } from '@/components/ui/primitives'
 import { logger } from '@/lib/logger'
+import { brand } from '@/lib/brand'
 
 /**
  * Route error boundary.
@@ -42,25 +43,38 @@ export default function Error({
     <div className="flex min-h-dvh flex-col justify-center">
       <Container size="narrow" className="py-20">
         <Eyebrow>Something went wrong</Eyebrow>
-        <h1 className="mt-4 font-display text-3xl leading-tight text-ink sm:text-4xl">
+        <h1 className="font-display text-ink mt-4 text-3xl leading-tight sm:text-4xl">
           This screen didn&rsquo;t load.
         </h1>
-        <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-secondary">
-          The failure was on our side, not in your record — nothing has been changed or lost.
-          Trying again often works; if it keeps happening, the reference below will help us find
-          it.
+        <p className="text-ink-secondary mt-4 max-w-md text-sm leading-relaxed">
+          The failure was on our side. Everything you had already saved is safe; anything typed but
+          not yet saved on this screen may need entering again. Trying again often works.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-2.5">
-          <Button onClick={reset}>Try again</Button>
-          <Button asChild variant="secondary">
+          <Button onClick={reset} className="h-11">Try again</Button>
+          <Button asChild variant="secondary" className="h-11">
             <Link href="/today">Go to Today</Link>
           </Button>
         </div>
 
-        {error.digest ? (
-          <p className="mt-8 font-mono text-xs text-ink-faint">Reference {error.digest}</p>
-        ) : null}
+        <p className="text-ink-muted mt-8 text-xs leading-relaxed">
+          Still broken? Email{' '}
+          <a
+            href={`mailto:${brand.email.support}${error.digest ? `?subject=Reference%20${error.digest}` : ''}`}
+            className="text-accent underline underline-offset-2"
+          >
+            {brand.email.support}
+          </a>
+          {error.digest ? (
+            <>
+              {' '}
+              with reference <span className="font-mono">{error.digest}</span>.
+            </>
+          ) : (
+            '.'
+          )}
+        </p>
       </Container>
     </div>
   )

@@ -173,12 +173,12 @@ const TRUST = [
   {
     icon: CircleCheck,
     title: 'Kept on your say-so',
-    body: 'Nothing enters your record until you confirm it.',
+    body: 'Nothing the AI infers about someone is kept until you confirm it.',
   },
   {
     icon: Download,
     title: 'Yours to take or delete',
-    body: 'Export everything, or delete it, at any time.',
+    body: 'Export your whole record, or delete it, at any time.',
   },
   {
     icon: Lock,

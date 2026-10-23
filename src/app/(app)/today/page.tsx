@@ -402,6 +402,7 @@ export default async function TodayPage({
       <FirstRun state={firstRun} className="mt-9" />
 
       <UpcomingMeetings
+        connected={firstRun.calendarConnected}
         events={upcomingEvents}
         timeZone={profile.timezone ?? 'UTC'}
         nowIso={now.toISOString()}
