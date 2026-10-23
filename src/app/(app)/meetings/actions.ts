@@ -277,7 +277,13 @@ export async function addMeetingParticipant(
 export async function generateBrief(meetingId: string) {
   const capability = await checkCapability('meetingBrief', 'meeting_brief')
   if (!capability.allowed) {
-    return { ok: false as const, error: capability.message, upgrade: true as const }
+    // "See plans" only where a plan change would help: a Pro account at its
+    // fair-use ceiling would be offered the plan it already has.
+    return {
+      ok: false as const,
+      error: capability.message,
+      upgrade: 'plan' in capability && capability.plan === 'free',
+    }
   }
 
   const user = await requireUser()

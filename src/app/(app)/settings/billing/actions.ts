@@ -26,12 +26,24 @@ export interface BillingState {
 
 const ENTITLED = ['trialing', 'active', 'past_due']
 
+/**
+ * Stripe subscription statuses that mean the customer already has a live
+ * subscription. Checked at Stripe, not only in our table: the table lags the
+ * webhook, and writes `free` for unpaid or paused subscriptions that Stripe is
+ * still billing. `incomplete` is left out on purpose -- it is an abandoned
+ * payment that expires by itself, and blocking on it would lock a customer out
+ * of retrying.
+ */
+const LIVE_AT_STRIPE = new Set(['trialing', 'active', 'past_due', 'unpaid', 'paused'])
+
 export async function startCheckout(
   _prev: BillingState,
   _formData: FormData,
 ): Promise<BillingState> {
   const unavailable = { error: 'Upgrading is not available right now. Nothing was charged.' }
-  if (!features.billing) return unavailable
+  // All three, or none. Checkout without the webhook (or without the service
+  // role it writes with) would take a payment that nothing can turn into Pro.
+  if (!features.billing || !features.billingWebhooks || !features.serviceRole) return unavailable
 
   const priceId = proPriceId()
   if (!priceId) return unavailable
@@ -72,6 +84,19 @@ export async function startCheckout(
       subscription?.stripe_customer_id,
     )
 
+    // Stripe is the source of truth for "already subscribed". A second tap
+    // before the webhook lands, or an unpaid subscription our table shows as
+    // free, must lead to the portal -- never to a second subscription.
+    if (customer) {
+      const existing = await stripe().subscriptions.list({ customer, status: 'all', limit: 20 })
+      if (existing.data.some((s) => LIVE_AT_STRIPE.has(s.status))) {
+        return {
+          error:
+            'This account already has a subscription. Use Manage billing to see it, update your card or change your plan. Nothing was charged.',
+        }
+      }
+    }
+
     const session = await stripe().checkout.sessions.create(
       {
         mode: 'subscription',
@@ -94,9 +119,15 @@ export async function startCheckout(
         success_url: absoluteUrl('/settings/billing?checkout=success'),
         cancel_url: absoluteUrl('/settings/billing?checkout=canceled'),
       },
-      // Idempotent per user per day: a double-submitted form must not create
-      // two sessions, let alone two subscriptions.
-      { idempotencyKey: `checkout:${user.id}:${priceId}:${new Date().toISOString().slice(0, 10)}` },
+      // Idempotent for ten minutes, per customer and price: a double-submitted
+      // form gets the same session back. It used to be per day, and Stripe
+      // replays a cached response -- error or completed session -- for the
+      // whole window, so one failed or finished attempt locked the customer
+      // out of checkout until midnight UTC. The duplicate-subscription guard
+      // above is what actually prevents a second subscription.
+      {
+        idempotencyKey: `checkout:${user.id}:${customer ?? 'new'}:${priceId}:${Math.floor(Date.now() / 600_000)}`,
+      },
     )
 
     url = session.url
@@ -104,7 +135,9 @@ export async function startCheckout(
     logger.error('billing.checkout_failed', {
       error: error instanceof Error ? error.name : 'unknown',
     })
-    return { error: 'We could not start checkout. Nothing was charged. Try again in a moment.' }
+    return {
+      error: `We could not start checkout. Nothing was charged. Try again in a moment, or email ${brand.email.support}.`,
+    }
   }
 
   if (!url) return { error: 'Checkout could not be opened. Nothing was charged.' }
@@ -141,7 +174,11 @@ async function ensureCustomer(
     .from('subscriptions')
     .upsert({ user_id: userId, stripe_customer_id: created.id }, { onConflict: 'user_id' })
   if (error) {
-    logger.warn('billing.customer_store_failed', { code: error.code })
+    // Stop here. Carrying on would leave a Stripe customer this account cannot
+    // find again, and the next checkout would create a second one. Retrying is
+    // safe: the idempotency key returns this same customer.
+    logger.error('billing.customer_store_failed', { code: error.code })
+    throw new Error('customer_store_failed')
   }
   return created.id
 }

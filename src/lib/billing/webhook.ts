@@ -1,6 +1,7 @@
 import type Stripe from 'stripe'
 import { FOUNDING_OFFER, type PlanId } from './plans'
 import {
+  effectivePlan,
   isEntitledStatus,
   transitionsBetween,
   type SubscriptionState,
@@ -237,6 +238,23 @@ async function handle(
     status,
     cancelAtPeriodEnd: subscription.cancel_at_period_end || subscription.cancel_at !== null,
     currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+  }
+
+  // One row per account, so an event about a *different* subscription must not
+  // overwrite a live one. A late or retried event for an old, canceled
+  // subscription -- or an abandoned second checkout -- used to replace an
+  // active Pro row and drop a paying customer to Free while Stripe went on
+  // charging them. A non-entitling event for another subscription is ignored
+  // while the stored one still confers Pro; an entitling one is applied, so a
+  // genuine move to a new subscription still lands.
+  if (
+    before?.stripeSubscriptionId &&
+    before.stripeSubscriptionId !== subscription.id &&
+    effectivePlan(before) !== 'free' &&
+    plan === 'free'
+  ) {
+    deps.log?.('billing.webhook_superseded_subscription', { type: event.type })
+    return { status: 'ignored', userId }
   }
 
   const founding = await resolveFounding(before, plan, deps)
