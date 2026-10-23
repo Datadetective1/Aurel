@@ -42,12 +42,12 @@ export async function sendEmail(message: OutgoingEmail): Promise<SendResult> {
   const text = message.text ?? toPlainText(message.html)
 
   if (!features.emailDelivery) {
-    // Subject and recipient only. The body can contain a person's private
-    // relationship record, and that must not end up in a log aggregator.
+    // Kind and a redacted recipient only. The body can contain a person's
+    // private relationship record, and so can the subject -- follow-through
+    // subjects name people and meetings -- and neither belongs in a log.
     logger.info('email.not_delivered', {
       kind: message.kind,
       to: redactAddress(message.to),
-      subject: message.subject,
       reason: 'no_provider_configured',
     })
     return { ok: true, delivered: false, reason: 'not_configured' }

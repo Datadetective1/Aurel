@@ -103,3 +103,42 @@ describe('isBlockedAddress', () => {
     expect(isBlockedAddress('')).toBe(true)
   })
 })
+
+describe('isBlockedAddress: every spelling of an internal address', () => {
+  it('blocks IPv4-mapped IPv6 in hex form, as DNS returns it', () => {
+    expect(isBlockedAddress('::ffff:7f00:1')).toBe(true) // 127.0.0.1
+    expect(isBlockedAddress('::ffff:a9fe:a9fe')).toBe(true) // 169.254.169.254
+    expect(isBlockedAddress('::ffff:0a00:0001')).toBe(true) // 10.0.0.1
+    expect(isBlockedAddress('0:0:0:0:0:ffff:7f00:1')).toBe(true)
+  })
+
+  it('blocks NAT64, 6to4 and IPv4-compatible forms of internal addresses', () => {
+    expect(isBlockedAddress('64:ff9b::7f00:1')).toBe(true)
+    expect(isBlockedAddress('64:ff9b::a9fe:a9fe')).toBe(true)
+    expect(isBlockedAddress('64:ff9b:1::1')).toBe(true)
+    expect(isBlockedAddress('2002:7f00:1::')).toBe(true)
+    expect(isBlockedAddress('::7f00:1')).toBe(true)
+  })
+
+  it('blocks benchmarking, documentation, Teredo and multicast ranges', () => {
+    expect(isBlockedAddress('198.18.0.1')).toBe(true)
+    expect(isBlockedAddress('198.19.255.255')).toBe(true)
+    expect(isBlockedAddress('203.0.113.5')).toBe(true)
+    expect(isBlockedAddress('2001:db8::1')).toBe(true)
+    expect(isBlockedAddress('2001:0::1')).toBe(true)
+    expect(isBlockedAddress('ff02::1')).toBe(true)
+    expect(isBlockedAddress('febf::1')).toBe(true)
+  })
+
+  it('still allows public addresses in every form', () => {
+    expect(isBlockedAddress('8.8.8.8')).toBe(false)
+    expect(isBlockedAddress('::ffff:808:808')).toBe(false)
+    expect(isBlockedAddress('64:ff9b::808:808')).toBe(false)
+    expect(isBlockedAddress('2606:4700:4700::1111')).toBe(false)
+    expect(isBlockedAddress('198.20.0.1')).toBe(false)
+  })
+
+  it('treats garbage as blocked rather than public', () => {
+    expect(isBlockedAddress('1:2:3:4:5:6:7:8:9')).toBe(true)
+  })
+})

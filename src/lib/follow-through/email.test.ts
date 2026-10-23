@@ -117,7 +117,9 @@ describe('the scheduled job', () => {
     const clientAt = body.indexOf('createServiceRoleClient()')
     expect(secretAt).toBeGreaterThan(-1)
     expect(secretAt).toBeLessThan(clientAt)
-    expect(body).toMatch(/!secret \|\| header !== `Bearer \$\{secret\}`/)
+    // Constant-time, and it refuses outright when no secret is configured
+    // (see lib/cron-auth.test.ts).
+    expect(body).toMatch(/cronAuthorized\(request\.headers\.get\('authorization'\), secret\)/)
   })
 
   it('reserves the day through the ledger rather than trusting its own memory', () => {

@@ -13,6 +13,7 @@ type Fields = Record<string, unknown>
 
 /** Keys that must never be logged, whatever the call site passes. */
 const FORBIDDEN_KEYS = new Set([
+  'subject',
   'content',
   'body',
   'transcript',

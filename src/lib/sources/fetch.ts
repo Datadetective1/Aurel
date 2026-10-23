@@ -45,7 +45,9 @@ const ALLOWED_CONTENT_TYPES = [
 ]
 
 /** Presented to the site being fetched. Honest about what this is. */
-const USER_AGENT = `${brand.slug}bot/1.0 (+${brand.domain}/bot; professional context research; respects robots.txt)`
+// Says what it is and where to ask about it. It made no robots.txt claim it
+// did not enforce, and no longer links a /bot page that did not exist.
+const USER_AGENT = `${brand.slug}bot/1.0 (+https://${brand.domain}/privacy; professional context research)`
 
 export type FetchFailure =
   | 'invalid_url'
@@ -97,24 +99,68 @@ export function isBlockedAddress(address: string): boolean {
     if (a === 172 && b >= 16 && b <= 31) return true // private
     if (a === 192 && b === 168) return true // private
     if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
-    if (a === 192 && b === 0) return true // IETF protocol assignments
+    if (a === 192 && b === 0) return true // IETF protocol assignments + TEST-NET-1
+    if (a === 198 && (b === 18 || b === 19)) return true // benchmarking 198.18.0.0/15
+    if (a === 198 && b === 51 && parts[2] === 100) return true // TEST-NET-2
+    if (a === 203 && b === 0 && parts[2] === 113) return true // TEST-NET-3
+    if (a === 192 && b === 88 && parts[2] === 99) return true // 6to4 relay anycast
     if (a >= 224) return true // multicast + reserved
     return false
   }
 
   if (version === 6) {
-    const normalised = address.toLowerCase().replace(/^\[|\]$/g, '')
-    if (normalised === '::' || normalised === '::1') return true
-    if (normalised.startsWith('fe80')) return true // link-local
-    if (/^f[cd]/.test(normalised)) return true // unique local fc00::/7
-    // IPv4-mapped IPv6 (::ffff:127.0.0.1) must be checked as IPv4.
-    const mapped = normalised.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-    if (mapped) return isBlockedAddress(mapped[1]!)
+    // Judged on the expanded form, so every spelling of the same address
+    // gets the same answer. A DNS AAAA answer arrives as `::ffff:7f00:1`, not
+    // `::ffff:127.0.0.1`, and a check on the dotted spelling alone let it by.
+    const h = expandIPv6(address.toLowerCase().replace(/^\[|\]$/g, ''))
+    if (!h) return true
+    const embedded = (hi: number, lo: number) => `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`
+
+    const firstFiveZero = h.slice(0, 5).every((x) => x === 0)
+    // ::/96 (unspecified, loopback, IPv4-compatible) and ::ffff:0:0/96 (mapped)
+    if (firstFiveZero && (h[5] === 0 || h[5] === 0xffff))
+      return isBlockedAddress(embedded(h[6]!, h[7]!))
+    // 64:ff9b::/96 NAT64 carries an IPv4 address; 64:ff9b:1::/48 is local use.
+    if (h[0] === 0x64 && h[1] === 0xff9b) {
+      if (h[2] === 1) return true
+      return isBlockedAddress(embedded(h[6]!, h[7]!))
+    }
+    if (h[0] === 0x2002) return isBlockedAddress(embedded(h[1]!, h[2]!)) // 6to4
+    if (h[0] === 0x2001 && h[1] === 0) return true // Teredo
+    if (h[0] === 0x2001 && h[1] === 0xdb8) return true // documentation
+    if ((h[0]! & 0xffc0) === 0xfe80) return true // link-local fe80::/10
+    if ((h[0]! & 0xfe00) === 0xfc00) return true // unique local fc00::/7
+    if ((h[0]! & 0xff00) === 0xff00) return true // multicast
     return false
   }
 
   // Not a literal IP — caller resolves it first.
   return true
+}
+
+/**
+ * An IPv6 literal as eight 16-bit groups, or null if it is not one. Handles
+ * `::` compression and a trailing dotted IPv4 (`::ffff:1.2.3.4`).
+ */
+function expandIPv6(address: string): number[] | null {
+  let text = address.split('%')[0]!
+  const dotted = text.match(/(\d+\.\d+\.\d+\.\d+)$/)
+  if (dotted) {
+    const parts = dotted[1]!.split('.').map(Number)
+    if (parts.some((n) => Number.isNaN(n) || n > 255)) return null
+    text =
+      text.slice(0, -dotted[1]!.length) +
+      `${((parts[0]! << 8) | parts[1]!).toString(16)}:${((parts[2]! << 8) | parts[3]!).toString(16)}`
+  }
+  const halves = text.split('::')
+  if (halves.length > 2) return null
+  const head = halves[0] ? halves[0].split(':') : []
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : []
+  const missing = 8 - head.length - tail.length
+  if (halves.length === 1 ? head.length !== 8 : missing < 1) return null
+  const groups = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...tail]
+  const values = groups.map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN))
+  return values.some((v) => Number.isNaN(v)) ? null : values
 }
 
 /** Resolve a hostname and reject if ANY resolved address is blocked. */

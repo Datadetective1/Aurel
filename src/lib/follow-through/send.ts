@@ -121,7 +121,13 @@ export async function composeFollowThrough(
       }
 
   const photoByPerson = new Map<string, string | null>()
-  const paths = (people ?? []).filter((p) => p.avatar_path).map((p) => p.avatar_path as string)
+  // Only paths inside this account's own storage folder. This runs with the
+  // service-role client, which can sign any object in the bucket, and
+  // `avatar_path` is a column the account can write: without this filter a
+  // crafted path would put a signed link to somebody else's private photo into
+  // this account's email. Anything outside the folder falls back to the
+  // public avatar_url, or none.
+  const paths = ownAvatarPaths(people ?? [], profile.id)
   if (paths.length > 0) {
     const { data: signed } = await supabase.storage
       .from(AVATAR_BUCKET)
@@ -247,4 +253,20 @@ export async function alreadyServedToday(
     .eq('local_date', localDate)
     .eq('trigger', 'scheduled')
   return (count ?? 0) > 0
+}
+
+/**
+ * Avatar paths this account may have signed by the service-role client: only
+ * those inside its own `<userId>/` folder. See the call site for why.
+ */
+export function ownAvatarPaths(
+  people: readonly { avatar_path: string | null }[],
+  userId: string,
+): string[] {
+  const ownFolder = `${userId}/`
+  return people
+    .map((p) => p.avatar_path)
+    .filter((path): path is string =>
+      Boolean(path && path.startsWith(ownFolder) && !path.split('/').includes('..')),
+    )
 }
