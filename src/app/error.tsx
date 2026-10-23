@@ -52,7 +52,9 @@ export default function Error({
         </p>
 
         <div className="mt-8 flex flex-wrap gap-2.5">
-          <Button onClick={reset} className="h-11">Try again</Button>
+          <Button onClick={reset} className="h-11">
+            Try again
+          </Button>
           <Button asChild variant="secondary" className="h-11">
             <Link href="/today">Go to Today</Link>
           </Button>
