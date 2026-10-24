@@ -15,7 +15,9 @@ import type { Bookmark, CaptureMode } from './capture'
  *   - a transcription that fails leaves the audio where it was, to try again
  *   - a part already turned into words is never sent twice
  *   - a conversation that fails to save keeps its words, not just its audio
- *   - reopening the app finds an unsent recording and offers it back
+ *   - reopening the app finds an unsent recording and offers it back, even
+ *     after an update moved the app's folder (the store finds the file again)
+ *   - a part that cannot be found is reported, never dropped in silence
  *   - nothing is thrown away except by the person, or after it was kept
  *
  * The audio is the person's own and stays in the app's private Documents
@@ -63,17 +65,43 @@ export interface PendingStore {
   /** Bytes on disk, or null when the file is gone. */
   sizeOf(uri: string): number | null
   removeAudio(uri: string): void
+  /**
+   * Where a file written down earlier is now, or null when it is nowhere.
+   * iOS moves an app's folder when the app is updated, so a path saved by
+   * the previous version can point at a folder that no longer exists.
+   */
+  locate(uri: string): string | null
 }
 
 export type TranscribeResult =
   | { ok: true; text: string; captureId?: string | null }
-  | { ok: false; error: string; retryable: boolean; captureId?: string | null }
+  | {
+      ok: false
+      error: string
+      retryable: boolean
+      captureId?: string | null
+      /** The underlying error, for a tester to pass on. Not a sentence for the person. */
+      detail?: string
+    }
+
+export type TranscribePartsResult =
+  | { ok: true }
+  | {
+      ok: false
+      error: string
+      detail?: string
+      /** A part's audio is no longer on the phone, so trying again cannot help. */
+      missing?: boolean
+    }
 
 export type PartTranscriber = (part: CapturePart, index: number) => Promise<TranscribeResult>
 
 /** Below this a file holds no speech worth sending; the server refuses it anyway. */
 export const MIN_PART_BYTES = 1_000
-const RETRIES = 2
+/** After the first attempt fails in a way worth retrying, wait this long before each next one. */
+export const RETRY_DELAYS_MS = [2_000, 6_000]
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 export function newPending(input: {
   id: string
@@ -126,41 +154,49 @@ export function closePart(
 
 /**
  * Turn every part that has no words yet into words, in order, saving after
- * each one. A retryable failure is tried again twice; the first failure that
- * remains stops the run and is reported. Nothing is deleted here.
+ * each one. A retryable failure is tried again after a pause (twice); the
+ * first failure that remains stops the run and is reported. Nothing is
+ * deleted here.
  */
 export async function transcribeParts(
   pending: PendingCapture,
   transcribe: PartTranscriber,
   store: PendingStore,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  options: { wait?: (ms: number) => Promise<void> } = {},
+): Promise<TranscribePartsResult> {
+  const wait = options.wait ?? sleep
+  const discarded = { ok: false as const, error: 'This recording was discarded.' }
   // Parts may be added while this runs (the conversation is still being
   // recorded); the live length picks them up.
   for (let i = 0; i < pending.parts.length; i++) {
-    if (pending.done) return { ok: false, error: 'This recording was discarded.' }
+    if (pending.done) return discarded
     const part = pending.parts[i]!
     if (part.text !== null) continue
     if (store.sizeOf(part.uri) === null) {
-      return { ok: false, error: 'Part of this recording is missing from the phone.' }
+      return { ok: false, error: 'Part of this recording is missing from the phone.', missing: true }
     }
     let last: TranscribeResult | null = null
-    for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      if (attempt > 0) {
+        await wait(RETRY_DELAYS_MS[attempt - 1]!)
+        if (pending.done) return discarded
+      }
       last = await transcribe(part, i)
       if (last.captureId !== undefined) part.captureId = last.captureId
       if (last.ok || !last.retryable) break
     }
     // Discarded (or kept) while this part was out: write nothing back.
-    if (pending.done) return { ok: false, error: 'This recording was discarded.' }
+    if (pending.done) return discarded
     if (last && last.ok) {
       part.text = last.text
       store.save(pending)
       continue
     }
     store.save(pending)
-    return {
-      ok: false,
-      error: last && !last.ok ? last.error : 'Part of the recording could not be turned into words.',
+    if (last && !last.ok) {
+      return last.detail ? { ok: false, error: last.error, detail: last.detail } : { ok: false, error: last.error }
     }
+    return { ok: false, error: 'Part of the recording could not be turned into words.' }
   }
   return { ok: true }
 }
@@ -184,26 +220,40 @@ export function forget(pending: PendingCapture | null, store: PendingStore): voi
 /**
  * What reopening the app finds. A recording the app was closed in the middle
  * of keeps every part closed before that moment; the part being recorded is
- * not a complete file and cannot be sent, and the person is told so.
+ * not a complete file and cannot be sent, and the person is told so. Parts
+ * are looked for where an update may have moved them; a part found nowhere
+ * is counted and reported, never dropped without a word.
  */
 export function recover(store: PendingStore):
   | { kind: 'none' }
-  | { kind: 'unsent'; pending: PendingCapture; lostCurrentPart: boolean }
-  | { kind: 'lost'; lostCurrentPart: true } {
+  | { kind: 'unsent'; pending: PendingCapture; lostCurrentPart: boolean; missingParts: number }
+  | { kind: 'lost'; lostCurrentPart: boolean; missingParts: number } {
   const pending = store.load()
   if (!pending) return { kind: 'none' }
   const lostCurrentPart = Boolean(pending.current)
   if (pending.current) {
-    store.removeAudio(pending.current)
+    const current = store.locate(pending.current)
+    if (current) store.removeAudio(current)
     pending.current = null
   }
-  pending.parts = pending.parts.filter((p) => p.text !== null || store.sizeOf(p.uri) !== null)
+  let missingParts = 0
+  pending.parts = pending.parts.filter((p) => {
+    const found = store.locate(p.uri)
+    if (found) {
+      p.uri = found
+      return true
+    }
+    // Its words were kept already: the audio is no longer needed.
+    if (p.text !== null) return true
+    missingParts += 1
+    return false
+  })
   if (pending.parts.length === 0) {
     store.clear()
-    return lostCurrentPart ? { kind: 'lost', lostCurrentPart: true } : { kind: 'none' }
+    return lostCurrentPart || missingParts > 0 ? { kind: 'lost', lostCurrentPart, missingParts } : { kind: 'none' }
   }
   store.save(pending)
-  return { kind: 'unsent', pending, lostCurrentPart }
+  return { kind: 'unsent', pending, lostCurrentPart, missingParts }
 }
 
 /** A store that lives in memory: tests, and the web preview where there is no file system. */
@@ -228,5 +278,6 @@ export function memoryStore(sizes: Map<string, number> = new Map()): PendingStor
     removeAudio: (uri) => {
       sizes.delete(uri)
     },
+    locate: (uri) => (sizes.has(uri) ? uri : null),
   }
 }

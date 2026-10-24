@@ -92,6 +92,10 @@ export default function Capture() {
   const [typed, setTyped] = React.useState('')
   const [typing, setTyping] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  // The technical reason behind an error, shown small for a tester to pass on.
+  const [errorDetail, setErrorDetail] = React.useState<string | null>(null)
+  // The last send failed: the main button offers to try again.
+  const [sendFailed, setSendFailed] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<string | null>(null)
   // Re-render when the pending record changes; the record itself lives in a ref.
@@ -132,6 +136,10 @@ export default function Capture() {
   // --- an unsent recording from before -----------------------------------------
   React.useEffect(() => {
     const found = recover(store)
+    const missing =
+      found.kind !== 'none' && found.missingParts > 0
+        ? ` ${found.missingParts === 1 ? 'One part' : `${found.missingParts} parts`} could not be found on this phone and ${found.missingParts === 1 ? 'is' : 'are'} not included.`
+        : ''
     if (found.kind === 'unsent') {
       pendingRef.current = found.pending
       setMode(found.pending.mode)
@@ -139,11 +147,16 @@ export default function Capture() {
       setPhase('stopped')
       setNotice(
         `This recording from ${formatTime(found.pending.createdAt, Intl.DateTimeFormat().resolvedOptions().timeZone)} has not been sent yet. Send it, or discard it.` +
-          (found.lostCurrentPart ? ' The app closed while it was recording, so the last part — since the most recent pause — could not be saved.' : ''),
+          (found.lostCurrentPart ? ' The app closed while it was recording, so the last part — since the most recent pause — could not be saved.' : '') +
+          missing,
       )
       bump()
     } else if (found.kind === 'lost') {
-      setNotice('The app closed while recording, before any part of it could be saved. Nothing was sent.')
+      setNotice(
+        found.lostCurrentPart && found.missingParts === 0
+          ? 'The app closed while recording, before any part of it could be saved. Nothing was sent.'
+          : `An unsent recording could not be found on this phone, so it cannot be sent.${found.lostCurrentPart ? ' The app closed while it was recording.' : ''} Nothing was sent.`,
+      )
     }
   }, [store])
 
@@ -407,6 +420,8 @@ export default function Capture() {
           setFakeSeconds(0)
           setNotice(null)
           setError(null)
+          setErrorDetail(null)
+          setSendFailed(false)
         },
       },
     ])
@@ -415,6 +430,8 @@ export default function Capture() {
   const send = async (fromTyping: boolean) => {
     setPhase('sending')
     setError(null)
+    setErrorDetail(null)
+    setSendFailed(false)
     setNotice(null)
     const p = pendingRef.current
     try {
@@ -429,7 +446,15 @@ export default function Capture() {
         if (!words.ok) {
           setStatus(null)
           setPhase('stopped')
-          setError(`${words.error} The recording is safe on this phone — try again, or discard it.`)
+          // The failure says what went wrong; that the audio is kept is said
+          // here, once -- unless the audio is what is missing.
+          setError(
+            words.missing
+              ? `${words.error} It cannot be sent as it is — discard it, or type what happened instead.`
+              : `${words.error} The recording is safe on this phone — try again, or discard it.`,
+          )
+          setErrorDetail(words.detail ?? null)
+          setSendFailed(true)
           return
         }
         text = composeCaptureText(transcriptOf(p), p.bookmarks, typed)
@@ -460,9 +485,10 @@ export default function Capture() {
       setStatus(null)
       setPhase(fromTyping ? 'ready' : 'stopped')
       const kept = fromTyping ? '' : ' The recording and its words are safe on this phone.'
+      setSendFailed(!fromTyping)
       setError(
         (e instanceof ApiError && e.failure.kind === 'offline'
-          ? 'You are offline. Send it when you reconnect.'
+          ? 'Atturel could not be reached. Check the connection, then try again.'
           : e instanceof ApiError && e.failure.kind === 'server'
             ? e.failure.message
             : 'That could not be sent. Try again.') + kept,
@@ -574,7 +600,10 @@ export default function Capture() {
             <Button label="Type notes instead" icon="edit-3" variant="secondary" onPress={() => setTyping(true)} />
           </View>
           <T variant="meta" tone="muted" style={{ marginTop: 12 }}>
-            Audio stays on this iPhone until it has been turned into words and the conversation is kept, then it is deleted. Atturel’s servers do not keep it. Recording pauses if you leave the app.
+            {transport === 'storage'
+              ? 'To turn it into words, the audio is sent through Atturel to a speech-to-text service, held briefly in private storage while that happens, then deleted. '
+              : 'To turn it into words, the audio is sent through Atturel to a speech-to-text service; Atturel does not keep it. '}
+            The copy on this iPhone is deleted once the conversation is kept. Recording pauses if you leave the app.
           </T>
         </>
       ) : null}
@@ -623,7 +652,13 @@ export default function Capture() {
             />
           </Card>
           <View style={{ marginTop: 14, gap: 10 }}>
-            <Button label="Understand it" icon="arrow-right" size="lg" busy={phase === 'sending'} onPress={() => void send(false)} />
+            <Button
+              label={sendFailed && phase === 'stopped' ? 'Try again' : 'Understand it'}
+              icon={sendFailed && phase === 'stopped' ? 'refresh-cw' : 'arrow-right'}
+              size="lg"
+              busy={phase === 'sending'}
+              onPress={() => void send(false)}
+            />
             {phase === 'stopped' ? <Button label="Discard recording" variant="ghost" onPress={discard} /> : null}
           </View>
           {status ? <T variant="small" tone="secondary" style={{ marginTop: 12 }} accessibilityLiveRegion="polite">{status}</T> : null}
@@ -632,6 +667,11 @@ export default function Capture() {
 
       {error ? (
         <T variant="small" tone="critical" style={{ marginTop: 14 }} accessibilityRole="alert">{error}</T>
+      ) : null}
+      {error && errorDetail ? (
+        <T variant="meta" tone="muted" style={{ marginTop: 6 }} selectable>
+          {errorDetail}
+        </T>
       ) : null}
     </Screen>
   )

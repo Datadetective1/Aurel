@@ -26,6 +26,7 @@ on:
         options:
           - TestFlight
           - Simulator (preview data)
+          - Simulator (production backend)
         default: TestFlight
       submit:
         description: Upload the build to TestFlight when it finishes
@@ -134,12 +135,18 @@ jobs:
           if [ "$SUBMIT" = "true" ]; then flags="$flags --auto-submit"; fi
           eas build $flags > "$RUNNER_TEMP/build.json"
 
-      # Release build for the iOS simulator with the app's invented preview
-      # data: no sign-in, no network, no Apple signing. For checking a fix on
-      # real iOS (EAS cloud simulator) before a TestFlight build.
+      # Release build for the iOS simulator, no Apple signing. For checking a
+      # fix on real iOS (EAS cloud simulator) before a TestFlight build.
+      #   preview data: the app's invented record; no sign-in, no network.
+      #   production backend: signs in to the real service, like TestFlight.
       - name: Build for the iOS simulator
         if: inputs.build != 'TestFlight'
-        run: eas build --platform ios --profile simulator-preview --non-interactive --no-wait --json > "$RUNNER_TEMP/build.json"
+        env:
+          BUILD: ${{ inputs.build }}
+        run: |
+          profile=simulator-preview
+          if [ "$BUILD" = "Simulator (production backend)" ]; then profile=simulator; fi
+          eas build --platform ios --profile "$profile" --non-interactive --no-wait --json > "$RUNNER_TEMP/build.json"
 
       - name: Summary
         if: always()

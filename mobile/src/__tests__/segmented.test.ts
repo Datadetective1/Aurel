@@ -59,7 +59,20 @@ describe('storage transport', () => {
       },
     })
     const { store, p } = recording(['file:///a.m4a'])
-    expect(await transcribeParts(p, storageTranscriber(d), store)).toEqual({ ok: true })
+    expect(await transcribeParts(p, storageTranscriber(d), store, { wait: async () => {} })).toEqual({ ok: true })
+  })
+
+  it('says what failed in words, not as an internal code', async () => {
+    const offline = Object.assign(new Error('offline'), { failure: { kind: 'offline' } })
+    const { d } = deps({
+      async requestUpload() {
+        throw offline
+      },
+    })
+    const { store, p } = recording(['file:///a.m4a'])
+    const result = await transcribeParts(p, storageTranscriber(d), store, { wait: async () => {} })
+    expect(result).toEqual({ ok: false, error: 'Atturel could not be reached. Check the connection.' })
+    expect(p.parts[0]!.text).toBeNull()
   })
 
   it('discards on the server only parts that never became words', async () => {

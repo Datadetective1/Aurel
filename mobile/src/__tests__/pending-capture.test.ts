@@ -18,6 +18,7 @@ import {
  */
 
 const NOW = new Date('2026-10-24T15:00:00Z')
+const noWait = { wait: async () => {} }
 
 function setup(files: Record<string, number> = {}) {
   const store = memoryStore(new Map(Object.entries(files)))
@@ -82,7 +83,7 @@ describe('turning parts into words', () => {
       attempts += 1
       return { ok: false, error: 'The provider is busy.', retryable: true }
     }
-    expect(await transcribeParts(p, t, store)).toEqual({ ok: false, error: 'The provider is busy.' })
+    expect(await transcribeParts(p, t, store, noWait)).toEqual({ ok: false, error: 'The provider is busy.' })
     expect(attempts).toBe(3)
     // The first part's words are kept; the second part's audio is still there.
     expect(store.saved?.parts.map((x) => x.text)).toEqual(['kept', null])
@@ -97,7 +98,50 @@ describe('turning parts into words', () => {
       attempts += 1
       return { ok: false, error: "You've used this month's minutes.", retryable: false }
     }
-    await transcribeParts(p, t, store)
+    await transcribeParts(p, t, store, noWait)
+    expect(attempts).toBe(1)
+  })
+
+  it('pauses before each retry, longer each time', async () => {
+    const { store, p } = setup({ 'a.m4a': 1e5 })
+    p.parts = [{ uri: 'a.m4a', seconds: 600, text: null }]
+    const waits: number[] = []
+    let attempts = 0
+    const t: PartTranscriber = async () => {
+      attempts += 1
+      return attempts < 3 ? { ok: false, error: 'Atturel could not be reached.', retryable: true } : { ok: true, text: 'third time' }
+    }
+    expect(await transcribeParts(p, t, store, { wait: async (ms) => void waits.push(ms) })).toEqual({ ok: true })
+    expect(waits).toEqual([2_000, 6_000])
+    expect(p.parts[0]!.text).toBe('third time')
+  })
+
+  it('passes on what went wrong underneath, for a tester to report', async () => {
+    const { store, p } = setup({ 'a.m4a': 1e5 })
+    p.parts = [{ uri: 'a.m4a', seconds: 60, text: null }]
+    const t: PartTranscriber = async () => ({
+      ok: false,
+      error: 'The phone could not prepare this recording for sending.',
+      retryable: false,
+      detail: 'Unsupported FormDataPart implementation',
+    })
+    expect(await transcribeParts(p, t, store, noWait)).toEqual({
+      ok: false,
+      error: 'The phone could not prepare this recording for sending.',
+      detail: 'Unsupported FormDataPart implementation',
+    })
+  })
+
+  it('stops retrying once the person discards it during the pause', async () => {
+    const { store, p } = setup({ 'a.m4a': 1e5 })
+    p.parts = [{ uri: 'a.m4a', seconds: 60, text: null }]
+    let attempts = 0
+    const t: PartTranscriber = async () => {
+      attempts += 1
+      return { ok: false, error: 'busy', retryable: true }
+    }
+    const result = await transcribeParts(p, t, store, { wait: async () => forget(p, store) })
+    expect(result).toEqual({ ok: false, error: 'This recording was discarded.' })
     expect(attempts).toBe(1)
   })
 
@@ -107,6 +151,7 @@ describe('turning parts into words', () => {
     expect(await transcribeParts(p, words({}), store)).toEqual({
       ok: false,
       error: 'Part of this recording is missing from the phone.',
+      missing: true,
     })
   })
 
@@ -150,8 +195,39 @@ describe('reopening the app', () => {
     const { store, p } = setup({ 'open.m4a': 5e4 })
     p.current = 'open.m4a'
     store.save(p)
-    expect(recover(store)).toEqual({ kind: 'lost', lostCurrentPart: true })
+    expect(recover(store)).toEqual({ kind: 'lost', lostCurrentPart: true, missingParts: 0 })
     expect(store.saved).toBeNull()
+  })
+
+  it('finds a recording again after an update moved the app folder', () => {
+    // iOS gives an updated app a new container folder; the files move with it.
+    const OLD = 'file:///var/mobile/Containers/Data/Application/OLD-ID/Documents/ExpoAudio/recording-1.m4a'
+    const NEW = 'file:///var/mobile/Containers/Data/Application/NEW-ID/Documents/ExpoAudio/recording-1.m4a'
+    const { store, p } = setup({ [NEW]: 1e5 })
+    store.locate = (uri) => (uri === OLD || uri === NEW ? NEW : null)
+    p.parts = [{ uri: OLD, seconds: 120, text: null }]
+    store.save(p)
+    const found = recover(store)
+    expect(found).toMatchObject({ kind: 'unsent', missingParts: 0 })
+    if (found.kind === 'unsent') expect(found.pending.parts[0]!.uri).toBe(NEW)
+    expect(store.saved?.parts[0]!.uri).toBe(NEW)
+  })
+
+  it('reports a part found nowhere instead of dropping it in silence', () => {
+    const { store, p } = setup({ 'a.m4a': 1e5 })
+    p.parts = [
+      { uri: 'a.m4a', seconds: 60, text: null },
+      { uri: 'gone.m4a', seconds: 60, text: null },
+    ]
+    store.save(p)
+    expect(recover(store)).toMatchObject({ kind: 'unsent', missingParts: 1 })
+  })
+
+  it('says so when every part is gone, rather than finding "nothing"', () => {
+    const { store, p } = setup({})
+    p.parts = [{ uri: 'gone.m4a', seconds: 60, text: null }]
+    store.save(p)
+    expect(recover(store)).toEqual({ kind: 'lost', lostCurrentPart: false, missingParts: 1 })
   })
 
   it('finds nothing when nothing was pending', () => {
