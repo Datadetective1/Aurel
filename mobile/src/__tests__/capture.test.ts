@@ -27,3 +27,22 @@ describe('capture rules', () => {
     expect(bytes).toBeLessThan(4.5 * 1024 * 1024)
   })
 })
+
+import { atWallTime, wallTime } from '../lib/format'
+
+describe('wallTime', () => {
+  it('reads the instant in the account zone, not the phone zone', () => {
+    const at = new Date('2026-10-21T13:53:00Z')
+    expect(wallTime(at, 'America/Chicago')).toBe('2026-10-21T08:53')
+    expect(wallTime(at, 'Europe/Paris')).toBe('2026-10-21T15:53')
+    expect(wallTime(new Date('2026-10-21T05:00:00Z'), 'America/Chicago')).toBe('2026-10-21T00:00')
+  })
+})
+
+describe('atWallTime', () => {
+  it('finds 9:00 on the right day, even far from UTC', () => {
+    for (const tz of ['America/Chicago', 'Pacific/Honolulu', 'Pacific/Kiritimati', 'Asia/Kolkata', 'Europe/London']) {
+      expect(wallTime(atWallTime('2026-10-25T09:00', tz), tz)).toBe('2026-10-25T09:00')
+    }
+  })
+})

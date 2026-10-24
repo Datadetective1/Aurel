@@ -349,10 +349,14 @@ export async function checkPersonLimit(): Promise<CapabilityCheck> {
 
   const user = await requireUser()
   const supabase = await createClient()
+  // The invented sample record is not the person's relationship memory, so it
+  // does not use up the plan's people: a Free account that loads the samples
+  // to see how Atturel works can still add the five people it actually knows.
   const { count } = await supabase
     .from('people')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
+    .eq('is_demo', false)
     .is('archived_at', null)
 
   const used = count ?? 0

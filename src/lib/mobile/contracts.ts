@@ -49,6 +49,30 @@ export interface MeResponse {
   onboarded: boolean
 }
 
+// --- POST /api/mobile/sign-up --------------------------------------------------
+/** No bearer token: this is how an account starts. Same rules as the web form. */
+export interface SignUpRequest {
+  fullName: string
+  email: string
+  password: string
+}
+export type SignUpResponse =
+  | { ok: true; needsConfirmation: boolean }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
+// --- POST /api/mobile/onboarding ------------------------------------------------
+/** The one required onboarding step. Answers before onboarding, like /me. */
+export interface OnboardingRequest {
+  fullName: string
+  preferredName?: string
+  jobTitle?: string
+  company?: string
+  /** IANA zone from the device, e.g. "America/Chicago". */
+  timezone?: string
+}
+export type OnboardingResponse =
+  { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
 // --- GET /api/mobile/account ---------------------------------------------------
 export interface AccountResponse {
   email: string | null
@@ -59,6 +83,8 @@ export interface AccountResponse {
   billing: 'none' | 'web' | 'apple' | 'included'
   legal: { privacyUrl: string; termsUrl: string; supportEmail: string }
   capture: CaptureLimits
+  /** Whether the fictional sample record is in this account. Absent on older servers. */
+  sampleData?: { loaded: boolean }
 }
 
 /** What the server will accept for one recording, so the app can say so up front. */
@@ -69,7 +95,22 @@ export interface CaptureLimits {
   segmentSeconds: number | null
   /** Transcription left this month, in seconds; null when unlimited. */
   remainingSeconds?: number | null
+  /**
+   * How each recorded part reaches transcription. `storage`: a signed upload
+   * to private, temporary storage (migration 0022). `direct`: one request per
+   * part to /api/conversations/transcribe, each part well under the
+   * request-body ceiling. Absent on servers that predate parts, which means
+   * `storage` when `segmentSeconds` is set and a single upload otherwise.
+   */
+  partTransport?: 'storage' | 'direct'
 }
+
+// --- POST /api/mobile/access ----------------------------------------------------
+/** A pilot invitation code, redeemed exactly as on the web. */
+export interface RedeemAccessRequest {
+  code: string
+}
+export type RedeemAccessResponse = { ok: true; message: string } | { ok: false; error: string }
 
 // --- DELETE /api/mobile/account ------------------------------------------------
 export interface DeleteAccountRequest {
@@ -98,7 +139,14 @@ export interface TodayResponse {
 
 // --- GET /api/mobile/meetings/:id ---------------------------------------------
 export interface MeetingResponse {
-  meeting: { id: string; title: string; scheduledAt: string | null; objective: string | null }
+  meeting: {
+    id: string
+    title: string
+    scheduledAt: string | null
+    objective: string | null
+    /** Part of the fictional sample record. */
+    isDemo?: boolean
+  }
   timeZone: string
   prep: PrepState
   people: VisualPerson[]
@@ -135,11 +183,63 @@ export interface MeetingResponse {
   preparedAt: string | null
 }
 
+// --- POST /api/mobile/meetings ----------------------------------------------------
+/** A meeting created on the phone. The same validation as the web form. */
+export interface CreateMeetingRequest {
+  title: string
+  /** Required, as on the web: a brief cannot optimise for nothing. */
+  objective: string
+  /** Wall-clock time in the account's zone, "YYYY-MM-DDTHH:mm"; omitted for unscheduled. */
+  scheduledAt?: string
+  durationMinutes?: number
+  /** People already on record. Anyone not the caller's is ignored. */
+  attendeeIds?: string[]
+}
+export type CreateMeetingResponse =
+  | { ok: true; meetingId: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
+// --- POST /api/mobile/meetings/:id/attendees -----------------------------------------
+export interface AddAttendeeRequest {
+  personId: string
+}
+export type AddAttendeeResponse = { ok: true } | { ok: false; error: string }
+
+// --- POST /api/mobile/meetings/:id/prepare -----------------------------------------
+/** Build the brief. Same entitlement, metering and evidence trail as the web. */
+export type PrepareResponse =
+  { ok: true; grounded: boolean | null } | { ok: false; error: string; upgrade?: boolean }
+
 // --- GET /api/mobile/people ---------------------------------------------------
 export interface PeopleResponse {
   timeZone: string
   people: (VisualPerson & { relationshipLabel: string })[]
 }
+
+// --- POST /api/mobile/people --------------------------------------------------
+export interface CreatePersonRequest {
+  fullName: string
+  jobTitle?: string
+  organizationName?: string
+}
+export type CreatePersonResponse =
+  | { ok: true; personId: string }
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
+// --- POST /api/mobile/loops/:id ---------------------------------------------------
+/** Done, Later, Cancel, Reopen: the web's one-tap loop actions. */
+export interface LoopActionRequest {
+  action: 'done' | 'later' | 'cancel' | 'reopen'
+}
+export type LoopActionResponse = { ok: true } | { ok: false; error: string }
+
+// --- POST / DELETE /api/mobile/sample-data ------------------------------------------
+/**
+ * The fictional sample record (invented people, flagged `is_demo`). POST loads
+ * it, idempotently; DELETE removes it together with anything captured with
+ * those invented people, and nothing else.
+ */
+export type SampleDataResponse = { ok: true; message: string } | { ok: false; error: string }
 
 // --- GET /api/mobile/people/:id -----------------------------------------------
 export type PersonResponse = VisualPersonDetail & { timeZone: string }

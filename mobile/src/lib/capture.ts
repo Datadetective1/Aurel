@@ -5,17 +5,22 @@ import { AudioQuality, IOSOutputFormat, type RecordingOptions } from 'expo-audio
  * =============================================================================
  * Recording settings tuned for speech, and the limits that follow from them.
  *
- * Mono AAC at 32 kbps is about 240 KB a minute. Sent in one piece, a
- * recording goes through a function whose request body is capped at about
- * 4.5 MB, so it stops itself at seventeen minutes and says why. When the
- * server offers segmented upload (GET /api/mobile/account), the recording is
- * cut into ten-minute segments that go straight to private storage, and the
- * limit is what the server says -- two hours today. See lib/segmented.
+ * Mono AAC at 32 kbps is about 240 KB a minute. A recording is kept as parts:
+ * every pause, and every ten minutes, closes the file and starts a new one,
+ * so each part is a complete recording on its own (lib/pending-capture). A
+ * part is about 2.4 MB, inside the 4.5 MB request ceiling of the single
+ * upload route, so parts can go one at a time to transcription. The total
+ * length is what the server says (GET /api/mobile/account); an older server
+ * says seventeen minutes.
+ *
+ * Files are written to the app's Documents directory, not the cache, so iOS
+ * never clears one under storage pressure before it has been sent.
  * =============================================================================
  */
 
 export const VOICE_RECORDING: RecordingOptions = {
   extension: '.m4a',
+  directory: 'document',
   sampleRate: 22050,
   numberOfChannels: 1,
   bitRate: 32000,
@@ -32,6 +37,9 @@ export const VOICE_RECORDING: RecordingOptions = {
 
 /** The single-upload limit, used until the server says otherwise. */
 export const MAX_RECORDING_SECONDS = 17 * 60
+
+/** A part is closed at this length, whatever the server's total limit. */
+export const PART_SECONDS = 10 * 60
 
 /** "4:07", "1:02:09". */
 export function elapsed(totalSeconds: number): string {

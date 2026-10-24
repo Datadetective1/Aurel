@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: person } = await ctx.supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, email, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, organizations(name, domain)',
+      'id, full_name, preferred_name, email, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organizations(name, domain)',
     )
     .eq('user_id', ctx.user.id)
     .eq('id', id)
@@ -57,6 +57,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       lastInteractionAt: person.last_interaction_at,
       openLoops: loops.length,
       owe: loops.filter((l) => l.direction === 'owe').length,
+      isDemo: person.is_demo,
       nextMeeting: record.nextMeeting,
     },
     loops,

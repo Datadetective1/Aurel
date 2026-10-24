@@ -80,6 +80,19 @@ const personSchema = z.object({
 })
 
 export async function createPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await createPersonCore(formData)
+  if (!result.personId) return result
+  redirect(`/people/${result.personId}${result.research ? '?research=1' : ''}`)
+}
+
+/**
+ * The person, without the navigation: validated, held to the plan's people
+ * limit, written, counted. The web form opens their page afterwards; the
+ * native app (`POST /api/mobile/people`) returns to whatever it was doing.
+ */
+export async function createPersonCore(
+  formData: FormData,
+): Promise<ActionState & { personId?: string; research?: boolean }> {
   const parsed = personSchema.safeParse({
     fullName: formData.get('fullName'),
     preferredName: formData.get('preferredName') || undefined,
@@ -147,7 +160,7 @@ export async function createPerson(_prev: ActionState, formData: FormData): Prom
   })
 
   revalidatePath('/people')
-  redirect(`/people/${person.id}${v.profileUrl ? '?research=1' : ''}`)
+  return { personId: person.id, research: Boolean(v.profileUrl) }
 }
 
 export async function updatePerson(_prev: ActionState, formData: FormData): Promise<ActionState> {

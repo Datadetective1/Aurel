@@ -23,7 +23,7 @@ export async function GET() {
     ctx.supabase
       .from('people')
       .select(
-        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, avatar_path, organization_id, organizations(name, domain)',
+        'id, full_name, preferred_name, job_title, relevance, relationship_type, last_interaction_at, avatar_url, avatar_path, is_demo, organization_id, organizations(name, domain)',
       )
       .eq('user_id', ctx.user.id)
       .is('archived_at', null)
@@ -51,6 +51,7 @@ export async function GET() {
       lastInteractionAt: p.last_interaction_at,
       openLoops: mine.length,
       owe: mine.filter((l) => actionDirection(l) === 'owe').length,
+      isDemo: p.is_demo,
     }
   }
 

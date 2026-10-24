@@ -5,7 +5,7 @@ import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
 import { PLANS } from '@/lib/billing/plans'
 import { hasFullAccess } from '@/lib/billing/access'
 import { deleteCurrentAccount } from '@/lib/account/deletion.server'
-import { captureLimits } from '@/lib/capture/limits'
+import { mobileCaptureLimits } from '@/lib/capture/limits'
 import { absoluteUrl, brand } from '@/lib/brand'
 import { features } from '@/lib/env'
 import type {
@@ -63,7 +63,8 @@ export async function GET() {
       termsUrl: absoluteUrl('/terms'),
       supportEmail: brand.email.support,
     },
-    capture: { ...captureLimits(features.captureStorage), remainingSeconds },
+    capture: { ...mobileCaptureLimits(features.captureStorage), remainingSeconds },
+    sampleData: { loaded: Boolean(profile?.demo_seeded_at) },
   }
   return json(body)
 }

@@ -55,6 +55,18 @@ for it.
    subscription disclosures), 3.1.3 (multiplatform services — whether a web
    subscriber may use the app), 5.1.1(v) (in-app account deletion — done).
 
+## The decision this now needs (October 2026)
+
+Guideline 3.1.3(b) lets an app unlock a subscription bought on the web only
+"provided those items are also available as in-app purchases within the app".
+The United States storefront exception (3.1.1(a)) allows links and buttons to
+web checkout; it does not remove that condition. Apps in Atturel's position —
+no prices or purchase buttons, a web-paid plan visible on the review account —
+have been rejected under 3.1.1 (Apple Developer Forums, May 2026). Before the
+first App Store submission, choose: build the StoreKit plan below, or submit
+with a Free reviewer account and accept that risk. TestFlight internal testing
+is not affected. See docs/IOS_READINESS.md §5.
+
 ## Until then
 
 The iOS app sells nothing and shows no price. A web subscriber signs in and

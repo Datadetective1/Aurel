@@ -47,6 +47,28 @@ const signInSchema = z.object({
 const GENERIC_SIGN_IN_ERROR = 'That email and password combination did not work.'
 
 export async function signUp(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const result = await signUpCore(formData)
+  if (!result.ok) return result
+
+  // No session means Supabase is holding the account for email confirmation.
+  if (result.needsConfirmation) {
+    redirect(`/check-email?email=${encodeURIComponent(result.email)}`)
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/onboarding')
+}
+
+/**
+ * The account, without the navigation: validated, created, welcomed. The web
+ * form goes on to "check your email" or onboarding; the native app
+ * (`POST /api/mobile/sign-up`) says the same on the phone. The same
+ * enumeration rule holds for both: an address that already has an account
+ * gets the same answer as a new one.
+ */
+export async function signUpCore(
+  formData: FormData,
+): Promise<(AuthState & { ok: false }) | { ok: true; email: string; needsConfirmation: boolean }> {
   const parsed = signUpSchema.safeParse({
     fullName: formData.get('fullName'),
     email: formData.get('email'),
@@ -54,7 +76,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
   })
 
   if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors }
+    return { ok: false, fieldErrors: z.flattenError(parsed.error).fieldErrors }
   }
 
   const supabase = await createClient()
@@ -72,9 +94,12 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     // Rate limits are worth surfacing accurately; everything else stays generic
     // so this endpoint cannot be used to enumerate registered addresses.
     if (error.status === 429) {
-      return { error: 'Too many attempts. Wait a minute and try again.' }
+      return { ok: false, error: 'Too many attempts. Wait a minute and try again.' }
     }
-    return { error: 'We could not create that account. Try a different email address.' }
+    return {
+      ok: false,
+      error: 'We could not create that account. Try a different email address.',
+    }
   }
 
   // Welcome mail is best-effort and deliberately not awaited for its result
@@ -89,13 +114,7 @@ export async function signUp(_prev: AuthState, formData: FormData): Promise<Auth
     kind: 'welcome',
   })
 
-  // No session means Supabase is holding the account for email confirmation.
-  if (!data.session) {
-    redirect(`/check-email?email=${encodeURIComponent(parsed.data.email)}`)
-  }
-
-  revalidatePath('/', 'layout')
-  redirect('/onboarding')
+  return { ok: true, email: parsed.data.email, needsConfirmation: !data.session }
 }
 
 /** First name for a greeting. Falls back to the whole string. */

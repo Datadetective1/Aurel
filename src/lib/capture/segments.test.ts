@@ -11,10 +11,14 @@ import {
 } from './segments'
 import {
   captureLimits,
+  mobileCaptureLimits,
   ownsSegmentPath,
   segmentPath,
   SEGMENT_MAX_BYTES,
   MAX_SEGMENTS,
+  SINGLE_UPLOAD_MAX_BYTES,
+  SINGLE_UPLOAD_MAX_SECONDS,
+  SPEECH_BYTES_PER_SECOND,
 } from './limits'
 import { measureDuration, mp4DurationSeconds } from './audio-duration'
 import { transcriptionCostMicros, transcriptionUsageRecords } from '@/lib/billing/transcription'
@@ -271,6 +275,29 @@ describe('limits', () => {
     expect(captureLimits(false)).toEqual({ maxSeconds: 17 * 60, segmentSeconds: null })
     expect(captureLimits(true)).toEqual({ maxSeconds: 2 * 3600, segmentSeconds: 600 })
     expect(segmentPath(ALICE, CAPTURE, 7, 'm4a')).toBe(`${ALICE}/${CAPTURE}/007.m4a`)
+  })
+
+  it('the phone records two hours in ten-minute parts, whichever way the bytes travel', () => {
+    expect(mobileCaptureLimits(true)).toEqual({
+      maxSeconds: 2 * 3600,
+      segmentSeconds: 600,
+      partTransport: 'storage',
+    })
+    expect(mobileCaptureLimits(false)).toEqual({
+      maxSeconds: 2 * 3600,
+      segmentSeconds: 600,
+      partTransport: 'direct',
+    })
+  })
+
+  it('a direct part fits one request, with room for a richer encoder', () => {
+    const { segmentSeconds } = mobileCaptureLimits(false)
+    expect(segmentSeconds).toBeLessThanOrEqual(SINGLE_UPLOAD_MAX_SECONDS)
+    // At the speech encoding a part is about 2.4 MB; even at 1.75x that rate
+    // it stays under the request-body ceiling.
+    expect((segmentSeconds ?? Infinity) * SPEECH_BYTES_PER_SECOND * 1.75).toBeLessThan(
+      SINGLE_UPLOAD_MAX_BYTES,
+    )
   })
 })
 
