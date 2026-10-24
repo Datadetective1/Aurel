@@ -2,6 +2,7 @@
   "expo": {
     "name": "Atturel",
     "slug": "atturel",
+    "owner": "datadetective1",
     "scheme": "atturel",
     "version": "0.1.0",
     "orientation": "portrait",
