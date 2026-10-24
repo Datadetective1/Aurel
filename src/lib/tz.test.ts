@@ -357,7 +357,13 @@ describe('relative days without Intl.RelativeTimeFormat', () => {
 
   it('says exactly what Intl.RelativeTimeFormat (en-US, numeric auto) says', () => {
     const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })
-    const counts = [...Array.from({ length: 4001 }, (_, i) => i - 2000), 9_999, -9_999, 123_456, -1_234_567]
+    const counts = [
+      ...Array.from({ length: 4001 }, (_, i) => i - 2000),
+      9_999,
+      -9_999,
+      123_456,
+      -1_234_567,
+    ]
     for (const unit of units) {
       for (const n of counts) expect(relativeUnit(n, unit)).toBe(rtf.format(n, unit))
     }
@@ -383,18 +389,19 @@ describe('relative days without Intl.RelativeTimeFormat', () => {
   })
 
   it('works where Intl.RelativeTimeFormat does not exist, as on the iPhone', () => {
-    const original = Intl.RelativeTimeFormat
-    // @ts-expect-error -- removing it is the point: Hermes does not have it.
-    delete Intl.RelativeTimeFormat
+    // Removing it is the point: Hermes does not have it.
+    const intl = Intl as { RelativeTimeFormat?: typeof Intl.RelativeTimeFormat }
+    const original = intl.RelativeTimeFormat
+    delete intl.RelativeTimeFormat
     try {
-      expect(typeof Intl.RelativeTimeFormat).toBe('undefined')
+      expect(typeof intl.RelativeTimeFormat).toBe('undefined')
       expect(relativeDayIn('2026-08-14', 'America/Chicago', THE_BUG)).toBe('2 weeks ago')
       expect(relativeDayIn('2026-08-24', 'America/Chicago', THE_BUG)).toBe('3 days ago')
       expect(relativeDayIn('2026-09-03', 'America/Chicago', THE_BUG)).toBe('Next week')
       expect(relativeDayIn('2026-10-27', 'America/Chicago', THE_BUG)).toBe('In 2 months')
       expect(relativeDayIn('2025-08-27', 'America/Chicago', THE_BUG)).toBe('Last year')
     } finally {
-      Intl.RelativeTimeFormat = original
+      intl.RelativeTimeFormat = original
     }
   })
 })
