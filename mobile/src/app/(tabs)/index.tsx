@@ -16,6 +16,7 @@ import { Notice } from '~/components/notice'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * TODAY

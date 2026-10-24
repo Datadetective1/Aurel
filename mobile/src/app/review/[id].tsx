@@ -10,6 +10,7 @@ import { DIRECTION_ICON } from '~/components/chip'
 import { Card, Empty, Failure, Loading, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * WHAT HAPPENED

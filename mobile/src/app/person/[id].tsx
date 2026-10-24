@@ -15,6 +15,7 @@ import { Notice } from '~/components/notice'
 import { Card, Failure, Loading, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * ONE PERSON

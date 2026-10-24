@@ -11,6 +11,7 @@ import { Card } from '~/components/screen'
 import { Field } from '~/components/field'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * CREATE AN ACCOUNT

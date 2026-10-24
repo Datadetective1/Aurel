@@ -14,6 +14,7 @@ import { PeoplePicker } from '~/components/people-picker'
 import { Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { fonts, useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * NEW MEETING

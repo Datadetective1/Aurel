@@ -55,6 +55,9 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.hermes-intl.js"
+    ],
     "moduleNameMapper": {
       "^~/(.*)$": "<rootDir>/src/$1",
       "^@atturel/web/(.*)$": "<rootDir>/../src/$1"
