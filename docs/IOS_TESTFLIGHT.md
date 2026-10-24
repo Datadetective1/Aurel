@@ -18,7 +18,12 @@ Nobody should ever ask you for a password, a 2FA code or a key file in a
 chat. Secrets go into GitHub's own secrets page, which encrypts them; once
 saved, they cannot be read back, not even by whoever runs the workflow.
 
-## 1. Once: give GitHub an Expo token (Amary)
+## 1. Once: give GitHub an Expo token and an Apple API key (Amary)
+
+The Expo project `@datadetective1/atturel` exists (ID
+`b7b37d6f-7256-4608-8a55-c2f0363628b9`, in `mobile/app.json`).
+
+**Expo token** (`EXPO_TOKEN`, done):
 
 1. <https://expo.dev> → your avatar → **Account settings** → **Access
    tokens** → **Create token**. Name it `github-atturel` and copy it.
@@ -26,13 +31,11 @@ saved, they cannot be read back, not even by whoever runs the workflow.
    **New repository secret**. Name: `EXPO_TOKEN`. Secret: paste the token →
    **Add secret**.
 
-That is usually all. The workflow signs in to Apple with an App Store Connect
-API key it finds on your Expo account: EAS stores one there when it submits
-an app, as it did for PacePerk. The workflow uses a key only after checking
-that it can see Atturel's App Store Connect record.
-
-**Only if a run stops with "No App Store Connect API key"**, add a key of
-your own:
+**App Store Connect API key.** The workflow signs in to Apple with this key
+to create Atturel's provisioning profile and upload builds. No password or
+2FA code is involved. EAS keeps such a key on the Expo account only after a
+store submission, and PacePerk has only had internal builds, so there is
+none to reuse. Create one:
 
 1. App Store Connect → **Users and Access** → **Integrations** → **App Store
    Connect API** → **Team Keys** → **+**. Name `GitHub Atturel`, access
@@ -41,6 +44,10 @@ your own:
 2. Add three repository secrets on the same GitHub page:
    `ASC_API_KEY_P8` (open the `.p8` file in a text editor and paste all of
    it), `ASC_API_KEY_ID` and `ASC_API_KEY_ISSUER_ID`.
+
+The workflow uses the key only after checking that it can see Atturel's App
+Store Connect record. If these secrets are ever removed, it falls back to a
+team key stored on the Expo account, if one exists.
 
 ## 2. Build and send to TestFlight
 
