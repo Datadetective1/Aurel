@@ -1,0 +1,50 @@
+name: TestFlight status
+
+# Reports whether Apple has finished processing Atturel's newest TestFlight
+# build (or a given build number), and the internal testing groups. Waits for
+# processing if it is still running. Read-only; uses the same App Store Connect
+# key secrets as the iOS TestFlight workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Build number to check (leave empty for the newest)
+        required: false
+        default: ''
+      wait_minutes:
+        description: Minutes to wait for Apple's processing
+        required: false
+        default: '30'
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: Check TestFlight
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Find the App Store Connect key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+        run: node scripts/ci/asc-setup.cjs
+
+      - name: TestFlight status
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          TESTFLIGHT_WAIT_MINUTES: ${{ inputs.wait_minutes }}
+        run: node scripts/ci/testflight-status.cjs
