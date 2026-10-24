@@ -101,6 +101,16 @@ const aboutSchema = z.object({
 })
 
 export async function saveAbout(_prev: StepState, formData: FormData): Promise<StepState> {
+  const result = await saveAboutCore(formData)
+  if (!result.ok) return result
+  redirect('/today?welcome=1')
+}
+
+/**
+ * The one required step, without the navigation. The web goes to Today; the
+ * native app (`POST /api/mobile/onboarding`) does the same on the phone.
+ */
+export async function saveAboutCore(formData: FormData): Promise<StepState & { ok?: boolean }> {
   const parsed = aboutSchema.safeParse({
     fullName: formData.get('fullName'),
     preferredName: formData.get('preferredName'),
@@ -150,7 +160,7 @@ export async function saveAbout(_prev: StepState, formData: FormData): Promise<S
   }
 
   revalidatePath('/', 'layout')
-  redirect('/today?welcome=1')
+  return { ok: true }
 }
 
 // --- Step: intent -------------------------------------------------------------

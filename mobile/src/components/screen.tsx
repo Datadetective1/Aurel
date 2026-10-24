@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Feather from '@expo/vector-icons/Feather'
 import { config } from '~/lib/config'
 import type { ApiFailure } from '~/lib/api'
+import { useAuth } from '~/lib/auth'
 import { useTheme } from '~/theme'
 import { T } from './text'
 import { Button } from './button'
@@ -105,19 +106,38 @@ export function Loading({ label = 'Loading' }: { label?: string }) {
   )
 }
 
-/** The failure, said plainly, with the one thing that might fix it. */
+/**
+ * The failure, said plainly, with the one thing that might fix it.
+ *
+ * A plan refusal is stated, never sold: the app offers no purchase and points
+ * to none, so the server's own wording (which may suggest upgrading, as the
+ * website does) is not shown here.
+ */
 export function Failure({ failure, onRetry }: { failure: ApiFailure; onRetry?: () => void }) {
+  const { refreshProfile, signOut } = useAuth()
   const copy =
     failure.kind === 'offline'
       ? { icon: 'wifi-off' as const, title: 'You are offline', body: 'Nothing here is cached on the phone yet. Reconnect and pull to refresh.' }
       : failure.kind === 'unauthenticated'
         ? { icon: 'lock' as const, title: 'Signed out', body: 'Sign in again to see your record.' }
         : failure.kind === 'onboarding_required'
-          ? { icon: 'compass' as const, title: 'Finish setting up on the web', body: 'Complete onboarding at atturel.com once, then come back here.' }
+          ? { icon: 'compass' as const, title: 'One step left', body: 'Say who you are, and your record opens.' }
           : failure.kind === 'not_found'
             ? { icon: 'search' as const, title: 'Not found', body: 'It may have been deleted on another device.' }
-            : { icon: 'alert-circle' as const, title: 'Something went wrong', body: failure.message }
-  return <Empty icon={copy.icon} title={copy.title} body={copy.body} action={onRetry ? { label: 'Try again', onPress: onRetry } : undefined} />
+            : failure.kind === 'plan_required'
+              ? { icon: 'lock' as const, title: 'Not part of your current plan', body: 'This part of Atturel is not included in the plan on this account.' }
+              : { icon: 'alert-circle' as const, title: 'Something went wrong', body: failure.message }
+  const action =
+    failure.kind === 'onboarding_required'
+      ? { label: 'Finish setting up', onPress: () => void refreshProfile() }
+      : failure.kind === 'unauthenticated'
+        ? { label: 'Sign in', onPress: () => void signOut() }
+        : failure.kind === 'plan_required'
+          ? undefined
+          : onRetry
+            ? { label: 'Try again', onPress: onRetry }
+            : undefined
+  return <Empty icon={copy.icon} title={copy.title} body={copy.body} action={action} />
 }
 
 export function Empty({

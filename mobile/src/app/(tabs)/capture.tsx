@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { AppState, Pressable, Switch, TextInput, View } from 'react-native'
+import { Alert, AppState, Pressable, Switch, TextInput, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import * as Haptics from 'expo-haptics'
@@ -11,18 +11,32 @@ import {
   useAudioRecorderState,
 } from 'expo-audio'
 import type { AccountResponse, CaptureRequest, CaptureResponse } from '@atturel/web/lib/mobile/contracts'
-import { api, ApiError, segmentedDeps, useApi } from '~/lib/api'
-import { SegmentedCapture } from '~/lib/segmented'
+import { api, ApiError, directTranscriber, segmentedDeps, useApi } from '~/lib/api'
+import { discardRemote, storageTranscriber } from '~/lib/segmented'
 import { config } from '~/lib/config'
 import {
   canStart,
   composeCaptureText,
   elapsed,
   MAX_RECORDING_SECONDS,
+  PART_SECONDS,
   VOICE_RECORDING,
-  type Bookmark,
   type CaptureMode,
 } from '~/lib/capture'
+import {
+  closePart,
+  forget,
+  newPending,
+  recordedSeconds,
+  recover,
+  transcribeParts,
+  transcriptOf,
+  type PartTranscriber,
+  type PendingCapture,
+} from '~/lib/pending-capture'
+import { pendingStore, previewPartUri } from '~/lib/pending-store'
+import { setRecordingState } from '~/lib/recording-state'
+import { formatTime } from '~/lib/format'
 import { Button } from '~/components/button'
 import { Card, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
@@ -37,12 +51,18 @@ import { fonts, TOUCH, useTheme } from '~/theme'
  * what came out before any of it becomes memory.
  *
  * Privacy is the design, not a setting:
- *   - recording happens only on this screen, in the foreground, visibly;
- *     leaving the app pauses it (background recording is off in app.json)
+ *   - recording happens only in the foreground, visibly; leaving the app
+ *     pauses it, and so does iOS taking the microphone for a call (background
+ *     recording is off in app.json)
  *   - recording other people requires the user to confirm they know
- *   - audio is never kept: it is uploaded, transcribed, and deleted. A long
- *     conversation goes up in ten-minute segments to private, temporary
- *     storage, each deleted as soon as it is transcribed (lib/segmented)
+ *   - audio never stays on Atturel's servers: each part is transcribed and
+ *     dropped there. It stays on this phone only until the conversation has
+ *     been kept, then it is deleted
+ *
+ * And a recording is never lost quietly (lib/pending-capture): every pause
+ * and every ten minutes closes a complete file; parts are turned into words
+ * while the conversation carries on; a failure keeps the audio to try again;
+ * reopening the app offers back anything unsent.
  *
  * Typed notes are always an alternative to recording.
  * =============================================================================
@@ -50,22 +70,38 @@ import { fonts, TOUCH, useTheme } from '~/theme'
 
 type Phase = 'ready' | 'recording' | 'paused' | 'stopped' | 'sending'
 
+const INTERRUPTED =
+  'Paused — iPhone needed the microphone (a call, Siri or another app). What was recorded is kept. Resume when you are ready.'
+
+function captureId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export default function Capture() {
   const { c } = useTheme()
   const params = useLocalSearchParams<{ meetingId?: string; personId?: string }>()
   const recorder = useAudioRecorder(VOICE_RECORDING)
   const native = useAudioRecorderState(recorder, 500)
+  const store = React.useMemo(() => pendingStore(), [])
 
   const [mode, setMode] = React.useState<CaptureMode>(params.meetingId ? 'meeting_recording' : 'voice_note')
   const [othersKnow, setOthersKnow] = React.useState(false)
   const [phase, setPhase] = React.useState<Phase>('ready')
-  const [bookmarks, setBookmarks] = React.useState<Bookmark[]>([])
   const [note, setNote] = React.useState('')
   const [typed, setTyped] = React.useState('')
   const [typing, setTyping] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<string | null>(null)
+  // Re-render when the pending record changes; the record itself lives in a ref.
+  const [, setVersion] = React.useState(0)
+  const bump = () => setVersion((v) => v + 1)
+
+  const pendingRef = React.useRef<PendingCapture | null>(null)
+  const queueRef = React.useRef<Promise<unknown>>(Promise.resolve())
+  const busyRef = React.useRef(false)
+  const lastTransitionRef = React.useRef(0)
+  const [recheck, setRecheck] = React.useState(0)
 
   // Preview data never touches the microphone: the clock is simulated.
   const [fakeSeconds, setFakeSeconds] = React.useState(0)
@@ -77,71 +113,162 @@ export default function Capture() {
 
   // What the server will accept. Until it answers, the single-upload limit.
   const account = useApi<AccountResponse>('/api/mobile/account')
-  const lengthLimit = account.data?.capture.maxSeconds ?? MAX_RECORDING_SECONDS
+  const limits = account.data?.capture
+  const lengthLimit = limits?.maxSeconds ?? MAX_RECORDING_SECONDS
   // The month's transcription allowance, when there is one: a recording that
   // would not fit stops at what is left, rather than failing once it is sent.
-  const remaining = account.data?.capture.remainingSeconds ?? null
+  const remaining = limits?.remainingSeconds ?? null
   const maxSeconds = remaining === null ? lengthLimit : Math.min(lengthLimit, remaining)
   const allowanceBound = remaining !== null && remaining < lengthLimit
-  const segmentSeconds = account.data?.capture.segmentSeconds ?? null
+  const partSeconds = Math.min(limits?.segmentSeconds ?? PART_SECONDS, PART_SECONDS)
+  const transport = limits?.partTransport ?? (limits?.segmentSeconds ? 'storage' : 'direct')
 
-  // Segmented capture: the recorder restarts every segment, so the elapsed
-  // time is the finished segments plus the one recording now.
-  const segmentedRef = React.useRef<SegmentedCapture | null>(null)
-  const finishedSecondsRef = React.useRef(0)
-  const rotatingRef = React.useRef(false)
-  const current = config.previewData ? fakeSeconds : native.durationMillis / 1000
-  const seconds = finishedSecondsRef.current + current
+  const transcriber = React.useCallback((): PartTranscriber => {
+    const personIds = pendingRef.current?.personId ? [pendingRef.current.personId] : []
+    return transport === 'storage' && !config.previewData ? storageTranscriber(segmentedDeps()) : directTranscriber(personIds)
+  }, [transport])
+
+  // --- an unsent recording from before -----------------------------------------
+  React.useEffect(() => {
+    const found = recover(store)
+    if (found.kind === 'unsent') {
+      pendingRef.current = found.pending
+      setMode(found.pending.mode)
+      setTyped(found.pending.note)
+      setPhase('stopped')
+      setNotice(
+        `This recording from ${formatTime(found.pending.createdAt, Intl.DateTimeFormat().resolvedOptions().timeZone)} has not been sent yet. Send it, or discard it.` +
+          (found.lostCurrentPart ? ' The app closed while it was recording, so the last part — since the most recent pause — could not be saved.' : ''),
+      )
+      bump()
+    } else if (found.kind === 'lost') {
+      setNotice('The app closed while recording, before any part of it could be saved. Nothing was sent.')
+    }
+  }, [store])
+
+  // The part being recorded, read from the recorder itself, so the clock does
+  // not jump when one part closes and the next begins.
+  const pending = pendingRef.current
+  const currentSeconds = config.previewData
+    ? fakeSeconds
+    : phase === 'recording' && pending?.current && native.url === pending.current
+      ? native.durationMillis / 1000
+      : 0
+  const seconds = recordedSeconds(pending) + (phase === 'recording' ? currentSeconds : 0)
+
+  /** Turn finished parts into words while the conversation carries on. */
+  const process = React.useCallback(() => {
+    const p = pendingRef.current
+    if (!p) return queueRef.current
+    queueRef.current = queueRef.current
+      .catch(() => {})
+      .then(() => transcribeParts(p, transcriber(), store))
+      .then(bump)
+    return queueRef.current
+  }, [store, transcriber])
+
+  const beginPart = React.useCallback(async () => {
+    const p = pendingRef.current
+    if (!p) return
+    lastTransitionRef.current = Date.now()
+    if (config.previewData) {
+      setFakeSeconds(0)
+      p.current = previewPartUri()
+      store.save(p)
+      return
+    }
+    // Options every time: without them expo-audio reuses the previous file,
+    // and the next part would overwrite one not yet sent.
+    await recorder.prepareToRecordAsync(VOICE_RECORDING)
+    recorder.record()
+    p.current = recorder.uri
+    store.save(p)
+  }, [recorder, store])
+
+  const endPart = React.useCallback(async () => {
+    const p = pendingRef.current
+    if (!p || !p.current) return
+    lastTransitionRef.current = Date.now()
+    if (config.previewData) {
+      closePart(p, { uri: p.current, seconds: fakeSeconds }, store)
+      setFakeSeconds(0)
+    } else {
+      const length = recorder.getStatus().durationMillis / 1000
+      const uri = p.current
+      await recorder.stop()
+      closePart(p, { uri, seconds: length }, store)
+    }
+    bump()
+    void process()
+  }, [recorder, store, fakeSeconds, process])
 
   const pause = React.useCallback(
-    (reason?: string) => {
-      if (phase !== 'recording') return
-      if (!config.previewData) recorder.pause()
+    async (reason?: string) => {
+      if (phase !== 'recording' || busyRef.current) return
+      busyRef.current = true
+      try {
+        await endPart()
+      } catch {
+        setError('The recording could not be paused cleanly. What was recorded before is kept.')
+      } finally {
+        busyRef.current = false
+      }
       setPhase('paused')
       if (reason) setNotice(reason)
     },
-    [phase, recorder],
+    [phase, endPart],
   )
 
   const stop = React.useCallback(
     async (reason?: string) => {
-      if (phase !== 'recording' && phase !== 'paused') return
-      if (!config.previewData) {
-        const segmentLength = native.durationMillis / 1000
-        await recorder.stop()
-        // The last segment joins the queue; it is the only one left to process.
-        if (segmentedRef.current && recorder.uri) segmentedRef.current.add(recorder.uri, segmentLength)
+      if ((phase !== 'recording' && phase !== 'paused') || busyRef.current) return
+      busyRef.current = true
+      try {
+        if (phase === 'recording') await endPart()
+      } catch {
+        setError('The last part could not be closed cleanly. Everything before it is kept.')
+      } finally {
+        busyRef.current = false
       }
       void setAudioModeAsync({ allowsRecording: false }).catch(() => {})
+      const p = pendingRef.current
+      if (p && p.parts.length === 0) {
+        // Too short to hold anything: nothing to send, nothing to keep.
+        forget(p, store)
+        pendingRef.current = null
+        setPhase('ready')
+        setNotice('That was too short to keep. Nothing was recorded.')
+        return
+      }
       setPhase('stopped')
       if (reason) setNotice(reason)
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
     },
-    [phase, recorder, native.durationMillis],
+    [phase, endPart, store],
   )
 
-  // Segment rotation: finish this file, queue it, start the next. The queue
-  // uploads and transcribes it while the conversation carries on.
+  // Every ten minutes: close this part, start the next. The new part begins
+  // straight away; the finished one is turned into words meanwhile.
   React.useEffect(() => {
-    if (phase !== 'recording' || !segmentSeconds || config.previewData) return
-    if (current < segmentSeconds || rotatingRef.current) return
-    rotatingRef.current = true
+    if (phase !== 'recording' || busyRef.current) return
+    if (currentSeconds < partSeconds) return
+    busyRef.current = true
     void (async () => {
       try {
-        const length = native.durationMillis / 1000
-        await recorder.stop()
-        if (recorder.uri) segmentedRef.current?.add(recorder.uri, length)
-        finishedSecondsRef.current += length
-        await recorder.prepareToRecordAsync()
-        recorder.record()
+        await endPart()
+        await beginPart()
       } catch {
         setError('The recording could not continue. What was recorded so far is kept — stop and send it.')
         setPhase('paused')
       } finally {
-        rotatingRef.current = false
+        busyRef.current = false
       }
     })()
-  }, [current, phase, segmentSeconds, recorder, native.durationMillis])
+  }, [currentSeconds, phase, partSeconds, endPart, beginPart])
+
+  React.useEffect(() => {
+    setRecordingState(phase === 'recording' ? 'recording' : phase === 'paused' ? 'paused' : 'idle')
+  }, [phase])
 
   // The screen stays awake while a recording is open, so auto-lock does not
   // pause a long meeting. Leaving the app still does.
@@ -149,17 +276,37 @@ export default function Capture() {
     if (phase !== 'recording' && phase !== 'paused') return
     void activateKeepAwakeAsync('capture').catch(() => {})
     return () => {
-      void deactivateKeepAwake('capture')
+      void deactivateKeepAwake('capture').catch(() => {})
     }
   }, [phase])
 
-  // Leaving the app pauses the recording. Nothing records out of sight.
+  // Leaving the app pauses the recording, closing the part so it survives even
+  // if iOS later ends the app in the background. Nothing records out of sight.
   React.useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') pause('Paused when you left the app. Resume when you are back.')
+      if (state === 'background') void pause('Paused when you left the app. What was recorded is kept. Resume when you are back.')
     })
     return () => sub.remove()
   }, [pause])
+
+  // iOS pauses the recorder itself for a call or Siri, and may resume it on
+  // its own afterwards. The screen must never say "Recording" while it is not,
+  // nor keep a recording going the person did not resume: an interruption
+  // closes the part, and only Resume starts the next one.
+  React.useEffect(() => {
+    if (config.previewData || phase !== 'recording' || busyRef.current) return
+    const settling = 1500 - (Date.now() - lastTransitionRef.current)
+    if (settling > 0) {
+      // A part just began; look again once the recorder has had time to report.
+      const t = setTimeout(() => setRecheck((n) => n + 1), settling + 50)
+      return () => clearTimeout(t)
+    }
+    if (native.mediaServicesDidReset) {
+      void pause('iPhone restarted its audio. Everything up to the last pause is kept; the moments just before this may be missing.')
+      return
+    }
+    if (!native.isRecording) void pause(INTERRUPTED)
+  }, [native.isRecording, native.mediaServicesDidReset, phase, pause, recheck])
 
   // The length limit, said before it bites.
   React.useEffect(() => {
@@ -193,76 +340,117 @@ export default function Capture() {
     if (!config.previewData) {
       const permission = await requestRecordingPermissionsAsync()
       if (!permission.granted) {
-        setError('Microphone access is off. Turn it on in Settings, or type notes instead.')
+        setError('Microphone access is off. Turn it on in Settings › Atturel › Microphone, or type notes instead.')
         return
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false })
-      await recorder.prepareToRecordAsync()
-      recorder.record()
-    } else {
-      setFakeSeconds(0)
     }
-    finishedSecondsRef.current = 0
-    segmentedRef.current = segmentSeconds && !config.previewData ? new SegmentedCapture(segmentedDeps()) : null
-    setBookmarks([])
+    pendingRef.current = newPending({
+      id: captureId(),
+      now: new Date(),
+      mode,
+      meetingId: params.meetingId ?? null,
+      personId: params.personId ?? null,
+      consent: mode === 'meeting_recording' ? othersKnow : false,
+    })
+    store.save(pendingRef.current)
+    queueRef.current = Promise.resolve()
+    try {
+      await beginPart()
+    } catch {
+      forget(pendingRef.current, store)
+      pendingRef.current = null
+      setError('The microphone could not start. Try again, or type notes instead.')
+      return
+    }
     setPhase('recording')
+    bump()
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
   }
 
-  const resume = () => {
-    if (!config.previewData) recorder.record()
+  const resume = async () => {
     setNotice(null)
-    setPhase('recording')
+    setError(null)
+    try {
+      if (!config.previewData) await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false })
+      await beginPart()
+      setPhase('recording')
+    } catch {
+      setError('The microphone could not restart. What was recorded is kept — stop and send it.')
+    }
   }
 
   const mark = () => {
-    setBookmarks((b) => [...b, { atSeconds: seconds, note: note.trim() }])
+    const p = pendingRef.current
+    if (!p) return
+    p.bookmarks.push({ atSeconds: seconds, note: note.trim() })
+    store.save(p)
     setNote('')
+    bump()
     void Haptics.selectionAsync().catch(() => {})
   }
 
   const discard = () => {
-    // Segments already uploaded are deleted from storage now, not left to the sweep.
-    void segmentedRef.current?.cancel()
-    segmentedRef.current = null
-    finishedSecondsRef.current = 0
-    setPhase('ready')
-    setBookmarks([])
-    setFakeSeconds(0)
-    setNotice(null)
+    Alert.alert('Discard this recording?', 'It has not been sent. Once discarded it cannot be recovered.', [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          const p = pendingRef.current
+          if (transport === 'storage' && !config.previewData) void discardRemote(segmentedDeps(), p)
+          forget(p, store)
+          pendingRef.current = null
+          setPhase('ready')
+          setTyped('')
+          setFakeSeconds(0)
+          setNotice(null)
+          setError(null)
+        },
+      },
+    ])
   }
 
   const send = async (fromTyping: boolean) => {
     setPhase('sending')
     setError(null)
+    setNotice(null)
+    const p = pendingRef.current
     try {
       let text = typed
-      if (!fromTyping) {
+      if (!fromTyping && p) {
+        p.note = typed
+        store.save(p)
         setStatus('Turning the recording into words…')
-        let transcript: string
-        if (segmentedRef.current) {
-          const finished = await segmentedRef.current.finish()
-          if (!finished.ok) throw new ApiError({ kind: 'server', message: finished.error })
-          transcript = finished.text
-        } else {
-          const uri = recorder.uri ?? 'preview.m4a'
-          transcript = await api.transcribe(uri, seconds, params.personId ? [params.personId] : [])
+        await queueRef.current.catch(() => {})
+        const words = await transcribeParts(p, transcriber(), store)
+        bump()
+        if (!words.ok) {
+          setStatus(null)
+          setPhase('stopped')
+          setError(`${words.error} The recording is safe on this phone — try again, or discard it.`)
+          return
         }
-        text = composeCaptureText(transcript, bookmarks, typed)
+        text = composeCaptureText(transcriptOf(p), p.bookmarks, typed)
       }
       setStatus('Reading it for what was promised and decided…')
+      // A recording carries the meeting and person it was started from, even
+      // when it is sent later (after a failure, or from a reopened app).
+      const meetingId = fromTyping ? params.meetingId : p?.meetingId
+      const personId = fromTyping ? params.personId : p?.personId
       const body: CaptureRequest = {
         text,
-        sourceKind: fromTyping ? 'typed_notes' : mode,
-        meetingId: params.meetingId,
-        participantIds: params.personId ? [params.personId] : undefined,
-        durationSeconds: fromTyping ? undefined : Math.round(seconds),
-        consent: !fromTyping && mode === 'meeting_recording' ? othersKnow : undefined,
+        sourceKind: fromTyping ? 'typed_notes' : (p?.mode ?? mode),
+        meetingId: meetingId ?? undefined,
+        participantIds: personId ? [personId] : undefined,
+        durationSeconds: fromTyping ? undefined : Math.round(recordedSeconds(p)),
+        consent: !fromTyping && p?.mode === 'meeting_recording' ? p.consent : undefined,
       }
       const result = await api.post<CaptureResponse>('/api/mobile/conversations', body)
+      // Kept on the server: only now is the audio on the phone deleted.
+      if (!fromTyping) forget(p, store)
+      pendingRef.current = null
       setStatus(null)
-      segmentedRef.current = null
-      finishedSecondsRef.current = 0
       setPhase('ready')
       setTyped('')
       setTyping(false)
@@ -270,17 +458,21 @@ export default function Capture() {
     } catch (e) {
       setStatus(null)
       setPhase(fromTyping ? 'ready' : 'stopped')
+      const kept = fromTyping ? '' : ' The recording and its words are safe on this phone.'
       setError(
-        e instanceof ApiError && e.failure.kind === 'offline'
-          ? 'You are offline. The recording is still here — send it when you reconnect.'
+        (e instanceof ApiError && e.failure.kind === 'offline'
+          ? 'You are offline. Send it when you reconnect.'
           : e instanceof ApiError && e.failure.kind === 'server'
             ? e.failure.message
-            : 'That could not be sent. Try again.',
+            : 'That could not be sent. Try again.') + kept,
       )
     }
   }
 
   const live = phase === 'recording' || phase === 'paused'
+  const marks = pending?.bookmarks.length ?? 0
+  const partsDone = pending?.parts.filter((x) => x.text !== null).length ?? 0
+  const partsTotal = pending?.parts.length ?? 0
 
   return (
     <Screen>
@@ -312,13 +504,13 @@ export default function Capture() {
           <T style={{ fontFamily: fonts.display, fontSize: 56, lineHeight: 64, color: c.ink, fontVariant: ['tabular-nums'], marginTop: 6 }} maxFontSizeMultiplier={1.2}>
             {elapsed(seconds)}
           </T>
-          {bookmarks.length > 0 ? <T variant="meta" tone="muted">{bookmarks.length === 1 ? '1 moment marked' : `${bookmarks.length} moments marked`}</T> : null}
+          {marks > 0 ? <T variant="meta" tone="muted">{marks === 1 ? '1 moment marked' : `${marks} moments marked`}</T> : null}
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
             <RoundButton
               icon={phase === 'recording' ? 'pause' : 'play'}
               label={phase === 'recording' ? 'Pause' : 'Resume'}
-              onPress={() => (phase === 'recording' ? pause() : resume())}
+              onPress={() => void (phase === 'recording' ? pause() : resume())}
             />
             <RoundButton icon="square" label="Stop" onPress={() => void stop()} primary />
             <RoundButton icon="bookmark" label="Mark" onPress={mark} />
@@ -381,7 +573,7 @@ export default function Capture() {
             <Button label="Type notes instead" icon="edit-3" variant="secondary" onPress={() => setTyping(true)} />
           </View>
           <T variant="meta" tone="muted" style={{ marginTop: 12 }}>
-            Audio is sent once to be turned into words and is not kept. Recording pauses if you leave the app.
+            Audio stays on this iPhone until it has been turned into words and the conversation is kept, then it is deleted. Atturel’s servers do not keep it. Recording pauses if you leave the app.
           </T>
         </>
       ) : null}
@@ -410,9 +602,14 @@ export default function Capture() {
       {phase === 'stopped' || phase === 'sending' ? (
         <Section label="Recorded">
           <Card>
-            <T variant="title">{elapsed(seconds)}</T>
+            <T variant="title">{elapsed(recordedSeconds(pending))}</T>
             <T variant="meta" tone="muted" style={{ marginTop: 2 }}>
-              {bookmarks.length ? `${bookmarks.length} marked moment${bookmarks.length === 1 ? '' : 's'}` : 'No moments marked'}
+              {[
+                marks ? `${marks} marked moment${marks === 1 ? '' : 's'}` : 'No moments marked',
+                partsTotal > 1 ? `${partsDone} of ${partsTotal} parts turned into words` : partsDone === 1 ? 'Turned into words' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </T>
             <TextInput
               accessibilityLabel="Anything to add"

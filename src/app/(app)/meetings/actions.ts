@@ -91,6 +91,24 @@ export async function createMeeting(
   _prev: MeetingState,
   formData: FormData,
 ): Promise<MeetingState> {
+  const result = await createMeetingCore(formData)
+  if (!result.meetingId) return result
+
+  // `prepare=1` is the "and prepare" half of the button: the brief page starts
+  // generation on arrival, with the same progress, failure and retry states as
+  // pressing Generate. It is done there rather than here so the user is not
+  // left on a frozen form for the length of a model call.
+  redirect(`/meetings/${result.meetingId}/brief?prepare=1`)
+}
+
+/**
+ * The meeting itself, without the navigation: validated, written, attendees
+ * attached, counted. The web form redirects to the brief afterwards; the
+ * native app (`POST /api/mobile/meetings`) prepares it from the phone.
+ */
+export async function createMeetingCore(
+  formData: FormData,
+): Promise<MeetingState & { meetingId?: string }> {
   const parsed = meetingSchema.safeParse({
     title: formData.get('title'),
     kind: formData.get('kind') ?? 'other',
@@ -182,11 +200,7 @@ export async function createMeeting(
 
   revalidatePath('/meetings')
   revalidatePath('/today')
-  // `prepare=1` is the "and prepare" half of the button: the brief page starts
-  // generation on arrival, with the same progress, failure and retry states as
-  // pressing Generate. It is done there rather than here so the user is not
-  // left on a frozen form for the length of a model call.
-  redirect(`/meetings/${meeting.id}/brief?prepare=1`)
+  return { meetingId: meeting.id }
 }
 
 export async function updateMeetingObjective(

@@ -2,14 +2,17 @@ import * as React from 'react'
 import { Pressable, View } from 'react-native'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
-import type { MeetingResponse } from '@atturel/web/lib/mobile/contracts'
+import type { AddAttendeeResponse, MeetingResponse, PrepareResponse } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_META } from '@atturel/web/lib/visual/relationship-actions'
-import { useApi } from '~/lib/api'
+import { api, ApiError, useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
 import { countdown, formatDate, formatTime, relativeDay, firstName } from '~/lib/format'
 import { Avatar } from '~/components/avatar'
 import { Button } from '~/components/button'
 import { Chip, ChipRow, DIRECTION_ICON, PrepChip } from '~/components/chip'
-import { CompanyLine, LoopRow } from '~/components/relationship'
+import { CompanyLine, LoopRow, SampleChip } from '~/components/relationship'
+import { PeoplePicker } from '~/components/people-picker'
+import { Notice } from '~/components/notice'
 import { Card, Empty, Failure, Loading, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
@@ -27,7 +30,9 @@ import { TOUCH, useTheme } from '~/theme'
  *            headline until opened
  *
  * Nothing is generated on the phone. Every line is read from the brief the
- * web stored, or fresh from the record.
+ * server stored, or fresh from the record. "Prepare" asks the server to build
+ * that brief with the web's own Generate -- the same entitlement, metering and
+ * evidence trail -- and then reads it like any other.
  * =============================================================================
  */
 
@@ -37,7 +42,13 @@ export default function Prepare() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
   const [depth, setDepth] = React.useState<Depth>('glance')
-  const { data, error, loading, refreshing, refresh } = useApi<MeetingResponse>(id ? `/api/mobile/meetings/${id}` : null)
+  const { data, error, loading, refreshing, refresh, reload } = useApi<MeetingResponse>(id ? `/api/mobile/meetings/${id}` : null)
+  const [notice, setNotice] = React.useState<string | null>(null)
+  useFresh(reload)
+  const changed = (message: string) => {
+    setNotice(message)
+    reload()
+  }
 
   if (loading) return <Screen topInset={false}><Loading label="Loading the brief" /></Screen>
   if (error || !data) return <Screen topInset={false} onRefresh={refresh}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
@@ -61,6 +72,8 @@ export default function Prepare() {
         </T>
       </View>
       <T variant="display" style={{ marginTop: 8 }} accessibilityRole="header">{data.meeting.title}</T>
+      {data.meeting.isDemo ? <View style={{ marginTop: 8 }}><SampleChip /></View> : null}
+      {notice ? <Notice text={notice} onDone={() => setNotice(null)} /> : null}
 
       {data.people.length === 1 ? (
         <Pressable
@@ -126,22 +139,16 @@ export default function Prepare() {
       </View>
 
       {data.prep !== 'ready' ? (
-        <Empty
-          icon="edit-3"
-          title={data.prep === 'needs_people' ? 'No one is in this meeting yet' : 'Not prepared yet'}
-          body={
-            data.prep === 'needs_people'
-              ? 'Add who is attending on the web, then prepare. The brief is built from what you know about them.'
-              : 'Prepare this meeting on the web once — the brief then lives here at every depth.'
-          }
-        />
+        <Unprepared data={data} onChanged={changed} />
       ) : depth === 'glance' ? (
         <Glance data={data} />
       ) : depth === 'quick' ? (
-        <Quick data={data} />
+        <Quick data={data} onChanged={changed} />
       ) : (
         <Deep data={data} />
       )}
+
+      {data.prep === 'ready' ? <PrepareButton meetingId={data.meeting.id} again onDone={changed} /> : null}
 
       <View style={{ marginTop: 28, gap: 10 }}>
         <Button
@@ -209,7 +216,100 @@ function Glance({ data }: { data: MeetingResponse }) {
   )
 }
 
-function Quick({ data }: { data: MeetingResponse }) {
+/**
+ * Before the brief: who is missing, or the one button that builds it. The
+ * web's Generate runs on the server; this screen waits and then reads.
+ */
+function Unprepared({ data, onChanged }: { data: MeetingResponse; onChanged: (message: string) => void }) {
+  const [adding, setAdding] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  if (data.prep === 'needs_people') {
+    const add = async (personId: string, name: string) => {
+      setError(null)
+      try {
+        const result = await api.post<AddAttendeeResponse>(`/api/mobile/meetings/${data.meeting.id}/attendees`, { personId })
+        if (result.ok) onChanged(`${firstName(name)} added. Prepare when everyone is in.`)
+        else setError(result.error)
+      } catch (e) {
+        setError(
+          e instanceof ApiError && e.failure.kind === 'offline'
+            ? 'You are offline.'
+            : e instanceof ApiError && e.failure.kind === 'not_found'
+              ? 'Adding people from the app is not available yet. Use atturel.com.'
+              : 'That person could not be added. Try again.',
+        )
+      }
+    }
+    return (
+      <View>
+        <Empty icon="user-plus" title="No one is in this meeting yet" body="The brief is built from what you know about the people in the room. Add who will be there." />
+        {adding ? (
+          <PeoplePicker selected={[]} onToggle={(p) => void add(p.id, p.name)} />
+        ) : (
+          <Button label="Add people" icon="user-plus" variant="secondary" onPress={() => setAdding(true)} />
+        )}
+        {error ? <T variant="small" tone="critical" style={{ marginTop: 10 }} accessibilityRole="alert">{error}</T> : null}
+      </View>
+    )
+  }
+  return (
+    <View>
+      <Empty icon="edit-3" title="Not prepared yet" body="Atturel reads what you know about these people — past conversations, open loops, what they care about — and writes a brief at every depth." />
+      <PrepareButton meetingId={data.meeting.id} onDone={onChanged} />
+    </View>
+  )
+}
+
+function PrepareButton({ meetingId, again, onDone }: { meetingId: string; again?: boolean; onDone: (message: string) => void }) {
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const prepare = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api.post<PrepareResponse>(`/api/mobile/meetings/${meetingId}/prepare`, {})
+      if (result.ok) {
+        onDone(result.grounded ? 'Prepared from your records alone — no language model was involved.' : 'Prepared.')
+      } else {
+        setError(result.upgrade ? 'This account has used the briefs its plan includes.' : result.error)
+      }
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.failure.kind === 'offline'
+          ? 'You are offline.'
+          : e instanceof ApiError && e.failure.kind === 'not_found'
+            ? 'Preparing from the app is not available yet. Prepare it once on atturel.com.'
+            : e instanceof ApiError && e.failure.kind === 'server'
+              ? /upgrade|pro\b|plan/i.test(e.failure.message)
+                ? 'This account has used the briefs its plan includes.'
+                : e.failure.message
+              : 'The brief could not be prepared. Try again.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <View style={{ marginTop: again ? 20 : 0, gap: 8 }}>
+      <Button
+        label={again ? 'Prepare again with what is new' : 'Prepare now'}
+        icon={again ? 'refresh-cw' : 'zap'}
+        variant={again ? 'ghost' : 'primary'}
+        size={again ? 'md' : 'lg'}
+        busy={busy}
+        onPress={() => void prepare()}
+      />
+      {busy ? (
+        <T variant="small" tone="secondary" style={{ textAlign: 'center' }} accessibilityLiveRegion="polite">
+          Reading what you know about them — usually 10 to 30 seconds.
+        </T>
+      ) : null}
+      {error ? <T variant="small" tone="critical" accessibilityRole="alert">{error}</T> : null}
+    </View>
+  )
+}
+
+function Quick({ data, onChanged }: { data: MeetingResponse; onChanged: (message: string) => void }) {
   const { c } = useTheme()
   const q = data.quick
   const tz = data.timeZone
@@ -237,7 +337,7 @@ function Quick({ data }: { data: MeetingResponse }) {
 
       {data.loops.length > 0 ? (
         <Section label="Open between you" icon="corner-up-right">
-          {data.loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} />)}
+          {data.loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} onChanged={onChanged} />)}
         </Section>
       ) : null}
 

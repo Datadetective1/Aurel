@@ -5,11 +5,13 @@ import Feather from '@expo/vector-icons/Feather'
 import type { PersonResponse } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_ORDER } from '@atturel/web/lib/visual/relationship-actions'
 import { useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
 import { formatTime, relativeDay, firstName } from '~/lib/format'
 import { Avatar } from '~/components/avatar'
 import { Button } from '~/components/button'
 import { Chip, ChipRow, DirectionChip } from '~/components/chip'
-import { CompanyLine, LoopRow, Timeline } from '~/components/relationship'
+import { CompanyLine, LoopRow, SampleChip, Timeline } from '~/components/relationship'
+import { Notice } from '~/components/notice'
 import { Card, Failure, Loading, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
@@ -25,7 +27,13 @@ import { useTheme } from '~/theme'
 export default function Person() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
+  const { data, error, loading, refreshing, refresh, reload } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
+  const [notice, setNotice] = React.useState<string | null>(null)
+  useFresh(reload)
+  const changed = (message: string) => {
+    setNotice(message)
+    reload()
+  }
 
   if (loading) return <Screen topInset={false}><Loading /></Screen>
   if (error || !data) return <Screen topInset={false} onRefresh={refresh}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
@@ -45,10 +53,12 @@ export default function Person() {
         <T variant="display" style={{ marginTop: 14, textAlign: 'center' }} accessibilityRole="header">{person.name}</T>
         {person.title ? <T variant="small" tone="secondary" style={{ marginTop: 2, textAlign: 'center' }}>{person.title}</T> : null}
         {person.company ? <View style={{ marginTop: 6 }}><CompanyLine name={person.company} /></View> : null}
-        <View style={{ marginTop: 10 }}>
+        <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
           <Chip>{person.relationshipLabel}</Chip>
+          {person.isDemo ? <SampleChip /> : null}
         </View>
       </View>
+      {notice ? <Notice text={notice} onDone={() => setNotice(null)} /> : null}
 
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
         <View style={{ flex: 1 }}>
@@ -107,7 +117,7 @@ export default function Person() {
 
       {loops.length > 0 ? (
         <Section label="Open loops" icon="corner-up-right">
-          {loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} showPerson={false} />)}
+          {loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} showPerson={false} onChanged={changed} />)}
         </Section>
       ) : null}
 

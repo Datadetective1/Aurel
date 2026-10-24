@@ -40,7 +40,7 @@ export async function loadTodayVisual(
   const [{ data: meetings }, loops, conversations] = await Promise.all([
     supabase
       .from('meetings')
-      .select('id, title, scheduled_at, objective')
+      .select('id, title, scheduled_at, objective, is_demo')
       .eq('user_id', userId)
       .eq('status', 'upcoming')
       .gte('scheduled_at', from.toISOString())
@@ -63,7 +63,7 @@ export async function loadTodayVisual(
         supabase
           .from('meeting_attendees')
           .select(
-            'meeting_id, person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, organizations(name, domain))',
+            'meeting_id, person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organizations(name, domain))',
           )
           .eq('user_id', userId)
           .in('meeting_id', ids),
@@ -94,6 +94,7 @@ export async function loadTodayVisual(
         lastInteractionAt: p.last_interaction_at,
         openLoops: mine.length,
         owe: mine.filter((l) => l.direction === 'owe').length,
+        isDemo: p.is_demo,
       }
     })
     return {
@@ -104,6 +105,7 @@ export async function loadTodayVisual(
       prep: prepState({ hasBrief: prepared.has(m.id), attendeeCount: room.length }),
       people: room,
       openLoops: room.reduce((n, p) => n + p.openLoops, 0),
+      isDemo: m.is_demo,
     }
   })
 

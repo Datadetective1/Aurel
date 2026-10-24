@@ -29,6 +29,8 @@ export interface VisualPerson {
   openLoops: number
   /** Of those, the ones the user owes. */
   owe: number
+  /** Part of the fictional sample record. Shown as such wherever the person appears. */
+  isDemo?: boolean
 }
 
 export interface VisualLoop {
@@ -50,6 +52,8 @@ export interface VisualMeetingSummary {
   prep: PrepState
   people: VisualPerson[]
   openLoops: number
+  /** Part of the fictional sample record. */
+  isDemo?: boolean
 }
 
 export interface VisualGlance {

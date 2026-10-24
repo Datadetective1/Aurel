@@ -1,20 +1,23 @@
-import { SegmentedCapture, type SegmentedDeps } from '../lib/segmented'
+import { discardRemote, storageTranscriber, type SegmentedDeps } from '../lib/segmented'
+import { memoryStore, newPending, transcribeParts } from '../lib/pending-capture'
 
 /**
- * The phone's half of segmented capture: segments go up in order, retryable
- * failures are retried, words come back in order, and a discarded recording
- * is deleted on the server.
+ * Parts through private, temporary storage: each part is its own server-side
+ * capture, so a part that failed can be sent again from the phone's copy;
+ * whatever the server still holds for an abandoned part is discarded.
  */
 function deps(overrides: Partial<SegmentedDeps> = {}) {
   const calls: string[] = []
+  let n = 0
   const d: SegmentedDeps = {
     async readFile(uri) {
       calls.push(`read:${uri}`)
       return new ArrayBuffer(4_000)
     },
     async requestUpload({ index, captureId }) {
+      n += 1
       calls.push(`ticket:${index}:${captureId ?? 'new'}`)
-      return { uploadId: `u${index}`, captureId: 'cap-1', path: `user/cap-1/00${index}.m4a`, token: 't', contentType: 'audio/mp4' }
+      return { uploadId: `u${n}`, captureId: `cap-${n}`, path: `user/cap-${n}/000.m4a`, token: 't', contentType: 'audio/mp4' }
     },
     async putObject(ticket) {
       calls.push(`put:${ticket.path}`)
@@ -31,63 +34,41 @@ function deps(overrides: Partial<SegmentedDeps> = {}) {
   return { d, calls }
 }
 
-describe('segmented capture', () => {
-  it('uploads each segment once, in order, reusing the capture', async () => {
+function recording(uris: string[]) {
+  const store = memoryStore(new Map(uris.map((u) => [u, 240_000])))
+  const p = newPending({ id: 'x', now: new Date('2026-10-24T15:00:00Z'), mode: 'meeting_recording', consent: true })
+  p.parts = uris.map((uri) => ({ uri, seconds: 600, text: null }))
+  return { store, p }
+}
+
+describe('storage transport', () => {
+  it('uploads each part once, in order, each as a new capture', async () => {
     const { d, calls } = deps()
-    const capture = new SegmentedCapture(d)
-    capture.add('file:///a.m4a', 600)
-    capture.add('file:///b.m4a', 600)
-    capture.add('file:///c.m4a', 42)
-    const result = await capture.finish()
-    expect(result).toEqual({ ok: true, text: 'words u0\n\nwords u1\n\nwords u2' })
-    expect(calls.filter((c) => c.startsWith('ticket'))).toEqual(['ticket:0:new', 'ticket:1:cap-1', 'ticket:2:cap-1'])
-    expect(capture.segments).toBe(3)
+    const { store, p } = recording(['file:///a.m4a', 'file:///b.m4a'])
+    expect(await transcribeParts(p, storageTranscriber(d), store)).toEqual({ ok: true })
+    expect(calls.filter((x) => x.startsWith('ticket'))).toEqual(['ticket:0:new', 'ticket:0:new'])
+    expect(p.parts.map((x) => x.text)).toEqual(['words u1', 'words u2'])
+    expect(p.parts.map((x) => x.captureId)).toEqual(['cap-1', 'cap-2'])
   })
 
-  it('retries a retryable failure, then succeeds', async () => {
-    let attempts = 0
-    const { d } = deps({
-      async transcribe() {
-        attempts++
-        return attempts < 3 ? { ok: false, error: 'busy', retryable: true } : { ok: true, text: 'finally' }
-      },
-    })
-    const capture = new SegmentedCapture(d)
-    capture.add('file:///a.m4a', 600)
-    expect(await capture.finish()).toEqual({ ok: true, text: 'finally' })
-    expect(attempts).toBe(3)
-  })
-
-  it('stops at a failure that cannot be retried, and says what it was', async () => {
-    const { d, calls } = deps({
-      async transcribe() {
-        return { ok: false, error: "That audio format isn't supported.", retryable: false }
-      },
-    })
-    const capture = new SegmentedCapture(d)
-    capture.add('file:///a.m4a', 600)
-    capture.add('file:///b.m4a', 600)
-    expect(await capture.finish()).toEqual({ ok: false, error: "That audio format isn't supported." })
-    // The second segment is not sent once the recording has failed.
-    expect(calls.filter((c) => c.startsWith('put')).length).toBe(1)
-  })
-
-  it('reports an upload failure rather than losing it', async () => {
+  it('treats an upload that never reached the server as worth retrying', async () => {
+    let failures = 1
     const { d } = deps({
       async putObject() {
-        throw new Error('That part of the recording could not be uploaded.')
+        if (failures-- > 0) throw new Error('That part of the recording could not be uploaded.')
       },
     })
-    const capture = new SegmentedCapture(d)
-    capture.add('file:///a.m4a', 600)
-    expect(await capture.finish()).toEqual({ ok: false, error: 'That part of the recording could not be uploaded.' })
+    const { store, p } = recording(['file:///a.m4a'])
+    expect(await transcribeParts(p, storageTranscriber(d), store)).toEqual({ ok: true })
   })
 
-  it('a discarded recording is deleted on the server', async () => {
+  it('discards on the server only parts that never became words', async () => {
     const { d, calls } = deps()
-    const capture = new SegmentedCapture(d)
-    capture.add('file:///a.m4a', 600)
-    await capture.cancel()
-    expect(calls).toContain('discard:cap-1')
+    const { p } = recording(['file:///a.m4a', 'file:///b.m4a'])
+    p.parts[0]!.text = 'done'
+    p.parts[0]!.captureId = 'cap-done'
+    p.parts[1]!.captureId = 'cap-stuck'
+    await discardRemote(d, p)
+    expect(calls).toEqual(['discard:cap-stuck'])
   })
 })

@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { KeyboardAvoidingView, Linking, Platform, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Linking, Platform, ScrollView, TextInput, View } from 'react-native'
+import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { brand } from '@atturel/web/lib/brand'
 import { useAuth } from '~/lib/auth'
@@ -9,8 +10,9 @@ import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
 
 /**
- * Sign in with the same account as the web. Accounts are created, and
- * onboarding is finished, on the web -- the app does not duplicate either.
+ * Sign in with the same account as the web. A new account can be created
+ * here too (the web's own sign-up, through /api/mobile/sign-up); a forgotten
+ * password is reset on the web, where the link in the email lands.
  */
 export default function SignIn() {
   const { c } = useTheme()
@@ -42,7 +44,10 @@ export default function SignIn() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: c.bg }}>
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: insets.top, paddingBottom: insets.bottom + 16 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }}
+      >
         <T variant="label" tone="accent">{brand.name}</T>
         <T variant="display" style={{ marginTop: 10 }}>Walk into every room prepared.</T>
         <T variant="small" tone="secondary" style={{ marginTop: 10 }}>
@@ -88,13 +93,11 @@ export default function SignIn() {
           <View style={{ marginTop: 6 }}>
             <Button label="Sign in" onPress={submit} busy={busy} disabled={!email || !password} size="lg" />
           </View>
-          <Button
-            label="New here? Create an account on the web"
-            variant="ghost"
-            onPress={() => void Linking.openURL(`${config.apiUrl}/sign-up`)}
-          />
+          <Button label="Forgot your password?" variant="ghost" onPress={() => void Linking.openURL(`${config.apiUrl}/forgot-password`)} accessibilityHint="Opens atturel.com in Safari" />
+          <View style={{ height: 1, backgroundColor: c.line, marginVertical: 8 }} />
+          <Button label="New here? Create an account" variant="secondary" icon="user-plus" onPress={() => router.push('/sign-up')} />
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   )
 }

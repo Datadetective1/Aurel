@@ -25,6 +25,8 @@ function Navigator() {
 
   if (state.status === 'loading') return null
   const signedIn = state.status === 'signed_in'
+  const ready = signedIn && state.onboarded
+  const settingUp = signedIn && !state.onboarded
 
   return (
     <>
@@ -39,15 +41,20 @@ function Navigator() {
           contentStyle: { backgroundColor: c.bg },
         }}
       >
-        <Stack.Protected guard={signedIn}>
+        <Stack.Protected guard={ready}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="meeting/[id]" options={{ title: '' }} />
+          <Stack.Screen name="meeting/new" options={{ title: 'New meeting', presentation: 'modal' }} />
           <Stack.Screen name="person/[id]" options={{ title: '' }} />
           <Stack.Screen name="review/[id]" options={{ title: 'What happened', presentation: 'modal' }} />
           <Stack.Screen name="account" options={{ title: 'Account' }} />
         </Stack.Protected>
+        <Stack.Protected guard={settingUp}>
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+          <Stack.Screen name="sign-up" options={{ title: '', headerTransparent: true }} />
         </Stack.Protected>
       </Stack>
     </>

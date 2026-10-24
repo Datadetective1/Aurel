@@ -42,6 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       title: visual.meeting.title,
       scheduledAt: visual.meeting.scheduledAt,
       objective: visual.meeting.objective,
+      isDemo: visual.meeting.isDemo,
     },
     timeZone: ctx.timeZone,
     prep: visual.prep,

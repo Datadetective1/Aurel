@@ -40,6 +40,7 @@ export interface MeetingVisual {
     objective: string | null
     importance: number
     status: Database['public']['Enums']['meeting_status']
+    isDemo: boolean
   }
   artifact: { id: string; createdAt: string; grounded: boolean } | null
   brief: NormalizedBrief | null
@@ -100,7 +101,7 @@ export async function loadMeetingVisual(
   const [{ data: meeting }, { data: artifact }, { data: attendees }] = await Promise.all([
     supabase
       .from('meetings')
-      .select('id, title, kind, scheduled_at, objective, importance, status')
+      .select('id, title, kind, scheduled_at, objective, importance, status, is_demo')
       .eq('user_id', userId)
       .eq('id', meetingId)
       .maybeSingle(),
@@ -116,7 +117,7 @@ export async function loadMeetingVisual(
     supabase
       .from('meeting_attendees')
       .select(
-        'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, organization_id, organizations(name, domain))',
+        'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organization_id, organizations(name, domain))',
       )
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),
@@ -183,6 +184,7 @@ export async function loadMeetingVisual(
       lastInteractionAt: p.last_interaction_at,
       openLoops: mine.length,
       owe: mine.filter((l) => l.direction === 'owe').length,
+      isDemo: p.is_demo,
     }
   })
 
@@ -273,6 +275,7 @@ export async function loadMeetingVisual(
       objective: meeting.objective,
       importance: meeting.importance,
       status: meeting.status,
+      isDemo: meeting.is_demo,
     },
     artifact: artifact
       ? { id: artifact.id, createdAt: artifact.created_at, grounded: artifact.grounded_fallback }

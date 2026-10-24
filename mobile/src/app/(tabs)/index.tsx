@@ -2,11 +2,17 @@ import * as React from 'react'
 import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
-import type { TodayResponse } from '@atturel/web/lib/mobile/contracts'
-import { useApi } from '~/lib/api'
+import type { SampleDataResponse, TodayResponse } from '@atturel/web/lib/mobile/contracts'
+import { api, ApiError, useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
+import { pendingStore } from '~/lib/pending-store'
+import { recordedSeconds } from '~/lib/pending-capture'
+import { useRecordingState } from '~/lib/recording-state'
+import { elapsed } from '~/lib/capture'
 import { countdown, formatDayLabel } from '~/lib/format'
 import { Failure, Loading, Screen, Section, Empty, Card } from '~/components/screen'
 import { LoopRow, MeetingCard } from '~/components/relationship'
+import { Notice } from '~/components/notice'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
@@ -22,7 +28,18 @@ import { useTheme } from '~/theme'
  */
 export default function Today() {
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh } = useApi<TodayResponse>('/api/mobile/today')
+  const { data, error, loading, refreshing, refresh, reload } = useApi<TodayResponse>('/api/mobile/today')
+  const [notice, setNotice] = React.useState<string | null>(null)
+  const [unsent, setUnsent] = React.useState(() => pendingStore().load())
+  const recording = useRecordingState()
+  useFresh(() => {
+    reload()
+    setUnsent(pendingStore().load())
+  })
+  const changed = (message: string) => {
+    setNotice(message)
+    reload()
+  }
 
   if (loading) return <Screen><Loading /></Screen>
   if (error || !data) {
@@ -51,12 +68,31 @@ export default function Today() {
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T variant="label" tone="muted">{formatDayLabel(data.now, tz)}</T>
-        {/* Account, privacy, sign out and Delete Account live behind this. */}
-        <AccountButton />
+        <View style={{ flexDirection: 'row' }}>
+          <IconButton icon="plus" label="New meeting" onPress={() => router.push('/meeting/new')} />
+          {/* Account, privacy, sign out and Delete Account live behind this. */}
+          <AccountButton />
+        </View>
       </View>
       <T variant="display" style={{ marginTop: 2 }} accessibilityRole="header">
         {greeting(now, tz)}, {data.name.split(' ')[0]}
       </T>
+      {notice ? <Notice text={notice} onDone={() => setNotice(null)} /> : null}
+
+      {unsent && unsent.parts.length > 0 && recording === 'idle' ? (
+        <View style={{ marginTop: 16 }}>
+          <Card tone="caution">
+            <T variant="small">A {elapsed(recordedSeconds(unsent))} recording has not been sent yet. It is safe on this iPhone.</T>
+            <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+              <Button label="Open it in Capture" icon="mic" variant="secondary" onPress={() => router.push('/capture')} />
+            </View>
+          </Card>
+        </View>
+      ) : null}
+
+      {data.meetings.length === 0 && data.loops.length === 0 && data.awaitingReview.length === 0 ? (
+        <StartHere onLoaded={changed} />
+      ) : null}
 
       {next && soon ? (
         <View style={{ marginTop: 20 }}>
@@ -80,7 +116,12 @@ export default function Today() {
 
       <Section label={soon ? 'Later this week' : 'Coming up'} icon="calendar">
         {data.meetings.length === 0 ? (
-          <Empty icon="calendar" title="Nothing in the next seven days" body="Meetings you add on the web, or sync from your calendar, appear here with who is in them and what is open." />
+          <Empty
+            icon="calendar"
+            title="Nothing in the next seven days"
+            body="Meetings you add here or on the web, or sync from your calendar, appear with who is in them and what is open."
+            action={{ label: 'New meeting', onPress: () => router.push('/meeting/new') }}
+          />
         ) : rest.length === 0 ? (
           <T variant="small" tone="muted">Nothing else in the next seven days.</T>
         ) : (
@@ -119,7 +160,7 @@ export default function Today() {
         {data.loops.length === 0 ? (
           <T variant="small" tone="muted">Nothing open. Promises from your conversations collect here once you confirm them.</T>
         ) : (
-          data.loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} />)
+          data.loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} onChanged={changed} />)
         )}
       </Section>
     </Screen>
@@ -127,17 +168,69 @@ export default function Today() {
 }
 
 function AccountButton() {
+  return <IconButton icon="user" label="Account and settings" onPress={() => router.push('/account')} />
+}
+
+function IconButton({ icon, label, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; onPress: () => void }) {
   const { c } = useTheme()
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Account and settings"
-      hitSlop={8}
-      onPress={() => router.push('/account')}
+      accessibilityLabel={label}
+      hitSlop={4}
+      onPress={onPress}
       style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
     >
-      <Feather name="user" size={20} color={c.inkSecondary} />
+      <Feather name={icon} size={20} color={c.inkSecondary} />
     </Pressable>
+  )
+}
+
+/**
+ * First run, or a quiet week: the two ways in. A real meeting is the point;
+ * the sample record is for seeing what Atturel does before there is anything
+ * of one's own -- invented people, labelled as invented everywhere, removable
+ * in one step from Account.
+ */
+function StartHere({ onLoaded }: { onLoaded: (message: string) => void }) {
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const load = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await api.post<SampleDataResponse>('/api/mobile/sample-data', {})
+      if (result.ok) onLoaded(result.message)
+      else setError(result.error)
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.failure.kind === 'offline'
+          ? 'You are offline.'
+          : e instanceof ApiError && e.failure.kind === 'not_found'
+            ? 'Sample people are not available from the app yet. Load them from Settings › Data on atturel.com.'
+            : 'The sample could not be loaded. Try again.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <View style={{ marginTop: 20 }}>
+      <Card>
+        <T variant="title">Walk into your next meeting prepared.</T>
+        <T variant="small" tone="secondary" style={{ marginTop: 6 }}>
+          Add a meeting and who will be there. Atturel prepares a brief from what you know, then keeps what was promised when you capture the conversation.
+        </T>
+        <View style={{ marginTop: 14, gap: 10 }}>
+          <Button label="Prepare a meeting" icon="plus" onPress={() => router.push('/meeting/new')} />
+          <Button label="Explore with sample people" icon="eye" variant="secondary" busy={busy} onPress={() => void load()} />
+        </View>
+        <T variant="meta" tone="muted" style={{ marginTop: 10 }}>
+          The sample people are invented and marked as samples. Remove them any time from Account.
+        </T>
+        {error ? <T variant="small" tone="critical" style={{ marginTop: 8 }} accessibilityRole="alert">{error}</T> : null}
+      </Card>
+    </View>
   )
 }
 

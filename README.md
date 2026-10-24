@@ -177,7 +177,7 @@ product does not claim it has.
 
 ---
 
-## Visual + mobile (branch `visual-mobile-foundation`, not yet in production)
+## Visual + mobile
 
 A visual, mobile-first layer over the same intelligence: a briefing cockpit
 and room view on every brief depth, a face-first person page with a dated
@@ -187,6 +187,10 @@ on the same backend. See [docs/VISUAL_AND_MOBILE.md](docs/VISUAL_AND_MOBILE.md),
 [mobile/README.md](mobile/README.md) and
 [docs/COMMERCIAL_READINESS.md](docs/COMMERCIAL_READINESS.md). Review the
 visuals without signing in at `/dev/preview` on a preview deployment.
+
+The iPhone app's readiness, Apple compliance audit and two-minute demo are in
+[docs/IOS_READINESS.md](docs/IOS_READINESS.md); the steps to the first
+TestFlight build are in [docs/IOS_TESTFLIGHT.md](docs/IOS_TESTFLIGHT.md).
 
 ## Production status
 

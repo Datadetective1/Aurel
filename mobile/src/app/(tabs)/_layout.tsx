@@ -3,6 +3,7 @@ import { View } from 'react-native'
 import { Tabs } from 'expo-router/js-tabs'
 import Feather from '@expo/vector-icons/Feather'
 import { useTheme } from '~/theme'
+import { useRecordingState } from '~/lib/recording-state'
 
 /**
  * Five places, designed for a thumb: what is happening today, the people,
@@ -11,6 +12,7 @@ import { useTheme } from '~/theme'
  */
 export default function TabsLayout() {
   const { c } = useTheme()
+  const recording = useRecordingState()
   return (
     <Tabs
       screenOptions={{
@@ -32,20 +34,27 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="capture"
         options={{
-          title: 'Capture',
-          tabBarAccessibilityLabel: 'Capture a conversation',
+          title: recording === 'recording' ? 'Recording' : recording === 'paused' ? 'Paused' : 'Capture',
+          tabBarAccessibilityLabel:
+            recording === 'recording' ? 'Recording now. Open Capture' : recording === 'paused' ? 'Recording paused. Open Capture' : 'Capture a conversation',
+          tabBarActiveTintColor: recording === 'recording' ? c.critical : c.ink,
+          tabBarInactiveTintColor: recording === 'recording' ? c.critical : c.inkMuted,
           tabBarIcon: ({ focused }) => (
             <View
               style={{
                 width: 44,
                 height: 30,
                 borderRadius: 15,
-                backgroundColor: focused ? c.surfaceInverse : c.accentWash,
+                backgroundColor: recording === 'recording' ? c.critical : focused ? c.surfaceInverse : c.accentWash,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Feather name="mic" size={17} color={focused ? c.inkInverse : c.accent} />
+              <Feather
+                name={recording === 'paused' ? 'pause' : 'mic'}
+                size={17}
+                color={recording === 'recording' ? c.inkInverse : focused ? c.inkInverse : c.accent}
+              />
             </View>
           ),
         }}
