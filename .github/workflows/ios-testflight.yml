@@ -38,6 +38,7 @@ jobs:
     timeout-minutes: 120
     defaults:
       run:
+        shell: bash
         working-directory: mobile
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -116,6 +117,7 @@ jobs:
 
       - name: Summary
         if: always()
+        working-directory: .
         env:
           SUBMIT: ${{ inputs.submit }}
         run: |
