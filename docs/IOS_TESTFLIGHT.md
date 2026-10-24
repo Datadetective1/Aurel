@@ -11,14 +11,17 @@ ships to every browser.
 Builds run from GitHub, with no computer needed:
 **Actions → iOS TestFlight → Run workflow**
 (`.github/workflows/ios-testflight.yml`). The workflow builds on Expo's
-servers and uploads to TestFlight for internal testing. It never submits the
-app for App Store review or release.
+servers, uploads to TestFlight for internal testing, and waits until Apple has
+processed the build. It never submits the app for App Store review or release.
+
+The first build, Atturel 0.1.0 (1), was built and uploaded this way on
+24 October 2026. App Store Connect app ID: `6826645381`. Team: `7G53X2Y9ZL`.
 
 Nobody should ever ask you for a password, a 2FA code or a key file in a
 chat. Secrets go into GitHub's own secrets page, which encrypts them; once
 saved, they cannot be read back, not even by whoever runs the workflow.
 
-## 1. Once: give GitHub an Expo token and an Apple API key (Amary)
+## 1. Once: give GitHub an Expo token and an Apple API key (Amary, done)
 
 The Expo project `@datadetective1/atturel` exists (ID
 `b7b37d6f-7256-4608-8a55-c2f0363628b9`, in `mobile/app.json`).
@@ -31,7 +34,7 @@ The Expo project `@datadetective1/atturel` exists (ID
    **New repository secret**. Name: `EXPO_TOKEN`. Secret: paste the token →
    **Add secret**.
 
-**App Store Connect API key.** The workflow signs in to Apple with this key
+**App Store Connect API key** (`ASC_API_KEY_*`, done). The workflow signs in to Apple with this key
 to create Atturel's provisioning profile and upload builds. No password or
 2FA code is involved. EAS keeps such a key on the Expo account only after a
 store submission, and PacePerk has only had internal builds, so there is
@@ -67,22 +70,30 @@ What the run does, in order:
    ID and the Apple team ID.
 5. Sets up signing:
    - It reuses the Apple Distribution Certificate the team already keeps on
-     Expo (PacePerk's). Sharing a certificate between apps on one team is
-     normal and changes nothing for PacePerk.
+     Expo (PacePerk's, serial `48D1E631…`, valid until 13 September 2027).
+     Sharing a certificate between apps on one team is normal and changes
+     nothing for PacePerk.
    - Only if there is none, it creates one.
    - It creates a provisioning profile that belongs to `com.atturel.app`
      alone.
    - It can never revoke a certificate or a key. Any question the script does
      not expect stops the run rather than being answered.
-6. Builds on EAS with the SDK 57 image (Xcode 26.6), in about 15–25 minutes.
-   EAS raises the build number on every build.
-7. Uploads to App Store Connect. On the first upload, EAS creates the
+6. Builds on EAS with the SDK 57 image (Xcode 26.6). The first build took
+   about 6 minutes. EAS raises the build number on every build.
+7. Uploads to App Store Connect. On the first upload, EAS created the
    internal TestFlight group **Team (Expo)**, which gets every build, and
-   invites the team's Admin users.
+   invited the team's Admin users.
+8. Waits until Apple has processed the build (usually 5–30 minutes), then
+   reports whether internal testers can install it, and how many testers
+   each internal group has. Export compliance is answered by the app itself
+   (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
 
-The run's summary page links the build on expo.dev. Apple then processes the
-build, usually in 10–30 minutes. Export compliance is answered by the app
-itself (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
+The run's summary page links the build on expo.dev and shows the TestFlight
+result.
+
+To check TestFlight without building, run **Actions → TestFlight status →
+Run workflow** (`.github/workflows/testflight-status.yml`). It is read-only
+and takes an optional build number.
 
 Later releases are the same button. Raise `version` in `mobile/app.json` for
 a new public version number; build numbers take care of themselves.
@@ -110,6 +121,8 @@ The failing step's log says why. The usual causes:
 | Find the App Store Connect key | `No App Store Connect API key` or `could reach com.atturel.app` | Add the three `ASC_API_KEY_*` secrets (step 1). The key must be a team key, not an individual one. |
 | Set up signing | `Maximum number of Distribution Certificates` | The team has no certificate on Expo and Apple's limit is reached. The run will not revoke one. Revoke an unused certificate yourself at developer.apple.com, or upload the existing one to Expo, then run again. |
 | Build | Anything in the EAS build log | The summary links the build log on expo.dev. |
+| Wait for Apple to process the build | `could not process` or `export compliance` | App Store Connect → TestFlight → the build shows the reason, and Apple emails it. |
+| Wait for Apple to process the build | `Still waiting after 40 minutes` | Apple is slow. The upload is done; run **TestFlight status** later. |
 
 ## 5. Without GitHub, from a computer (fallback)
 

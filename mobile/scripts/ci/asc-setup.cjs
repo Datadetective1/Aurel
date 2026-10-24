@@ -28,6 +28,7 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
+const { asc } = require('./asc-api.cjs')
 
 const mobileDir = path.resolve(__dirname, '../..')
 const appJson = JSON.parse(fs.readFileSync(path.join(mobileDir, 'app.json'), 'utf8')).expo
@@ -37,30 +38,6 @@ const accountName = appJson.owner
 function fail(message) {
   console.error(`::error::${message}`)
   process.exit(1)
-}
-
-function base64url(input) {
-  return Buffer.from(input).toString('base64url')
-}
-
-function ascToken({ keyP8, keyId, issuerId }) {
-  const now = Math.floor(Date.now() / 1000)
-  const header = base64url(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }))
-  const payload = base64url(JSON.stringify({ iss: issuerId, iat: now, exp: now + 600, aud: 'appstoreconnect-v1' }))
-  const signature = crypto.sign('sha256', Buffer.from(`${header}.${payload}`), { key: keyP8, dsaEncoding: 'ieee-p1363' })
-  return `${header}.${payload}.${signature.toString('base64url')}`
-}
-
-async function asc(key, pathAndQuery) {
-  const res = await fetch(`https://api.appstoreconnect.apple.com${pathAndQuery}`, {
-    headers: { authorization: `Bearer ${ascToken(key)}` },
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    const detail = body?.errors?.[0]?.detail ?? body?.errors?.[0]?.title ?? ''
-    throw new Error(`App Store Connect answered ${res.status}${detail ? `: ${detail}` : ''}`)
-  }
-  return res.json()
 }
 
 // Accepts the .p8 however it was pasted: the whole file, the file without its

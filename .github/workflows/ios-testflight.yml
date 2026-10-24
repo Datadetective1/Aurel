@@ -1,6 +1,7 @@
 name: iOS TestFlight
 
-# Builds the iOS app on EAS and uploads it to TestFlight for internal testing.
+# Builds the iOS app on EAS, uploads it to TestFlight for internal testing and
+# waits until Apple has processed it.
 # Manual only: Actions > iOS TestFlight > Run workflow. It never submits the
 # app for App Store review or release.
 #
@@ -126,8 +127,6 @@ jobs:
       - name: Summary
         if: always()
         working-directory: .
-        env:
-          SUBMIT: ${{ inputs.submit }}
         run: |
           {
             echo "### iOS TestFlight"
@@ -136,7 +135,13 @@ jobs:
             if [ -s "$RUNNER_TEMP/build.json" ]; then
               jq -r '.[] | "- Build \(.appVersion) (\(.appBuildVersion)): \(.status) — https://expo.dev/accounts/'"$EXPO_ACCOUNT"'/projects/atturel/builds/\(.id)"' "$RUNNER_TEMP/build.json" || true
             fi
-            if [ "$SUBMIT" = "true" ]; then
-              echo "- Upload: after the build, EAS sends it to App Store Connect. Apple then processes it (usually 10–30 minutes) and TestFlight emails the team's internal testers."
-            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Read-only: polls App Store Connect until Apple has processed this build
+      # and TestFlight can hand it to internal testers.
+      - name: Wait for Apple to process the build
+        if: inputs.submit
+        timeout-minutes: 50
+        run: |
+          export BUILD_NUMBER="$(jq -r '.[0].appBuildVersion // empty' "$RUNNER_TEMP/build.json")"
+          node scripts/ci/testflight-status.cjs
