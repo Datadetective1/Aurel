@@ -60,6 +60,26 @@ export function captureLimits(storageEnabled: boolean): CaptureLimitsView {
 }
 
 /**
+ * What the native app may record. The phone closes a finished file every
+ * segment (and at every pause), so each part is its own complete recording.
+ * Without segmented storage, each part goes to the single-upload route on its
+ * own -- ten minutes is about 2.4 MB at the speech encoding, well inside the
+ * request-body ceiling -- and is dropped there exactly as a short voice note
+ * is. So the two-hour ceiling holds either way; storage only changes how the
+ * bytes travel. The monthly transcription allowance still applies to every
+ * part, checked on the server before any audio is sent.
+ */
+export function mobileCaptureLimits(
+  storageEnabled: boolean,
+): CaptureLimitsView & { partTransport: 'storage' | 'direct' } {
+  return {
+    maxSeconds: SEGMENTED_MAX_SECONDS,
+    segmentSeconds: SEGMENT_SECONDS,
+    partTransport: storageEnabled ? 'storage' : 'direct',
+  }
+}
+
+/**
  * The storage path for one segment. The first folder is the owner's user id.
  * No client can touch the bucket at all (migration 0022 grants nothing to
  * anon or authenticated); the server builds every path here and checks it

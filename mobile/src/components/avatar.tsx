@@ -1,15 +1,26 @@
 import * as React from 'react'
 import { View } from 'react-native'
 import { Image } from 'expo-image'
+import { config } from '~/lib/config'
 import { useTheme } from '~/theme'
 import { T } from './text'
 
 /**
- * A face. With no photo, initials on a tint derived from the name, so the same
- * person always looks the same and a list stays scannable. The image is
- * decorative beside a visible name, so it is hidden from VoiceOver; where no
- * name is visible the caller passes `label`.
+ * A face. Initials on a tint derived from the name always render, so the same
+ * person always looks the same and a list stays scannable; a photo, when
+ * there is one, is layered over them and removed if it fails, so a slow,
+ * broken or expired link shows initials rather than an empty circle -- the
+ * web's fallback, on the phone. The image is decorative beside a visible
+ * name, so it is hidden from VoiceOver; where no name is visible the caller
+ * passes `label`.
  */
+
+/** Photos are signed URLs; the sample people's illustrations are paths on the website. */
+function resolve(src: string | null | undefined): string | null {
+  if (!src) return null
+  if (/^https?:\/\//i.test(src)) return src
+  return src.startsWith('/') ? `${config.apiUrl}${src}` : null
+}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -49,6 +60,8 @@ export function Avatar({
     { bg: c.bgSunken, fg: c.inkSecondary },
   ]
   const tint = tints[bucket(name, tints.length)]!
+  const uri = resolve(src)
+  const [failed, setFailed] = React.useState<string | null>(null)
   const a11y = label
     ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label }
     : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const }
@@ -68,13 +81,19 @@ export function Avatar({
         overflow: 'hidden',
       }}
     >
-      {src ? (
-        <Image source={{ uri: src }} style={{ width: size, height: size }} contentFit="cover" contentPosition={{ top: '35%' }} transition={120} />
-      ) : (
-        <T style={{ color: tint.fg, fontSize: size * 0.34, lineHeight: size * 0.4, fontFamily: 'InstrumentSans_500Medium' }} maxFontSizeMultiplier={1}>
-          {initials(name)}
-        </T>
-      )}
+      <T style={{ color: tint.fg, fontSize: size * 0.34, lineHeight: size * 0.4, fontFamily: 'InstrumentSans_500Medium' }} maxFontSizeMultiplier={1}>
+        {initials(name)}
+      </T>
+      {uri && failed !== uri ? (
+        <Image
+          source={{ uri }}
+          style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }}
+          contentFit="cover"
+          contentPosition={{ top: '35%' }}
+          transition={120}
+          onError={() => setFailed(uri)}
+        />
+      ) : null}
     </View>
   )
 }

@@ -1,15 +1,18 @@
+import type { CapturePart, PartTranscriber, PendingCapture } from './pending-capture'
+
 /**
- * SEGMENTED CAPTURE, ON THE PHONE
+ * PARTS THROUGH PRIVATE, TEMPORARY STORAGE
  * =============================================================================
- * A long conversation is recorded as ten-minute segments. Each finished
- * segment is uploaded straight to private storage and transcribed while the
- * next one records, so stopping a ninety-minute meeting leaves one segment to
- * process rather than ninety minutes.
+ * When the server offers it (`partTransport: 'storage'`, migration 0022), a
+ * finished part is uploaded straight to a signed URL in the user's own
+ * folder of a private bucket, transcribed there, and deleted by the server
+ * the moment it succeeds or gives up. Otherwise each part goes as the body
+ * of one request to the single-upload route (lib/api `directTranscriber`).
  *
- * Segments are processed one at a time, in order. A segment whose
- * transcription fails with a retryable error is tried again (twice); the
- * server keeps its audio for that, and deletes it the moment it succeeds or
- * gives up. Words are kept on the phone only until the conversation is sent.
+ * Each part is its own server-side capture. A part that failed can then be
+ * sent again from the copy on the phone without colliding with the one that
+ * failed -- the server keys an upload by capture and index -- and the orphan
+ * sweep removes anything a failed attempt left behind within the hour.
  *
  * The dependencies are injected, so the rules here are tested without a
  * network.
@@ -40,75 +43,45 @@ export interface SegmentedDeps {
   discard(captureId: string): Promise<void>
 }
 
-const RETRIES = 2
-
-export class SegmentedCapture {
-  private captureId: string | null = null
-  private texts = new Map<number, string>()
-  private failure: string | null = null
-  private queue: Promise<void> = Promise.resolve()
-  private count = 0
-
-  constructor(private deps: SegmentedDeps) {}
-
-  get segments(): number {
-    return this.count
-  }
-
-  /** Queue a finished segment. Returns immediately; work happens in order. */
-  add(uri: string, seconds: number): void {
-    const index = this.count++
-    this.queue = this.queue.then(() => this.process(index, uri, seconds))
-  }
-
-  private async process(index: number, uri: string, seconds: number): Promise<void> {
-    if (this.failure) return
+/** One part: upload, transcribe, words back. The server deletes the audio. */
+export function storageTranscriber(deps: SegmentedDeps): PartTranscriber {
+  return async (part: CapturePart) => {
+    let captureId: string | null = null
     try {
-      const extension = (uri.split('.').pop() ?? 'm4a').toLowerCase()
-      const body = await this.deps.readFile(uri)
-      const ticket = await this.deps.requestUpload({
-        captureId: this.captureId,
-        index,
+      const extension = (part.uri.split('.').pop() ?? 'm4a').toLowerCase()
+      const body = await deps.readFile(part.uri)
+      const ticket = await deps.requestUpload({
+        captureId: null,
+        index: 0,
         extension,
         bytes: body.byteLength,
-        declaredSeconds: Math.round(seconds),
+        declaredSeconds: Math.round(part.seconds),
       })
-      this.captureId = ticket.captureId
-      await this.deps.putObject(ticket, body)
-
-      for (let attempt = 0; attempt <= RETRIES; attempt++) {
-        const result = await this.deps.transcribe(ticket.uploadId)
-        if (result.ok) {
-          this.texts.set(index, result.text)
-          return
-        }
-        if (!result.retryable || attempt === RETRIES) {
-          this.failure = result.error
-          return
-        }
-      }
+      captureId = ticket.captureId
+      await deps.putObject(ticket, body)
+      const result = await deps.transcribe(ticket.uploadId)
+      return result.ok
+        ? { ok: true, text: result.text, captureId }
+        : { ok: false, error: result.error, retryable: result.retryable, captureId }
     } catch (error) {
-      this.failure = error instanceof Error && error.message ? error.message : 'That part of the recording could not be sent.'
+      return {
+        ok: false,
+        // An upload that never reached the server is worth trying again.
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : 'That part of the recording could not be sent.',
+        retryable: true,
+        captureId,
+      }
     }
   }
+}
 
-  /** Every segment's words, in order -- or the first failure. */
-  async finish(): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
-    await this.queue
-    if (this.failure) return { ok: false, error: this.failure }
-    const parts: string[] = []
-    for (let i = 0; i < this.count; i++) {
-      const text = this.texts.get(i)
-      if (text === undefined) return { ok: false, error: 'Part of the recording is missing. Try again.' }
-      if (text.trim()) parts.push(text.trim())
-    }
-    return { ok: true, text: parts.join('\n\n') }
-  }
-
-  /** Throw the recording away, here and on the server. */
-  async cancel(): Promise<void> {
-    await this.queue.catch(() => {})
-    this.texts.clear()
-    if (this.captureId) await this.deps.discard(this.captureId).catch(() => {})
-  }
+/** Throw away whatever the server still holds for parts that never became words. */
+export async function discardRemote(deps: SegmentedDeps, pending: PendingCapture | null): Promise<void> {
+  const ids = new Set(
+    (pending?.parts ?? []).filter((p) => p.text === null && p.captureId).map((p) => p.captureId!),
+  )
+  await Promise.all([...ids].map((id) => deps.discard(id).catch(() => {})))
 }

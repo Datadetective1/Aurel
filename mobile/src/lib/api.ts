@@ -2,8 +2,9 @@ import * as React from 'react'
 import { config } from './config'
 import { supabase } from './supabase'
 import { previewResponse } from './preview-data'
-import type { DeleteAccountResponse } from '@atturel/web/lib/mobile/contracts'
+import type { DeleteAccountResponse, SignUpRequest, SignUpResponse } from '@atturel/web/lib/mobile/contracts'
 import type { SegmentedDeps, SegmentUploadTicket } from './segmented'
+import type { PartTranscriber } from './pending-capture'
 
 /**
  * THE APP'S ONE DOOR TO THE BACKEND
@@ -103,20 +104,73 @@ export const api = {
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
 
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+
   /**
-   * Audio to words, through the same route the web recorder uses. The audio
-   * is uploaded, transcribed and dropped server-side; only text comes back.
+   * Create an account. The one call made without a session, so it cannot go
+   * through `request`. The server answers as the web form does -- the same
+   * words whether or not the address already has an account.
    */
-  async transcribe(uri: string, durationSeconds: number, participantIds: string[] = []): Promise<string> {
-    if (config.previewData) return previewResponse<{ text: string }>('/transcribe', {}).then((r) => r.text)
-    const form = new FormData()
-    const extension = uri.split('.').pop()?.toLowerCase() ?? 'm4a'
-    form.append('audio', { uri, name: `capture.${extension}`, type: extension === 'webm' ? 'audio/webm' : 'audio/mp4' } as unknown as Blob)
-    form.append('durationSeconds', String(Math.round(durationSeconds)))
-    for (const id of participantIds) form.append('participant', id)
-    const result = await request<{ text: string }>('/api/conversations/transcribe', { method: 'POST', body: form })
-    return result.text
+  async signUp(body: SignUpRequest): Promise<SignUpResponse> {
+    if (config.previewData) return { ok: true, needsConfirmation: true }
+    let response: Response
+    try {
+      response = await fetch(`${config.apiUrl}/api/mobile/sign-up`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      throw new ApiError({ kind: 'offline' })
+    }
+    const result = (await response.json().catch(() => null)) as SignUpResponse | null
+    if (response.status === 404) {
+      return { ok: false, error: 'Creating an account from the app is not available yet. Use atturel.com.' }
+    }
+    return result ?? { ok: false, error: 'Something went wrong. Try again.' }
   },
+}
+
+/**
+ * One recorded part as the body of one request to the single-upload route,
+ * which transcribes it and drops the audio -- the same route and the same
+ * metering as a voice note. A failure says whether trying again could help:
+ * a lost connection or a busy provider could; an empty, oversized or
+ * over-allowance part could not.
+ */
+export function directTranscriber(participantIds: string[] = []): PartTranscriber {
+  return async (part) => {
+    if (config.previewData) {
+      const r = await previewResponse<{ text: string }>('/transcribe', {})
+      return { ok: true, text: r.text }
+    }
+    const access = await token()
+    if (!access) return { ok: false, error: 'Sign in again to send this recording.', retryable: false }
+    const form = new FormData()
+    const extension = part.uri.split('.').pop()?.toLowerCase() ?? 'm4a'
+    form.append('audio', { uri: part.uri, name: `capture.${extension}`, type: extension === 'webm' ? 'audio/webm' : 'audio/mp4' } as unknown as Blob)
+    form.append('durationSeconds', String(Math.round(part.seconds)))
+    for (const id of participantIds) form.append('participant', id)
+
+    let response: Response
+    try {
+      response = await fetch(`${config.apiUrl}/api/conversations/transcribe`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${access}` },
+        body: form,
+      })
+    } catch {
+      return { ok: false, error: 'You are offline. The recording is safe on this phone — send it when you reconnect.', retryable: true }
+    }
+    const body = (await response.json().catch(() => null)) as { text?: string; error?: string } | null
+    if (response.ok && typeof body?.text === 'string') return { ok: true, text: body.text }
+    if (response.status === 401) return { ok: false, error: 'Sign in again to send this recording.', retryable: false }
+    return {
+      ok: false,
+      error: body?.error ?? 'That part of the recording could not be turned into words.',
+      retryable: response.status >= 500 || response.status === 429,
+    }
+  }
 }
 
 /** The private bucket segments are uploaded to (migration 0022). */
@@ -183,7 +237,7 @@ export function useApi<T>(path: string | null) {
   const [refreshing, setRefreshing] = React.useState(false)
 
   const load = React.useCallback(
-    async (mode: 'initial' | 'refresh') => {
+    async (mode: 'initial' | 'refresh' | 'silent') => {
       if (!path) return
       if (mode === 'refresh') setRefreshing(true)
       try {
@@ -204,5 +258,13 @@ export function useApi<T>(path: string | null) {
     void load('initial')
   }, [load])
 
-  return { data, error, loading, refreshing, refresh: () => load('refresh') }
+  return {
+    data,
+    error,
+    loading,
+    refreshing,
+    refresh: () => load('refresh'),
+    /** Fetch again without the pull-to-refresh spinner: on returning to a screen. */
+    reload: () => load('silent'),
+  }
 }

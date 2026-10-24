@@ -1,8 +1,11 @@
 import * as React from 'react'
-import { TextInput, View } from 'react-native'
+import { Pressable, TextInput, View } from 'react-native'
+import { router } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import type { PeopleResponse } from '@atturel/web/lib/mobile/contracts'
 import { useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
+import { NewPerson } from '~/components/people-picker'
 import { Empty, Failure, Loading, Screen } from '~/components/screen'
 import { PersonRow } from '~/components/relationship'
 import { T } from '~/components/text'
@@ -12,7 +15,9 @@ import { fonts, TOUCH, useTheme } from '~/theme'
 export default function People() {
   const { c } = useTheme()
   const [query, setQuery] = React.useState('')
-  const { data, error, loading, refreshing, refresh } = useApi<PeopleResponse>('/api/mobile/people')
+  const { data, error, loading, refreshing, refresh, reload } = useApi<PeopleResponse>('/api/mobile/people')
+  const [adding, setAdding] = React.useState(false)
+  useFresh(reload)
   const now = new Date()
 
   const people = (data?.people ?? []).filter((p) => {
@@ -23,7 +28,28 @@ export default function People() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
-      <T variant="display" accessibilityRole="header">People</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <T variant="display" accessibilityRole="header">People</T>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add someone"
+          onPress={() => setAdding((a) => !a)}
+          style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+        >
+          <Feather name={adding ? 'x' : 'user-plus'} size={20} color={c.inkSecondary} />
+        </Pressable>
+      </View>
+      {adding ? (
+        <NewPerson
+          initialName={query}
+          onCancel={() => setAdding(false)}
+          onAdded={(person) => {
+            setAdding(false)
+            reload()
+            router.push({ pathname: '/person/[id]', params: { id: person.id } })
+          }}
+        />
+      ) : null}
       <View
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 12, minHeight: TOUCH }}
       >

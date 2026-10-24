@@ -1,11 +1,12 @@
 import * as React from 'react'
-import { Pressable, View } from 'react-native'
+import { ActionSheetIOS, Alert, Platform, Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
-import type { TimelineEntry, VisualLoop, VisualMeetingSummary, VisualPerson } from '@atturel/web/lib/mobile/contracts'
+import type { LoopActionResponse, TimelineEntry, VisualLoop, VisualMeetingSummary, VisualPerson } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_META } from '@atturel/web/lib/visual/relationship-actions'
 import { TIMELINE_KIND_LABEL } from '@atturel/web/lib/visual/timeline'
 import { monogram } from '@atturel/web/lib/visual/logo'
+import { api, ApiError } from '~/lib/api'
 import { formatDate, formatTime, relativeDay, firstName } from '~/lib/format'
 import { TOUCH, useTheme } from '~/theme'
 import { Avatar, FaceStack } from './avatar'
@@ -31,6 +32,11 @@ export function CompanyLine({ name }: { name: string }) {
       </T>
     </View>
   )
+}
+
+/** Marks the invented sample record wherever it appears, so it is never mistaken for a real one. */
+export function SampleChip() {
+  return <Chip icon="eye">Sample · invented</Chip>
 }
 
 /**
@@ -84,6 +90,7 @@ export function MeetingCard({ meeting, timeZone, now }: { meeting: VisualMeeting
               <PrepChip prep={meeting.prep} />
               {owe > 0 ? <Chip icon={DIRECTION_ICON.owe} tone="accent">{`You owe ${owe}`}</Chip> : null}
               {meeting.openLoops > owe ? <Chip>{`${meeting.openLoops - owe} open`}</Chip> : null}
+              {meeting.isDemo ? <SampleChip /> : null}
             </ChipRow>
           </View>
         </View>
@@ -93,15 +100,79 @@ export function MeetingCard({ meeting, timeZone, now }: { meeting: VisualMeeting
   )
 }
 
-/** One open loop: which way it runs, what it is, whose, when. */
-export function LoopRow({ loop, timeZone, now, showPerson = true }: { loop: VisualLoop; timeZone: string; now: Date; showPerson?: boolean }) {
+const LOOP_ACTIONS = [
+  { action: 'done', label: 'Done', done: 'Marked done.' },
+  { action: 'later', label: 'Later', done: 'Moved to later.' },
+  { action: 'cancel', label: 'No longer needed', done: 'Cancelled.' },
+] as const
+
+/**
+ * The web's one-tap loop actions, as the system's own action sheet. Nothing
+ * is asked back: the moment somebody closes a loop between meetings is not
+ * the moment for a form.
+ */
+export function chooseLoopAction(loop: VisualLoop, onChanged: (message: string) => void) {
+  const run = async (index: number) => {
+    const choice = LOOP_ACTIONS[index]
+    if (!choice) return
+    try {
+      const result = await api.post<LoopActionResponse>(`/api/mobile/loops/${loop.id}`, { action: choice.action })
+      if (result.ok) onChanged(choice.done)
+      else Alert.alert('Not saved', result.error)
+    } catch (e) {
+      Alert.alert(
+        'Not saved',
+        e instanceof ApiError && e.failure.kind === 'offline'
+          ? 'You are offline. Nothing changed.'
+          : e instanceof ApiError && e.failure.kind === 'not_found'
+            ? 'Closing loops from the app is not available yet. Use atturel.com.'
+            : 'That could not be saved. Try again.',
+      )
+    }
+  }
+  if (Platform.OS === 'ios') {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        title: loop.description,
+        options: [...LOOP_ACTIONS.map((a) => a.label), 'Keep open'],
+        cancelButtonIndex: LOOP_ACTIONS.length,
+        destructiveButtonIndex: 2,
+      },
+      (index) => void run(index),
+    )
+    return
+  }
+  Alert.alert(loop.description, undefined, [
+    ...LOOP_ACTIONS.map((a, i) => ({ text: a.label, onPress: () => void run(i) })),
+    { text: 'Keep open', style: 'cancel' as const },
+  ])
+}
+
+/** One open loop: which way it runs, what it is, whose, when. Tap to close it. */
+export function LoopRow({
+  loop,
+  timeZone,
+  now,
+  showPerson = true,
+  onChanged,
+}: {
+  loop: VisualLoop
+  timeZone: string
+  now: Date
+  showPerson?: boolean
+  /** When given, the row opens Done / Later / Cancel and calls this after a change. */
+  onChanged?: (message: string) => void
+}) {
   const { c } = useTheme()
   const meta = DIRECTION_META[loop.direction]
   return (
-    <View
-      accessible
+    <Pressable
+      disabled={!onChanged}
+      onPress={() => onChanged && chooseLoopAction(loop, onChanged)}
+      accessibilityRole={onChanged ? 'button' : 'text'}
+      accessibilityHint={onChanged ? 'Mark done, later, or no longer needed' : undefined}
       accessibilityLabel={`${meta.label}${loop.personName && showPerson ? `, ${loop.personName}` : ''}: ${loop.description}${loop.overdue ? ', overdue' : ''}`}
-      style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, minHeight: TOUCH }}
+      style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, minHeight: TOUCH, opacity: pressed ? 0.75 : 1 })}
     >
       <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: loop.overdue ? c.criticalWash : loop.direction === 'owe' ? c.accentWash : c.bgSunken, alignItems: 'center', justifyContent: 'center' }}>
         <Feather name={loop.overdue ? 'alert-circle' : DIRECTION_ICON[loop.direction]} size={15} color={loop.overdue ? c.critical : loop.direction === 'owe' ? c.accent : c.inkSecondary} />
@@ -114,7 +185,8 @@ export function LoopRow({ loop, timeZone, now, showPerson = true }: { loop: Visu
             .join(' · ')}
         </T>
       </View>
-    </View>
+      {onChanged ? <Feather name="more-horizontal" size={18} color={c.inkMuted} style={{ alignSelf: 'center' }} /> : null}
+    </Pressable>
   )
 }
 
@@ -206,7 +278,7 @@ export function PersonRow({ person, timeZone, now }: { person: VisualPerson; tim
       <Pressable
         onPress={() => router.push({ pathname: '/person/[id]', params: { id: person.id } })}
         accessibilityRole="button"
-        accessibilityLabel={`${person.name}${place ? `, ${place}` : ''}. ${fact}`}
+        accessibilityLabel={`${person.name}${person.isDemo ? ', invented sample person' : ''}${place ? `, ${place}` : ''}. ${fact}`}
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, opacity: pressed ? 0.8 : 1, minHeight: 64 })}
       >
         <Avatar name={person.fullName} src={person.src} size={48} />
@@ -214,6 +286,7 @@ export function PersonRow({ person, timeZone, now }: { person: VisualPerson; tim
           <T variant="body" style={{ fontFamily: 'InstrumentSans_500Medium' }} numberOfLines={1}>{person.name}</T>
           {place ? <T variant="meta" tone="muted" numberOfLines={1}>{place}</T> : null}
           <T variant="meta" tone={person.owe > 0 ? 'accent' : 'secondary'} style={{ marginTop: 2 }}>{fact}</T>
+          {person.isDemo ? <View style={{ marginTop: 6 }}><SampleChip /></View> : null}
         </View>
         <Feather name="chevron-right" size={18} color={c.inkMuted} />
       </Pressable>

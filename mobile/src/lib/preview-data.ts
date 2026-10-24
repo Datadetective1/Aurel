@@ -91,10 +91,20 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
         termsUrl: 'https://www.atturel.com/terms',
         supportEmail: 'support@atturel.com',
       },
-      capture: { maxSeconds: 17 * 60, segmentSeconds: null },
+      capture: { maxSeconds: 2 * 3600, segmentSeconds: 600, partTransport: 'direct' },
+      sampleData: { loaded: false },
     }
     return body as T
   }
+
+  if (p === '/me') return { id: 'preview', name: 'Amary', timeZone: TZ, onboarded: true } as T
+  if (p === '/sample-data') return { ok: true, message: 'Preview data is already invented.' } as T
+  if (p === '/onboarding') return { ok: true } as T
+  if (p === '/meetings' && init.method === 'POST') return { ok: true, meetingId: 'm-2' } as T
+  if (/^\/meetings\/[^/]+\/prepare$/.test(p)) return { ok: true, grounded: false } as T
+  if (/^\/meetings\/[^/]+\/attendees$/.test(p)) return { ok: true } as T
+  if (/^\/loops\/[^/]+$/.test(p)) return { ok: true } as T
+  if (p === '/people' && init.method === 'POST') return { ok: true, personId: PEOPLE[0]!.id } as T
 
   if (p === '/today') {
     const body: TodayResponse = {

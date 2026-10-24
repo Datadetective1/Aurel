@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { Linking, TextInput, View } from 'react-native'
+import { Alert, Linking, TextInput, View } from 'react-native'
+import * as Application from 'expo-application'
 import Feather from '@expo/vector-icons/Feather'
-import type { AccountResponse } from '@atturel/web/lib/mobile/contracts'
+import type { AccountResponse, SampleDataResponse } from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
 import { useAuth } from '~/lib/auth'
 import { config } from '~/lib/config'
@@ -66,6 +67,8 @@ export default function Account() {
         />
       </Section>
 
+      {data.sampleData ? <SampleData loaded={data.sampleData.loaded} onChanged={refresh} /> : null}
+
       <Section label="Session" icon="log-out">
         <Button label="Sign out" variant="secondary" icon="log-out" onPress={() => void signOut()} />
       </Section>
@@ -85,11 +88,14 @@ export default function Account() {
         )}
       </Section>
 
-      {config.previewData ? null : (
-        <T variant="meta" tone="muted" style={{ marginTop: 24, textAlign: 'center' }}>
-          Signed in to {config.apiUrl.replace(/^https?:\/\//, '')}
-        </T>
-      )}
+      <T variant="meta" tone="muted" style={{ marginTop: 24, textAlign: 'center' }}>
+        {[
+          `Atturel ${Application.nativeApplicationVersion ?? ''}${Application.nativeBuildVersion ? ` (build ${Application.nativeBuildVersion})` : ''}`.trim(),
+          config.previewData ? null : `Signed in to ${config.apiUrl.replace(/^https?:\/\//, '')}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </T>
     </Screen>
   )
 }
@@ -107,6 +113,62 @@ function LinkRow({
     <View style={{ alignItems: 'flex-start' }}>
       <Button label={label} variant="ghost" icon={icon} onPress={onPress} accessibilityHint="Opens outside the app" />
     </View>
+  )
+}
+
+/**
+ * The invented sample record: for seeing what Atturel does before there is
+ * anything of one's own, and for showing it to someone. Every sample person
+ * is marked as invented wherever they appear. Removing it also removes what
+ * was captured with those invented people -- never anything involving a real
+ * person -- so a demonstration can be reset and run again.
+ */
+function SampleData({ loaded, onChanged }: { loaded: boolean; onChanged: () => void }) {
+  const [busy, setBusy] = React.useState(false)
+  const [message, setMessage] = React.useState<string | null>(null)
+  const run = async (load: boolean) => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = load
+        ? await api.post<SampleDataResponse>('/api/mobile/sample-data', {})
+        : await api.delete<SampleDataResponse>('/api/mobile/sample-data')
+      setMessage(result.ok ? result.message : result.error)
+      if (result.ok) onChanged()
+    } catch (e) {
+      setMessage(e instanceof ApiError && e.failure.kind === 'offline' ? 'You are offline. Nothing changed.' : 'That did not work. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const confirmRemove = () =>
+    Alert.alert(
+      'Remove the sample record?',
+      'The invented people, their meeting, and anything you captured or prepared with only them are removed. Nothing involving a real person is touched.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void run(false) },
+      ],
+    )
+  return (
+    <Section label="Sample record" icon="eye">
+      <T variant="small" tone="secondary">
+        {loaded
+          ? 'Invented sample people are in this account, marked “Sample · invented” wherever they appear.'
+          : 'Load a few invented people, a past conversation and an upcoming meeting to see how Atturel works. They are marked as samples everywhere.'}
+      </T>
+      <View style={{ marginTop: 12, gap: 8 }}>
+        {loaded ? (
+          <>
+            <Button label="Remove sample record" variant="secondary" icon="trash" busy={busy} onPress={confirmRemove} />
+            <T variant="meta" tone="muted">To run a demonstration again: remove it, then load it fresh.</T>
+          </>
+        ) : (
+          <Button label="Load sample people" variant="secondary" icon="eye" busy={busy} onPress={() => void run(true)} />
+        )}
+      </View>
+      {message ? <T variant="small" tone="secondary" style={{ marginTop: 8 }} accessibilityLiveRegion="polite">{message}</T> : null}
+    </Section>
   )
 }
 
