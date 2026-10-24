@@ -49,6 +49,11 @@ export interface PendingCapture {
   parts: CapturePart[]
   /** The file being recorded right now, if any. Only this part can be lost. */
   current: string | null
+  /**
+   * Set when the person discards it, or once it was kept. Work still in
+   * flight (a part being transcribed) must not write it back afterwards.
+   */
+  done?: boolean
 }
 
 export interface PendingStore {
@@ -105,6 +110,10 @@ export function closePart(
   part: { uri: string; seconds: number },
   store: PendingStore,
 ): void {
+  if (pending.done) {
+    store.removeAudio(part.uri)
+    return
+  }
   const size = store.sizeOf(part.uri)
   if (size === null || size < MIN_PART_BYTES || part.seconds < 1) {
     if (size !== null) store.removeAudio(part.uri)
@@ -128,6 +137,7 @@ export async function transcribeParts(
   // Parts may be added while this runs (the conversation is still being
   // recorded); the live length picks them up.
   for (let i = 0; i < pending.parts.length; i++) {
+    if (pending.done) return { ok: false, error: 'This recording was discarded.' }
     const part = pending.parts[i]!
     if (part.text !== null) continue
     if (store.sizeOf(part.uri) === null) {
@@ -139,6 +149,8 @@ export async function transcribeParts(
       if (last.captureId !== undefined) part.captureId = last.captureId
       if (last.ok || !last.retryable) break
     }
+    // Discarded (or kept) while this part was out: write nothing back.
+    if (pending.done) return { ok: false, error: 'This recording was discarded.' }
     if (last && last.ok) {
       part.text = last.text
       store.save(pending)
@@ -163,6 +175,7 @@ export function transcriptOf(pending: PendingCapture): string {
 
 /** The conversation was kept, or the person threw it away: remove the audio and the note. */
 export function forget(pending: PendingCapture | null, store: PendingStore): void {
+  if (pending) pending.done = true
   for (const part of pending?.parts ?? []) store.removeAudio(part.uri)
   if (pending?.current) store.removeAudio(pending.current)
   store.clear()

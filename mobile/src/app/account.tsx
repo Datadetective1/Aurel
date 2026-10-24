@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Alert, Linking, TextInput, View } from 'react-native'
 import * as Application from 'expo-application'
 import Feather from '@expo/vector-icons/Feather'
-import type { AccountResponse, SampleDataResponse } from '@atturel/web/lib/mobile/contracts'
+import type { AccountResponse, RedeemAccessResponse, SampleDataResponse } from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
 import { useAuth } from '~/lib/auth'
 import { config } from '~/lib/config'
@@ -67,6 +67,8 @@ export default function Account() {
         />
       </Section>
 
+      {data.planLabel === 'Free' ? <PilotCode onRedeemed={refresh} /> : null}
+
       {data.sampleData ? <SampleData loaded={data.sampleData.loaded} onChanged={refresh} /> : null}
 
       <Section label="Session" icon="log-out">
@@ -113,6 +115,65 @@ function LinkRow({
     <View style={{ alignItems: 'flex-start' }}>
       <Button label={label} variant="ghost" icon={icon} onPress={onPress} accessibilityHint="Opens outside the app" />
     </View>
+  )
+}
+
+/**
+ * A pilot invitation code, for people invited to try Atturel in full. The
+ * web's own redemption (Settings › Access): the code is hashed before it
+ * reaches the database, and it can only ever grant pilot access. Nothing is
+ * bought or sold here.
+ */
+function PilotCode({ onRedeemed }: { onRedeemed: () => void }) {
+  const { c } = useTheme()
+  const [code, setCode] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
+  const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null)
+  const redeem = async () => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = await api.post<RedeemAccessResponse>('/api/mobile/access', { code: code.trim() })
+      setMessage(result.ok ? { ok: true, text: result.message } : { ok: false, text: result.error })
+      if (result.ok) onRedeemed()
+    } catch (e) {
+      setMessage({
+        ok: false,
+        text:
+          e instanceof ApiError && e.failure.kind === 'offline'
+            ? 'You appear to be offline.'
+            : e instanceof ApiError && e.failure.kind === 'server'
+              ? e.failure.message
+              : e instanceof ApiError && e.failure.kind === 'not_found'
+                ? 'Codes cannot be redeemed from the app yet. Use Settings › Access on atturel.com.'
+                : 'That code could not be checked. Try again.',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section label="Invitation code" icon="key">
+      <T variant="small" tone="secondary">Invited to try Atturel in full? Enter the code you were given.</T>
+      <TextInput
+        value={code}
+        onChangeText={setCode}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        accessibilityLabel="Invitation code"
+        placeholder="ATT-XXXX-XXXX-XXXX"
+        placeholderTextColor={c.inkFaint}
+        style={{ marginTop: 10, minHeight: TOUCH, borderWidth: 1, borderColor: c.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: c.ink, backgroundColor: c.surface, fontFamily: 'InstrumentSans_400Regular', fontSize: 16 }}
+      />
+      <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+        <Button label="Redeem" variant="secondary" busy={busy} disabled={code.trim().length < 6} onPress={() => void redeem()} />
+      </View>
+      {message ? (
+        <T variant="small" tone={message.ok ? 'positive' : 'critical'} style={{ marginTop: 8 }} accessibilityLiveRegion="polite">
+          {message.text}
+        </T>
+      ) : null}
+    </Section>
   )
 }
 

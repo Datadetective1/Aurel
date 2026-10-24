@@ -29,6 +29,9 @@ export async function POST(request: Request) {
   form.set('jobTitle', String(body.jobTitle ?? ''))
   form.set('company', String(body.company ?? ''))
   form.set('timezone', String(body.timezone ?? ''))
+  // The web form always sends these, empty when unanswered; the schema reads
+  // an absent field as null and refuses it. The phone does not ask them.
+  for (const field of ['jobFunction', 'seniority', 'pronouns']) form.set(field, '')
 
   const result = await saveAboutCore(form)
   if (!result.ok) {

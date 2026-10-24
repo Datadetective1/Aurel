@@ -16,7 +16,7 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Atturel records a conversation only while you hold it open on screen, so it can turn what was said into notes you review. Recording always shows on screen and pauses when you leave the app."
+        "NSMicrophoneUsageDescription": "Atturel records a conversation only while the app is open on your screen, so it can turn what was said into notes you review. Recording always shows in the app and pauses when you leave it."
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -126,7 +126,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Atturel records a conversation only while you hold it open on screen, so it can turn what was said into notes you review. Recording always shows on screen and pauses when you leave the app.",
+          "microphonePermission": "Atturel records a conversation only while the app is open on your screen, so it can turn what was said into notes you review. Recording always shows in the app and pauses when you leave it.",
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": false
         }

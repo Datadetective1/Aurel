@@ -23,6 +23,7 @@ const actions = {
   saveAboutCore: vi.fn(),
   loadDemoData: vi.fn(),
   removeSampleRecord: vi.fn(),
+  redeemInvitation: vi.fn(),
 }
 
 vi.mock('@/lib/mobile/route', async () => {
@@ -69,6 +70,9 @@ vi.mock('@/app/(auth)/actions', () => ({ signUpCore: actions.signUpCore }))
 vi.mock('@/app/onboarding/actions', () => ({ saveAboutCore: actions.saveAboutCore }))
 vi.mock('@/app/(app)/settings/actions', () => ({ loadDemoData: actions.loadDemoData }))
 vi.mock('@/lib/demo/reset', () => ({ removeSampleRecord: actions.removeSampleRecord }))
+vi.mock('@/app/(app)/settings/access-actions', () => ({
+  redeemInvitation: actions.redeemInvitation,
+}))
 vi.mock('@/lib/conversations/avatars', () => ({ resolveFaces: vi.fn() }))
 vi.mock('@/lib/conversations/queries', () => ({ listLoops: vi.fn() }))
 
@@ -79,6 +83,7 @@ const people = await import('./people/route')
 const signUp = await import('./sign-up/route')
 const onboarding = await import('./onboarding/route')
 const sample = await import('./sample-data/route')
+const access = await import('./access/route')
 
 const ID = '6f1c8a52-1b7e-4c1a-9f0e-2a3b4c5d6e7f'
 const post = (body: unknown) =>
@@ -213,6 +218,11 @@ describe('POST /api/mobile/onboarding', () => {
     expect(await res.json()).toEqual({ ok: true })
     const form = actions.saveAboutCore.mock.calls[0]![0] as FormData
     expect(form.get('timezone')).toBe('America/Chicago')
+    // Fields the phone does not ask are sent empty, as the web form sends them;
+    // absent, the web schema refuses them as null.
+    for (const field of ['jobTitle', 'company', 'jobFunction', 'seniority', 'pronouns']) {
+      expect(form.get(field)).toBe('')
+    }
   })
 })
 
@@ -225,5 +235,17 @@ describe('/api/mobile/sample-data', () => {
     const res = await sample.DELETE()
     expect(actions.removeSampleRecord).toHaveBeenCalledWith(expect.anything(), USER.id)
     expect(await res.json()).toEqual({ ok: true, message: 'Sample record removed.' })
+  })
+})
+
+describe('POST /api/mobile/access', () => {
+  it('redeems through the web action and passes its outcome through', async () => {
+    actions.redeemInvitation.mockResolvedValue({ error: 'That invitation has expired.' })
+    const res = await access.POST(post({ code: 'ATT-ABCD-EFGH-JKLM' }))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ ok: false, error: 'That invitation has expired.' })
+    expect((actions.redeemInvitation.mock.calls[0]![1] as FormData).get('code')).toBe(
+      'ATT-ABCD-EFGH-JKLM',
+    )
   })
 })

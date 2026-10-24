@@ -159,6 +159,35 @@ describe('reopening the app', () => {
   })
 })
 
+describe('discarding while a part is still being transcribed', () => {
+  it('does not bring the recording back when the part returns', async () => {
+    const { store, p } = setup({ 'a.m4a': 1e5, 'b.m4a': 1e5 })
+    p.parts = [
+      { uri: 'a.m4a', seconds: 600, text: null },
+      { uri: 'b.m4a', seconds: 600, text: null },
+    ]
+    let release: () => void = () => {}
+    const slow: PartTranscriber = (part) =>
+      new Promise((resolve) => {
+        release = () => resolve({ ok: true, text: part.uri })
+      })
+    const running = transcribeParts(p, slow, store)
+    forget(p, store) // the person taps Discard
+    release()
+    expect(await running).toEqual({ ok: false, error: 'This recording was discarded.' })
+    expect(store.saved).toBeNull()
+    expect(recover(store)).toEqual({ kind: 'none' })
+  })
+
+  it('removes a part that finishes closing after the discard', () => {
+    const { store, p } = setup({ 'late.m4a': 1e5 })
+    forget(p, store)
+    closePart(p, { uri: 'late.m4a', seconds: 30 }, store)
+    expect(store.sizeOf('late.m4a')).toBeNull()
+    expect(store.saved).toBeNull()
+  })
+})
+
 describe('forgetting', () => {
   it('deletes the audio and the note together, only when asked', () => {
     const { store, p } = setup({ 'a.m4a': 1e5, 'b.m4a': 1e5 })

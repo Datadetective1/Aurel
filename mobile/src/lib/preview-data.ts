@@ -100,6 +100,7 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
   if (p === '/me') return { id: 'preview', name: 'Amary', timeZone: TZ, onboarded: true } as T
   if (p === '/sample-data') return { ok: true, message: 'Preview data is already invented.' } as T
   if (p === '/onboarding') return { ok: true } as T
+  if (p === '/access') return { ok: true, message: 'Preview: nothing was redeemed.' } as T
   if (p === '/meetings' && init.method === 'POST') return { ok: true, meetingId: 'm-2' } as T
   if (/^\/meetings\/[^/]+\/prepare$/.test(p)) return { ok: true, grounded: false } as T
   if (/^\/meetings\/[^/]+\/attendees$/.test(p)) return { ok: true } as T

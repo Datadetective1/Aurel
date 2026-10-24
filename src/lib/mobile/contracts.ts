@@ -105,6 +105,13 @@ export interface CaptureLimits {
   partTransport?: 'storage' | 'direct'
 }
 
+// --- POST /api/mobile/access ----------------------------------------------------
+/** A pilot invitation code, redeemed exactly as on the web. */
+export interface RedeemAccessRequest {
+  code: string
+}
+export type RedeemAccessResponse = { ok: true; message: string } | { ok: false; error: string }
+
 // --- DELETE /api/mobile/account ------------------------------------------------
 export interface DeleteAccountRequest {
   confirmation: string
