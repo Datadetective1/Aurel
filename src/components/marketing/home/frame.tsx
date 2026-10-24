@@ -18,11 +18,14 @@ import { cn } from '@/lib/utils'
 export function ProductFrame({
   description,
   children,
+  note,
   className,
   bodyClassName,
 }: {
   description: string
   children: React.ReactNode
+  /** A short visible line under the frame, e.g. that the example is invented. */
+  note?: string
   className?: string
   bodyClassName?: string
 }) {
@@ -37,7 +40,12 @@ export function ProductFrame({
       >
         {children}
       </div>
-      <figcaption className="sr-only">{description}</figcaption>
+      <figcaption>
+        <span className="sr-only">{description}</span>
+        {note ? (
+          <span className="text-ink-faint mt-2 block text-right text-[0.6875rem]">{note}</span>
+        ) : null}
+      </figcaption>
     </figure>
   )
 }

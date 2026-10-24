@@ -78,7 +78,7 @@ function After() {
         Expand to three more teams in January.
       </p>
       <div className="border-line mt-3 flex items-center gap-2.5 border-t pt-3">
-        <Avatar name={ELENA.name} size="xs" />
+        <Avatar name={ELENA.name} src={ELENA.photo} size="sm" />
         <span className="text-ink min-w-0 flex-1 truncate text-[0.8125rem]">
           Send revised plan to {firstName(ELENA)}
         </span>

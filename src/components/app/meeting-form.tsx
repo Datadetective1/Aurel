@@ -42,6 +42,8 @@ export interface PersonOption {
   id: string
   name: string
   subtitle: string | null
+  /** A signed or pasted photo URL, when the user has added one. */
+  photo?: string | null
 }
 
 /**
@@ -181,7 +183,7 @@ export function MeetingForm({
             You have not added anyone yet. You can still create the meeting and add people later.
           </p>
         ) : (
-          <ul className="mt-4 grid gap-2">
+          <ul className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-2">
             {people.map((person) => {
               const isSelected = Boolean(selected[person.id])
               return (
@@ -199,7 +201,7 @@ export function MeetingForm({
                       onChange={() => toggle(person.id)}
                       className="border-line-strong bg-surface checked:border-accent checked:bg-accent size-4 shrink-0 appearance-none rounded-[3px] border"
                     />
-                    <Avatar name={person.name} size="xs" />
+                    <Avatar name={person.name} src={person.photo} size="sm" />
                     <span className="min-w-0">
                       <span className="text-ink block truncate text-sm">{person.name}</span>
                       {person.subtitle ? (

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { MeetingForm, type PersonOption } from '@/components/app/meeting-form'
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
+import { resolveFaces } from '@/lib/conversations/avatars'
 import { createClient } from '@/lib/supabase/server'
 import { describeZone } from '@/lib/tz'
 
@@ -18,17 +19,23 @@ export default async function NewMeetingPage({
 
   const { data } = await supabase
     .from('people')
-    .select('id, full_name, preferred_name, job_title, organizations(name)')
+    .select(
+      'id, full_name, preferred_name, job_title, avatar_path, avatar_url, organizations(name)',
+    )
     .eq('user_id', user.id)
     .is('archived_at', null)
     .order('relevance', { ascending: false })
     .order('full_name', { ascending: true })
     .limit(200)
 
+  // Signed with the user's own session: storage policies limit it to their folder.
+  const faces = await resolveFaces(supabase, data ?? [], (p) => p.id)
+
   const people: PersonOption[] = (data ?? []).map((p) => ({
     id: p.id,
     name: p.preferred_name || p.full_name,
     subtitle: [p.job_title, p.organizations?.name].filter(Boolean).join(' · ') || null,
+    photo: faces.get(p.id) ?? null,
   }))
 
   return (
