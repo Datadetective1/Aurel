@@ -1,4 +1,4 @@
-# First iOS build and TestFlight — the steps only Amary can do
+# iOS builds and TestFlight
 
 Everything that could be done without an Apple or Expo login is done and
 verified (see [IOS_READINESS.md](IOS_READINESS.md)): bundle id
@@ -8,33 +8,105 @@ iOS production bundle that compiles. Nothing secret is in the app; the three
 `EXPO_PUBLIC_*` values in `eas.json` are the same public values the website
 ships to every browser.
 
-What is left needs your Apple ID, your Expo account, or both. Nobody should
-ever ask you for those passwords in a chat; you type them into Apple's and
-Expo's own prompts.
+Builds run from GitHub, with no computer needed:
+**Actions → iOS TestFlight → Run workflow**
+(`.github/workflows/ios-testflight.yml`). The workflow builds on Expo's
+servers and uploads to TestFlight for internal testing. It never submits the
+app for App Store review or release.
 
-Allow about an hour the first time, most of it waiting.
+Nobody should ever ask you for a password, a 2FA code or a key file in a
+chat. Secrets go into GitHub's own secrets page, which encrypts them; once
+saved, they cannot be read back, not even by whoever runs the workflow.
 
-## 0. Backend — done
+## 1. Once: give GitHub an Expo token (Amary)
 
-The `/api/mobile/*` routes the app uses were merged (PR #7) and are live on
-`https://www.atturel.com`. No database migration is needed.
+1. <https://expo.dev> → your avatar → **Account settings** → **Access
+   tokens** → **Create token**. Name it `github-atturel` and copy it.
+2. <https://github.com/Datadetective1/Aurel/settings/secrets/actions> →
+   **New repository secret**. Name: `EXPO_TOKEN`. Secret: paste the token →
+   **Add secret**.
 
-## 1. Apple Developer Program (once) — done
+That is usually all. The workflow signs in to Apple with an App Store Connect
+API key it finds on your Expo account: EAS stores one there when it submits
+an app, as it did for PacePerk. The workflow uses a key only after checking
+that it can see Atturel's App Store Connect record.
 
-## 2. App Store Connect app record (once) — done
+**Only if a run stops with "No App Store Connect API key"**, add a key of
+your own:
 
-The app record for bundle id `com.atturel.app` exists. Its numeric **Apple
-ID** (App Store Connect → the app → **App Information** → General → Apple ID,
-for example `6741234567`) is not a secret; keep it handy for step 5.
+1. App Store Connect → **Users and Access** → **Integrations** → **App Store
+   Connect API** → **Team Keys** → **+**. Name `GitHub Atturel`, access
+   **Admin** → **Generate**. Download the `.p8` file (Apple offers it once)
+   and note the **Key ID** and the **Issuer ID** shown above the list.
+2. Add three repository secrets on the same GitHub page:
+   `ASC_API_KEY_P8` (open the `.p8` file in a text editor and paste all of
+   it), `ASC_API_KEY_ID` and `ASC_API_KEY_ISSUER_ID`.
 
-## 3. Link the project to Expo (once)
+## 2. Build and send to TestFlight
 
-`mobile/app.json` already names the owner, `datadetective1`, so the project is
-created under your account and nowhere else. Other projects on the account
-(such as PacePerk) are not touched: EAS addresses a project by its own slug,
-`atturel`.
+<https://github.com/Datadetective1/Aurel/actions/workflows/ios-testflight.yml>
+→ **Run workflow** → branch `main` → **Run workflow**. "Upload the build to
+TestFlight" is ticked by default; untick it for a build without an upload.
 
-On a Mac, Windows or Linux computer with git and Node 22 (LTS):
+What the run does, in order:
+
+1. Typechecks and tests the app. If either fails, the run stops before using
+   an EAS build.
+2. Checks that the token acts for `datadetective1`.
+3. Links the Expo project `@datadetective1/atturel`, creating it on the first
+   run. It never creates a second project or uses another account. PacePerk is
+   a separate project and is not touched.
+4. Finds the App Store Connect key (above), Atturel's App Store Connect app
+   ID and the Apple team ID.
+5. Sets up signing:
+   - It reuses the Apple Distribution Certificate the team already keeps on
+     Expo (PacePerk's). Sharing a certificate between apps on one team is
+     normal and changes nothing for PacePerk.
+   - Only if there is none, it creates one.
+   - It creates a provisioning profile that belongs to `com.atturel.app`
+     alone.
+   - It can never revoke a certificate or a key. Any question the script does
+     not expect stops the run rather than being answered.
+6. Builds on EAS with the SDK 57 image (Xcode 26.6), in about 15–25 minutes.
+   EAS raises the build number on every build.
+7. Uploads to App Store Connect. On the first upload, EAS creates the
+   internal TestFlight group **Team (Expo)**, which gets every build, and
+   invites the team's Admin users.
+
+The run's summary page links the build on expo.dev. Apple then processes the
+build, usually in 10–30 minutes. Export compliance is answered by the app
+itself (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
+
+Later releases are the same button. Raise `version` in `mobile/app.json` for
+a new public version number; build numbers take care of themselves.
+
+## 3. Install it on your iPhone (internal testing, no Apple review)
+
+1. On the iPhone, install **TestFlight** from the App Store.
+2. Open the TestFlight invitation email → **View in TestFlight** → **Accept**
+   → **Install**.
+3. No email? App Store Connect → the app → **TestFlight** → **Internal
+   Testing** → **Team (Expo)** (or create a group) → **+** next to Testers →
+   add yourself. Internal testers must be users of your App Store Connect
+   team, up to 100.
+
+Testers get each later build automatically.
+
+## 4. If a run fails
+
+The failing step's log says why. The usual causes:
+
+| Step | Message | Fix |
+| --- | --- | --- |
+| Check the Expo token | `EXPO_TOKEN secret is not set` | Step 1. |
+| Confirm the Expo account | `does not act for the datadetective1 account` | Create the token while signed in to Expo as `datadetective1`. |
+| Find the App Store Connect key | `No App Store Connect API key` or `could reach com.atturel.app` | Add the three `ASC_API_KEY_*` secrets (step 1). The key must be a team key, not an individual one. |
+| Set up signing | `Maximum number of Distribution Certificates` | The team has no certificate on Expo and Apple's limit is reached. The run will not revoke one. Revoke an unused certificate yourself at developer.apple.com, or upload the existing one to Expo, then run again. |
+| Build | Anything in the EAS build log | The summary links the build log on expo.dev. |
+
+## 5. Without GitHub, from a computer (fallback)
+
+On a Mac, Windows or Linux computer with git and Node 22:
 
 ```bash
 git clone https://github.com/Datadetective1/Aurel.git
@@ -42,109 +114,41 @@ cd Aurel/mobile
 npm ci
 npx eas-cli@latest login     # sign in to Expo yourself, in the terminal
 npx eas-cli@latest whoami    # must print: datadetective1
-npx eas-cli@latest init      # answer Yes to "Create a project for @datadetective1/atturel?"
-```
-
-`init` adds one line to `mobile/app.json`: `"extra": { "eas": { "projectId":
-"…" } }`. The project ID is not a secret. Either commit and push that change,
-or send the ID to whoever maintains the repo so it is committed for you;
-GitHub-started builds (step 7) need it on `main`.
-
-If `init` instead says a project already exists, stop: answer **No** and check
-<https://expo.dev/accounts/datadetective1/projects> — do not create a second
-one.
-
-## 4. Build and send to TestFlight in one command
-
-From `Aurel/mobile`:
-
-```bash
+npx eas-cli@latest init      # links or creates @datadetective1/atturel
 npx eas-cli@latest build --platform ios --profile production --auto-submit
 ```
 
-EAS asks a few questions the first time. Answer them yourself, in the
-terminal — never paste a password, a 2FA code or a key file into a chat:
+Answer EAS's questions yourself, in the terminal:
 
-- **Log in to your Apple account?** Yes. Apple ID and password go to Apple
-  through EAS; then the six-digit code on your iPhone.
-- **Select a team** (if asked): your developer team.
-- **Bundle identifier `com.atturel.app`** is already registered; EAS finds it.
-- **Distribution certificate.** If EAS offers to **reuse an existing Apple
-  Distribution Certificate** (for example the one PacePerk uses), choose
-  reuse — sharing it between apps on one team is normal and changes nothing
-  for PacePerk. If it offers to generate a new one, that is fine too.
-  **If it ever asks you to revoke a certificate, answer No** and stop:
-  revoking would break builds that use it.
-- **Provisioning profile:** generate a new one (it is specific to
-  `com.atturel.app`; PacePerk's is untouched).
-- **App Store Connect API Key for submissions:** let EAS generate one (or
-  reuse an existing one). EAS stores it so this and later submissions to
-  TestFlight run without asking again.
+- Log in to your Apple account: yes. Then the six-digit code on your iPhone.
+- **Reuse** the existing distribution certificate.
+- Generate a new provisioning profile.
+- Let EAS generate or reuse an App Store Connect API key.
 
-The build runs on Expo's servers, about 15–25 minutes, using the SDK 57 image
-(Xcode 26.6) pinned in `eas.json`. The build number starts at 1 and is
-incremented by EAS on every build. When it finishes, EAS uploads it to App
-Store Connect automatically (`--auto-submit`); the terminal and
-<https://expo.dev/accounts/datadetective1/projects/atturel/submissions> show
-progress.
+**If EAS ever asks you to revoke a certificate, answer No** and stop.
 
-## 5. If the upload needs doing by hand
-
-Only if `--auto-submit` was left off or the submission failed:
-
-```bash
-npx eas-cli@latest submit --platform ios --latest
-```
-
-Give it the numeric Apple ID from step 2 if asked. Apple then processes the
-build for 10–30 minutes and emails you. Export compliance is answered by the
-app itself (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
-
-## 6. Install it on your iPhone (internal testing — no Apple review)
-
-1. App Store Connect → the app → **TestFlight**. The build appears under iOS
-   builds once processed.
-2. **Internal Testing** → **+** → group name `Team` → add yourself (and anyone
-   else who is a user in your App Store Connect account; up to 100).
-3. On the iPhone: install **TestFlight** from the App Store, open the invitation
-   email, **Accept** → **Install**.
-
-Each later build is step 4 again. Testers get it automatically.
-
-## 6a. Later builds without your computer (optional)
-
-Once one build has succeeded from your computer (EAS's requirement for
-GitHub-started builds), later builds can start from GitHub — from the Expo
-website, or by an assistant connected to your Expo account:
-
-1. <https://expo.dev/accounts/datadetective1/projects/atturel/github> →
-   **Install** the Expo GitHub App on the GitHub account that owns `Aurel` →
-   link the repository `Datadetective1/Aurel`.
-2. Set **Base directory** to `mobile`.
-3. Make sure the project ID from step 3 is committed on `main`.
-
-Builds then use the same profile and credentials as step 4.
-
-## 7. Early testers outside your team (external testing — light Apple review)
+## 6. Early testers outside your team (external testing, light Apple review)
 
 Optional, after you have tried it yourself.
 
 1. TestFlight → **External Testing** → **+** → group `Early testers`.
-2. **Test Information**: beta description, feedback email
-   (`support@atturel.com`), privacy policy URL
-   `https://www.atturel.com/privacy`, and **Sign-in required → demo account**:
-   a dedicated reviewer account with sample data loaded and pilot access (see
-   the demo setup in IOS_READINESS.md). Never use your own account here.
+2. **Test Information**:
+   - beta description;
+   - feedback email: `support@atturel.com`;
+   - privacy policy URL: `https://www.atturel.com/privacy`;
+   - **Sign-in required → demo account**: a dedicated reviewer account with
+     sample data loaded and pilot access (see the demo setup in
+     IOS_READINESS.md). Never use your own account here.
 3. Add the build to the group → **Submit for Review**. Beta review usually
    takes a day. Then invite by email or share the public TestFlight link.
 4. Give testers pilot access so briefs and Atlas are not limited by the Free
-   plan: issue invitation codes on the web (Settings › Access); testers enter
+   plan. Issue invitation codes on the web (Settings › Access); testers enter
    them in the app under **Account › Invitation code**.
 
-Do not submit for App Store review yet — see the payment-rule decision in
+Do not submit for App Store review yet. See the payment-rule decision in
 IOS_READINESS.md §5.
 
-## 8. What only a real iPhone can confirm (please check on the first build)
+## 7. What only a real iPhone can confirm (please check on the first build)
 
 - Sign in, quit, reopen — still signed in (Keychain).
 - Create an account in the app; the confirmation email arrives; the link opens
