@@ -137,11 +137,15 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Read-only: polls App Store Connect until Apple has processed this build
-      # and TestFlight can hand it to internal testers.
+      # Polls App Store Connect until Apple has processed this build and
+      # TestFlight can hand it to internal testers. If the internal group that
+      # gets every build is still empty, it invites the team's Account Holder
+      # and Admins.
       - name: Wait for Apple to process the build
         if: inputs.submit
         timeout-minutes: 50
+        env:
+          INVITE_TEAM_ADMINS: 'true'
         run: |
           export BUILD_NUMBER="$(jq -r '.[0].appBuildVersion // empty' "$RUNNER_TEMP/build.json")"
           node scripts/ci/testflight-status.cjs
