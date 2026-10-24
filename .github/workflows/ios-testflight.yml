@@ -1,0 +1,134 @@
+name: iOS TestFlight
+
+# Builds the iOS app on EAS and uploads it to TestFlight for internal testing.
+# Manual only: Actions > iOS TestFlight > Run workflow. It never submits the
+# app for App Store review or release.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   EXPO_TOKEN             Required. An Expo access token that can act for the
+#                          datadetective1 account.
+#   ASC_API_KEY_P8         Optional, all three or none: an App Store Connect
+#   ASC_API_KEY_ID         team API key with the Admin role. When unset, the
+#   ASC_API_KEY_ISSUER_ID  run uses a key already stored on the Expo account.
+#
+# Signing: the run reuses the Apple team's existing distribution certificate
+# kept on Expo, and creates one only if there is none. It never revokes a
+# certificate or key, so the team's other apps keep working. Details in
+# docs/IOS_TESTFLIGHT.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: Upload the build to TestFlight when it finishes
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_ACCOUNT: datadetective1
+      # The signing preload reads this version's internals; change both together.
+      EAS_CLI_VERSION: 25.3.0
+    steps:
+      - name: Check the Expo token
+        working-directory: .
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::The EXPO_TOKEN secret is not set. Create a token at expo.dev (account settings > Access tokens) and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Check the app
+        run: |
+          npm run typecheck
+          npm test -- --ci
+
+      - name: Install EAS CLI
+        run: |
+          npm install --global "eas-cli@$EAS_CLI_VERSION"
+          echo "EAS_CLI_DIR=$(npm root --global)/eas-cli" >> "$GITHUB_ENV"
+
+      - name: Confirm the Expo account
+        run: |
+          eas whoami | sed 's/\x1b\[[0-9;]*m//g' | tee "$RUNNER_TEMP/whoami.txt"
+          if ! grep -Eq "^(• )?$EXPO_ACCOUNT( \(|$)" "$RUNNER_TEMP/whoami.txt"; then
+            echo "::error::EXPO_TOKEN does not act for the $EXPO_ACCOUNT account."
+            exit 1
+          fi
+
+      # Links @datadetective1/atturel, creating it the first time. Never another
+      # account, never a second project with the same slug.
+      - name: Link the Expo project
+        run: |
+          eas init --account "$EXPO_ACCOUNT" --non-interactive --json > "$RUNNER_TEMP/init.json"
+          project_id=$(jq -r .projectId "$RUNNER_TEMP/init.json")
+          echo "Expo project @$EXPO_ACCOUNT/atturel: $project_id ($(jq -r .status "$RUNNER_TEMP/init.json"))"
+          echo "EAS_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
+
+      - name: Find the App Store Connect key
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+        run: node scripts/ci/asc-setup.cjs
+
+      # Interactive mode with no terminal: the preload answers "reuse" to the
+      # certificate and profile questions, and any other question fails the
+      # step instead of being answered.
+      - name: Set up signing
+        env:
+          NODE_OPTIONS: --require ${{ github.workspace }}/mobile/scripts/ci/eas-reuse-credentials.cjs
+        run: eas credentials:configure-build --platform ios --profile production < /dev/null
+
+      - name: Build on EAS and upload to TestFlight
+        env:
+          SUBMIT: ${{ inputs.submit }}
+        run: |
+          flags="--platform ios --profile production --non-interactive --freeze-credentials --json"
+          if [ "$SUBMIT" = "true" ]; then flags="$flags --auto-submit"; fi
+          eas build $flags > "$RUNNER_TEMP/build.json"
+
+      - name: Summary
+        if: always()
+        working-directory: .
+        env:
+          SUBMIT: ${{ inputs.submit }}
+        run: |
+          {
+            echo "### iOS TestFlight"
+            if [ -n "$EAS_PROJECT_ID" ]; then echo "- Expo project: \`@$EXPO_ACCOUNT/atturel\` (\`$EAS_PROJECT_ID\`)"; fi
+            if [ -n "$ASC_APP_ID" ]; then echo "- App Store Connect app ID: \`$ASC_APP_ID\`"; fi
+            if [ -s "$RUNNER_TEMP/build.json" ]; then
+              jq -r '.[] | "- Build \(.appVersion) (\(.appBuildVersion)): \(.status) — https://expo.dev/accounts/'"$EXPO_ACCOUNT"'/projects/atturel/builds/\(.id)"' "$RUNNER_TEMP/build.json" || true
+            fi
+            if [ "$SUBMIT" = "true" ]; then
+              echo "- Upload: after the build, EAS sends it to App Store Connect. Apple then processes it (usually 10–30 minutes) and TestFlight emails the team's internal testers."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
