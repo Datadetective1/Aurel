@@ -138,8 +138,8 @@ describe('the voice privacy promise is legible when it matters', () => {
   it('stays on screen while recording', () => {
     // It used to be hidden during `phase === 'recording'` -- the reassurance
     // vanished at exactly the moment the microphone was open.
-    expect(voice).not.toMatch(/phase !== 'recording' \?[\s\S]{0,200}not retained/)
-    expect(voice).toMatch(/phase === 'recording'[\s\S]{0,200}not retained/)
+    expect(voice).not.toMatch(/phase !== 'recording' \?[\s\S]{0,200}does not keep it/)
+    expect(voice).toMatch(/phase === 'recording'[\s\S]{0,200}does not keep it/)
   })
 
   it('is not the faintest tone in the system', () => {

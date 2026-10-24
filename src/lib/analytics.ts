@@ -195,6 +195,7 @@ export type AnalyticsEvent =
   | 'mobile_person_opened'
   | 'mobile_capture_started'
   | 'mobile_capture_completed'
+  | 'mobile_capture_repeat'
   | 'mobile_ask_used'
 
 type Props = Record<string, string | number | boolean | null | undefined>

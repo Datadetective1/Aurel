@@ -2,6 +2,7 @@ import { mobileContext, json, readJson } from '@/lib/mobile/route'
 import { createConversationCore } from '@/app/(app)/conversations/actions'
 import { track } from '@/lib/analytics'
 import type { CaptureRequest, CaptureResponse } from '@/lib/mobile/contracts'
+import { findRepeat, REPEAT_CANDIDATES, REPEAT_WINDOW_MS } from '@/lib/capture/repeat-save'
 
 /**
  * Keep a conversation from the phone.
@@ -22,6 +23,23 @@ export async function POST(request: Request) {
   const sourceKind = ['voice_note', 'typed_notes', 'meeting_recording'].includes(body.sourceKind)
     ? body.sourceKind
     : 'typed_notes'
+
+  // "Try again" after a save whose answer was lost: answer with the
+  // conversation already kept rather than keeping it twice.
+  const { data: recent } = await ctx.supabase
+    .from('interactions')
+    .select('id, raw_notes, transcript')
+    .eq('user_id', ctx.user.id)
+    .eq('source_kind', sourceKind)
+    .gte('created_at', new Date(Date.now() - REPEAT_WINDOW_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(REPEAT_CANDIDATES)
+  const repeat = findRepeat(recent ?? [], body.text, sourceKind)
+  if (repeat) {
+    await track('mobile_capture_repeat', { sourceKind })
+    const response: CaptureResponse = { interactionId: repeat }
+    return json(response, 200)
+  }
 
   const form = new FormData()
   form.set('source', body.text)

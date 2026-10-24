@@ -63,9 +63,8 @@ export default function PrivacyPage() {
             </li>
             <li className="list-disc">
               Conversations you capture: text you type or paste, and transcripts of audio you record
-              or upload. Audio is used only to produce the transcript and is deleted once it has
-              been transcribed; anything left behind by an interrupted upload is removed within
-              about a day.
+              or upload. {brand.name} does not keep the audio: it is used only to produce the
+              transcript (see Voice recordings for how the transcription provider handles it).
             </li>
             <li className="list-disc">
               Documents you upload to read (such as a PDF), and the text extracted from them.
@@ -170,12 +169,26 @@ export default function PrivacyPage() {
 
         <Section title="Voice recordings">
           <p>
-            When you record a conversation or a voice note, the audio is sent to a speech-to-text
-            service to be turned into words, and the audio is then deleted. It is never added to
-            your record. A long recording is uploaded in parts to private, temporary storage that
-            only {brand.name}&rsquo;s servers can read; each part is deleted as soon as it has been
-            transcribed, and anything left behind is removed within about a day. What you keep is
-            the text, which you review and can edit or delete.
+            When you record a conversation or a voice note, the audio is sent through {brand.name}{' '}
+            to OpenAI&rsquo;s speech-to-text service to be turned into words. {brand.name} does not
+            keep the audio: it passes through our servers for the length of that request and is
+            never written to your record or our database. If a long recording is uploaded in parts,
+            each part waits in private, temporary storage that only {brand.name}&rsquo;s servers can
+            read, is deleted as soon as it has been transcribed, and anything left behind is removed
+            within about a day. On your iPhone, a recording stays in the app&rsquo;s private storage
+            until the conversation is kept or you discard it.
+          </p>
+          <p>
+            OpenAI handles the audio under its own published API data policy. That policy currently
+            states that audio sent for transcription is not used to train its models and is not
+            retained after it has been transcribed. That is OpenAI&rsquo;s commitment rather than
+            something {brand.name} can verify on its own systems; we rely on the published policy.
+          </p>
+          <p>
+            What you keep is the text, which you review and can edit or delete. To find what was
+            promised and decided, that text is sent to OpenAI&rsquo;s language model. Under the same
+            published policy it is not used to train OpenAI&rsquo;s models, and OpenAI may keep it
+            for up to 30 days to monitor for abuse.
           </p>
           <p>
             Before recording other people, you confirm they know. Recording happens only while the
@@ -206,7 +219,9 @@ export default function PrivacyPage() {
             <li className="list-disc">Vercel — hosting the application</li>
             <li className="list-disc">
               OpenAI — the language model behind briefs, reading conversations and answering
-              questions, and speech-to-text. Only the bounded context a task needs is sent.
+              questions, and speech-to-text. Only the bounded context a task needs is sent. OpenAI
+              does not use it to train its models; see Voice recordings for how long OpenAI may keep
+              what is sent.
             </li>
             <li className="list-disc">
               Exa — finding public professional material when you research someone

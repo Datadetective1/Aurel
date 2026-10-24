@@ -4,6 +4,7 @@ import * as React from 'react'
 import { CircleAlert, Loader2, Mic, Square, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { recordVoiceEvent } from '@/app/(app)/meetings/voice-actions'
+import { brand } from '@/lib/brand'
 
 /**
  * VOICE DEBRIEF
@@ -361,8 +362,8 @@ export function VoiceDebrief({
           true. */}
       <p className="text-ink-muted mt-2 text-xs leading-relaxed">
         {phase === 'recording'
-          ? 'Audio is used to create the transcript and is not retained.'
-          : 'Record your own debrief after the conversation. Audio is used to create the transcript and is not retained.'}
+          ? `Audio is used to create the transcript; ${brand.name} does not keep it.`
+          : `Record your own debrief after the conversation. Audio is used to create the transcript; ${brand.name} does not keep it.`}
       </p>
 
       {error ? (

@@ -101,7 +101,7 @@ describe('the promises this component makes', () => {
 
   it('says what happens to the audio, near the control', () => {
     expect(source).toContain('Record your own debrief after the conversation.')
-    expect(source).toContain('is not retained')
+    expect(source).toContain('does not keep it')
   })
 
   it('announces state changes to a screen reader', () => {
