@@ -128,6 +128,32 @@ The failing step's log says why. The usual causes:
 | Wait for Apple to process the build | `could not process` or `export compliance` | App Store Connect → TestFlight → the build shows the reason, and Apple emails it. |
 | Wait for Apple to process the build | `Still waiting after 40 minutes` | Apple is slow. The upload is done; run **TestFlight status** later. |
 
+## 4a. If the app crashes on the iPhone
+
+1. When iOS asks "Atturel crashed: share additional information with the
+   developer?", tap **Share** and say what you tapped. That sends the crash
+   log to App Store Connect.
+2. **Actions → TestFlight status → Run workflow** with **crash reports**
+   ticked. The run prints the crash logs testers shared: device, iOS version,
+   comment and backtrace, never the tester's email. A backtrace through
+   `RCTExceptionsManager reportFatal` → `RCTFatal` means a JavaScript
+   exception, not a native crash.
+3. To check a fix on real iOS before a TestFlight build: **Actions → iOS
+   TestFlight → Run workflow**, "What to build" = **Simulator (preview
+   data)**. This is a release build for the iOS simulator with the app's
+   invented preview data: no sign-in, no Apple signing, nothing uploaded.
+   - It runs in an EAS macOS sandbox with `xcrun simctl`; the device log
+     shows the JavaScript error message.
+   - The first crash (0.1.0 (1)) was reproduced and its fix checked this
+     way.
+
+The first crash, on People and Today in 0.1.0 (1), came from
+`Intl.RelativeTimeFormat`. The iPhone's JavaScript engine (Hermes) does not
+have it; Node, where the tests ran, does. The mobile tests now run with the
+iPhone's `Intl` (`mobile/jest.hermes-intl.js`). Every screen also has an
+error boundary, so a screen that fails shows "Try again" instead of closing
+the app.
+
 ## 5. Without GitHub, from a computer (fallback)
 
 On a Mac, Windows or Linux computer with git and Node 22:
