@@ -20,6 +20,13 @@ name: iOS TestFlight
 on:
   workflow_dispatch:
     inputs:
+      build:
+        description: What to build
+        type: choice
+        options:
+          - TestFlight
+          - Simulator (preview data)
+        default: TestFlight
       submit:
         description: Upload the build to TestFlight when it finishes
         type: boolean
@@ -102,6 +109,7 @@ jobs:
           echo "EAS_PROJECT_ID=$project_id" >> "$GITHUB_ENV"
 
       - name: Find the App Store Connect key
+        if: inputs.build == 'TestFlight'
         env:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
@@ -112,17 +120,26 @@ jobs:
       # certificate and profile questions, and any other question fails the
       # step instead of being answered.
       - name: Set up signing
+        if: inputs.build == 'TestFlight'
         env:
           NODE_OPTIONS: --require ${{ github.workspace }}/mobile/scripts/ci/eas-reuse-credentials.cjs
         run: eas credentials:configure-build --platform ios --profile production < /dev/null
 
       - name: Build on EAS and upload to TestFlight
+        if: inputs.build == 'TestFlight'
         env:
           SUBMIT: ${{ inputs.submit }}
         run: |
           flags="--platform ios --profile production --non-interactive --freeze-credentials --json"
           if [ "$SUBMIT" = "true" ]; then flags="$flags --auto-submit"; fi
           eas build $flags > "$RUNNER_TEMP/build.json"
+
+      # Release build for the iOS simulator with the app's invented preview
+      # data: no sign-in, no network, no Apple signing. For checking a fix on
+      # real iOS (EAS cloud simulator) before a TestFlight build.
+      - name: Build for the iOS simulator
+        if: inputs.build != 'TestFlight'
+        run: eas build --platform ios --profile simulator-preview --non-interactive --no-wait --json > "$RUNNER_TEMP/build.json"
 
       - name: Summary
         if: always()
@@ -142,7 +159,7 @@ jobs:
       # gets every build is still empty, it invites the team's Account Holder
       # and Admins.
       - name: Wait for Apple to process the build
-        if: inputs.submit
+        if: inputs.build == 'TestFlight' && inputs.submit
         timeout-minutes: 50
         env:
           INVITE_TEAM_ADMINS: 'true'

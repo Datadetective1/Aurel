@@ -10,6 +10,7 @@ import { Empty, Failure, Loading, Screen } from '~/components/screen'
 import { PersonRow } from '~/components/relationship'
 import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /** Everyone on record, faces first, most recently spoken to at the top. */
 export default function People() {

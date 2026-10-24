@@ -10,6 +10,7 @@ import { Failure, Loading, Screen, Section, Card } from '~/components/screen'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * ACCOUNT

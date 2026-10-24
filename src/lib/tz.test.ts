@@ -11,6 +11,7 @@ import {
   instantToWallTime,
   isOverdueIn,
   relativeDayIn,
+  relativeUnit,
   safeZone,
   startOfDayUtc,
   todayIn,
@@ -341,5 +342,66 @@ describe('wallTimeToInstant: typed wall time is read in the account zone', () =>
     expect(wallTimeToInstant('2026-10-21T08:53', 'Not/AZone')!.toISOString()).toBe(
       '2026-10-21T08:53:00.000Z',
     )
+  })
+})
+
+/**
+ * The iPhone app crashed on People and Today (TestFlight 0.1.0 (1)): Hermes,
+ * its JavaScript engine, has no Intl.RelativeTimeFormat, and "Last spoke 3
+ * weeks ago" called it. The phrasing is now written out; these hold it to what
+ * Intl produced, so the website reads exactly as before, and prove it works
+ * where Intl.RelativeTimeFormat does not exist.
+ */
+describe('relative days without Intl.RelativeTimeFormat', () => {
+  const units = ['day', 'week', 'month', 'year'] as const
+
+  it('says exactly what Intl.RelativeTimeFormat (en-US, numeric auto) says', () => {
+    const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })
+    const counts = [
+      ...Array.from({ length: 4001 }, (_, i) => i - 2000),
+      9_999,
+      -9_999,
+      123_456,
+      -1_234_567,
+    ]
+    for (const unit of units) {
+      for (const n of counts) expect(relativeUnit(n, unit)).toBe(rtf.format(n, unit))
+    }
+  })
+
+  it('gives every calendar day the same words as before, across six years', () => {
+    // The implementation this replaced, kept here as the reference.
+    const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })
+    const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+    const before = (days: number) => {
+      if (days === 0) return 'Today'
+      if (days === 1) return 'Tomorrow'
+      if (days === -1) return 'Yesterday'
+      if (Math.abs(days) < 7) return capitalise(rtf.format(days, 'day'))
+      if (Math.abs(days) < 31) return capitalise(rtf.format(Math.round(days / 7), 'week'))
+      if (Math.abs(days) < 365) return capitalise(rtf.format(Math.round(days / 30), 'month'))
+      return capitalise(rtf.format(Math.round(days / 365), 'year'))
+    }
+    const today = todayIn('America/Chicago', THE_BUG)
+    for (let days = -1100; days <= 1100; days++) {
+      expect(relativeDayIn(addDays(today, days), 'America/Chicago', THE_BUG)).toBe(before(days))
+    }
+  })
+
+  it('works where Intl.RelativeTimeFormat does not exist, as on the iPhone', () => {
+    // Removing it is the point: Hermes does not have it.
+    const intl = Intl as { RelativeTimeFormat?: typeof Intl.RelativeTimeFormat }
+    const original = intl.RelativeTimeFormat
+    delete intl.RelativeTimeFormat
+    try {
+      expect(typeof intl.RelativeTimeFormat).toBe('undefined')
+      expect(relativeDayIn('2026-08-14', 'America/Chicago', THE_BUG)).toBe('2 weeks ago')
+      expect(relativeDayIn('2026-08-24', 'America/Chicago', THE_BUG)).toBe('3 days ago')
+      expect(relativeDayIn('2026-09-03', 'America/Chicago', THE_BUG)).toBe('Next week')
+      expect(relativeDayIn('2026-10-27', 'America/Chicago', THE_BUG)).toBe('In 2 months')
+      expect(relativeDayIn('2025-08-27', 'America/Chicago', THE_BUG)).toBe('Last year')
+    } finally {
+      intl.RelativeTimeFormat = original
+    }
   })
 })

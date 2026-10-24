@@ -11,6 +11,7 @@ import { Empty, Failure, Loading, Screen, Section } from '~/components/screen'
 import { CompanyLine } from '~/components/relationship'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * ATLAS

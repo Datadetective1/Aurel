@@ -8,6 +8,7 @@ import { config } from '~/lib/config'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * Sign in with the same account as the web. A new account can be created

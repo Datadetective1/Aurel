@@ -3,9 +3,9 @@ name: TestFlight status
 # Reports whether Apple has finished processing Atturel's newest TestFlight
 # build (or a given build number), and the internal testing groups. Waits for
 # processing if it is still running. Uses the same App Store Connect key
-# secrets as the iOS TestFlight workflow. Read-only unless "invite team admins"
-# is ticked: then an empty internal group gets the team's Account Holder and
-# Admins.
+# secrets as the iOS TestFlight workflow. "Crash reports" also prints the crash
+# logs testers shared. Read-only unless "invite team admins" is ticked: then an
+# empty internal group gets the team's Account Holder and Admins.
 
 on:
   workflow_dispatch:
@@ -20,6 +20,10 @@ on:
         default: '30'
       invite_team_admins:
         description: If the internal group is empty, invite the team's Account Holder and Admins
+        type: boolean
+        default: false
+      crash_reports:
+        description: Also print the crash reports testers shared from TestFlight
         type: boolean
         default: false
 
@@ -48,6 +52,10 @@ jobs:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
         run: node scripts/ci/asc-setup.cjs
+
+      - name: Crash reports shared from TestFlight
+        if: inputs.crash_reports
+        run: node scripts/ci/testflight-crashes.cjs
 
       - name: TestFlight status
         env:

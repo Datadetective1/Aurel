@@ -16,6 +16,7 @@ import { Notice } from '~/components/notice'
 import { Card, Empty, Failure, Loading, Screen, Section } from '~/components/screen'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
+export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
  * PREPARE

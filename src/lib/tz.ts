@@ -362,13 +362,28 @@ export function relativeDayIn(
   if (days === 1) return 'Tomorrow'
   if (days === -1) return 'Yesterday'
 
-  // Locale pinned for the same reason the zone is: this renders on both sides.
-  const rtf = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })
   const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-  if (Math.abs(days) < 7) return capitalise(rtf.format(days, 'day'))
-  if (Math.abs(days) < 31) return capitalise(rtf.format(Math.round(days / 7), 'week'))
-  if (Math.abs(days) < 365) return capitalise(rtf.format(Math.round(days / 30), 'month'))
-  return capitalise(rtf.format(Math.round(days / 365), 'year'))
+  if (Math.abs(days) < 7) return capitalise(relativeUnit(days, 'day'))
+  if (Math.abs(days) < 31) return capitalise(relativeUnit(Math.round(days / 7), 'week'))
+  if (Math.abs(days) < 365) return capitalise(relativeUnit(Math.round(days / 30), 'month'))
+  return capitalise(relativeUnit(Math.round(days / 365), 'year'))
+}
+
+/**
+ * "in 3 days", "last week", "5 months ago": the words
+ * `Intl.RelativeTimeFormat('en-US', { numeric: 'auto' })` produces, written
+ * out. Hermes, the JavaScript engine the iPhone app runs on, has no
+ * Intl.RelativeTimeFormat (only Collator, DateTimeFormat and NumberFormat), so
+ * the call threw there and the app crashed on People and Today in TestFlight
+ * 0.1.0 (1). The locale stays pinned to en-US, as before; tz.test.ts holds
+ * this to the real Intl output, so the website's wording does not change.
+ */
+export function relativeUnit(n: number, unit: 'day' | 'week' | 'month' | 'year'): string {
+  if (n === 0) return unit === 'day' ? 'today' : `this ${unit}`
+  if (n === 1) return unit === 'day' ? 'tomorrow' : `next ${unit}`
+  if (n === -1) return unit === 'day' ? 'yesterday' : `last ${unit}`
+  const count = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return n > 0 ? `in ${count} ${unit}s` : `${count} ${unit}s ago`
 }
 
 /**
