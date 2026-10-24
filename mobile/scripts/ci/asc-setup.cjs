@@ -63,12 +63,41 @@ async function asc(key, pathAndQuery) {
   return res.json()
 }
 
+// Accepts the .p8 however it was pasted: the whole file, the file without its
+// BEGIN/END lines, with Windows line endings or literal "\n"s, wrapped in
+// quotes, or base64-encoded. Returns the key as the PKCS#8 PEM Apple issued.
 function p8FromSecret(raw) {
-  const text = raw.trim()
-  if (text.includes('BEGIN PRIVATE KEY')) return `${text}\n`
-  const decoded = Buffer.from(text, 'base64').toString('utf8')
-  if (decoded.includes('BEGIN PRIVATE KEY')) return decoded
-  fail('ASC_API_KEY_P8 must hold the contents of the AuthKey_XXXX.p8 file (or that text base64-encoded).')
+  const text = raw.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n').replace(/\r/g, '')
+  const body = text
+    .split('\n')
+    .filter((line) => !/BEGIN|END/.test(line))
+    .join('')
+    .replace(/\s/g, '')
+  const der = Buffer.from(body, 'base64')
+  const attempts = [
+    () => crypto.createPrivateKey(text),
+    () => crypto.createPrivateKey(Buffer.from(text.replace(/\s/g, ''), 'base64').toString('utf8')),
+    () => crypto.createPrivateKey({ key: der, format: 'der', type: 'pkcs8' }),
+    () => crypto.createPrivateKey({ key: der, format: 'der', type: 'sec1' }),
+  ]
+  for (const attempt of attempts) {
+    try {
+      const key = attempt()
+      if (key.asymmetricKeyType === 'ec') return key.export({ type: 'pkcs8', format: 'pem' })
+    } catch {
+      // Try the next way it might have been pasted.
+    }
+  }
+  // Describe the value's shape, never its content, so the cause is visible.
+  const lines = text.split('\n').length
+  const shape = /^[A-Z0-9]{10}$/.test(text)
+    ? 'it looks like a Key ID'
+    : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)
+      ? 'it looks like an Issuer ID'
+      : /\.p8$/i.test(text)
+        ? 'it looks like a file name'
+        : `${text.length} characters on ${lines} line${lines === 1 ? '' : 's'}`
+  fail(`ASC_API_KEY_P8 is not a readable App Store Connect key (${shape}). Open the AuthKey_XXXX.p8 file in a text editor and paste everything in it, including the BEGIN and END lines.`)
 }
 
 async function candidatesFromExpo() {
@@ -101,6 +130,16 @@ async function main() {
   const fromSecrets = Boolean(ASC_API_KEY_P8 && ASC_API_KEY_ID && ASC_API_KEY_ISSUER_ID)
   if (!fromSecrets && (ASC_API_KEY_P8 || ASC_API_KEY_ID || ASC_API_KEY_ISSUER_ID)) {
     fail('Set all three of ASC_API_KEY_P8, ASC_API_KEY_ID and ASC_API_KEY_ISSUER_ID, or none of them.')
+  }
+  if (fromSecrets) {
+    const keyId = ASC_API_KEY_ID.trim()
+    const issuerId = ASC_API_KEY_ISSUER_ID.trim()
+    if (!/^[A-Z0-9]{10}$/.test(keyId)) {
+      fail(`ASC_API_KEY_ID should be the 10-character Key ID shown next to the key (it has ${keyId.length} characters).`)
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(issuerId)) {
+      fail(`ASC_API_KEY_ISSUER_ID should be the Issuer ID shown above the key list, like 57246542-96fe-1a63-e053-0824d011072a (it has ${issuerId.length} characters).`)
+    }
   }
 
   const candidates = fromSecrets
