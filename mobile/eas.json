@@ -9,6 +9,9 @@
         "EXPO_PUBLIC_API_URL": "https://www.atturel.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://mfvomtwwnkqsaiqzjbxy.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_njz0Seq43wtwpE5zhRriRQ_CiQZLKe3"
+      },
+      "ios": {
+        "image": "sdk-57"
       }
     },
     "development": {
@@ -16,7 +19,8 @@
       "developmentClient": false,
       "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "sdk-57"
       }
     },
     "preview": {
@@ -26,7 +30,10 @@
     "production": {
       "extends": "base",
       "distribution": "store",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "image": "sdk-57"
+      }
     }
   },
   "submit": {

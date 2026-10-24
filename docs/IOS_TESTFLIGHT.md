@@ -14,79 +14,91 @@ Expo's own prompts.
 
 Allow about an hour the first time, most of it waiting.
 
-## 0. Before the build: merge and deploy the PR
+## 0. Backend — done
 
-The app talks to `https://www.atturel.com`. Creating meetings, preparing,
-closing loops, signing up, onboarding, sample data and invitation codes need
-the new `/api/mobile/*` routes from the `ios-testflight-readiness` PR. Until
-it is merged and Vercel has deployed it, the app still runs but those buttons
-say "not available from the app yet". No database migration is needed.
+The `/api/mobile/*` routes the app uses were merged (PR #7) and are live on
+`https://www.atturel.com`. No database migration is needed.
 
-## 1. Apple Developer Program (once)
+## 1. Apple Developer Program (once) — done
 
-1. <https://developer.apple.com/account> → sign in with the Apple ID that will
-   own the app. If it says you are not enrolled: **Enroll** (paid, yearly; an
-   organisation needs its D-U-N-S number, an individual does not).
-2. Wait for the enrollment email. Everything below needs it.
+## 2. App Store Connect app record (once) — done
 
-## 2. App Store Connect app record (once)
+The app record for bundle id `com.atturel.app` exists. Its numeric **Apple
+ID** (App Store Connect → the app → **App Information** → General → Apple ID,
+for example `6741234567`) is not a secret; keep it handy for step 5.
 
-1. <https://appstoreconnect.apple.com> → **Apps** → **+** → **New App**.
-2. Platforms **iOS** · Name **Atturel** (if taken, try "Atturel — Meeting Prep")
-   · Primary language **English (U.S.)** · Bundle ID: choose
-   **com.atturel.app** if listed. If it is not listed, open
-   <https://developer.apple.com/account/resources/identifiers/list> → **+** →
-   **App IDs** → **App** → Description `Atturel`, Explicit
-   `com.atturel.app`, no extra capabilities → **Register**, then come back.
-   · SKU `atturel-ios` · User Access **Full Access** → **Create**.
-3. **App Information** → copy the numeric **Apple ID** (for example
-   `6741234567`). You need it in step 5.
+## 3. Link the project to Expo (once)
 
-## 3. Expo account and project link (once)
+`mobile/app.json` already names the owner, `datadetective1`, so the project is
+created under your account and nowhere else. Other projects on the account
+(such as PacePerk) are not touched: EAS addresses a project by its own slug,
+`atturel`.
 
-On a Mac or Windows/Linux machine with Node 20 or newer and git:
+On a Mac, Windows or Linux computer with git and Node 22 (LTS):
 
 ```bash
-git clone https://github.com/Datadetective1/Aurel.git && cd Aurel
-npm ci                    # the app imports a few shared files from ../src
-cd mobile && npm ci
-npx eas-cli@latest login  # your Expo account; create one free at expo.dev
-npx eas-cli@latest init   # links the project; adds extra.eas.projectId + owner to app.json
-git add app.json && git commit -m "Link the Expo project" && git push
+git clone https://github.com/Datadetective1/Aurel.git
+cd Aurel/mobile
+npm ci
+npx eas-cli@latest login     # sign in to Expo yourself, in the terminal
+npx eas-cli@latest whoami    # must print: datadetective1
+npx eas-cli@latest init      # answer Yes to "Create a project for @datadetective1/atturel?"
 ```
 
-## 4. Build
+`init` adds one line to `mobile/app.json`: `"extra": { "eas": { "projectId":
+"…" } }`. The project ID is not a secret. Either commit and push that change,
+or send the ID to whoever maintains the repo so it is committed for you;
+GitHub-started builds (step 7) need it on `main`.
+
+If `init` instead says a project already exists, stop: answer **No** and check
+<https://expo.dev/accounts/datadetective1/projects> — do not create a second
+one.
+
+## 4. Build and send to TestFlight in one command
+
+From `Aurel/mobile`:
 
 ```bash
-npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest build --platform ios --profile production --auto-submit
 ```
 
-Answer the prompts:
+EAS asks a few questions the first time. Answer them yourself, in the
+terminal — never paste a password, a 2FA code or a key file into a chat:
 
-- **Log in to your Apple account?** Yes — your Apple ID, then the 6-digit code
-  on your iPhone.
-- **Select a team** (if asked) — your developer team.
-- **Register bundle identifier / generate Distribution Certificate /
-  generate Provisioning Profile?** Yes to each. EAS stores them; nothing is
-  written into the repository.
+- **Log in to your Apple account?** Yes. Apple ID and password go to Apple
+  through EAS; then the six-digit code on your iPhone.
+- **Select a team** (if asked): your developer team.
+- **Bundle identifier `com.atturel.app`** is already registered; EAS finds it.
+- **Distribution certificate.** If EAS offers to **reuse an existing Apple
+  Distribution Certificate** (for example the one PacePerk uses), choose
+  reuse — sharing it between apps on one team is normal and changes nothing
+  for PacePerk. If it offers to generate a new one, that is fine too.
+  **If it ever asks you to revoke a certificate, answer No** and stop:
+  revoking would break builds that use it.
+- **Provisioning profile:** generate a new one (it is specific to
+  `com.atturel.app`; PacePerk's is untouched).
+- **App Store Connect API Key for submissions:** let EAS generate one (or
+  reuse an existing one). EAS stores it so this and later submissions to
+  TestFlight run without asking again.
 
-The build runs on Expo's servers, about 15–25 minutes. The build number is set
-and incremented by EAS (`appVersionSource: remote`, `autoIncrement`), starting
-at 1. The build page link printed in the terminal shows progress and logs.
+The build runs on Expo's servers, about 15–25 minutes, using the SDK 57 image
+(Xcode 26.6) pinned in `eas.json`. The build number starts at 1 and is
+incremented by EAS on every build. When it finishes, EAS uploads it to App
+Store Connect automatically (`--auto-submit`); the terminal and
+<https://expo.dev/accounts/datadetective1/projects/atturel/submissions> show
+progress.
 
-## 5. Send it to TestFlight
+## 5. If the upload needs doing by hand
+
+Only if `--auto-submit` was left off or the submission failed:
 
 ```bash
 npx eas-cli@latest submit --platform ios --latest
 ```
 
-Give it the numeric Apple ID from step 2 when asked (or add
-`"ascAppId": "<that number>"` under `submit.production.ios` in `eas.json` so
-it never asks again). Apple then processes the build for 10–30 minutes and
-emails you.
-
-Export compliance is answered by the app itself (`ITSAppUsesNonExemptEncryption`
-is false: the app only uses standard HTTPS).
+Give it the numeric Apple ID from step 2 if asked. Apple then processes the
+build for 10–30 minutes and emails you. Export compliance is answered by the
+app itself (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
 
 ## 6. Install it on your iPhone (internal testing — no Apple review)
 
@@ -97,7 +109,21 @@ is false: the app only uses standard HTTPS).
 3. On the iPhone: install **TestFlight** from the App Store, open the invitation
    email, **Accept** → **Install**.
 
-Each later build is: step 4 then step 5. Testers get it automatically.
+Each later build is step 4 again. Testers get it automatically.
+
+## 6a. Later builds without your computer (optional)
+
+Once one build has succeeded from your computer (EAS's requirement for
+GitHub-started builds), later builds can start from GitHub — from the Expo
+website, or by an assistant connected to your Expo account:
+
+1. <https://expo.dev/accounts/datadetective1/projects/atturel/github> →
+   **Install** the Expo GitHub App on the GitHub account that owns `Aurel` →
+   link the repository `Datadetective1/Aurel`.
+2. Set **Base directory** to `mobile`.
+3. Make sure the project ID from step 3 is committed on `main`.
+
+Builds then use the same profile and credentials as step 4.
 
 ## 7. Early testers outside your team (external testing — light Apple review)
 
