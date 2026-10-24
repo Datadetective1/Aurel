@@ -27,6 +27,18 @@
       "extends": "base",
       "distribution": "internal"
     },
+    "simulator-preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_PREVIEW_DATA": "1"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release",
+        "image": "sdk-57"
+      }
+    },
     "production": {
       "extends": "base",
       "distribution": "store",
