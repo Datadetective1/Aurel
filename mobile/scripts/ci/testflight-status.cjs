@@ -3,7 +3,12 @@
  * Waits until Apple has processed Atturel's newest TestFlight build (or the
  * build numbered BUILD_NUMBER), then reports whether internal testers can
  * install it. It also reports the TestFlight groups and how many testers each
- * internal group has. Read-only against App Store Connect.
+ * internal group has.
+ *
+ * Read-only, with one exception, and only when INVITE_TEAM_ADMINS=true. If the
+ * internal group that gets every build has no testers yet, it invites the
+ * team's Account Holder and Admins. Those are users of this App Store Connect
+ * team, who can already see everything in it.
  *
  * Runs after asc-setup.cjs, which leaves the key and the app's ID in the
  * environment: EXPO_ASC_API_KEY_PATH, EXPO_ASC_KEY_ID, EXPO_ASC_ISSUER_ID,
@@ -56,7 +61,7 @@ async function groups(key) {
   const res = await asc(key, `/v1/apps/${ASC_APP_ID}/betaGroups?limit=50`)
   const out = []
   for (const g of res.data) {
-    const line = { name: g.attributes.name, internal: g.attributes.isInternalGroup, allBuilds: g.attributes.hasAccessToAllBuilds }
+    const line = { id: g.id, name: g.attributes.name, internal: g.attributes.isInternalGroup, allBuilds: g.attributes.hasAccessToAllBuilds }
     if (line.internal) {
       const testers = await asc(key, `/v1/betaGroups/${g.id}/betaTesters?limit=200`)
       const states = {}
@@ -70,6 +75,43 @@ async function groups(key) {
     out.push(line)
   }
   return out
+}
+
+// EAS creates "Team (Expo)" to hold the team's admins, but it adds only users
+// whose roles include ADMIN, which can leave out the Account Holder. So when
+// that group, or another internal group that gets every build, is still
+// empty, invite the Account Holder and the Admins. Once it has anyone,
+// nothing changes.
+async function inviteTeamAdmins(key, groupList) {
+  const target =
+    groupList.find((g) => g.internal && g.allBuilds && g.name === 'Team (Expo)') ?? groupList.find((g) => g.internal && g.allBuilds)
+  if (!target || target.testers > 0) return
+  const users = (await asc(key, '/v1/users?limit=200')).data
+  const admins = users.filter((u) => (u.attributes.roles ?? []).some((r) => r === 'ACCOUNT_HOLDER' || r === 'ADMIN'))
+  for (const u of admins) {
+    const email = u.attributes.username
+    const existing = (await asc(key, `/v1/betaTesters?filter[email]=${encodeURIComponent(email)}&limit=1`)).data[0]
+    if (existing) {
+      await asc(key, `/v1/betaGroups/${target.id}/relationships/betaTesters`, {
+        method: 'POST',
+        body: { data: [{ type: 'betaTesters', id: existing.id }] },
+      })
+    } else {
+      await asc(key, '/v1/betaTesters', {
+        method: 'POST',
+        body: {
+          data: {
+            type: 'betaTesters',
+            attributes: { email, firstName: u.attributes.firstName ?? '', lastName: u.attributes.lastName ?? '' },
+            relationships: { betaGroups: { data: [{ type: 'betaGroups', id: target.id }] } },
+          },
+        },
+      })
+    }
+  }
+  const n = admins.length
+  console.log(`Invited ${n} team member${n === 1 ? '' : 's'} (Account Holder and Admins) to "${target.name}". TestFlight emails each an invitation.`)
+  summary(`- Invited ${n} team member${n === 1 ? '' : 's'} (Account Holder and Admins) to "${target.name}"`)
 }
 
 async function main() {
@@ -105,6 +147,16 @@ async function main() {
 
   console.log(`Build ${build.version} (${build.number}) is processed and ${build.internal === 'IN_BETA_TESTING' ? 'available to internal testers' : 'ready for internal testing'}.`)
   summary(`- TestFlight: build ${build.version} (${build.number}) processed, internal testing: \`${build.internal}\``)
+
+  if (process.env.INVITE_TEAM_ADMINS === 'true') {
+    try {
+      await inviteTeamAdmins(key, await groups(key))
+    } catch (e) {
+      const message = `Could not invite the team to TestFlight (${e.message}). Add yourself: App Store Connect > TestFlight > Internal Testing > Team (Expo) > Testers > +.`
+      console.log(`::warning::${message}`)
+      summary(`- ${message}`)
+    }
+  }
 
   for (const g of await groups(key)) {
     const detail = g.internal

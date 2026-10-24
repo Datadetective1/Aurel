@@ -81,19 +81,23 @@ What the run does, in order:
 6. Builds on EAS with the SDK 57 image (Xcode 26.6). The first build took
    about 6 minutes. EAS raises the build number on every build.
 7. Uploads to App Store Connect. On the first upload, EAS created the
-   internal TestFlight group **Team (Expo)**, which gets every build, and
-   invited the team's Admin users.
+   internal TestFlight group **Team (Expo)**, which gets every build.
 8. Waits until Apple has processed the build (usually 5–30 minutes), then
    reports whether internal testers can install it, and how many testers
-   each internal group has. Export compliance is answered by the app itself
+   each internal group has.
+   - If that group has no testers, it invites the team's Account Holder and
+     Admins, and TestFlight emails each of them. EAS meant to do this on the
+     first upload but left the group empty: it adds only users with the Admin
+     role, which can miss the Account Holder. Export compliance is answered by the app itself
    (`ITSAppUsesNonExemptEncryption` is false: standard HTTPS only).
 
 The run's summary page links the build on expo.dev and shows the TestFlight
 result.
 
 To check TestFlight without building, run **Actions → TestFlight status →
-Run workflow** (`.github/workflows/testflight-status.yml`). It is read-only
-and takes an optional build number.
+Run workflow** (`.github/workflows/testflight-status.yml`). It takes an
+optional build number. It is read-only unless **invite team admins** is
+ticked; then an empty internal group gets the Account Holder and Admins.
 
 Later releases are the same button. Raise `version` in `mobile/app.json` for
 a new public version number; build numbers take care of themselves.

@@ -2,8 +2,10 @@ name: TestFlight status
 
 # Reports whether Apple has finished processing Atturel's newest TestFlight
 # build (or a given build number), and the internal testing groups. Waits for
-# processing if it is still running. Read-only; uses the same App Store Connect
-# key secrets as the iOS TestFlight workflow.
+# processing if it is still running. Uses the same App Store Connect key
+# secrets as the iOS TestFlight workflow. Read-only unless "invite team admins"
+# is ticked: then an empty internal group gets the team's Account Holder and
+# Admins.
 
 on:
   workflow_dispatch:
@@ -16,6 +18,10 @@ on:
         description: Minutes to wait for Apple's processing
         required: false
         default: '30'
+      invite_team_admins:
+        description: If the internal group is empty, invite the team's Account Holder and Admins
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,4 +53,5 @@ jobs:
         env:
           BUILD_NUMBER: ${{ inputs.build_number }}
           TESTFLIGHT_WAIT_MINUTES: ${{ inputs.wait_minutes }}
+          INVITE_TEAM_ADMINS: ${{ inputs.invite_team_admins }}
         run: node scripts/ci/testflight-status.cjs
