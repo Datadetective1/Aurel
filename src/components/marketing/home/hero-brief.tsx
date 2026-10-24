@@ -11,7 +11,7 @@ import { ProductFrame } from './frame'
  * Not the whole brief -- the five things that make the point in a second:
  *
  *   when             the countdown and the time
- *   who              faces and first names
+ *   who              their faces and first names
  *   what for         the objective
  *   what to recall   one thing to remember, with where it came from
  *   what you owe     the one open loop
@@ -28,6 +28,7 @@ export function HeroBrief({ className }: { className?: string }) {
   return (
     <ProductFrame
       className={className}
+      note="Illustrative example · fictional people"
       description={`An ${brand.name} meeting brief for "${MEETING.title}", starting in about two hours, with ${ROOM.map((p) => `${p.name}, ${p.role} at ${p.org}`).join('; ')}. Objective: ${MEETING.objective} Remember: ${remember.text} (${remember.basis.toLowerCase()}). Open loop: ${OPEN_LOOP.text}, due today.`}
     >
       <div className="px-5 pt-4 pb-4 sm:px-6 sm:pt-5">
@@ -41,10 +42,17 @@ export function HeroBrief({ className }: { className?: string }) {
           <p className="font-display text-ink min-w-0 text-xl leading-tight sm:text-2xl">
             {MEETING.title}
           </p>
-          <ul className="flex shrink-0 -space-x-2">
+          {/* Negative margins: the faces are larger than the title line, and
+              overhang it rather than making the card taller. */}
+          <ul className="-my-0.5 flex shrink-0 -space-x-3 sm:-my-2">
             {ROOM.map((p) => (
               <li key={p.id}>
-                <Avatar name={p.name} size="md" className="ring-surface ring-2" />
+                <Avatar
+                  name={p.name}
+                  src={p.photo}
+                  priority
+                  className="ring-surface size-11 ring-2 sm:size-14"
+                />
               </li>
             ))}
           </ul>

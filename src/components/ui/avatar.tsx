@@ -1,4 +1,5 @@
 import { cn, hashToBucket, initials } from '@/lib/utils'
+import { AvatarPhoto } from './avatar-photo'
 
 /**
  * Avatar with a generated fallback.
@@ -39,49 +40,35 @@ export function Avatar({
   name,
   src,
   size = 'md',
+  alt = '',
+  priority = false,
   className,
 }: {
   name: string
   src?: string | null
   size?: keyof typeof SIZES
+  /** Only when the name is not already written beside the face. */
+  alt?: string
+  /** Load eagerly: for a face that is part of the first screen. */
+  priority?: boolean
   className?: string
 }) {
   const tint = TINTS[hashToBucket(name, TINTS.length)]!
 
-  if (src) {
-    return (
-      /* Avatars are arbitrary remote or data URLs supplied per user, so
-         next/image would need a per-user remote allowlist to be configured.
-         eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={src}
-        alt=""
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-        referrerPolicy="no-referrer"
-        className={cn(
-          // object-position slightly above centre: faces sit in the upper
-          // half of most portraits, and a centred crop cuts foreheads.
-          'border-line bg-bg-sunken shrink-0 rounded-full border object-cover object-[50%_35%]',
-          SIZES[size],
-          className,
-        )}
-      />
-    )
-  }
-
+  // The initials are always rendered. A photo is laid over them, so a slow,
+  // broken or expired image falls back to them instead of to an empty circle.
   return (
     <span
-      aria-hidden="true"
+      aria-hidden={src && alt ? undefined : true}
       className={cn(
-        'border-line inline-flex shrink-0 items-center justify-center rounded-full border font-medium tracking-[0.02em] select-none',
+        'border-line relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border font-medium tracking-[0.02em] select-none',
         SIZES[size],
         tint,
         className,
       )}
     >
-      {initials(name)}
+      <span aria-hidden="true">{initials(name)}</span>
+      {src ? <AvatarPhoto src={src} alt={alt} priority={priority} /> : null}
     </span>
   )
 }

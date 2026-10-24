@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import type { VisualPerson } from '@/lib/visual/types'
 import { BriefDepthNav } from '@/components/app/brief-depth-nav'
 import { LoopList } from '@/components/app/loop-list'
 import { TodayShortcuts } from '@/components/app/today-shortcuts'
@@ -36,6 +37,7 @@ import { PeopleList } from './preview-people'
 import { ConversationsListView } from './preview-conversations'
 import { PersonHeroView } from './preview-person'
 import { researchCapability } from '@/lib/research/providers'
+import { ELENA, NADIA, THEO, type DemoPerson } from '@/components/marketing/home/fixtures'
 import {
   CONVERSATION,
   CONVERSATION_DECISIONS,
@@ -100,6 +102,9 @@ const SCREENS = [
   'research-recovery',
   'profile-question',
   'profile-result',
+  // Photos and their fallbacks: the homepage's fictional people, plus one
+  // person with no photo and one whose photo URL is broken.
+  'faces',
 ] as const
 type Screen = (typeof SCREENS)[number]
 
@@ -111,6 +116,36 @@ const SILHOUETTE =
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#d9d2c4"/><circle cx="40" cy="31" r="14" fill="#a99f8c"/><path d="M14 80c2-18 13-27 26-27s24 9 26 27z" fill="#a99f8c"/></svg>',
   )
+
+/** The homepage's fictional people, with their generated portraits. */
+const demoFace = (p: DemoPerson, src: string | null = p.photo): VisualPerson => ({
+  id: `demo-${p.id}`,
+  name: p.name,
+  fullName: p.name,
+  src,
+  title: p.role,
+  company: p.org,
+  companyDomain: null,
+  context: p.context,
+  lastInteractionAt: new Date(NOW.getTime() - 9 * 86_400_000).toISOString(),
+  openLoops: 1,
+  owe: 0,
+})
+const FACES: VisualPerson[] = [
+  demoFace(ELENA),
+  demoFace(THEO),
+  demoFace(NADIA),
+  // No photo on record: initials, as most people will have.
+  {
+    ...demoFace({ ...NADIA, id: 'ines', name: 'Ines Carvalho', role: 'Procurement Lead' }),
+    src: null,
+  },
+  // A photo URL that fails to load: falls back to initials, not a broken image.
+  demoFace(
+    { ...THEO, id: 'rafael', name: 'Rafael Ortiz', role: 'IT Director' },
+    '/people/missing.webp',
+  ),
+]
 
 export default async function VisualPreview({
   searchParams,
@@ -269,6 +304,90 @@ export default async function VisualPreview({
               timeZone={TZ}
               now={now}
             />
+          </Container>
+        ) : null}
+
+        {screen === 'faces' ? (
+          <Container size="default" className="py-8 sm:py-12">
+            <MeetingCockpit
+              title="Platform renewal review"
+              scheduledAt={MEETING_START}
+              people={FACES}
+              prep="ready"
+              openLoops={2}
+              owe={1}
+              timeZone={TZ}
+              now={now}
+            />
+            <RoomView
+              className="mt-8"
+              people={FACES}
+              centerLabel="2:00 PM"
+              centerDetail="Today"
+              timeZone={TZ}
+              now={now}
+            />
+            <div className="mt-10">
+              <PersonHeroView
+                personId={FACES[0]!.id}
+                name={FACES[0]!.name}
+                fullName={FACES[0]!.fullName}
+                src={FACES[0]!.src}
+                title={FACES[0]!.title}
+                company={FACES[0]!.company}
+                companyDomain={null}
+                relevance={5}
+                relationship="Customer"
+              />
+            </div>
+            <RelationshipMap
+              className="mt-5"
+              you={{ name: 'You', src: null }}
+              person={{ name: FACES[0]!.name, fullName: FACES[0]!.fullName, src: FACES[0]!.src }}
+              organization={{
+                name: ELENA.org,
+                domain: null,
+                title: ELENA.role,
+                colleagues: FACES.slice(1, 5).map((p) => ({ id: p.id, name: p.name, src: p.src })),
+              }}
+              meetings={{ held: 4, next: null }}
+              conversations={{
+                count: 2,
+                lastAt: FACES[0]!.lastInteractionAt,
+                firstAt: null,
+                lastId: null,
+              }}
+              directions={{ owe: 1, waiting: 0, revisit: 0, personal: 0, completed: 0 }}
+              background={[]}
+              themes={['Adoption by team', 'Renewal scope']}
+              timeZone={TZ}
+              now={now}
+            />
+            <div className="mt-10">
+              <PersonHeroView
+                personId={FACES[3]!.id}
+                name={FACES[3]!.name}
+                fullName={FACES[3]!.fullName}
+                src={null}
+                title={FACES[3]!.title}
+                company={FACES[3]!.company}
+                companyDomain={null}
+                relevance={3}
+                relationship="Prospect"
+              />
+            </div>
+            <div className="mt-10">
+              <MeetingForm
+                people={FACES.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  subtitle: [p.title, p.company].join(' · '),
+                  photo: p.src,
+                }))}
+                preselectedPersonId={FACES[0]!.id}
+                timeZoneLabel={describeZone(TZ)}
+              />
+            </div>
           </Container>
         ) : null}
 

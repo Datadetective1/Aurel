@@ -2,8 +2,11 @@
  * MARKETING FIXTURES
  * =============================================================================
  * Invented people, organisations and meetings for the public homepage. None of
- * them is a real person, a real customer or anyone in the product's database,
- * and none has a photo: the initials fallback is what most records look like.
+ * them is a real person, a real customer or anyone in the product's database.
+ *
+ * Their portraits are AI-generated images of people who do not exist, made for
+ * this page and served from `public/people`. They are never anyone's uploaded
+ * photo; provenance is recorded in `public/people/README.md`.
  *
  * The homepage never reads production data. Everything it shows comes from
  * this file, and nothing here is shared with `app/dev/preview`, whose
@@ -18,6 +21,8 @@ export interface DemoPerson {
   org: string
   /** How they sit in this meeting, as the app labels it. */
   context: string
+  /** A generated portrait of a fictional person, from `public/people`. */
+  photo: string
 }
 
 export const ELENA: DemoPerson = {
@@ -26,6 +31,7 @@ export const ELENA: DemoPerson = {
   role: 'VP Operations',
   org: 'Larkspur Health',
   context: 'Decision maker',
+  photo: '/people/elena-marsh.webp',
 }
 
 export const THEO: DemoPerson = {
@@ -34,6 +40,7 @@ export const THEO: DemoPerson = {
   role: 'Finance Director',
   org: 'Larkspur Health',
   context: 'Influencer',
+  photo: '/people/theo-lindqvist.webp',
 }
 
 export const NADIA: DemoPerson = {
@@ -42,6 +49,7 @@ export const NADIA: DemoPerson = {
   role: 'Program Lead',
   org: 'Fernway Partners',
   context: 'Contributor',
+  photo: '/people/nadia-osei.webp',
 }
 
 export const ROOM = [ELENA, THEO, NADIA]

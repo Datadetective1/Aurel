@@ -46,6 +46,9 @@ const EDGES: {
   { a: 'you', b: 'loop', label: 'you owe', t: 0.45, accent: true, dashed: true },
 ]
 
+/** Radius of a person's node: large enough for the portrait to read as a face. */
+const R = 22
+
 const PEOPLE = [
   { key: 'elena' as const, person: ELENA, sub: ELENA.org },
   { key: 'theo' as const, person: THEO, sub: THEO.org },
@@ -113,15 +116,9 @@ function ConnectionMap() {
         const p = AT[key]
         return (
           <g key={key}>
-            <circle cx={p.x} cy={p.y} r={19} className="text-bg-sunken" fill="currentColor" />
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={19}
-              className="text-line"
-              fill="none"
-              stroke="currentColor"
-            />
+            <circle cx={p.x} cy={p.y} r={R} className="text-bg-sunken" fill="currentColor" />
+            {/* Initials underneath, the portrait over them: if the image is slow
+                or fails, the node still says who it is. */}
             <text
               x={p.x}
               y={p.y + 4}
@@ -133,9 +130,29 @@ function ConnectionMap() {
             >
               {initials(person.name)}
             </text>
+            <clipPath id={`relationship-face-${key}`}>
+              <circle cx={p.x} cy={p.y} r={R} />
+            </clipPath>
+            <image
+              href={person.photo}
+              x={p.x - R}
+              y={p.y - R}
+              width={R * 2}
+              height={R * 2}
+              preserveAspectRatio="xMidYMid slice"
+              clipPath={`url(#relationship-face-${key})`}
+            />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={R}
+              className="text-line"
+              fill="none"
+              stroke="currentColor"
+            />
             <text
               x={p.x}
-              y={p.y + 33}
+              y={p.y + 36}
               textAnchor="middle"
               fontSize={11.5}
               className="text-ink"
@@ -145,7 +162,7 @@ function ConnectionMap() {
             </text>
             <text
               x={p.x}
-              y={p.y + 46}
+              y={p.y + 49}
               textAnchor="middle"
               fontSize={9.5}
               className="text-ink-muted"
@@ -248,7 +265,7 @@ export function RelationshipVisual({ className }: { className?: string }) {
     >
       <div className="bg-bg-sunken border-line border-b px-3 py-4 sm:px-6 md:border-r md:border-b-0">
         <div className="mb-1 flex items-center gap-2.5 px-2">
-          <Avatar name={ELENA.name} size="xs" />
+          <Avatar name={ELENA.name} src={ELENA.photo} size="sm" />
           <p className="text-ink-secondary text-xs">
             {ELENA.name} · {ELENA.role}
           </p>
