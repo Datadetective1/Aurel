@@ -1,4 +1,5 @@
-import type { CapturePart, PartTranscriber, PendingCapture } from './pending-capture'
+import type { CapturePart, PartTranscriber, PendingCapture, TranscribeResult } from './pending-capture'
+import { detailOf, UPLOAD_ERRORS } from './direct-upload'
 
 /**
  * PARTS THROUGH PRIVATE, TEMPORARY STORAGE
@@ -64,18 +65,23 @@ export function storageTranscriber(deps: SegmentedDeps): PartTranscriber {
         ? { ok: true, text: result.text, captureId }
         : { ok: false, error: result.error, retryable: result.retryable, captureId }
     } catch (error) {
-      return {
-        ok: false,
-        // An upload that never reached the server is worth trying again.
-        error:
-          error instanceof Error && error.message
-            ? error.message
-            : 'That part of the recording could not be sent.',
-        retryable: true,
-        captureId,
-      }
+      return { ...failureOf(error), captureId }
     }
   }
+}
+
+/**
+ * A step that threw, in words. The app's API calls throw an ApiError whose
+ * message is only its kind ("offline"), so the kind is turned into a
+ * sentence here; anything else is said plainly with the error as detail.
+ */
+function failureOf(error: unknown): Extract<TranscribeResult, { ok: false }> {
+  const failure = (error as { failure?: { kind: string; message?: string } } | null)?.failure
+  if (failure?.kind === 'unauthenticated') return { ok: false, error: UPLOAD_ERRORS.signIn, retryable: false }
+  if (failure?.kind === 'offline') return { ok: false, error: UPLOAD_ERRORS.unreachable, retryable: true }
+  if (failure?.message) return { ok: false, error: failure.message, retryable: failure.kind === 'server' }
+  // An upload that never reached the server is worth trying again.
+  return { ok: false, error: 'That part of the recording could not be sent.', retryable: true, detail: detailOf(error) }
 }
 
 /** Throw away whatever the server still holds for parts that never became words. */

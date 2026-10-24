@@ -13,6 +13,12 @@ import { memoryStore, type PendingCapture, type PendingStore } from './pending-c
  *
  * The web preview has no file system and preview data never records, so it
  * uses memory.
+ *
+ * Paths are written down whole (file:///var/mobile/Containers/Data/
+ * Application/<id>/Documents/...), and iOS gives the app a new <id> folder
+ * when it is updated, moving the files with it. So a file is looked for at
+ * its path first, then at the same place under today's Documents folder: a
+ * recording left unsent before a TestFlight update is still offered back.
  */
 
 function fileStore(): PendingStore {
@@ -22,6 +28,29 @@ function fileStore(): PendingStore {
   const file = (uri: string) => {
     try {
       return new File(uri)
+    } catch {
+      return null
+    }
+  }
+
+  const DOCUMENTS = '/Documents/'
+  const locate = (uri: string): File | null => {
+    const at = file(uri)
+    try {
+      if (at?.exists) return at
+    } catch {
+      // Fall through to the moved location.
+    }
+    const i = uri.indexOf(DOCUMENTS)
+    if (i < 0) return null
+    const rest = uri
+      .slice(i + DOCUMENTS.length)
+      .split('/')
+      .filter(Boolean)
+    if (rest.length === 0) return null
+    try {
+      const moved = new File(Paths.document, ...rest)
+      return moved.exists ? moved : null
     } catch {
       return null
     }
@@ -63,6 +92,9 @@ function fileStore(): PendingStore {
       } catch {
         // Already gone.
       }
+    },
+    locate(uri) {
+      return locate(uri)?.uri ?? null
     },
   }
 }

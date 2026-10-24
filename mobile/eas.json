@@ -39,6 +39,15 @@
         "image": "sdk-57"
       }
     },
+    "simulator": {
+      "extends": "base",
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release",
+        "image": "sdk-57"
+      }
+    },
     "production": {
       "extends": "base",
       "distribution": "store",

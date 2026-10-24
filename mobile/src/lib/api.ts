@@ -1,10 +1,12 @@
 import * as React from 'react'
+import { File } from 'expo-file-system'
 import { config } from './config'
 import { supabase } from './supabase'
 import { previewResponse } from './preview-data'
 import type { DeleteAccountResponse, SignUpRequest, SignUpResponse } from '@atturel/web/lib/mobile/contracts'
 import type { SegmentedDeps, SegmentUploadTicket } from './segmented'
 import type { PartTranscriber } from './pending-capture'
+import { directTranscriber as uploadPart } from './direct-upload'
 
 /**
  * THE APP'S ONE DOOR TO THE BACKEND
@@ -133,44 +135,26 @@ export const api = {
 
 /**
  * One recorded part as the body of one request to the single-upload route,
- * which transcribes it and drops the audio -- the same route and the same
- * metering as a voice note. A failure says whether trying again could help:
- * a lost connection or a busy provider could; an empty, oversized or
- * over-allowance part could not.
+ * which transcribes it and drops the audio. The rules -- how the file is
+ * attached, how a failure is told apart -- are in lib/direct-upload; this
+ * gives them the phone: the session's token, the file on disk, and fetch.
  */
 export function directTranscriber(participantIds: string[] = []): PartTranscriber {
-  return async (part) => {
-    if (config.previewData) {
+  if (config.previewData) {
+    return async () => {
       const r = await previewResponse<{ text: string }>('/transcribe', {})
       return { ok: true, text: r.text }
     }
-    const access = await token()
-    if (!access) return { ok: false, error: 'Sign in again to send this recording.', retryable: false }
-    const form = new FormData()
-    const extension = part.uri.split('.').pop()?.toLowerCase() ?? 'm4a'
-    form.append('audio', { uri: part.uri, name: `capture.${extension}`, type: extension === 'webm' ? 'audio/webm' : 'audio/mp4' } as unknown as Blob)
-    form.append('durationSeconds', String(Math.round(part.seconds)))
-    for (const id of participantIds) form.append('participant', id)
-
-    let response: Response
-    try {
-      response = await fetch(`${config.apiUrl}/api/conversations/transcribe`, {
-        method: 'POST',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${access}` },
-        body: form,
-      })
-    } catch {
-      return { ok: false, error: 'You are offline. The recording is safe on this phone — send it when you reconnect.', retryable: true }
-    }
-    const body = (await response.json().catch(() => null)) as { text?: string; error?: string } | null
-    if (response.ok && typeof body?.text === 'string') return { ok: true, text: body.text }
-    if (response.status === 401) return { ok: false, error: 'Sign in again to send this recording.', retryable: false }
-    return {
-      ok: false,
-      error: body?.error ?? 'That part of the recording could not be turned into words.',
-      retryable: response.status >= 500 || response.status === 429,
-    }
   }
+  return uploadPart(
+    {
+      apiUrl: config.apiUrl,
+      token,
+      openFile: (uri) => new File(uri) as unknown as Blob,
+      fetch: (url, init) => fetch(url, init),
+    },
+    participantIds,
+  )
 }
 
 /** The private bucket segments are uploaded to (migration 0022). */
@@ -200,7 +184,9 @@ export function segmentedDeps(): SegmentedDeps {
       request<SegmentUploadTicket>('/api/capture/segments', { method: 'POST', body: JSON.stringify(input) }),
 
     async readFile(uri) {
-      return (await fetch(uri)).arrayBuffer()
+      // From disk, not through fetch: Expo's fetch answers a missing file
+      // with a 404 body, which would be uploaded as if it were the audio.
+      return new File(uri).arrayBuffer()
     },
 
     async putObject(ticket, body) {

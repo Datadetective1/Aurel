@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { formatElapsed, pickMimeType, recordingSupported } from './voice-debrief'
 import { cn } from '@/lib/utils'
 import { SINGLE_UPLOAD_MAX_BYTES, SINGLE_UPLOAD_MAX_SECONDS } from '@/lib/capture/limits'
+import { brand } from '@/lib/brand'
 
 /**
  * VOICE RECORDER
@@ -338,8 +339,8 @@ export function VoiceRecorder({
 
       <p className="text-ink-muted mt-2 text-xs leading-relaxed">
         {mode === 'live'
-          ? 'Audio is used to create the transcript and is not retained. Tell the people in the room before you press record.'
-          : 'Say what happened in your own words. Audio is used to create the transcript and is not retained.'}
+          ? `Audio is used to create the transcript; ${brand.name} does not keep it. Tell the people in the room before you press record.`
+          : `Say what happened in your own words. Audio is used to create the transcript; ${brand.name} does not keep it.`}
       </p>
 
       {notice && !error ? (
