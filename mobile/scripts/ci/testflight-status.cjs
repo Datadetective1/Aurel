@@ -14,6 +14,11 @@
  * environment: EXPO_ASC_API_KEY_PATH, EXPO_ASC_KEY_ID, EXPO_ASC_ISSUER_ID,
  * ASC_APP_ID. TESTFLIGHT_WAIT_MINUTES caps the wait (default 40).
  *
+ * It then reports, read-only, what external testing would still need for that
+ * build: its external state and expiry, the Beta App Review information and
+ * the test information, each as set or missing. Contact details and the demo
+ * account's name and password are never printed.
+ *
  * Exit 0: processed, and the build is ready or in testing for internal testers.
  * Exit 1: processing failed, export compliance is missing, or the wait ran out.
  * No tester emails or names are printed, only counts and invitation states.
@@ -54,7 +59,55 @@ async function latestBuild(key) {
     version: find('preReleaseVersion')?.attributes.version ?? '?',
     processing: build.attributes.processingState,
     internal: find('buildBetaDetail')?.attributes.internalBuildState ?? 'UNKNOWN',
+    external: find('buildBetaDetail')?.attributes.externalBuildState ?? 'UNKNOWN',
+    expired: build.attributes.expired,
+    expires: build.attributes.expirationDate,
+    encryption: build.attributes.usesNonExemptEncryption,
   }
+}
+
+const isSet = (value) => (value === null || value === undefined || value === '' ? 'missing' : 'set')
+
+// What external testing needs beyond a processed build. Each lookup stands
+// alone: a key without the role to read one part reports that part, not a failure.
+async function externalReadiness(key, build) {
+  const lines = [
+    `Build ${build.version} (${build.number}) for external testing: \`${build.external}\`; ` +
+      `${build.expired ? 'expired' : `expires ${String(build.expires ?? '?').slice(0, 10)}`}; ` +
+      `non-exempt encryption: ${build.encryption === false ? 'no' : String(build.encryption)}`,
+  ]
+  const part = async (label, read) => {
+    try {
+      lines.push(`${label}: ${await read()}`)
+    } catch (e) {
+      lines.push(`${label}: not readable (${e.message})`)
+    }
+  }
+  await part('Beta App Review information', async () => {
+    const a = (await asc(key, `/v1/apps/${ASC_APP_ID}/betaAppReviewDetail`)).data.attributes
+    return [
+      `contact name ${isSet(a.contactFirstName && a.contactLastName)}`,
+      `contact email ${isSet(a.contactEmail)}`,
+      `contact phone ${isSet(a.contactPhone)}`,
+      `sign-in required ${a.demoAccountRequired ? 'yes' : 'no'}`,
+      `demo account ${isSet(a.demoAccountName && a.demoAccountPassword)}`,
+      `review notes ${isSet(a.notes)}`,
+    ].join(', ')
+  })
+  await part('Test information', async () => {
+    const all = (await asc(key, `/v1/apps/${ASC_APP_ID}/betaAppLocalizations?limit=20`)).data
+    if (all.length === 0) return 'missing'
+    return all
+      .map(({ attributes: a }) =>
+        `${a.locale}: description ${isSet(a.description)}, feedback email ${isSet(a.feedbackEmail)}, privacy policy ${a.privacyPolicyUrl ?? 'missing'}`,
+      )
+      .join('; ')
+  })
+  await part('What to Test', async () => {
+    const all = (await asc(key, `/v1/builds/${build.id}/betaBuildLocalizations?limit=20`)).data
+    return all.length === 0 ? 'missing' : all.map(({ attributes: a }) => `${a.locale} ${isSet(a.whatsNew)}`).join(', ')
+  })
+  return lines
 }
 
 async function groups(key) {
@@ -158,12 +211,22 @@ async function main() {
     }
   }
 
-  for (const g of await groups(key)) {
+  const all = await groups(key)
+  for (const g of all) {
     const detail = g.internal
       ? `internal, ${g.allBuilds ? 'gets every build' : 'builds added by hand'}, ${g.testers} tester${g.testers === 1 ? '' : 's'}${g.states ? ` (${g.states})` : ''}`
       : 'external'
     console.log(`Group "${g.name}": ${detail}`)
     summary(`- Group "${g.name}": ${detail}`)
+  }
+  if (!all.some((g) => !g.internal)) {
+    console.log('No external group yet.')
+    summary('- No external group yet.')
+  }
+
+  for (const line of await externalReadiness(key, build)) {
+    console.log(line)
+    summary(`- ${line}`)
   }
   console.log(`https://appstoreconnect.apple.com/apps/${ASC_APP_ID}/testflight/ios`)
 }

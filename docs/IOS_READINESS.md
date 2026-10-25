@@ -102,16 +102,16 @@ Delete Account route. The deletion workflow kept its one minimal audit row in
 
 ## 4. Apple compliance audit (checked against the live guidelines)
 
-| Area                              | Status                                                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Bundle id, signing                | `com.atturel.app`; certificates and profiles are created by EAS on the first build                           |
-| Microphone permission             | Purpose string present and accurate; foreground only; no `UIBackgroundModes`                                 |
-| Privacy manifest                  | `PrivacyInfo.xcprivacy` generated from `ios.privacyManifests`; no tracking                                   |
-| Account deletion (5.1.1(v))       | In the app: Account › Delete account, typed confirmation, billing stopped first                              |
-| Sign in with Apple (4.8)          | **Not required**: the app uses only Atturel's own email-and-password accounts                                |
-| Encryption export compliance      | `ITSAppUsesNonExemptEncryption = false` (HTTPS only)                                                         |
-| Demo account for review (2.1)     | Needed for external TestFlight and App Store: a dedicated reviewer account with sample data and pilot access |
-| In-app purchase (3.1.1, 3.1.3(b)) | **Owner decision before App Store submission** — see §5                                                      |
+| Area                              | Status                                                                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Bundle id, signing                | `com.atturel.app`; certificates and profiles are created by EAS on the first build                                      |
+| Microphone permission             | Purpose string present and accurate; foreground only; no `UIBackgroundModes`                                            |
+| Privacy manifest                  | `PrivacyInfo.xcprivacy` generated from `ios.privacyManifests`; no tracking                                              |
+| Account deletion (5.1.1(v))       | In the app: Account › Delete account, typed confirmation, billing stopped first                                         |
+| Sign in with Apple (4.8)          | **Not required**: the app uses only Atturel's own email-and-password accounts                                           |
+| Encryption export compliance      | `ITSAppUsesNonExemptEncryption = false` (HTTPS only)                                                                    |
+| Demo account for review (2.1)     | `appreview@atturel.com`: Pro via the standard 14-day trial at submission, sample data, emails off; IOS_TESTFLIGHT.md §6 |
+| In-app purchase (3.1.1, 3.1.3(b)) | **Owner decision before App Store submission** — see §5                                                                 |
 
 ### App Privacy answers for App Store Connect (draft, for you to confirm)
 
@@ -145,7 +145,9 @@ manifest; if you change an answer, change `mobile/app.json` too.
    reviewer account on Free and accept the rejection risk. Nothing was built or
    changed in billing.
 2. **Free-plan limits for testers.** Free has 3 briefs a month, 60 transcription
-   minutes, 5 people and no Atlas. Give early testers pilot codes.
+   minutes, 5 people and no Atlas. **Decided (owner, 25 Oct 2026):** testers
+   use the standard 14-day Pro trial, then $29 a month if they subscribe. No
+   pilot codes by default.
 3. **Sample people and the Free people limit.** This branch stops the five
    invented sample people from counting toward Free's five people (a Free
    account that loaded the sample could not add anyone real). Revert the
