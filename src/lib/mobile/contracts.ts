@@ -394,6 +394,88 @@ export interface PersonEditFields {
   notes: string | null
 }
 
+// --- GET /api/mobile/people?q= -------------------------------------------------
+// Answered as a PeopleResponse: the web's people search (`search_everything`),
+// limited to the caller's own saved, active people. Never public research.
+
+// --- GET / POST /api/mobile/people/:id/research ---------------------------------
+/**
+ * Public research for one person, and the review of what it found. GET reads
+ * what is on record and never searches. POST searches, only when the user
+ * asks, and holds every page it finds: nothing is added to the person's
+ * record until the user says a page is them.
+ */
+export interface ResearchFact {
+  /** The stored fact's id; for a page still waiting, its position on that page. */
+  id: string
+  kind: string
+  /** "Role", "Previously", "Education"... */
+  label: string
+  value: string
+  detail: string | null
+  evidence: 'confirmed' | 'observed' | 'inferred' | 'unknown'
+  /** The words on the page it rests on. */
+  excerpt: string | null
+  current: boolean
+}
+
+export interface ResearchSource {
+  id: string
+  title: string
+  url: string | null
+  host: string | null
+  publisher: string | null
+  publishedAt: string | null
+  /** waiting: nothing from it is in the record yet. kept: in the record. rejected: marked as someone else. */
+  state: 'waiting' | 'kept' | 'rejected'
+  /** For a page still waiting: how strong the identity check found the match. */
+  match: 'strong' | 'possible' | null
+  /** Why it may be them, in the identity check's own terms, or what the user decided. */
+  why: string
+  /** For a page still waiting: where their name appears on it. */
+  nameExcerpt: string | null
+  /** The user decided this one themselves. */
+  reviewed: boolean
+  /** Waiting: what it would add. Kept: what rests on it now. */
+  facts: ResearchFact[]
+  /** Communication readings it would propose, or proposed; each is reviewed on its own. */
+  proposals: number
+}
+
+export interface ResearchResponse {
+  person: {
+    id: string
+    name: string
+    fullName: string
+    organization: string | null
+    jobTitle: string | null
+    hasProfileUrl: boolean
+  }
+  /** False when public search is off: research can then only read a profile link. */
+  canDiscover: boolean
+  hint: string | null
+  lastResearchedAt: string | null
+  sources: ResearchSource[]
+  /** Pages checked and not used: about someone else, or unreadable. */
+  notUsed: number
+}
+
+export interface RunResearchResponse extends ResearchResponse {
+  outcome: {
+    ok: boolean
+    message: string | null
+    /** When research could not tell who they are: the details that would help. */
+    missing: ('organization' | 'jobTitle' | 'profileUrl')[] | null
+  }
+}
+
+// --- POST /api/mobile/people/:id/sources/:sourceId ---------------------------------
+export interface SourceDecisionRequest {
+  decision: 'confirm' | 'reject'
+}
+export type SourceDecisionResponse =
+  { ok: true; factsAdded: number; research: ResearchResponse } | { ok: false; error: string }
+
 // --- POST /api/mobile/ask -----------------------------------------------------
 export interface AskRequest {
   question: string

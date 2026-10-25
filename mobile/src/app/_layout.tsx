@@ -52,6 +52,7 @@ function Navigator() {
           <Stack.Screen name="edit-person/[id]" options={{ title: 'Edit', presentation: 'modal' }} />
           <Stack.Screen name="archived/index" options={{ title: 'Archived' }} />
           <Stack.Screen name="archived/[id]" options={{ title: '' }} />
+          <Stack.Screen name="research/[id]" options={{ title: 'Public footprint' }} />
         </Stack.Protected>
         <Stack.Protected guard={settingUp}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />

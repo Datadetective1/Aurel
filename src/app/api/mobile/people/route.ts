@@ -1,4 +1,5 @@
 import { mobileContext, json, readJson } from '@/lib/mobile/route'
+import { logger } from '@/lib/logger'
 import { createPersonCore } from '@/app/(app)/people/actions'
 import { resolveFaces } from '@/lib/conversations/avatars'
 import { listLoops } from '@/lib/conversations/queries'
@@ -11,15 +12,26 @@ import type {
   PeopleResponse,
 } from '@/lib/mobile/contracts'
 
+type Ctx = Extract<Awaited<ReturnType<typeof mobileContext>>, { ok: true }>
+
+const SUMMARY_COLUMNS =
+  'id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organizations(name, domain)'
+
 /**
  * Everyone on record, most recently spoken to first, with faces and what is
  * open. With `?archived=1`, the people removed from the active record instead.
+ * With `?q=`, the web's people search over everyone saved, not only the ones
+ * this list carries.
  */
 export async function GET(request: Request) {
   const ctx = await mobileContext()
   if (!ctx.ok) return ctx.response
 
-  if (new URL(request.url).searchParams.get('archived') === '1') {
+  const params = new URL(request.url).searchParams
+  const q = params.get('q')
+  if (q !== null) return searchPeople(ctx, q)
+
+  if (params.get('archived') === '1') {
     const { data } = await ctx.supabase
       .from('people')
       .select('id, full_name, preferred_name, archived_at, is_demo, organizations(name)')
@@ -39,24 +51,88 @@ export async function GET(request: Request) {
     return json(body)
   }
 
-  const [{ data: people }, loops] = await Promise.all([
-    ctx.supabase
-      .from('people')
-      .select(
-        'id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organizations(name, domain)',
-      )
-      .eq('user_id', ctx.user.id)
-      .is('archived_at', null)
-      .order('last_interaction_at', { ascending: false, nullsFirst: false })
-      .limit(300),
+  const { data: people } = await ctx.supabase
+    .from('people')
+    .select(SUMMARY_COLUMNS)
+    .eq('user_id', ctx.user.id)
+    .is('archived_at', null)
+    .order('last_interaction_at', { ascending: false, nullsFirst: false })
+    .limit(300)
+
+  return json(await summaries(ctx, people ?? []))
+}
+
+/**
+ * SEARCH, the web's: the same `search_everything` function the web's search
+ * calls, so the same words find the same people in the same order. People
+ * match on name or role; a company that matches brings the people saved
+ * there, which on the web is one more tap away.
+ *
+ * Only the caller's own, active people: the function runs under row-level
+ * security, and every person is read back with `user_id` and `archived_at`
+ * filters on top. It never reaches public research or anyone else's record.
+ */
+async function searchPeople(ctx: Ctx, query: string): Promise<Response> {
+  const q = query.trim().slice(0, 120)
+  if (q.length < 2) return json<PeopleResponse>({ timeZone: ctx.timeZone, people: [] })
+
+  const { data, error } = await ctx.supabase.rpc('search_everything', { q, max_results: 50 })
+  if (error) {
+    logger.warn('mobile.people_search_failed', { code: error.code })
+    return json({ error: 'Search is not available right now.' }, 502)
+  }
+  const results = (data ?? []) as { entity: string; id: string }[]
+  const matched = results.filter((r) => r.entity === 'person').map((r) => r.id)
+  const companies = results.filter((r) => r.entity === 'organization').map((r) => r.id)
+
+  const { data: atCompanies } = companies.length
+    ? await ctx.supabase
+        .from('people')
+        .select('id')
+        .eq('user_id', ctx.user.id)
+        .is('archived_at', null)
+        .in('organization_id', companies)
+        .order('last_interaction_at', { ascending: false, nullsFirst: false })
+        .limit(50)
+    : { data: [] as { id: string }[] }
+
+  const ids = [...new Set([...matched, ...(atCompanies ?? []).map((p) => p.id)])].slice(0, 50)
+  if (ids.length === 0) return json<PeopleResponse>({ timeZone: ctx.timeZone, people: [] })
+
+  const { data: people } = await ctx.supabase
+    .from('people')
+    .select(SUMMARY_COLUMNS)
+    .eq('user_id', ctx.user.id)
+    .is('archived_at', null)
+    .in('id', ids)
+  const rank = new Map(ids.map((id, i) => [id, i]))
+  const ordered = (people ?? []).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0))
+  return json(await summaries(ctx, ordered))
+}
+
+type SummaryRow = {
+  id: string
+  full_name: string
+  preferred_name: string | null
+  avatar_url: string | null
+  avatar_path: string | null
+  job_title: string | null
+  relationship_type: string
+  last_interaction_at: string | null
+  is_demo: boolean
+  organizations: { name: string; domain: string | null } | null
+}
+
+/** Faces, place and what is open, the same for the list and for search. */
+async function summaries(ctx: Ctx, people: SummaryRow[]): Promise<PeopleResponse> {
+  const [loops, faces] = await Promise.all([
     listLoops(ctx.supabase, ctx.user.id, { scope: 'active', timeZone: ctx.timeZone }),
+    resolveFaces(ctx.supabase, people, (p) => p.id),
   ])
 
-  const faces = await resolveFaces(ctx.supabase, people ?? [], (p) => p.id)
-
-  const body: PeopleResponse = {
+  return {
     timeZone: ctx.timeZone,
-    people: (people ?? []).map((p) => {
+    people: people.map((p) => {
       const mine = loops.filter((l) => l.personId === p.id)
       const label = relationshipLabel(p.relationship_type)
       return {
@@ -76,14 +152,14 @@ export async function GET(request: Request) {
       }
     }),
   }
-  return json(body)
 }
 
 /**
  * Add someone from the phone -- typically while setting up a meeting with a
  * person not yet on record. The web's creation path: the plan's people limit,
  * the duplicate check and organisation matching all apply. Research is not
- * started here; it stays a deliberate step on the person's page on the web.
+ * started here, whatever was entered -- a profile link included. It stays a
+ * deliberate step on the person's page (`/api/mobile/people/:id/research`).
  */
 export async function POST(request: Request) {
   const ctx = await mobileContext()

@@ -7,7 +7,7 @@ import type { Database } from '@/lib/supabase/types'
 import { requireUser } from '@/lib/auth'
 import { getWorkspace } from '@/lib/workspace'
 import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
-import { ingestText, ingestUrl } from '@/lib/research/ingest'
+import { addHeldResults, ingestText, ingestUrl, readHeld, withoutHeld } from '@/lib/research/ingest'
 import { extractDocument } from '@/lib/sources/document'
 import { resolveSearchProvider, researchCapability } from '@/lib/research/providers'
 import {
@@ -43,6 +43,8 @@ export interface ResearchState {
   sourcesAccepted?: number
   factsCreated?: number
   observationsProposed?: number
+  /** Pages read and held for the user to check: nothing from them is in the record yet. */
+  sourcesHeld?: number
   needsReview?: boolean
   /**
    * Set when research ran but could not confidently identify the person --
@@ -295,7 +297,18 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
 /** A research run longer than this is worth a look, even when it succeeds. */
 const SLOW_RESEARCH_MS = 60_000
 
-export async function researchPerson(personId: string): Promise<ResearchState> {
+export async function researchPerson(
+  personId: string,
+  options: {
+    /**
+     * Add nothing until the user checks it: every page that may be about them
+     * is read and held for review instead of being linked. The app's research
+     * runs this way.
+     */
+    holdForReview?: boolean
+  } = {},
+): Promise<ResearchState> {
+  const hold = options.holdForReview === true
   const capability = await checkCapability('researchPerson', 'person_research')
   if (!capability.allowed) {
     // The analytics event measures how often this happens; this line is what an
@@ -347,6 +360,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
   let accepted = 0
   let facts = 0
   let proposals = 0
+  let held = 0
   let inputTokens = 0
   let outputTokens = 0
   let usedProvider: string | undefined
@@ -462,6 +476,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
         personId,
         // Only the profile URL the user themselves supplied gets that trust.
         userSupplied: url === person.profile_url,
+        holdForReview: hold,
       })
 
       if (result.usage) {
@@ -478,6 +493,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
         facts += result.factsCreated
         proposals += result.observationsProposed
       }
+      if (result.held) held++
     }
 
     await updateJob(supabase, jobId, {
@@ -495,7 +511,7 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       .from('people')
       .update({
         last_researched_at: new Date().toISOString(),
-        research_status: accepted > 0 ? 'complete' : 'no_results',
+        research_status: accepted > 0 ? 'complete' : held > 0 ? 'needs_review' : 'no_results',
       })
       .eq('id', personId)
       .eq('user_id', user.id)
@@ -516,11 +532,12 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
       sourcesAccepted: accepted,
       factsCreated: facts,
       observationsProposed: proposals,
+      sourcesHeld: held,
       searchRequests,
       searchCostUnits,
       inputTokens,
       outputTokens,
-      succeeded: accepted > 0,
+      succeeded: accepted > 0 || held > 0,
     })
 
     const elapsedMs = Date.now() - startedAt
@@ -537,6 +554,19 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     }
 
     revalidatePath(`/people/${personId}`)
+
+    if (held > 0) {
+      return {
+        ok: true,
+        message: `Reviewed ${considered} source${considered === 1 ? '' : 's'}. ${held} may be about ${person.full_name}. Nothing is in their record until you check ${held === 1 ? 'it' : 'each one'}.`,
+        sourcesConsidered: considered,
+        sourcesAccepted: accepted,
+        sourcesHeld: held,
+        factsCreated: facts,
+        observationsProposed: proposals,
+        needsReview: true,
+      }
+    }
 
     if (accepted === 0) {
       return {
@@ -648,9 +678,23 @@ export async function rejectSourceMatch(sourceId: string, personId: string) {
   const user = await requireUser()
   const supabase = await createClient()
 
+  // What a held page would have added goes with it: "not them" leaves nothing
+  // waiting to be added later.
+  const { data: link } = await supabase
+    .from('source_person_links')
+    .select('match_signals')
+    .eq('source_id', sourceId)
+    .eq('person_id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
   await supabase
     .from('source_person_links')
-    .update({ identity_match_status: 'no_match', reviewed_by_user: true })
+    .update({
+      identity_match_status: 'no_match',
+      reviewed_by_user: true,
+      match_signals: withoutHeld(link?.match_signals),
+    })
     .eq('source_id', sourceId)
     .eq('person_id', personId)
     .eq('user_id', user.id)
@@ -675,10 +719,25 @@ export async function rejectSourceMatch(sourceId: string, personId: string) {
   return { ok: true as const }
 }
 
-/** Confirm a source really is about this person. */
+/**
+ * Confirm a source really is about this person.
+ *
+ * A page held for review (research run with `holdForReview`) carries what it
+ * would add; confirming is the moment that goes into the record. The results
+ * are cleared from the link first, so a second confirmation adds nothing.
+ */
 export async function confirmSourceMatch(sourceId: string, personId: string) {
   const user = await requireUser()
   const supabase = await createClient()
+
+  const { data: link } = await supabase
+    .from('source_person_links')
+    .select('workspace_id, match_signals')
+    .eq('source_id', sourceId)
+    .eq('person_id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  const held = readHeld(link?.match_signals)
 
   await supabase
     .from('source_person_links')
@@ -686,6 +745,7 @@ export async function confirmSourceMatch(sourceId: string, personId: string) {
       identity_match_status: 'confirmed',
       identity_match_confidence: 1,
       reviewed_by_user: true,
+      match_signals: withoutHeld(link?.match_signals),
     })
     .eq('source_id', sourceId)
     .eq('person_id', personId)
@@ -697,9 +757,20 @@ export async function confirmSourceMatch(sourceId: string, personId: string) {
     .eq('id', sourceId)
     .eq('user_id', user.id)
 
-  await track('research_source_accepted', {})
+  const added =
+    held && link
+      ? await addHeldResults(supabase, {
+          workspaceId: link.workspace_id,
+          userId: user.id,
+          personId,
+          sourceId,
+          held,
+        })
+      : { factsCreated: 0, observationsProposed: 0 }
+
+  await track('research_source_accepted', { factsAdded: added.factsCreated })
   revalidatePath(`/people/${personId}`)
-  return { ok: true as const }
+  return { ok: true as const, ...added }
 }
 
 /**

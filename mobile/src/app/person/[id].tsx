@@ -124,6 +124,28 @@ export default function Person() {
         </Section>
       ) : null}
 
+      {/* Public research is its own step, never started by what was typed in. */}
+      <Section label="Public footprint" icon="globe">
+        {person.isDemo ? (
+          <T variant="small" tone="muted">Sample people are invented, so there is nothing public to find.</T>
+        ) : (
+          <>
+            <T variant="small" tone="secondary">
+              Look {firstName(person.name)} up in public professional sources. You check each page before anything is added.
+            </T>
+            <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+              <Button
+                label="Research public footprint"
+                icon="search"
+                variant="secondary"
+                accessibilityHint="Opens public research. Nothing is searched until you ask."
+                onPress={() => router.push({ pathname: '/research/[id]', params: { id: person.id } })}
+              />
+            </View>
+          </>
+        )}
+      </Section>
+
       <Manage
         person={{ id: person.id, name: person.name, hasPhoto: Boolean(person.src), editable: Boolean(data.edit) }}
         onChanged={changed}

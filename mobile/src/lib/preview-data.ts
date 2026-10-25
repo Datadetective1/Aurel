@@ -10,7 +10,11 @@ import type {
   PeopleResponse,
   PersonResponse,
   PreferencesResponse,
+  ResearchResponse,
+  ResearchSource,
   ReviewResponse,
+  RunResearchResponse,
+  SourceDecisionResponse,
   TodayResponse,
 } from '@atturel/web/lib/mobile/contracts'
 import {
@@ -37,6 +41,64 @@ import {
 
 const TZ = 'America/Toronto'
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Research in preview: nothing found until the button is pressed, then two invented pages to check. */
+const previewResearch: { searched: boolean; decisions: Record<string, 'confirm' | 'reject'> } = { searched: false, decisions: {} }
+
+function previewReview(personId: string): ResearchResponse {
+  const person = PEOPLE.find((x) => x.id === personId) ?? PEOPLE[0]!
+  const found: ResearchSource[] = [
+    {
+      id: 'src-team',
+      title: `Leadership team | ${person.company ?? 'Northwind'}`,
+      url: 'https://example.com/about/leadership',
+      host: 'example.com',
+      publisher: person.company ?? 'Northwind',
+      publishedAt: null,
+      state: 'waiting',
+      match: 'strong',
+      why: `Matched because their name is in the page title and it is published by ${person.company ?? 'Northwind'}.`,
+      nameExcerpt: `…our leadership team. ${person.fullName} leads partnerships across North America, having joined from…`,
+      reviewed: false,
+      facts: [
+        { id: 'src-team:0', kind: 'current_role', label: 'Role', value: person.title ?? 'Head of Partnerships', detail: null, evidence: 'observed', excerpt: `${person.fullName} leads partnerships`, current: true },
+        { id: 'src-team:1', kind: 'prior_role', label: 'Previously', value: 'Partnerships at Halcyon', detail: null, evidence: 'inferred', excerpt: 'having joined from Halcyon', current: false },
+      ],
+      proposals: 0,
+    },
+    {
+      id: 'src-talk',
+      title: 'Panel: building partner programmes',
+      url: 'https://example.org/events/panel',
+      host: 'example.org',
+      publisher: null,
+      publishedAt: '2026-03-12T00:00:00.000Z',
+      state: 'waiting',
+      match: 'possible',
+      why: `This might be ${person.fullName}, but there is not enough to be sure. Matched because their name appears in the page.`,
+      nameExcerpt: `…speakers include ${person.fullName} and two others from…`,
+      reviewed: false,
+      facts: [{ id: 'src-talk:0', kind: 'appearance', label: 'Public appearance', value: 'Panel on partner programmes, March 2026', detail: null, evidence: 'observed', excerpt: null, current: true }],
+      proposals: 1,
+    },
+  ]
+  const sources = previewResearch.searched
+    ? found.map((s): ResearchSource => {
+        const decision = previewResearch.decisions[s.id]
+        if (decision === 'reject') return { ...s, state: 'rejected', match: null, why: 'You said this is someone else.', nameExcerpt: null, reviewed: true, facts: [], proposals: 0 }
+        if (decision === 'confirm') return { ...s, state: 'kept', match: null, why: 'You confirmed this is them.', nameExcerpt: null, reviewed: true }
+        return s
+      })
+    : []
+  return {
+    person: { id: person.id, name: person.name, fullName: person.fullName, organization: person.company ?? null, jobTitle: person.title ?? null, hasProfileUrl: false },
+    canDiscover: true,
+    hint: null,
+    lastResearchedAt: previewResearch.searched ? NOW.toISOString() : null,
+    sources,
+    notUsed: previewResearch.searched ? 4 : 0,
+  }
+}
 
 function meeting(id: string): MeetingResponse {
   const m = MEETINGS.find((x) => x.id === id) ?? MEETINGS[0]!
@@ -167,6 +229,41 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
 
   const meetingMatch = p.match(/^\/meetings\/([^/]+)$/)
   if (meetingMatch) return meeting(meetingMatch[1]!) as T
+
+  if (p.startsWith('/people?q=')) {
+    const q = decodeURIComponent(p.slice('/people?q='.length)).toLowerCase()
+    const body: PeopleResponse = {
+      timeZone: TZ,
+      people: PEOPLE.filter((x) => [x.name, x.fullName, x.title, x.company].some((v) => v?.toLowerCase().includes(q))).map((x) => ({
+        ...x,
+        relationshipLabel: x.context ?? 'Colleague',
+      })),
+    }
+    return body as T
+  }
+
+  const researchMatch = p.match(/^\/people\/([^/]+)\/research$/)
+  if (researchMatch) {
+    if (init.method === 'POST') previewResearch.searched = true
+    const review = previewReview(researchMatch[1]!)
+    return (init.method === 'POST'
+      ? ({
+          ...review,
+          outcome: { ok: true, message: 'Reviewed 6 sources. 2 may be about them. Nothing is in their record until you check each one.', missing: null },
+        } satisfies RunResearchResponse)
+      : review) as T
+  }
+  const sourceMatch = p.match(/^\/people\/([^/]+)\/sources\/([^/]+)$/)
+  if (sourceMatch) {
+    const decision = (JSON.parse(String(init.body ?? '{}')) as { decision?: 'confirm' | 'reject' }).decision ?? 'confirm'
+    previewResearch.decisions[sourceMatch[2]!] = decision
+    const body: SourceDecisionResponse = {
+      ok: true,
+      factsAdded: decision === 'confirm' ? 2 : 0,
+      research: previewReview(sourceMatch[1]!),
+    }
+    return body as T
+  }
 
   if (p === '/people') {
     const body: PeopleResponse = {

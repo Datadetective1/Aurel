@@ -28,8 +28,10 @@ _Updated 25 October 2026._
   - **2C + 2B (iOS): approved by the owner on 25 Oct 2026 and merged (PR #19, `bb9c006`).**
   - **TestFlight 0.1.0 (4)** was built from `bb9c006` and processed by Apple on 25 Oct 2026, for internal testing only. It was not submitted for App Store review.
     - The owner reports it installed. Four screens were seen; none of the §1.4 checks has passed yet (§1.5).
+- **iOS People search and public research: built, in draft PR #21, awaiting the owner's review** (§5, "iOS People search and public research"). Not merged, no build. It holds every page research finds until the owner says it is them.
+  - On the simulator, search and adding a profile link passed. The research steps were not run: the Expo account's free simulator minutes are used up until 1 Nov 2026 (§5, "Simulator results").
 - **Open pull requests:**
-  - **PR #20 is doc-only:** this audit, with no code. It goes first.
+  - **PR #20 (doc-only) was merged on 25 Oct 2026** (`df4d3e3`), with the Phase 4 photo decision (§4, item 6).
   - **PR #21** (iOS search and research) is stacked on it, and so is the website follow-up for 5.7 and 5.8.
 - Owner decisions on discovery, removal, billing, notifications, privacy and photos are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.** A reproducible case and the acceptance test are in §2, "Finding 8.7".
@@ -149,6 +151,10 @@ The simulator test of a real reinstall-over-the-top update passed (§1.1, scenar
    - Turn Microphone back on and return to Atturel. Start recording now records.
 5. **Real device: offline.** Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
 6. Any checks added by the phase being shipped.
+7. **Real device, once PR #21 ships: search and public research.**
+   - Search finds someone saved by name, role or company; nobody else's people and no archived people appear. Offline, the phone's matches stay, and the screen says so.
+   - Research public footprint: opening the screen does not search. The button does. Each page shows why, where the name appears, and what it would add.
+   - "This is them" adds the page's facts. "Not them" removes the page, and it is not offered again. Open page opens the browser.
 
 ### 1.5 Build 0.1.0 (4) on the owner's iPhone (25 Oct 2026)
 
@@ -185,7 +191,7 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 | 2.2 | **Remove a person: no UI on either platform.** `archivePerson` and `deletePerson` exist, but nothing calls them. A hard delete would cascade away that person's loops (`commitments.person_id ON DELETE CASCADE`), observations, notes and facts.                                            | Partial     | P1       |
 | 2.3 | **Duplicate warning on create does nothing visible.** `createPersonCore` finds a same-name person, records it in analytics, and creates the duplicate anyway. That lookup filters by `workspace_id`, while everything else filters by `user_id`. Merge review exists on the web People page. | Partial     | P1       |
 | 2.4 | Person photo, web: upload, replace and remove (private `avatars` bucket, 2 MB, JPEG/PNG/WebP), plus suggested public photos with confirm or reject.                                                                                                                                          | Implemented | —        |
-| 2.5 | iOS person: read-only. No edit, photo, remove, research or memory review. Cannot add a person from the People tab.                                                                                                                                                                           | Missing     | P1       |
+| 2.5 | iOS person: read-only. No edit, photo, remove, research or memory review. Cannot add a person from the People tab. **2B added edit, photo, remove and add; PR #21 adds public research with review. Memory review on iOS is still missing (8.2).**                                           | Partial     | P1       |
 | 2.6 | Provenance is modelled well: user-entered fields; researched `professional_facts` with sources and evidence level; confirmed, observed, inferred or unknown labels; `identity_locked`.                                                                                                       | Implemented | —        |
 | 2.7 | **Own photo: missing.** `profiles.avatar_url` and `avatar_path` exist, but nothing reads or writes them. No bio field.                                                                                                                                                                       | Missing     | P1       |
 | 2.8 | Own profile, web: name, preferred name, title, company, pronouns, time zone. **iOS: set once at onboarding, never editable, including time zone,** which every date calculation uses.                                                                                                        | Partial     | P1       |
@@ -214,14 +220,16 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 
 ### Public research and identity
 
-| #   | Finding                                                                                                                                                                  | Status         | Sev |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --- |
-| 5.1 | **The refusal to link unverified identity is correct, and stays.** A name with no company cannot auto-link (0.28 < 0.55).                                                | Implemented    | —   |
-| 5.2 | Recovery asks for org, title or URL and offers a pasted link. It **never shows which candidates were rejected or why.**                                                  | Partial        | P1  |
-| 5.3 | **Confirming an uncertain source extracts no facts.** It shows "No facts rest on this".                                                                                  | Broken         | P1  |
-| 5.4 | The publisher label is heuristic. A loose JSON-LD match can name a host or platform instead of the original publisher. No code labels a source with the search provider. | Partial        | P2  |
-| 5.5 | **Placeholder URLs look real.** `add-context.tsx` builds `https://acme.com/leadership/<real person's name>`.                                                             | Broken (trust) | P1  |
-| 5.6 | Each refine re-runs research and counts against the quota again. People actions have no `maxDuration`.                                                                   | P2             | P2  |
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Status              | Sev |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --- |
+| 5.1 | **The refusal to link unverified identity is correct, and stays.** A name with no company cannot auto-link (0.28 < 0.55).                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implemented         | —   |
+| 5.2 | Recovery asks for org, title or URL and offers a pasted link. It **never shows which candidates were rejected or why.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Partial             | P1  |
+| 5.3 | **Confirming an uncertain source extracts no facts.** It shows "No facts rest on this". **PR #21:** a page held by the app's research carries what it would add, so confirming it adds those facts, on the web or the phone. A page the web's research was unsure of still adds nothing on confirm.                                                                                                                                                                                                                                                                                                     | Partial             | P1  |
+| 5.4 | The publisher label is heuristic. A loose JSON-LD match can name a host or platform instead of the original publisher. No code labels a source with the search provider.                                                                                                                                                                                                                                                                                                                                                                                                                                | Partial             | P2  |
+| 5.5 | **Placeholder URLs look real.** `add-context.tsx` builds `https://acme.com/leadership/<real person's name>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Broken (trust)      | P1  |
+| 5.6 | Each refine re-runs research and counts against the quota again. People actions have no `maxDuration`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | P2                  | P2  |
+| 5.7 | **Web: entering a profile link starts research by itself.** After adding a person with a profile link, their page opens with `?research=1` and research runs on arrival (`autoStart`). That page is then linked as a confirmed match ("You provided this directly"), and its facts are added without review. This conflicts with the owner's rule of 25 Oct 2026: entering details must not silently start research or treat unverified information as confirmed. The phone does neither. **Owner decision:** remove `autoStart` on the web and hold the typed link's page for review, as the app does. | Conflicts with rule | P1  |
+| 5.8 | **Web research can re-link a page the user marked "not them"** when the page's content has changed: its fresh path writes the identity status again. The app's held research checks the user's earlier decision first. Fix: the same check on the web path.                                                                                                                                                                                                                                                                                                                                             | Broken (trust)      | P1  |
 
 ### Prepare (brief engine)
 
@@ -620,6 +628,158 @@ Limitations:
 - On the simulator, **Open Settings** opened the main Settings page rather than Atturel's own page. On a physical iPhone, iOS normally opens the app's page. This goes on the next TestFlight checklist (§1.4).
 - Not run on the simulator: Ask opened with a question. Three jest tests cover it, added after the run; two of them fail against the old code.
 - Test data was restored afterwards: own photo removed, no avatar files left for QA account A, both email switches on. QA Person Three stays archived with the edited fields. QA accounts A and B are kept until the owner approves deleting them.
+
+**iOS People search and public research (25 Oct 2026, draft PR #21, not merged)**
+
+The owner's request: on iPhone, search within your own saved people as the web does; on a person's page, "Research public footprint", reusing the web's research, showing sources and evidence, with nothing saved before review.
+
+What was already there:
+
+- **iPhone search:** the People tab already filtered the list on the phone, by name, role and company. It covered only the 300 people the list loads.
+- **Web search:** the ⌘K search calls `search_everything`, which matches people by name or role, excludes archived people, and runs under row-level security.
+- **Web research:** research runs on the person's page. It links pages it is confident about and adds their facts at once, labelled observed or inferred, never confirmed. Pages it is unsure of wait for "Check this is them".
+  - It is not review-first.
+  - Adding a person with a profile link starts it automatically (5.7).
+- **The iPhone had no research.**
+
+What changed:
+
+- **Search, server-backed.**
+  - `GET /api/mobile/people?q=` calls the same `search_everything`.
+  - It returns matched people, then the user's own people at a matching company.
+  - Every person is read back with `user_id` and `archived_at` filters on top of row-level security.
+  - The phone filters what it has at once and replaces that with the server's answer. If the server cannot be reached, it keeps the phone's matches and says so.
+  - The copy says it searches only the people you have saved.
+- **Research, held for review:**
+  - The web's `researchPerson` gains a `holdForReview` option, and the app always uses it. The web's own run is unchanged.
+  - Each page is checked and read exactly as before. What it would add is held on its link (`match_signals.held`), and the link stays `unreviewed`.
+  - Nothing reaches the record, a brief or Ask until "This is them". Confirming adds the held facts through the same writers, once, with no second model call. "Not them" drops them.
+  - A page already decided, already in the record, or already waiting is left as it is. So "not them" is never offered again.
+- **Routes:**
+  - `GET /api/mobile/people/:id/research` reads and never searches.
+  - `POST` searches, only from the button (`maxDuration` 120).
+  - `POST /api/mobile/people/:id/sources/:sourceId` takes "This is them" or "Not them", through the web's own confirm and reject.
+- **Screens:**
+  - Person page: a "Public footprint" section that opens the research screen. It is hidden for sample people, because searching an invented name could only find strangers.
+  - Research screen, for each page:
+    - "Looks like them" or "Might be them";
+    - why, in the identity check's own words;
+    - where the name appears;
+    - what it would add, each fact with its evidence words;
+    - Open page, This is them, Not them.
+  - When research cannot identify the person, the screen names what would help and offers Edit details. Saving details does not search.
+- **Shared evidence words** (`src/lib/evidence-words.ts`), used by the web badge and the app.
+
+What did not change:
+
+- **No schema change.**
+- **No new provider or paid service:**
+  - the search provider is the existing one;
+  - a run uses one research from the plan, as on the web;
+  - confirming a held page costs nothing more.
+- **Privacy:**
+  - No public directory, cross-account search or profile sharing.
+  - Photos are untouched and stay private; research never suggests photos.
+  - Production has no shared people and no multi-member workspaces. The routes filter by `user_id` anyway.
+
+Tests:
+
+- **Web:** 1055/1055 pass. This adds 51 new tests across five files, including:
+  - nothing from a held page reaches the record, not even for a typed link;
+  - "not them" is never re-offered;
+  - searching again counts pages still waiting;
+  - the web's run is unchanged;
+  - confirm adds held facts once, and malformed held data is refused;
+  - search is limited to the user's own active people;
+  - adding or editing never starts research.
+- `tsc` is clean, and lint shows 0 errors.
+- **iOS:** 94/94 pass, 9 of them new. `tsc` is clean.
+
+Preview results (25 Oct 2026, PR #21 preview, production database, QA accounts A and B). All passed:
+
+- **Search:**
+  - finds by name (Marcus Lee), by company (Northwind finds Marcus), and the three QA Person records;
+  - archived people are not found, by name or by company;
+  - one letter searches nothing;
+  - no token gets 401;
+  - account B's own "Marcus Lee" record never appears in A's results, and B finds it in its own.
+- **Research, with a test person** (Ada Lovelace, her Wikipedia page as the profile link):
+  - Adding her started nothing: 0 research jobs, links or facts.
+  - The run held the page ("Looks like them"). It gave why it matched, where the name appears, and 3 facts it would add, none confirmed. The database showed the link `unreviewed` with the 3 facts held, 0 facts in her record, and one research charged.
+  - "This is them" added the 3 facts.
+  - Searching again left the page in her record, with no duplicate facts.
+  - "Not them" withdrew all 3 and cleared what was held.
+  - Account B could not read her research or confirm her page (404). An archived person's research is not found.
+  - She is archived afterwards, so QA account A has 4 active people again. The run used 2 of its 3 researches this month.
+
+**Simulator results (25 Oct 2026). Partial: stopped before the research run.**
+
+- **Set-up:**
+  - EAS simulator build `f567b6f0` of PR #21's code (`a67cf96`), iPhone 18 Pro simulator, QA account A.
+  - The app pointed at the PR #21 preview, which uses the production database. Production itself does not have these routes until PR #21 merges.
+  - The preview address is set only on the QA branch `qa/pr21-simulator`, which is never merged.
+
+| Check on the simulator                                                                                          | Result                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search "north"                                                                                                  | **Pass**: Marcus Lee, found through his company (Northwind QA)                                                                                                                                            |
+| Search "quinn" and "ada" (archived people), and "brightwater" (an archived person's company)                    | **Pass**: no one                                                                                                                                                                                          |
+| Search "person"                                                                                                 | **Pass**: QA Person Six, Five, Seven, in the server's order. The phone's own list sorts differently, so this is the server search                                                                         |
+| Add Grace Hopper (company and role). Then, in Edit details, add her Wikipedia page as the profile link and save | **Pass**: her page shows Public footprint with "Research public footprint". The database after saving: 0 research jobs, 0 linked pages, 0 facts, no research status. Research used is unchanged at 2 of 3 |
+
+- **Not run on the simulator:**
+  - the research run;
+  - pages waiting for review;
+  - Ask and briefs while a page waits;
+  - "This is them" and "Not them".
+- **Why it stopped:**
+  - The simulator session ended.
+  - The Expo account's free simulator minutes are used up until 1 Nov 2026. A paid Expo plan needs the owner's approval.
+  - QA account A's last research credit was not spent. Grace Hopper stays active, with her profile link, for when it resumes.
+- **Remaining simulator checks, after 1 Nov 2026.** Run them when the Expo simulator minutes and QA account A's research credits reset; both reset on 1 Nov.
+  1. **Build.** Run one EAS simulator build of PR #21's current head, pointed at its preview the same way (the QA branch `qa/pr21-simulator`).
+  2. **Open the research screen.** Sign in as QA account A. On Grace Hopper, open "Research public footprint" and check that opening it searches nothing (no research job).
+  3. **Run research once.** This uses one research credit. Expected:
+     - the page waits, as "Looks like them";
+     - it shows why it matched and the facts it would add, each labelled;
+     - the database shows 0 facts and the link `unreviewed` with the facts held.
+  4. **While it waits:** Ask about Grace and prepare a brief with her. Neither uses the page or its facts. The brief uses one of A's briefs.
+  5. **"This is them":** the facts are saved, and the web page shows them.
+  6. **"Not them":** the facts are withdrawn, and the screen says "Marked as someone else".
+     - Ask and a later brief must no longer use the page. On PR #21 alone, a confirmed-then-rejected page is still cited; PR #22 fixes that and passed this on its preview.
+     - If PR #22 is merged first, run this step on PR #21 with PR #22 merged in.
+  7. **Search again** (a second research credit). Check the rejected page is not offered again. Otherwise this rests on the unit tests and the stored state.
+  8. **Clean up:** archive Grace Hopper (reversible). Do not delete anything.
+- **Already covered elsewhere:**
+  - The same flow passed through the routes the app calls (the Ada test above).
+  - The research screen has jest tests.
+  - Confirm, reject and "never offered again" have unit tests.
+
+Limitations:
+
+- **The preview has neither the search provider nor the AI key.** So the preview research could only read the profile link, and the built-in composer did the reading; its facts were poor. Discovery and model reading run only in production. Judge their quality on the TestFlight build, with the owner's approval.
+- **Held results sit in an existing JSON column.** A dedicated column would be cleaner; it needs a schema change and the owner's approval.
+- **Search finds the same people as the web, plus people at a matching company,** with the web's ranking. The web's search does not match preferred names; neither does this.
+- **Memory proposals from a confirmed page are reviewed on the web.** The iPhone has no memory review yet (8.2).
+- **5.7 and 5.8 are web behaviour, unchanged here.** The owner decided on 25 Oct 2026 to fix them in a separate follow-up PR, stacked on this one.
+- **After "Not them", Ask and briefs can still name the page** (found by reading the code, not seen live). The facts are withdrawn, but in two cases the page's title stays listed:
+  - **The cases:**
+    - a page the user confirmed and then rejected;
+    - a page read earlier for someone else.
+  - **Where it shows:** under "Public sources read" in Ask, and as a "Public source" citation in a brief.
+  - **Why:** both still count as read, because Ask and briefs check only that a page was read and is not waiting for review.
+  - **Not affected:** a page freshly held and then rejected. It never counts as read.
+  - **On the web:** `main` has the same gap for any page marked "not them".
+  - **The fix:** in the follow-up PR, which counts only pages accepted as this person.
+
+Review plan (no merge, no build without the owner):
+
+1. **Preview, as QA account A:**
+   - Search a name, a role and a company; a single letter; an archived person (not found).
+   - On a person, research. Pages wait, and nothing new appears on their web page until confirmed.
+   - Confirm one page: its facts appear on the web person page.
+   - Reject one page, then search again: it is not offered again.
+2. **iOS simulator build** against production (the workflow's simulator option), with the same steps on the phone.
+3. **Real-device checks** (§1.4) once the owner approves a TestFlight build.
 
 **Order and testing**
 

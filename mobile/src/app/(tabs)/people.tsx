@@ -5,6 +5,7 @@ import Feather from '@expo/vector-icons/Feather'
 import type { ArchivedPeopleResponse, PeopleResponse } from '@atturel/web/lib/mobile/contracts'
 import { useApi } from '~/lib/api'
 import { useFresh } from '~/lib/use-fresh'
+import { useDebounced } from '~/lib/use-debounced'
 import { NewPerson } from '~/components/people-picker'
 import { Empty, Failure, Loading, Screen, StaleNote } from '~/components/screen'
 import { PersonRow } from '~/components/relationship'
@@ -12,7 +13,16 @@ import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
-/** Everyone on record, faces first, most recently spoken to at the top. */
+/**
+ * Everyone on record, faces first, most recently spoken to at the top.
+ *
+ * Search is the web's people search, over everyone saved -- not only the
+ * people this list carries. It filters what is on the phone at once, then
+ * shows the server's answer when it arrives; if that cannot be reached, the
+ * phone's own matches stay, and say so. It only ever searches the people you
+ * have saved: looking someone up publicly is a separate, deliberate step on
+ * their page.
+ */
 export default function People() {
   const { c } = useTheme()
   const [query, setQuery] = React.useState('')
@@ -27,11 +37,16 @@ export default function People() {
   const archivedCount = archived.data?.people.length ?? 0
   const now = new Date()
 
-  const people = (data?.people ?? []).filter((p) => {
-    const q = query.trim().toLowerCase()
+  const q = query.trim()
+  const term = useDebounced(q)
+  const search = useApi<PeopleResponse>(term.length >= 2 ? `/api/mobile/people?q=${encodeURIComponent(term)}` : null)
+  const onPhone = (data?.people ?? []).filter((p) => {
     if (!q) return true
-    return [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q))
+    return [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q.toLowerCase()))
   })
+  const searched = q.length >= 2 && term === q ? search.data?.people : undefined
+  const people = searched ?? onPhone
+  const searchFailed = q.length >= 2 && term === q && Boolean(search.error)
 
   return (
     <Screen
@@ -75,8 +90,9 @@ export default function People() {
       >
         <Feather name="search" size={16} color={c.inkMuted} />
         <TextInput
-          accessibilityLabel="Search people"
-          placeholder="Search by name or company"
+          accessibilityLabel="Search your people"
+          accessibilityHint="Searches only the people you have saved"
+          placeholder="Search your people by name, role or company"
           placeholderTextColor={c.inkMuted}
           value={query}
           onChangeText={setQuery}
@@ -86,6 +102,14 @@ export default function People() {
         />
       </View>
 
+      {q ? (
+        <T variant="meta" tone="muted" style={{ marginTop: 6 }}>
+          {searchFailed
+            ? 'Could not reach Atturel to search everyone. These are the matches on this phone.'
+            : 'Only the people you have saved. To look someone up publicly, open their page.'}
+        </T>
+      ) : null}
+
       <View style={{ marginTop: 8 }}>
         {loading ? (
           <Loading />
@@ -94,8 +118,8 @@ export default function People() {
         ) : people.length === 0 ? (
           <Empty
             icon="users"
-            title={query ? 'Nobody by that name' : 'Nobody on record yet'}
-            body={query ? 'Try part of a name or a company.' : 'People you add on the web, or who appear in a conversation you capture, show up here.'}
+            title={q ? 'None of your people match' : 'Nobody on record yet'}
+            body={q ? 'Try part of a name, a role or a company. To add them, use Add someone above.' : 'People you add on the web, or who appear in a conversation you capture, show up here.'}
           />
         ) : (
           people.map((p) => <PersonRow key={p.id} person={p} timeZone={data?.timeZone ?? 'UTC'} now={now} />)

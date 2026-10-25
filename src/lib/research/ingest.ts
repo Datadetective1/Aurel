@@ -1,11 +1,16 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { z } from 'zod'
 import type { Database } from '@/lib/supabase/types'
 import { safeFetch, parseUrl } from '@/lib/sources/fetch'
 import { classifyUrl, extractFromHtml, extractFromText } from '@/lib/sources/extract'
 import { assessIdentity, needsReview, shouldAutoLink } from './identity'
 import { runPrompt } from '@/lib/ai/provider'
-import { sourceExtractionPrompt } from '@/lib/ai/prompts/source-extraction'
+import {
+  extractedFactSchema,
+  sourceExtractionPrompt,
+  sourceExtractionSchema,
+} from '@/lib/ai/prompts/source-extraction'
 import { logger } from '@/lib/logger'
 import { recordUsage } from '@/lib/billing/entitlements'
 import { brand } from '@/lib/brand'
@@ -39,6 +44,12 @@ export interface IngestOptions {
   refresh?: boolean
   /** True when the user pasted this URL themselves — a strong identity signal. */
   userSupplied?: boolean
+  /**
+   * Read and assess the page, but add nothing to the person's record. What it
+   * would add is held with the link, as `match_signals.held`, until the user
+   * says whether it is them (`addHeldResults`, or rejection, which drops it).
+   */
+  holdForReview?: boolean
 }
 
 /** Provenance -> the shape the usage meter wants. Null when nothing generated. */
@@ -86,6 +97,8 @@ export interface IngestResult {
   } | null
   /** User-facing explanation when nothing usable came back. */
   message: string | null
+  /** Read and held for the user's review: nothing from it is in the record yet. */
+  held?: boolean
 }
 
 /**
@@ -258,20 +271,49 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
   // --- cache -----------------------------------------------------------------
   const { data: existing } = await supabase
     .from('sources')
-    .select('id, source_title, access_status, processing_status, content_hash, source_type')
+    .select(
+      'id, source_url, source_title, publisher, published_at, extracted_text, access_status, processing_status, content_hash, source_type',
+    )
     .eq('workspace_id', workspaceId)
     .eq('source_url', normalisedUrl)
     .maybeSingle()
 
   if (existing && !options.refresh && existing.processing_status === 'complete') {
+    // Held for review: read from what is stored, never linked as confirmed
+    // just because the page is already on file. The source's own status is
+    // left alone -- it may stand behind someone else.
+    if (personId && options.holdForReview && existing.extracted_text) {
+      const person = await loadSubject(supabase, personId)
+      if (person) {
+        return holdForReview(supabase, {
+          workspaceId,
+          userId,
+          personId,
+          person,
+          source: {
+            id: existing.id,
+            title: existing.source_title,
+            text: existing.extracted_text,
+            url: existing.source_url ?? normalisedUrl,
+            publisher: existing.publisher,
+            publishedAt: existing.published_at,
+            sourceType: existing.source_type,
+          },
+          userSupplied: options.userSupplied ?? false,
+          markSource: false,
+        })
+      }
+    }
+
     // Still associate it with this person if that link does not exist yet.
+    // Under the hold, a typed link is never recorded as confirmed here.
     const linked = personId
       ? await ensurePersonLink(supabase, {
           workspaceId,
           userId,
           sourceId: existing.id,
           personId,
-          userSupplied: options.userSupplied ?? false,
+          userSupplied: !options.holdForReview && (options.userSupplied ?? false),
         })
       : null
 
@@ -424,6 +466,26 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
       usage: null,
       message: null,
     }
+  }
+
+  if (options.holdForReview) {
+    return holdForReview(supabase, {
+      workspaceId,
+      userId,
+      personId,
+      person,
+      source: {
+        id: sourceId,
+        title: extracted.title,
+        text: extracted.text,
+        url: fetched.finalUrl,
+        publisher: extracted.publisher,
+        publishedAt: extracted.publishedAt,
+        sourceType,
+      },
+      userSupplied: options.userSupplied ?? false,
+      markSource: true,
+    })
   }
 
   const assessment = assessIdentity(
@@ -677,6 +739,265 @@ export async function ingestText(
     observationsProposed,
     message: null,
   }
+}
+
+// --- held for review -----------------------------------------------------------
+
+type Subject = {
+  full_name: string
+  job_title: string | null
+  email: string | null
+  organizations: { name: string } | null
+}
+
+async function loadSubject(supabase: Client, personId: string): Promise<Subject | null> {
+  const { data } = await supabase
+    .from('people')
+    .select('full_name, job_title, email, organizations(name)')
+    .eq('id', personId)
+    .maybeSingle()
+  return data
+}
+
+/**
+ * What a page would add, kept on its link until the user decides. Validated
+ * on the way back out: it is stored JSON, and only well-formed facts may
+ * reach the record.
+ */
+const heldSchema = z.object({
+  facts: z.array(extractedFactSchema),
+  observations: sourceExtractionSchema.shape.communicationObservations,
+  asOf: z.string().nullable(),
+})
+
+export type HeldResults = z.infer<typeof heldSchema>
+
+/** The held results on a link's `match_signals`, or null when there are none. */
+export function readHeld(signals: unknown): HeldResults | null {
+  if (!signals || typeof signals !== 'object' || !('held' in signals)) return null
+  const parsed = heldSchema.safeParse((signals as { held: unknown }).held)
+  return parsed.success ? parsed.data : null
+}
+
+/** The link's signals without held results, once the user has decided. */
+export function withoutHeld(
+  signals: unknown,
+): Database['public']['Tables']['source_person_links']['Update']['match_signals'] {
+  if (!signals || typeof signals !== 'object' || Array.isArray(signals)) return {}
+  const { held: _held, ...rest } = signals as Record<string, unknown>
+  return rest as Database['public']['Tables']['source_person_links']['Update']['match_signals']
+}
+
+/**
+ * HOLD FOR REVIEW
+ *
+ * The identity check and the reading run exactly as they would otherwise, so
+ * the review shows what the page would really add. But the link is left
+ * `unreviewed` -- the state that asks "Check this is them" on the web too --
+ * and the facts and proposals wait in `match_signals.held`. Nothing reaches
+ * the person's record, a brief or Ask until the user says it is them.
+ *
+ * A page that is plainly not about them is recorded as such, as without the
+ * hold, and nothing is held for it.
+ */
+async function holdForReview(
+  supabase: Client,
+  input: {
+    workspaceId: string
+    userId: string
+    personId: string
+    person: Subject
+    source: {
+      id: string
+      title: string | null
+      text: string
+      url: string
+      publisher: string | null
+      publishedAt: string | null
+      sourceType: SourceType
+    }
+    userSupplied: boolean
+    /** Mark the source itself as awaiting identity. Only for a page fetched now. */
+    markSource: boolean
+  },
+): Promise<IngestResult> {
+  const { source, person } = input
+
+  // What the user already decided, what is already in the record, and what
+  // is already waiting are left exactly as they are: "not them" is never
+  // offered again, and searching again does not re-read a page still waiting.
+  const { data: prior } = await supabase
+    .from('source_person_links')
+    .select('identity_match_status, identity_match_confidence, reviewed_by_user, match_signals')
+    .eq('source_id', source.id)
+    .eq('person_id', input.personId)
+    .maybeSingle()
+  const priorHeld = prior ? readHeld(prior.match_signals) : null
+  const inRecord =
+    prior?.identity_match_status === 'confirmed' || prior?.identity_match_status === 'probable'
+  if (prior && (prior.reviewed_by_user || inRecord || priorHeld)) {
+    return {
+      sourceId: source.id,
+      accessStatus: inRecord ? 'analyzed' : 'identity_uncertain',
+      title: source.title,
+      sourceType: source.sourceType,
+      reused: true,
+      identity: {
+        status: prior.identity_match_status,
+        confidence: Number(prior.identity_match_confidence ?? 0),
+        explanation: prior.reviewed_by_user
+          ? 'You already decided about this page.'
+          : 'Already found for this person.',
+      },
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: null,
+      message: null,
+      held: !prior.reviewed_by_user && !inRecord && priorHeld !== null,
+    }
+  }
+
+  const assessment = assessIdentity(
+    {
+      fullName: person.full_name,
+      organization: person.organizations?.name ?? null,
+      jobTitle: person.job_title,
+      email: person.email,
+    },
+    { title: source.title, text: source.text, url: source.url, publisher: source.publisher },
+    { userSuppliedUrl: input.userSupplied },
+  )
+
+  const base = {
+    sourceId: source.id,
+    accessStatus: 'identity_uncertain' as const,
+    title: source.title,
+    sourceType: source.sourceType,
+    reused: !input.markSource,
+    factsCreated: 0,
+    observationsProposed: 0,
+  }
+  const link = (status: Database['public']['Enums']['identity_match_status'], signals: object) =>
+    supabase.from('source_person_links').upsert(
+      {
+        workspace_id: input.workspaceId,
+        user_id: input.userId,
+        source_id: source.id,
+        person_id: input.personId,
+        identity_match_status: status,
+        identity_match_confidence: assessment.confidence,
+        match_signals:
+          signals as Database['public']['Tables']['source_person_links']['Insert']['match_signals'],
+      },
+      { onConflict: 'source_id,person_id' },
+    )
+  const markUncertain = async () => {
+    if (input.markSource) {
+      await supabase
+        .from('sources')
+        .update({ access_status: 'identity_uncertain' })
+        .eq('id', source.id)
+    }
+  }
+  const notThem = (explanation: string) => ({
+    ...base,
+    identity: { status: 'no_match' as const, confidence: assessment.confidence, explanation },
+    usage: null,
+    message: explanation,
+  })
+
+  if (assessment.status === 'no_match') {
+    await link('no_match', assessment.signals)
+    await markUncertain()
+    return notThem(assessment.explanation)
+  }
+
+  const generation = await runPrompt(sourceExtractionPrompt, {
+    person: {
+      fullName: person.full_name,
+      organization: person.organizations?.name ?? null,
+      jobTitle: person.job_title,
+    },
+    source: {
+      id: source.id,
+      url: source.url,
+      title: source.title,
+      publisher: source.publisher,
+      publishedAt: source.publishedAt,
+      sourceType: source.sourceType,
+      text: source.text,
+    },
+  })
+
+  if (generation.output.containedInstructions) {
+    logger.warn('research.source_contained_instructions', {
+      sourceId: source.id,
+      personId: input.personId,
+    })
+  }
+
+  if (!generation.output.mentionsTarget) {
+    await link('no_match', assessment.signals)
+    await markUncertain()
+    return {
+      ...notThem(`On reading it, this source does not appear to be about ${person.full_name}.`),
+      usage: usageFrom(generation.provenance),
+    }
+  }
+
+  const held: HeldResults = {
+    facts: generation.output.facts,
+    observations: generation.output.communicationObservations,
+    asOf: source.publishedAt,
+  }
+  await link('unreviewed', { ...assessment.signals, held })
+  await markUncertain()
+
+  return {
+    ...base,
+    identity: {
+      status: assessment.status,
+      confidence: assessment.confidence,
+      explanation: assessment.explanation,
+    },
+    usage: usageFrom(generation.provenance),
+    message: `${assessment.explanation} Check it is them before ${brand.name} adds anything.`,
+    held: true,
+  }
+}
+
+/**
+ * The user said a held page is them: what it would add goes into the record,
+ * through the same writers a research run uses, so a fact already on record
+ * from another page gains this one as a source instead of being duplicated.
+ * No model runs here; the reading was done, and metered, with the research.
+ */
+export async function addHeldResults(
+  supabase: Client,
+  input: {
+    workspaceId: string
+    userId: string
+    personId: string
+    sourceId: string
+    held: HeldResults
+  },
+): Promise<{ factsCreated: number; observationsProposed: number }> {
+  const factsCreated = await persistFacts(supabase, {
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    personId: input.personId,
+    sourceId: input.sourceId,
+    facts: input.held.facts,
+    asOf: input.held.asOf,
+  })
+  const observationsProposed = await proposeObservations(supabase, {
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    personId: input.personId,
+    sourceId: input.sourceId,
+    observations: input.held.observations,
+  })
+  return { factsCreated, observationsProposed }
 }
 
 // --- persistence helpers -------------------------------------------------------
