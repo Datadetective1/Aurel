@@ -1041,10 +1041,16 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 - **Expiry:** entitlements read an expired trial row as Free with Free's limits, and the Plan page, iPhone line and notices follow.
 - **Checkout parameters:** `trial_end`, the 48-hour minimum, the terms text, and no trial after expiry.
 - **Pages:** the Plan page in each state, the pricing page, and the account response.
+- **Vercel preview (25 Oct), read-only:**
+  - **The pricing page, signed out:** 200, with the trial line, the CTA and 13 allowance rows. There is no Teams card and no annual price, nothing overflows at phone width, and there are no console errors.
+  - **Settings › Plan, signed in as QA account B** (Free, never trialed, no grant, confirmed read-only). It showed Subscribe but no trial. So the preview has the Stripe secret key, but lacks the webhook secret, the price ID or the service role; which one could not be read from this session.
+  - Checkout refuses on exactly those conditions, so Subscribe could only have failed there. **Fixed:** Subscribe and the trial now follow one check (`checkoutAvailable`). Where subscribing cannot complete, the page offers neither and says upgrading is not available.
+  - No button was pressed and nothing was written.
 
 **Not verified: Stripe test mode, end to end.** This session has no Stripe keys, and the configured test-mode webhook delivers to production, which runs the old handler. A real test-mode run of this branch needs, from the owner:
 
-1. A Stripe **test-mode** webhook endpoint pointing at this branch's preview deployment, with its signing secret in the preview environment (and Vercel deployment protection bypassed for it), or Stripe CLI forwarding with test keys.
+1. **In Vercel's Preview environment, test-mode values for:** `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO_MONTHLY` (a test $29 monthly price), `STRIPE_WEBHOOK_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`. One of the last three is missing today (above).
+   - Then a Stripe **test-mode** webhook endpoint pointing at this branch's preview deployment, with Vercel deployment protection bypassed for it. Or use Stripe CLI forwarding with test keys.
 2. Approval to run it on QA account B. That writes a trial and a test-mode Stripe customer to QA B's row. It can be reset afterwards with one documented UPDATE.
 3. Then: start twice; subscribe during the trial with card 4242 4242 4242 4242; resend events from the Stripe dashboard; cancel in the portal; let a second QA trial expire by setting its `trial_ends_at` in the past.
 

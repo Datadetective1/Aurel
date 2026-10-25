@@ -126,7 +126,7 @@ vi.mock('@/lib/billing/stripe', async (original) => ({
   ...(await original<typeof import('@/lib/billing/stripe')>()),
   stripe: () => stripeFake,
   proPriceId: () => (h.configured ? 'price_pro' : null),
-  trialAvailable: () => h.configured,
+  checkoutAvailable: () => h.configured,
 }))
 vi.mock('@/lib/billing/notify', () => ({
   notifyTrial: (...a: unknown[]) => notifyTrial(...(a as [])),

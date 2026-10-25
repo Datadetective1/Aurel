@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   entitlements: {} as Record<string, unknown>,
   row: null as Record<string, unknown> | null,
   pending: 0,
+  checkout: true,
 }))
 
 vi.mock('server-only', () => ({}))
@@ -44,7 +45,7 @@ vi.mock('./actions', () => ({
   startProTrial: vi.fn(),
   openBillingPortal: vi.fn(),
 }))
-vi.mock('@/lib/billing/stripe', () => ({ trialAvailable: () => true }))
+vi.mock('@/lib/billing/stripe', () => ({ checkoutAvailable: () => h.checkout }))
 vi.mock('@/lib/env', async (original) => ({
   ...(await original<typeof import('@/lib/env')>()),
   features: { billing: true, billingWebhooks: true, serviceRole: true },
@@ -80,6 +81,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-25T15:00:00Z'))
   h.pending = 0
+  h.checkout = true
 })
 afterEach(() => {
   cleanup()
@@ -222,5 +224,18 @@ describe('owner and pilot accounts', () => {
     h.row = row()
     await show()
     expect(screen.queryByRole('button', { name: /Start your 14-day|Subscribe to Pro/ })).toBeNull()
+  })
+})
+
+describe('a deployment where subscribing cannot complete', () => {
+  it('offers neither the trial nor Subscribe, and says upgrading is not available', async () => {
+    // Missing the webhook secret, the price or the service role: Checkout
+    // would refuse, so nothing is offered that could only fail.
+    h.checkout = false
+    h.entitlements = { plan: 'free', tier: 'standard', provider: 'none', trial: null }
+    h.row = row()
+    await show()
+    expect(screen.queryByRole('button', { name: /Start your 14-day|Subscribe to Pro/ })).toBeNull()
+    expect(screen.getByText(/Upgrading is not available yet/)).toBeTruthy()
   })
 })

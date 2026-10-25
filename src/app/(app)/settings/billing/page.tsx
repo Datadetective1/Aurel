@@ -11,7 +11,7 @@ import { ManageBillingButton, TrialButton, UpgradeButton } from '@/components/ap
 import { InvitationPanel } from '@/components/app/invitation-panel'
 import { hasFullAccess } from '@/lib/billing/access'
 import { planSummary } from '@/lib/billing/plan-summary'
-import { trialAvailable } from '@/lib/billing/stripe'
+import { checkoutAvailable } from '@/lib/billing/stripe'
 import { trialEligibility } from '@/lib/billing/trial'
 import { features } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
@@ -75,6 +75,7 @@ export default async function BillingSettingsPage({
   // screen: the trial and its end, the first or next charge, or that nothing
   // will be charged.
   const onTrial = entitlements.trial?.state === 'active'
+  const subscribable = checkoutAvailable()
   const summary = planSummary({
     plan: entitlements.plan,
     fullAccess,
@@ -87,7 +88,7 @@ export default async function BillingSettingsPage({
         }
       : null,
     trialOffered:
-      trialAvailable() &&
+      subscribable &&
       entitlements.plan === 'free' &&
       trialEligibility(
         billing
@@ -99,7 +100,7 @@ export default async function BillingSettingsPage({
           : null,
         fullAccess,
       ).eligible,
-    canSubscribe: features.billing && !fullAccess && (entitlements.plan === 'free' || onTrial),
+    canSubscribe: subscribable && !fullAccess && (entitlements.plan === 'free' || onTrial),
     timeZone,
   })
   // Subscribed at Stripe, as opposed to on the trial Atturel grants itself.
@@ -284,7 +285,7 @@ export default async function BillingSettingsPage({
         </p>
       ) : null}
 
-      {!features.billing ? (
+      {!subscribable ? (
         <p className="border-line bg-bg-sunken text-ink-muted mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           Upgrading is not available yet. Everything else works normally.

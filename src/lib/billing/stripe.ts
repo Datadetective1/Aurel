@@ -43,12 +43,13 @@ export function proPriceId(): string | null {
 }
 
 /**
- * Whether the Pro trial may be offered: only where subscribing works end to
- * end -- Checkout, the price, the webhook that records the subscription, and
- * the service role that grants the trial -- so a trial can always end in a
- * real choice.
+ * Whether subscribing works end to end on this deployment: Checkout, the
+ * price, the webhook that records the subscription, and the service role it
+ * writes with. Subscribe to Pro is offered only then -- a button that can only
+ * fail is not an offer -- and so is the trial, so it can always end in a real
+ * choice.
  */
-export function trialAvailable(): boolean {
+export function checkoutAvailable(): boolean {
   return Boolean(
     features.billing && features.billingWebhooks && features.serviceRole && proPriceId(),
   )
