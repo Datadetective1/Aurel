@@ -658,8 +658,26 @@ Tests:
 - `tsc` is clean, and lint shows 0 errors.
 - **iOS:** 94/94 pass, 9 of them new. `tsc` is clean.
 
+Preview results (25 Oct 2026, PR #21 preview, production database, QA accounts A and B). All passed:
+
+- **Search:**
+  - finds by name (Marcus Lee), by company (Northwind finds Marcus), and the three QA Person records;
+  - archived people are not found, by name or by company;
+  - one letter searches nothing;
+  - no token gets 401;
+  - account B's own "Marcus Lee" record never appears in A's results, and B finds it in its own.
+- **Research, with a test person** (Ada Lovelace, her Wikipedia page as the profile link):
+  - Adding her started nothing: 0 research jobs, links or facts.
+  - The run held the page ("Looks like them"). It gave why it matched, where the name appears, and 3 facts it would add, none confirmed. The database showed the link `unreviewed` with the 3 facts held, 0 facts in her record, and one research charged.
+  - "This is them" added the 3 facts.
+  - Searching again left the page in her record, with no duplicate facts.
+  - "Not them" withdrew all 3 and cleared what was held.
+  - Account B could not read her research or confirm her page (404). An archived person's research is not found.
+  - She is archived afterwards, so QA account A has 4 active people again. The run used 2 of its 3 researches this month.
+
 Limitations:
 
+- **The preview has neither the search provider nor the AI key.** So the preview research could only read the profile link, and the built-in composer did the reading; its facts were poor. Discovery and model reading run only in production. Judge their quality on the TestFlight build, with the owner's approval.
 - **Held results sit in an existing JSON column.** A dedicated column would be cleaner; it needs a schema change and the owner's approval.
 - **Search finds the same people as the web, plus people at a matching company,** with the web's ranking. The web's search does not match preferred names; neither does this.
 - **Memory proposals from a confirmed page are reviewed on the web.** The iPhone has no memory review yet (8.2).
