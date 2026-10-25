@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { bearerFlagValue, forwardedHeaders } from '@/lib/bearer-routes'
+import { signedInDestination } from '@/lib/safe-redirect'
 
 /**
  * Session refresh + route protection.
@@ -89,12 +90,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Signed-in users have no reason to see the auth screens again.
+  // Signed-in users have no reason to see the auth screens again. They go on
+  // to where they were heading -- the pricing page's trial button asks for
+  // Settings › Plan -- or to Today.
   if (user && (pathname === '/sign-in' || pathname === '/sign-up')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/today'
-    url.search = ''
-    return NextResponse.redirect(url)
+    const destination = signedInDestination(request.nextUrl.searchParams.get('next'))
+    return NextResponse.redirect(new URL(destination, request.url))
   }
 
   return response
