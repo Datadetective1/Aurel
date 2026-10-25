@@ -177,23 +177,62 @@ Answer EAS's questions yourself, in the terminal:
 
 **If EAS ever asks you to revoke a certificate, answer No** and stop.
 
-## 6. Early testers outside your team (external testing, light Apple review)
+## 6. Early testers outside your team (external testing, Apple beta review)
 
-Optional, after you have tried it yourself.
+**Prepared 25 Oct 2026, not submitted.** Build 0.1.0 (5) is eligible: Apple
+reports it `READY_FOR_BETA_SUBMISSION`, export compliance answered, expiring
+23 Jan 2027. No new build is needed (audit §5, "External TestFlight"). The
+**TestFlight status** workflow reports what is still missing, without printing
+any contact details or the demo password.
 
-1. TestFlight → **External Testing** → **+** → group `Early testers`.
-2. **Test Information**:
-   - beta description;
+**Before you submit:**
+
+- the real-device checks on the build you submit have passed (audit §1.4);
+- the Terms and Privacy pages no longer say "Draft" (IOS_READINESS.md §5,
+  item 4).
+
+1. **Group.** TestFlight → **External Testing** → **+** → `Early testers`.
+2. **Test Information** (TestFlight → Test Information, once per app):
+   - beta app description: "Atturel prepares you for important conversations
+     and keeps track of what was agreed. Add the people you meet, read a short
+     brief before a meeting, and capture what happened afterwards. Atturel
+     finds the decisions and commitments and asks before keeping any of them.";
    - feedback email: `support@atturel.com`;
-   - privacy policy URL: `https://www.atturel.com/privacy`;
-   - **Sign-in required → demo account**: a dedicated reviewer account with
-     sample data loaded and pilot access (see the demo setup in
-     IOS_READINESS.md). Never use your own account here.
-3. Add the build to the group → **Submit for Review**. Beta review usually
-   takes a day. Then invite by email or share the public TestFlight link.
-4. Give testers pilot access so briefs and Atlas are not limited by the Free
-   plan. Issue invitation codes on the web (Settings › Access); testers enter
-   them in the app under **Account › Invitation code**.
+   - marketing URL: `https://www.atturel.com`;
+   - privacy policy URL: `https://www.atturel.com/privacy`.
+3. **Beta App Review Information** (same page):
+   - contact name, email and phone: yours;
+   - **Sign-in required**: on. User name `appreview@atturel.com`.
+   - **Password: set it yourself.** In Cloudflare, add `appreview@atturel.com`
+     as an Email Routing address for atturel.com that forwards to you. Then
+     use **Forgot your password?** on www.atturel.com and type the new password
+     straight into App Store Connect. It never goes in chat, the repository or
+     an email.
+   - review notes: "Sign in with the account provided. It is on the Free plan
+     and holds an invented sample record; every sample person is labelled
+     'Sample · invented'. Try: Today → Q3 capacity review → Prepare now
+     (Free includes 3 briefs a month); People → a person; Capture → record or
+     type a short note → Understand it → Keep. Recording needs microphone
+     access and is used only to make a transcript; audio is not kept. The app
+     sells nothing: plans are managed on the website. Account → Delete account
+     deletes the account."
+
+   The account (created 25 Oct 2026) is onboarded, on Free, with the sample
+   record loaded and Atturel's emails switched off. It has no invitation code
+   and no trial: the app unlocks nothing, so it raises no in-app purchase
+   question (IOS_READINESS.md §5, item 1). Its Atlas tab says "Not part of
+   your current plan". Never use your own account here.
+
+4. **What to Test** (on the build): "Prepare for a meeting with someone you
+   are about to see, then capture the conversation afterwards (record, or
+   type notes) and keep the commitments. Tell us what was wrong or missing:
+   use TestFlight's feedback, or write to support@atturel.com."
+5. Add build 0.1.0 (5) to the group → **Submit for Review** (you, when ready).
+   Beta review usually takes about a day. Then invite testers by email or
+   share the public TestFlight link.
+6. **Access for testers.** Testers create an account and use the standard
+   14-day Pro trial from the website (Settings › Plan), then $29 a month if
+   they subscribe. No invitation codes by default (owner, 25 Oct 2026).
 
 Do not submit for App Store review yet. See the payment-rule decision in
 IOS_READINESS.md §5.

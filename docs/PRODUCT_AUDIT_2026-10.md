@@ -51,6 +51,9 @@ _Updated 25 October 2026._
   - **None of its real-device checks has run yet** (§1.4, items 1–8).
 - **Pricing and the 14-day Pro trial: released.** PR #26 was merged on 25 Oct 2026 (`4295ac6`), owner-approved. The owner turned the trial offer on (`PRO_TRIAL_OFFER=on`) the same day, and both domains show it (§5, "Pricing and the Pro trial", "Release").
 - **Pilot onboarding has started** (owner, 25 Oct 2026). The pilot guide is `docs/PILOT_ONBOARDING.md`. Further feature work follows customer evidence.
+  - **PR #27 merged** on 25 Oct 2026 (`0b814fd`): the pricing page's trial button now reaches Settings › Plan for signed-in visitors. Verified on production on both domains (§5, "Release").
+  - **Who first:** consultants and fractional leaders who manage recurring client relationships, on the standard offer (14-day Pro trial with no card, then $29 a month). No ongoing pilot access by default (owner, 25 Oct 2026).
+  - **External TestFlight: prepared, not submitted.** Build 0.1.0 (5) is eligible, and no new build is needed (§5, "External TestFlight").
 - **Pending, for the next available opportunity (owner approval where noted):**
   - **PR #21's simulator research steps** (§5, "Remaining simulator checks"). They wait until 1 Nov 2026, when the Expo minutes and QA account A's research credits reset; a paid Expo plan needs approval. Grace Hopper stays on QA account A for them.
   - **Real-device checks on build 0.1.0 (5):** the §1.4 checklist, which was not verified on build 4 (§1.5). Item 8 covers 8.7's typed notes, PR #21's search and research, and 8.6's Account calendar and Sync now.
@@ -1108,6 +1111,7 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 - `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`): a trial that expires without a subscription. It now has 8 test people.
 - `qa-billing-start-20261025@atturel-demo.dev` (user `f4a93930-…`): the public "Start your 14-day Pro trial" button. Its trial runs to 8 Nov 2026.
 - All three are onboarded, in America/Chicago. The credentials are held outside the repository and were never printed.
+- `atturel-demo.dev` has no DNS records, so any mail to these accounts bounces. The App Store reviewer account uses atturel.com instead ("External TestFlight" below).
 
 **What still rests on automated tests, not live evidence:** the webhook lifecycle (subscribing during the trial, the first charge at the trial's end, a failed first charge, cancellation before the first charge, repeated and out-of-order events), and the trial-ending emails. In live mode these are verified only by genuine pilot purchases. No artificial charge, declined real card, refund or accelerated billing is run in live mode (owner, 25 Oct 2026).
 
@@ -1150,9 +1154,14 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
     - it got the trial at once, ending 8 Nov 2026;
     - it made **no request to Stripe**, and created no Stripe customer;
     - the row reads `free` / `trialing`.
-  - **Gap, fixed in the PR after #26:** the same button took a _signed-in_ visitor to `/sign-up`, which middleware sent to Today, not to the trial. It now asks for Settings › Plan (`next`), which middleware honours for signed-in visitors. The sign-up page's "Sign in" link keeps that destination.
+  - **Gap, fixed in PR #27** (merged 25 Oct 2026, `0b814fd`): the same button took a _signed-in_ visitor to `/sign-up`, which middleware sent to Today, not to the trial. It now asks for Settings › Plan (`next`), which middleware honours for signed-in visitors. The sign-up page's "Sign in" link keeps that destination.
+  - **Verified on production after the merge, on `atturel.com` and `www.atturel.com`** (`qa-billing-start`, no new trial):
+    - signed out, the button opens sign-up with `next=/settings/billing`, and signing in through its "Sign in" link lands on Settings › Plan;
+    - signed in, the button goes straight to Settings › Plan;
+    - `next=//example.com` and `next=/%09/example.com` land on Today, on the site;
+    - no request reached Stripe.
   - The shared redirect check now also refuses whitespace and control characters. The URL parser drops tabs and newlines, so `/<tab>/evil.com` passed the old check and resolved to `evil.com`. This applies to the sign-in form and the email-link callback too.
-  - A new account still finishes onboarding on Today. The pilot guide sends them to Settings › Plan.
+  - A new account still finishes onboarding on Today. The email confirmation link and onboarding do not carry `next`; carrying it would change the confirmation link and onboarding's four exits, which is new scope, so it waits for pilot evidence. The pilot guide sends new accounts to Settings › Plan.
 - **Live Stripe objects created for QA:** one customer (`qa-billing-trial`), one expired Checkout session, and one open session that expires unpaid on 26 Oct. No charge, subscription or refund.
 - **Still resting on automated tests, until genuine pilot purchases:**
   - a completed live subscription;
@@ -1172,6 +1181,35 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
    - Subscriptions started during a trial are ordinary Stripe subscriptions, which the pre-trial webhook already handles.
 3. **Reverting before those trials end would cut them short,** so it is not part of this plan.
 4. **Rows are never rewritten for a rollback.** Each account keeps its trial history (`trial_ends_at`), including after a later subscription.
+
+### External TestFlight (prepared 25 Oct 2026, not submitted)
+
+_The owner asked for this to be prepared in parallel, with no beta review submission and no new build._
+
+- **Build 0.1.0 (5) is eligible.** The read-only TestFlight status workflow (run #4) reports:
+  - processed (`VALID`) and in internal testing;
+  - `READY_FOR_BETA_SUBMISSION` for external testing;
+  - export compliance answered, with no non-exempt encryption;
+  - it expires on 23 Jan 2027.
+- **Still missing in App Store Connect** (owner steps, `docs/IOS_TESTFLIGHT.md` §6):
+  - an external group;
+  - the test information (description, feedback email, privacy policy URL);
+  - the Beta App Review information (contact, sign-in, notes);
+  - What to Test for the build.
+- **A new build is not necessary.** The only app change since build 5 (`ea84289`) is PR #26's Account screen: a trial billing line, and the invitation-code field shown to trial users.
+  - On build 5, a trial account still reads "Pro trial · ends …" from the server. Its billing line falls back to "Nothing is billed", which is true of the trial.
+  - Build 5 not showing the code field to trial users matches the owner's no-codes default.
+  - Everything else testers use runs on the server, which is already live.
+  - A new build is needed only for a fix the real-device checks turn up, or before 23 Jan 2027.
+- **Reviewer account:** `appreview@atturel.com` (user `a4fa330a-…`), created 25 Oct 2026.
+  - Onboarded, in America/Los_Angeles, on Free, with no trial, no code and no Stripe customer. Atturel's emails are switched off.
+  - The sample record is loaded: 5 invented people, and "Q3 capacity review" on Today. The Atlas answers `plan_required`, which the app shows as "Not part of your current plan" with no purchase prompt.
+  - Its first password is random, held outside the repository and never printed. The owner sets their own with "Forgot your password?" once `appreview@atturel.com` routes to them (Cloudflare Email Routing), and enters it only in App Store Connect.
+  - Free, not a trial or a code: the app then unlocks nothing obtained outside the App Store, which avoids the 3.1.1 / 3.1.3(b) question (IOS_READINESS.md §5, item 1). No account gets ongoing pilot access (owner, 25 Oct 2026).
+- **Before submitting (owner):**
+  - the build 5 real-device checks (§1.4) have passed;
+  - the Terms and Privacy pages no longer say "Draft". They still do on production (IOS_READINESS.md §5, item 4).
+- **Testers' access:** the standard 14-day Pro trial from the website, then $29 a month. No invitation codes by default.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.
 

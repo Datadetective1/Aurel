@@ -41,8 +41,9 @@ About 20 minutes, around one real conversation you have coming up.
 
 1. Open capture: **Conversations › Add a conversation** on a laptop, or **Capture** in a phone's browser.
 2. **Paste** your notes or a transcript, **Record**, or **Upload** a file.
-3. Keep it. Atturel reads it for decisions and commitments.
-4. In the iPhone app instead: **Capture**, record or type, then **Understand it**.
+3. Under **Who was in it?**, tap the person you met. Commitments are attached to them.
+4. Keep it. Atturel reads it for decisions and commitments.
+5. In the iPhone app instead: **Capture**, record or type, then **Understand it**.
 
 ## 6. Review a commitment
 
@@ -66,13 +67,14 @@ Two questions, by reply or to support@atturel.com:
 ## For the Atturel team (not for pilots)
 
 - **Inviting pilots.** The owner sends the invitations; no one sends them on the owner's behalf. Use this guide as the demo agenda, around the pilot's own upcoming conversation.
+- **Who and on what terms (owner, 25 Oct 2026).** Consultants and fractional leaders who manage recurring client relationships come first. Everyone gets the standard offer: the 14-day Pro trial with no card, then $29 a month if they subscribe. No one gets ongoing pilot access (invitation codes) by default.
 - **iPhone access today: internal TestFlight only.**
   - Build 0.1.0 (5) is in internal testing.
   - Internal testers must be users of the App Store Connect team, up to 100. They need no Apple review.
   - The internal group (Team (Expo)) has one tester.
-- **iPhone access for pilots outside the team: external TestFlight.** This is not set up yet. It needs:
+- **iPhone access for pilots outside the team: external TestFlight.** Being prepared, not submitted. It needs:
   - an external group with test information;
-  - a dedicated reviewer demo account;
+  - the reviewer demo account (`appreview@atturel.com`, created 25 Oct 2026);
   - Apple's beta review (usually about a day).
 
   Testers are then invited by email or a public link. Steps: `docs/IOS_TESTFLIGHT.md` §6.
@@ -81,4 +83,4 @@ Two questions, by reply or to support@atturel.com:
 - **Payments.** Live checkout and the no-card trial are verified on production.
   - The live payment lifecycle is not yet verified by a real transaction: a completed subscription, the first charge, a failed charge, and cancellation.
   - The first genuine pilot purchase is that evidence. Watch the webhook delivery in Stripe (Developers › Webhooks › the live endpoint).
-- **Known friction.** A new account finishes onboarding on Today. The trial is started from Settings › Plan, as step 2 says.
+- **Known friction.** A new account confirms its email and finishes onboarding on Today, even when it came from the trial button. The trial is started from Settings › Plan, as step 2 says. An existing user who signs in from the trial button lands on Settings › Plan.
