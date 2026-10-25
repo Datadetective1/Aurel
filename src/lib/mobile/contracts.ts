@@ -533,7 +533,19 @@ export interface ReviewResponse {
     /** Pre-selected when the reading is confident; the user still decides. */
     likely: boolean
   }[]
-  decisions: { id: string; description: string; excerpt: string | null; likely: boolean }[]
+  decisions: {
+    id: string
+    description: string
+    excerpt: string | null
+    /** Pre-selected when settled and confident; never when only proposed. */
+    likely: boolean
+    /**
+     * The words only propose it -- a suggestion, recommendation, hypothetical
+     * or open question. Shown as "Proposed, not decided" and never pre-ticked.
+     * Absent from servers older than finding 8.7's fix.
+     */
+    proposed?: boolean
+  }[]
   /** Relationship memories proposed for people; confirmed on the person page. */
   memoryProposals: number
 }

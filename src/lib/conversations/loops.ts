@@ -1,5 +1,6 @@
 import type { Database } from '@/lib/supabase/types'
 import { addDays, isOverdueIn, todayIn } from '@/lib/tz'
+import { readDecision } from './decisions'
 
 /**
  * OPEN LOOPS
@@ -141,6 +142,21 @@ export const LOOP_PROPOSAL_FLOOR = 0.4
  * still presses Confirm; this only decides which boxes start ticked.
  */
 export const LOOP_PRESELECT_THRESHOLD = 0.7
+
+/**
+ * Whether a proposed decision starts ticked in Review: a confident reading,
+ * and never one that reads as only proposed (finding 8.7). Read again from
+ * the words here, so rows written before that rule start unticked too.
+ */
+export function decisionPreselected(decision: {
+  confidence: number | null
+  description: string
+  excerpt: string | null
+}): boolean {
+  return (
+    (decision.confidence ?? 0) >= LOOP_PRESELECT_THRESHOLD && readDecision(decision) !== 'proposed'
+  )
+}
 
 /** The one-word label a badge carries for a proposal's confidence. */
 export function confidenceLabel(confidence: number | null): 'Likely' | 'Possible' | null {

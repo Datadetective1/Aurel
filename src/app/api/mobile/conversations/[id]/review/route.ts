@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { mobileContext, json, readJson } from '@/lib/mobile/route'
 import { submitReview } from '@/app/(app)/conversations/actions'
-import { LOOP_PRESELECT_THRESHOLD } from '@/lib/conversations/loops'
+import { decisionPreselected, LOOP_PRESELECT_THRESHOLD } from '@/lib/conversations/loops'
+import { isProposedDecision } from '@/lib/conversations/decisions'
 import { actionDirection } from '@/lib/visual/relationship-actions'
 import type { ReviewRequest, ReviewResponse, ReviewResult } from '@/lib/mobile/contracts'
 
@@ -75,12 +76,18 @@ async function load(id: string) {
       excerpt: l.excerpt,
       likely: Number(l.confidence ?? 0) >= LOOP_PRESELECT_THRESHOLD,
     })),
-    decisions: (decisions ?? []).map((d) => ({
-      id: d.id,
-      description: d.description,
-      excerpt: d.excerpt,
-      likely: Number(d.confidence ?? 0) >= LOOP_PRESELECT_THRESHOLD,
-    })),
+    // The web's reading, so a proposal is never pre-ticked on either: an app
+    // that predates the label still starts it unticked through `likely`.
+    decisions: (decisions ?? []).map((d) => {
+      const reading = { description: d.description, excerpt: d.excerpt }
+      return {
+        id: d.id,
+        description: d.description,
+        excerpt: d.excerpt,
+        likely: decisionPreselected({ ...reading, confidence: Number(d.confidence ?? 0) }),
+        proposed: isProposedDecision(reading),
+      }
+    }),
     memoryProposals: memories ?? 0,
   }
   return { ctx, data }
