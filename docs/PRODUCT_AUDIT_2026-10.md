@@ -38,21 +38,28 @@ _Updated 25 October 2026._
     - Signed in as QA account B, a page marked "not them" shows PR #22's "Reconsider this page".
     - Vercel's deployment list could not be read from the assistant's session (403).
   - **Tests on main:** web 1157/1157 and iPhone 97/97, with clean typechecks.
-- **The iPhone app has not been rebuilt.** The new iPhone screens are in the source only: People search, research, the 8.7 "Proposed, not decided" label and, once PR #25 is merged, the 8.6 Account calendar with Sync now. TestFlight 0.1.0 (4) gets only the server-side behaviour, including 8.7's unticked proposals. A new build needs the owner's approval.
+- **Finding 8.6 (calendar freshness): merged 25 Oct 2026 (PR #25, `ea84289`), owner-approved, and live** (§2, "Finding 8.6").
+  - Every saved connection, on the website and the iPhone, shows the date and time it last synced, in the account's time zone. It is flagged after 24 hours, with a note that Atturel syncs only when Sync now is pressed.
+  - The iPhone has its own Sync now. Temporary failures stay retryable; only a refused grant asks for a reconnect. Disconnect is offered in every saved state.
+  - The one-minute limit holds when the website and the iPhone press at once.
+  - No background sync and no sync-on-open (owner, 25 Oct 2026). No migration.
+  - **Production evidence (read-only, QA account B, which has no calendar):** the iPhone Sync now route went from 404 to 401 within about a minute of the merge, and has no GET (405). An unknown provider gets 404. The account route returns the new calendar block, with the Settings link and no token fields. Settings renders with no console errors. Production calendar rows were unchanged afterwards.
+  - The owner's Microsoft connection last synced on 27 Aug 2026. No production sync was run.
+- **Finding 8.7's live AI check: passed, 5 of 5 (25 Oct 2026)** (§2, "Finding 8.7"). The device check is still pending.
+- **TestFlight 0.1.0 (5)** was built from `ea84289` after the live check passed (GitHub run #15, EAS build `0e2f93c5`). Apple processed it as VALID on 25 Oct 2026 at 18:07 UTC. It is in internal testing only and was not submitted for App Store review.
+  - It is the first build with People search and research, 8.7's "Proposed, not decided" label, and 8.6's Account calendar with Sync now.
+  - **None of its real-device checks has run yet** (§1.4, items 1–8).
+- **Pricing and the 14-day Pro trial: implemented on branch `pro-trial`, in a draft PR, awaiting owner review.** Not merged and not deployed (§5, "Pricing and the Pro trial").
 - **Pending, for the next available opportunity (owner approval where noted):**
   - **PR #21's simulator research steps** (§5, "Remaining simulator checks"). They wait until 1 Nov 2026, when the Expo minutes and QA account A's research credits reset; a paid Expo plan needs approval. Grace Hopper stays on QA account A for them.
-  - **Finding 8.7's live AI check:** five runs of the test conversation, on a deployment with the AI key. Needs approval.
-  - **Real-device checks on the next TestFlight build:** the §1.4 checklist (all NOT VERIFIED on build 4, §1.5), plus 8.7's typed notes with a decision and a proposal, plus PR #21's search and research on the phone, plus 8.6's Account calendar and Sync now. The build itself needs approval.
-  - **Finding 8.6's live checks** (§2, "Finding 8.6"). Each needs the owner's approval: a manual Sync now on a real connection, and the iPhone screen on a new build.
-- Owner decisions on discovery, removal, billing, notifications, privacy and photos are recorded in §4.
-- **Finding 8.7** (§2): a proposed action was sometimes read as a confirmed decision. **Fixed in PR #23 and merged; not yet validated.** It still needs the live AI check and the device check.
-- **Finding 8.6 (calendar freshness): implemented in draft PR #25, awaiting owner review.** Not merged, not deployed, and not on a device (§2, "Finding 8.6").
-  - Every saved connection, on the website and the iPhone, now shows the date and time it last synced, in the account's time zone. It is flagged after 24 hours, with a note that Atturel syncs only when Sync now is pressed.
-  - The iPhone gets its own Sync now. Temporary failures stay retryable; only a refused grant asks for a reconnect. Disconnect is offered in every saved state.
-  - The one-minute limit now holds when the website and the iPhone press at once.
-  - No background sync and no sync-on-open (owner, 25 Oct 2026). No migration.
-  - The owner's Microsoft connection last synced on 27 Aug 2026 and still has not synced: no production sync was run.
-- **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026). It is fixed; validation is pending.
+  - **Real-device checks on build 0.1.0 (5):** the §1.4 checklist, which was not verified on build 4 (§1.5). Item 8 covers 8.7's typed notes, PR #21's search and research, and 8.6's Account calendar and Sync now.
+  - **Finding 8.6's live provider check:** a manual Sync now on a real connection. Needs the owner's approval.
+  - **Production billing uses the existing live Stripe account** (owner, 25 Oct 2026; no sandbox).
+    - A live Checkout session opened from production confirms the live key and the $29 price.
+    - Matching the webhook secret to the live endpoint awaits the first real event.
+    - The live payment lifecycle rests on automated tests until genuine pilot purchases (§5, "Pricing and the Pro trial").
+- Owner decisions on discovery, removal, billing, notifications, privacy, photos and pricing are recorded in §4, with the approved roadmap.
+- **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026). It is fixed and its live AI check passed; the device check on build 5 is pending.
 
 ---
 
@@ -167,10 +174,14 @@ The simulator test of a real reinstall-over-the-top update passed (§1.1, scenar
    - Turn Microphone back on and return to Atturel. Start recording now records.
 5. **Real device: offline.** Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
 6. Any checks added by the phase being shipped.
-7. **Real device, once PR #21 ships: search and public research.**
+7. **Real device, once PR #21 ships: search and public research.** In build 0.1.0 (5).
    - Search finds someone saved by name, role or company; nobody else's people and no archived people appear. Offline, the phone's matches stay, and the screen says so.
    - Research public footprint: opening the screen does not search. The button does. Each page shows why, where the name appears, and what it would add.
    - "This is them" adds the page's facts. "Not them" removes the page, and it is not offered again. Open page opens the browser.
+8. **Real device, build 0.1.0 (5): findings 8.7 and 8.6.**
+   - **8.7:** in Capture, type notes that contain "We decided to move the launch to March." and "I'd suggest we go with vendor B." In Review, the first is a decision, ticked. The second, if it is listed, reads "Proposed, not decided" and is not ticked. Keep with the defaults: only the first becomes a decision.
+   - **8.6:** Account shows the Microsoft connection as "Connected", capitalised, with "Last synced Aug 27, 9:43 PM" and the note that it has not synced since. Pressing Sync now syncs it, or says plainly why not. Reconnect, if offered, opens the website. This is the owner's real connection, so pressing Sync now is the owner's call.
+   - **Plan line:** Account shows the plan as before, "Full access" on the owner's account.
 
 ### 1.5 Build 0.1.0 (4) on the owner's iPhone (25 Oct 2026)
 
@@ -266,15 +277,15 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 
 ### The loop (Capture → Review → Memory → Commitments → Today)
 
-| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Status                           | Sev |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --- |
-| 8.1 | Proposals are created as `proposed`. Review confirms or rejects them, and only confirmed items are active. Memory is never written without approval.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Implemented                      | —   |
-| 8.2 | **iOS Review is keep-or-reject only**: no editing a loop's text or date. It says memory proposals "wait on each person's page", but the iOS person page cannot show or confirm them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Partial                          | P1  |
-| 8.3 | **A confirmed loop cannot be edited** on either platform. Reopen exists on web only. Create a loop exists on web only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Partial                          | P1  |
-| 8.4 | Dead actions: `addCommitment`, `completeCommitment`, `reopenCommitment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Unused                           | P2  |
-| 8.5 | **Web and iOS Today disagree for the same account.** They differ in meeting window, countdown threshold, number of loops and ranking, and which conversations count as awaiting review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Inconsistent                     | P2  |
-| 8.6 | **Calendar never syncs in the background.** There is no cron; it syncs only on connect and on the web's "Sync now". The iPhone has no sync control. **Seen on the owner's account (25 Oct 2026):**<br>• The iPhone Account screen shows "last synced 27 Aug 2026". That is accurate: the Microsoft connection synced successfully twice, at 9:40 and 9:43 PM Chicago time on 27 Aug, minutes after it was connected.<br>• Nothing has synced since: no sync events and no later imports (one event, 29 Aug).<br>• The status still reads connected, so two months without new meetings looks healthy. The stored access token expired an hour after connecting. A refresh token renews it at the next sync, unless Microsoft has retired it after a long unused period, in which case a reconnect is needed.<br>• A second account connected on 18 Oct has never synced: it connected before the sync-at-connect code (`f75d2ac`) was deployed, and that user has not pressed "Sync now".<br>• **Related iPhone bug (2B):** the Account screen checks for status `'active'`, but the stored values are `connected`, `expired`, `revoked`, `error` and `admin_consent_required`. So it shows lowercase "connected".<br>**Owner decision (25 Oct 2026):** no background sync and no sync-on-open. **Implemented in draft PR #25** (below, "Finding 8.6"): the date and time of the last sync on both platforms, a stale flag after 24 hours, Sync now on the iPhone, retryable failures, Disconnect in every state, and a one-minute limit that holds across devices. | Fixed in draft PR; not validated | P1  |
-| 8.7 | **A proposed action is sometimes read as a confirmed decision.** Reported by the owner on build 3 (24–25 Oct 2026). The build 4 Review example is **not** evidence of this: its transcript says "we decided", so reading it as a decision was correct. A reproducible case exists in the fallback composer, which wrote 4 of the 9 conversation analyses in the week of 19 Oct. Detail, editing and the acceptance test are below. **Phase 3 priority.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Broken (trust)                   | P1  |
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Status                                             | Sev |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | --- |
+| 8.1 | Proposals are created as `proposed`. Review confirms or rejects them, and only confirmed items are active. Memory is never written without approval.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Implemented                                        | —   |
+| 8.2 | **iOS Review is keep-or-reject only**: no editing a loop's text or date. It says memory proposals "wait on each person's page", but the iOS person page cannot show or confirm them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Partial                                            | P1  |
+| 8.3 | **A confirmed loop cannot be edited** on either platform. Reopen exists on web only. Create a loop exists on web only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Partial                                            | P1  |
+| 8.4 | Dead actions: `addCommitment`, `completeCommitment`, `reopenCommitment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Unused                                             | P2  |
+| 8.5 | **Web and iOS Today disagree for the same account.** They differ in meeting window, countdown threshold, number of loops and ranking, and which conversations count as awaiting review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Inconsistent                                       | P2  |
+| 8.6 | **Calendar never syncs in the background.** There is no cron; it syncs only on connect and on the web's "Sync now". The iPhone has no sync control. **Seen on the owner's account (25 Oct 2026):**<br>• The iPhone Account screen shows "last synced 27 Aug 2026". That is accurate: the Microsoft connection synced successfully twice, at 9:40 and 9:43 PM Chicago time on 27 Aug, minutes after it was connected.<br>• Nothing has synced since: no sync events and no later imports (one event, 29 Aug).<br>• The status still reads connected, so two months without new meetings looks healthy. The stored access token expired an hour after connecting. A refresh token renews it at the next sync, unless Microsoft has retired it after a long unused period, in which case a reconnect is needed.<br>• A second account connected on 18 Oct has never synced: it connected before the sync-at-connect code (`f75d2ac`) was deployed, and that user has not pressed "Sync now".<br>• **Related iPhone bug (2B):** the Account screen checks for status `'active'`, but the stored values are `connected`, `expired`, `revoked`, `error` and `admin_consent_required`. So it shows lowercase "connected".<br>**Owner decision (25 Oct 2026):** no background sync and no sync-on-open. **Merged in PR #25** (below, "Finding 8.6"): the date and time of the last sync on both platforms, a stale flag after 24 hours, Sync now on the iPhone, retryable failures, Disconnect in every state, and a one-minute limit that holds across devices. | Fixed and live; device and provider checks pending | P1  |
+| 8.7 | **A proposed action is sometimes read as a confirmed decision.** Reported by the owner on build 3 (24–25 Oct 2026). The build 4 Review example is **not** evidence of this: its transcript says "we decided", so reading it as a decision was correct. A reproducible case exists in the fallback composer, which wrote 4 of the 9 conversation analyses in the week of 19 Oct. Detail, editing and the acceptance test are below. **Fixed in PR #23**; live AI check passed 5/5 (25 Oct).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Fixed; device check pending                        | P1  |
 
 #### Finding 8.7: what the code does, and the acceptance test
 
@@ -347,14 +358,19 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
   - A simulated model answer that calls every variant a 0.9 decision.
   - The phone's review route and the web's review action, end to end: keeping the defaults confirms only (A).
   - The web Review component, and the iPhone Review screen.
+- **Live model check: passed, 5 of 5 (25 Oct 2026, production, QA account B).**
+  - Five typed-notes conversations through the iPhone's own route, each with (A) "We decided to move the launch to March." and the six proposal variants above. They are titled "QA 8.7 live check 1/5" to "5/5" and remain on QA account B.
+  - Model `gpt-4.1-mini`, prompt `conversation@2.1.0`.
+  - **Every run:** (A) came back as the only decision, at 0.9, marked likely and not proposed. No proposal came back as a decision at any confidence.
+  - **Observed:** the model did not list the proposals at all, neither as proposed decisions nor as open loops. So the live check confirms that nothing is wrongly decided. It does not show "Proposed, not decided" on the model path; the composer path and the stored-proposal path are covered by tests.
+  - All five decisions were left pending review; nothing was kept.
 - **Still to do:**
-  - The live model check (five runs of the test conversation). It needs a deployment with the AI key and the owner's approval.
-  - The device check on the next TestFlight build.
+  - The device check on build 0.1.0 (5) (§1.4, item 8).
   - Editing and re-filing decisions on the iPhone (8.2), kept out of this PR.
 
 #### Finding 8.6: what changed, and what remains
 
-_Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. Not merged, not deployed, not on a device._
+_Merged 25 Oct 2026 (PR #25, `ea84289`), owner-approved, and live in production. On the iPhone in TestFlight 0.1.0 (5); its device check is pending (§1.4, item 8)._
 
 **Owner decision (25 Oct 2026):** there is no background sync and no sync-on-open. A calendar syncs when it is connected and when the user presses Sync now.
 
@@ -401,7 +417,7 @@ _Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. N
 - **Not verified (each needs the owner's approval):**
   - **No sync was run on any production account.** Whether the owner's Microsoft refresh token still works is unknown. Microsoft retires an unused one after about 90 days, so around 26 Nov 2026. A manual Sync now before then would confirm it and keep it alive; that is the owner's call.
   - **Real Microsoft and Google failure responses** have only been exercised against stubs.
-  - **The iPhone screen needs a new TestFlight build.** Until then, build 4 ignores the new fields and still shows the lowercase status.
+  - **The iPhone screen is in build 0.1.0 (5)**, which has not yet been checked on a device. Build 4 ignores the new fields and still shows the lowercase status.
   - **The connected and failed states on the website** are covered by tests only. No QA account has a calendar connected.
 
 ### iOS quality
@@ -465,7 +481,7 @@ Each phase ships as its own PR. Nothing reaches production until it is merged to
 2. **Removing a person: reversible archive by default.**
    - Provide restore.
    - Provide a separately confirmed permanent delete that states plainly what happens to the associated records (loops, observations, notes, facts, meeting attendance, conversation participation).
-3. **iOS billing: show current plan and access only.** No purchasing and no external payment links without first reviewing the applicable App Store requirements.
+3. **iOS billing: show current plan and access only.** No purchasing and no external payment links without first reviewing the applicable App Store requirements. **How subscriptions are offered in a public App Store build is explicitly unresolved** (owner, 25 Oct 2026).
 4. **Push notifications: deferred** until commitments and follow-through work reliably.
 5. **Privacy: done in PR #16.** The wording distinguishes Atturel's handling from the transcription provider's, with no zero-retention claim unless contractually and technically verified.
 
@@ -474,6 +490,24 @@ Each phase ships as its own PR. Nothing reaches production until it is merged to
    - Photos uploaded under the current promise ("Your photo is shown only to you, in Atturel. It is not part of any public profile.") stay private until that person opts in.
    - Photos attached to private People records stay private to the owner, and are never shared with the pictured person or anyone else.
    - No discovery or photo-sharing behaviour changes in Phase 2 or 3. The current wording stays accurate until discovery ships; it changes then.
+
+7. **Pricing (owner, 25 Oct 2026).**
+   - Two plans: Free, and Pro at $29 a month. Pro is positioned around preparation, relationship memory and follow-through.
+   - Free keeps five active people, with enough access to experience the core flow. Allowances are unchanged.
+   - A 14-day Pro trial with no card, once per account. The account returns to Free unless the user explicitly subscribes, and its data is kept.
+   - Paid pilots start on monthly billing. **$290 a year is approved for later**, after retention is observed. Annual billing is not offered now.
+   - Privacy, evidence labels, correction controls and data export stay available on every plan.
+   - Only shipped capabilities are advertised. The Teams offer is removed from the pricing page.
+   - **App Store subscription handling is explicitly unresolved** (item 3).
+   - Audit updates go in the next implementation PR; there is no doc-only PR.
+
+8. **Approved roadmap (owner, 25 Oct 2026).** These do not block pilot recruitment.
+   1. Actionable follow-through for approved commitments.
+   2. "Since you last spoke" context in meeting preparation.
+   3. A quick conversation debrief using the existing Capture.
+   4. Thoughtful reconnect suggestions, at a frequency the user chooses.
+   5. Selective contact import, and adding existing context.
+   6. Editable, selectively shared conversation recaps.
 
 Still open (no decision needed yet):
 
@@ -955,6 +989,156 @@ Further requirements set by the owner:
 - **QA account.** Reuse the existing disposable QA account for Phase 2 testing. Do not delete it without the owner's approval at the end.
 - **Merging and releases.** Run automated tests and verify the website preview before merging each implementation PR. **No Phase 2 PR is merged and no TestFlight build is published without presenting the results for owner review first.**
 - The next TestFlight release runs the §1.4 checklist, including the unverified update-survival test. The Phase 3 fix for finding 8.7 stays planned.
+
+### Pricing and the Pro trial (branch `pro-trial`, draft PR, 25 Oct 2026)
+
+_Implements decision 7 (§4). Not merged, not deployed. Allowances unchanged. No migration: every column already exists in production (checked read-only)._
+
+**How the trial works:**
+
+- **Granted by Atturel, not Stripe.** Start your 14-day Pro trial (Settings › Plan) sets the account's existing `subscriptions` row to `status = 'trialing'` with `trial_ends_at`.
+  - `plan` stays `free`, because `plan` records what is paid for.
+  - It is one conditional UPDATE, only on a Free row that has never had a trial or a Stripe subscription (`src/lib/billing/trial-claim.ts`).
+  - No card is asked for, and nothing is created at Stripe.
+- **Ends by itself, under one rule.** `trialRunning` (`src/lib/billing/trial.ts`) is the only expiry rule: Pro while the time is before `trial_ends_at`, never after.
+  - Every reader uses it: entitlements (so every server capability and limit check, the website, the iPhone account response and the sidebar label), and the webhook's trial guard. The Plan page reads it through entitlements.
+  - It is evaluated on each request, and nothing writes the expiry. So a trial ends on time even if the daily job, a reminder or a webhook never runs.
+  - A date that cannot be read counts as ended.
+  - A test checks that the readers agree to the millisecond at the boundary.
+- **Back to Free keeps everything.** Nothing is deleted or archived. Reading, editing and export are not plan-gated. With more than five active people, adding or restoring one asks for Pro; nobody is hidden.
+- **Consent is structural.** While the trial runs there is no Stripe subscription, so a card added or updated in the billing portal cannot start billing (the portal cannot create a subscription). Only Subscribe to Pro — $29/month does that. It opens Checkout with the first charge date and the monthly terms beside Stripe's button, and on the Plan page before it.
+- **Subscribing keeps the rest of the trial.** The Checkout subscription carries `trial_end`, so the first charge is when the trial would have ended. Stripe requires at least 48 hours, so in the last two days it is 48 hours and 10 minutes away, never sooner. After the trial, subscribing charges today and says so.
+- **Opt-in, and offered only where it can end in a real choice.** The trial is offered only when subscribing works (Checkout, the price, the webhook and the service role) **and** `PRO_TRIAL_OFFER` is exactly `on`. Unset means no offer, so merging opens nothing (owner, 25 Oct 2026: start with the offer off). The pricing page advertises the trial only under the same condition.
+- **One open Checkout per customer.** Before opening Checkout, any open session on other terms is expired; one on the same terms (first charge date and price) is reused. Stripe will not complete an expired session, so two tabs, a back button or a later second press cannot produce two subscriptions.
+- **Checkout charges what the terms state.** `adaptive_pricing` is turned off on the session. The live account has Adaptive Pricing on, and a live session opened from abroad presented S$38.55 beside our "$29" terms.
+
+**Abandoned checkout cannot remove or extend a trial (reviewed 25 Oct 2026):**
+
+- **Nothing happens when Checkout is closed or a card is declined.** No subscription is created, and the trial row is untouched. `checkout.session.expired` is not an event the handler acts on (tested).
+- **An `incomplete` or `incomplete_expired` subscription while the trial runs is ignored**, whatever `trial_end` it carries, so it can neither shorten nor lengthen the trial (tested).
+- **`trial_ends_at` has two writers only:** the trial claim (once, onto an empty value), and the webhook for a subscription that entitles, which needs a completed Checkout with a card.
+- **Known and bounded: up to about two extra days.** Subscribing in the trial's last two days puts the first charge 48 hours and 10 minutes out, Stripe's minimum. So Pro can run up to about two days past the trial's end.
+  - It needs a completed Checkout with a card. Canceling afterwards keeps Pro to that date without a charge.
+  - It happens at most once per account: a later subscription gets no trial.
+  - Accepting it keeps the promise that subscribing never charges before the trial ends.
+- **Canceling keeps the rest of the trial only because the portal cancels at the end of the period.** The live portal is set that way (verified read-only, below). An immediate cancellation, for example from the Stripe dashboard, would end Pro at once.
+
+**The reminder before the first charge stays** (owner, 25 Oct 2026).
+
+**What customers see:**
+
+- **Plan page:** the trial's end date in the account's time zone, the days left, "No card, nothing charged", what happens after, and the subscribe action with its terms. After the trial it says "Your Pro trial ended on … Nothing was charged." There is no second trial and no Manage billing for a trial alone.
+- **iPhone (account response):** the plan line reads "Pro trial · ends 8 Nov 2026" or "Pro · first charge 8 Nov 2026", and `billing` is `trial`. Plan and access only: no purchase or payment link (decision 3).
+  - Build 5 shows the new plan line. It shows an unknown `billing` value as "Nothing is billed", which is true of the trial.
+  - The source's trial wording on the Account screen ships in the next build.
+- **Emails, through the existing system:**
+  - Trial started.
+  - **Trial ending**, two to three days before the end, from the daily 13:00 UTC job.
+  - Trial ended.
+  - Subscribed, with the first charge date and terms.
+  - **First charge soon**, two to three days before a subscribed trial's first charge, so it never arrives unannounced.
+  - Canceled during the trial: "You will not be charged" (it used to say "charged again").
+  - The daily notices come from windows, not a ledger, so only the scheduled run sends them, never a manual run.
+- **Pricing page:**
+  - Free and Pro, led by preparation, relationship memory and follow-through.
+  - The trial terms, and an allowance table read from the plans the paywall enforces.
+  - "On every plan": privacy, evidence, corrections and export.
+  - No Teams card. No annual price. Nothing unbuilt is advertised: deep research, weekly intelligence and advanced memory are left out.
+
+**Did the existing webhook need changes? Yes. Each change is pinned by a test that fails on the old code (7 failed on it).**
+
+1. **No subscription confirmation was ever sent for subscribing during the trial.** The trial row already read as Pro, so "became Pro" never fired. The same happened for subscribing after an expired trial.
+2. **An abandoned or failed checkout erased a running trial.** Its `incomplete` subscription overwrote the row with Free.
+3. **The confirmation had no first charge date**, and the cancellation notice said "You will not be charged again" when nothing had been charged.
+
+Ordering, the event ledger and replays needed no change. A late or repeated event re-reads Stripe's current state and sends nothing new, and the tests confirm it for trial subscriptions.
+
+**Verified:**
+
+- **Web: 1371/1371 tests. iPhone: 108/108.** Typechecks are clean, ESLint reports 0 errors, and Prettier is clean on the changed web files.
+- **Lifecycle, against the real webhook handler and an in-memory ledger:**
+  - subscribe during the trial, with duplicate and late deliveries;
+  - the first charge, and a failed first charge (`past_due`, then `unpaid`);
+  - cancel during the trial, then end at the trial's end;
+  - an abandoned checkout during the trial;
+  - subscribing after expiry.
+- **Starting twice, and twice at once:** the server action against a table with Postgres's update semantics. Separately, **the real UPDATE in a scratch Postgres 16 under two concurrent sessions,** re-run with the final statement. The second session waited on the first's row lock, re-checked the conditions and claimed nothing. The row ended `free` / `trialing` with one end date.
+- **A revert reads trials as Free:** the pre-trial rule (`effectivePlan`) applied to trial rows, running or ended, returns Free (tested).
+- **Expiry:** entitlements read an expired trial row as Free with Free's limits, and the Plan page, iPhone line and notices follow.
+- **Checkout parameters:** `trial_end`, the 48-hour minimum, the terms text, and no trial after expiry.
+- **Pages:** the Plan page in each state, the pricing page, and the account response.
+- **Vercel preview (25 Oct), read-only:**
+  - **The pricing page, signed out:** 200, with the trial line, the CTA and 13 allowance rows. There is no Teams card and no annual price, nothing overflows at phone width, and there are no console errors.
+  - **Settings › Plan, signed in as QA account B** (Free, never trialed, no grant, confirmed read-only). It showed Subscribe but no trial. So the preview has the Stripe secret key, but lacks the webhook secret, the price ID or the service role; which one could not be read from this session.
+  - Checkout refuses on exactly those conditions, so Subscribe could only have failed there. **Fixed:** Subscribe and the trial now follow one check (`checkoutAvailable`). Where subscribing cannot complete, the page offers neither and says upgrading is not available.
+  - No button was pressed and nothing was written.
+
+**Billing QA accounts (created 25 Oct 2026 at the owner's request; QA account B is untouched):**
+
+- `qa-billing-trial-20261025@atturel-demo.dev` (user `686fddce-…`), for subscribing during the trial, abandoned checkout and cancellation.
+- `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`), for a trial that expires without a subscription.
+- **Why two:** each account gets one trial, and these two paths need separate trials.
+- Both are onboarded, Free, never trialed, in America/Chicago. Both sign in on the PR #26 preview: the account response answers 200 with "Free".
+- The credentials are held outside the repository and were never printed.
+
+**Production billing configuration (25 Oct 2026, owner direction: use the existing live account; no sandbox, no duplicate products, prices or webhooks).**
+
+- **Verified, live Stripe API (read-only):**
+  - Price `price_1UQHvV…`: $29.00 USD, monthly, interval count 1, active. It is the only live price.
+  - Webhook "Atturel LIVE - production" to `https://www.atturel.com/api/stripe/webhook`: enabled, with exactly the eight events in `HANDLED_EVENTS`.
+  - Default portal configuration: cancel at the end of the period (which keeps the rest of a trial), payment-method updates and invoice history on, plan switching and pause off.
+- **Verified, production behaviour, without exposing any secret:**
+  - **Live secret key and live price.** Production's existing Checkout, opened by billing QA account `qa-billing-trial-…`, created a `cs_live_` session for `price_1UQHvV…`, card required. So `STRIPE_SECRET_KEY` is live, and `STRIPE_PRICE_PRO_MONTHLY` is the live price and passes the code's $29 monthly check.
+    - Nothing was entered or paid. The session expires unpaid; it created one live customer for the QA account.
+  - **Webhook secret present.** A request with a bad signature to production's webhook answered 400. Without the webhook secret, the service role and the Stripe key it would have answered 503.
+  - **Daily job and email delivery work.** The scheduled follow-through job last sent at 13:00 UTC on 25 Oct (15 deliveries in two weeks). The trial reminders run in that same job.
+- **Not verifiable without a real event: that the webhook secret matches the live endpoint.** Stripe's API cannot resend an event, and there has been no live subscription event yet. The first genuine pilot checkout is the evidence: Stripe Dashboard → Developers → Webhooks → the live endpoint → Event deliveries should show 200.
+- **Evidence and inference, kept apart:**
+  - The production database has only six test-mode events (14 Oct 2026, 02:03–02:17 UTC) and no live ones.
+  - The earlier note that production "appears to use test keys" was an inference from those events alone, and it was wrong. The live Checkout session above shows production now uses the live key.
+- **Owner settings in Stripe, which the API cannot read:**
+  - **"Send a reminder email 7 days before a free trial ends"** (Settings → Billing → Subscriptions and emails). Card-network rules for trials that convert to paid call for a reminder, and Stripe documents 7 days. Atturel's own "first charge soon" email comes 2–3 days before; Stripe's covers the 7-day notice.
+  - Successful-payment receipts and failed-payment emails.
+  - Adaptive Pricing can stay on for other uses; Atturel's Checkout turns it off per session.
+
+**Billing QA accounts (created 25 Oct 2026 at the owner's request; QA account B is untouched):**
+
+- `qa-billing-trial-20261025@atturel-demo.dev` (user `686fddce-…`): the subscribe path. It now has a live Stripe customer from the Checkout check above, and no subscription.
+- `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`): a trial that expires without a subscription.
+- Both are onboarded, in America/Chicago. The credentials are held outside the repository and were never printed.
+
+**What still rests on automated tests, not live evidence:** the webhook lifecycle (subscribing during the trial, the first charge at the trial's end, a failed first charge, cancellation before the first charge, repeated and out-of-order events), and the trial-ending emails. In live mode these are verified only by genuine pilot purchases. No artificial charge, declined real card, refund or accelerated billing is run in live mode (owner, 25 Oct 2026).
+
+**Independent code review before release (25 Oct 2026).** A separate reviewer read the final diff for trial expiry, consent, remaining trial time, abandoned checkout, duplicate subscriptions and webhook handling.
+
+- **Confirmed correct:**
+  - one expiry rule for every reader;
+  - one trial per account;
+  - nothing but a completed Checkout starts billing;
+  - `trial_end` and every displayed first-charge date use the same instant and time zone;
+  - an abandoned Checkout cannot shorten, extend or erase a trial;
+  - the ledger, re-reads and old-subscription guard.
+- **Defects found and fixed in this PR:**
+  - **Duplicate "You are subscribed" emails.** Stripe's near-simultaneous events for one checkout could each send it. Billing emails and trial notices now carry an idempotency key (subscription, transition, date), and Resend sends one email per key for 24 hours. The same key stops a rerun of the daily job from repeating a notice.
+  - **The iPhone showed "Pro · first charge …" after a cancellation.** It now reads the subscription and says "Pro until …".
+  - **A Checkout opened before the trial could still be paid afterwards,** charging today and ending the trial. Starting a trial now closes the account's open Checkouts.
+  - **The trial's date was kept on record for one event only.** It now persists through later events.
+- **Known and accepted, for the owner to weigh:**
+  - **A failed first charge keeps Pro while Stripe retries.** This is the existing `past_due` grace for paying customers, now also covering subscriptions started during a trial. Checkout verifies the card when it is saved; a later decline would allow up to Stripe's retry window of unpaid Pro.
+  - **A daily job that fails misses that day's notices.** No migration was added for a delivery ledger. The job's own history shows it running daily, and Stripe's 7-day reminder (owner setting) covers subscribed trials.
+  - **Two live subscriptions are still possible in two narrow ways:** two presses in the same instant across a minute boundary in a trial's last 48 hours, or a subscription created from the Stripe dashboard. The webhook then follows the newest one that entitles.
+
+**Rollback. No step resets a trial, a QA account or any customer data:**
+
+1. **Stop new trials.** Remove `PRO_TRIAL_OFFER` (or set it to anything but `on`) in Production and redeploy.
+   - Trials already running keep their end date and remaining days.
+   - The pricing page stops advertising the trial. Subscribe still works.
+   - Nothing in the database changes.
+2. **If the code itself must go,** revert the PR after the trials running at step 1 have ended (at most 14 days later).
+   - A trial row keeps `plan = 'free'`, so the pre-trial code reads every trial row as Free, running or ended (tested). No row needs changing.
+   - Subscriptions started during a trial are ordinary Stripe subscriptions, which the pre-trial webhook already handles.
+3. **Reverting before those trials end would cut them short,** so it is not part of this plan.
+4. **Rows are never rewritten for a rollback.** Each account keeps its trial history (`trial_ends_at`), including after a later subscription.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.
 

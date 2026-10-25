@@ -48,7 +48,7 @@ export function supabaseBillingStore(): BillingStore {
       const { data } = await raw
         .from('subscriptions')
         .select(
-          'user_id, plan, status, cancel_at_period_end, current_period_end, is_founding, stripe_customer_id, stripe_subscription_id, stripe_state_at',
+          'user_id, plan, status, cancel_at_period_end, current_period_end, is_founding, stripe_customer_id, stripe_subscription_id, trial_ends_at, stripe_state_at',
         )
         .eq('user_id', userId)
         .maybeSingle()
@@ -63,6 +63,7 @@ export function supabaseBillingStore(): BillingStore {
         isFounding: Boolean(row.is_founding),
         stripeCustomerId: (row.stripe_customer_id as string | null) ?? null,
         stripeSubscriptionId: (row.stripe_subscription_id as string | null) ?? null,
+        trialEndsAt: (row.trial_ends_at as string | null) ?? null,
         stateAt: (row.stripe_state_at as string | null) ?? null,
       }
     },

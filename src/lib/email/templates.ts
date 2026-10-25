@@ -408,11 +408,37 @@ const billingUrl = absoluteUrl('/settings/billing')
 export function proActivatedEmail({
   firstName,
   planLabel,
+  firstChargeOn = null,
+  price = null,
 }: {
   firstName: string
   planLabel: string
+  /** Subscribed during the trial: the first charge, already formatted. */
+  firstChargeOn?: string | null
+  /** The monthly price, formatted, for the terms. */
+  price?: string | null
 }): BuiltEmail {
   const name = firstName.trim() || 'there'
+  if (firstChargeOn) {
+    return {
+      subject: `You are subscribed to ${planLabel}`,
+      html: renderEmail({
+        preheader: `Nothing is charged until ${firstChargeOn}.`,
+        body: [
+          eyebrow('Your plan'),
+          heading(`${escapeHtml(name)}, you are subscribed to ${escapeHtml(planLabel)}`),
+          paragraph(
+            `The rest of your trial is yours. Your first charge${price ? ` of ${escapeHtml(price)}` : ''} is on ${escapeHtml(firstChargeOn)}, then${price ? ` ${escapeHtml(price)}` : ''} every month until you cancel.`,
+          ),
+          paragraph(
+            `Cancel from Settings before ${escapeHtml(firstChargeOn)} and you will not be charged. Receipts come from our payment processor.`,
+          ),
+          button('See your plan', billingUrl),
+        ].join(''),
+        footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+      }),
+    }
+  }
   return {
     subject: `${planLabel} is on`,
     html: renderEmail({
@@ -436,10 +462,13 @@ export function proActivatedEmail({
 export function proCancellationScheduledEmail({
   firstName,
   endsOn,
+  inTrial = false,
 }: {
   firstName: string
   /** Already formatted for the reader, or null when unknown. */
   endsOn: string | null
+  /** Canceled before the first charge: nothing was ever charged. */
+  inTrial?: boolean
 }): BuiltEmail {
   const name = firstName.trim() || 'there'
   return {
@@ -450,7 +479,9 @@ export function proCancellationScheduledEmail({
         eyebrow('Your plan'),
         heading('Your Pro plan is set to end'),
         paragraph(
-          `${escapeHtml(name)}, you will keep Pro${endsOn ? ` until ${escapeHtml(endsOn)}` : ' until the end of the period you paid for'}. You will not be charged again.`,
+          inTrial
+            ? `${escapeHtml(name)}, you will keep Pro${endsOn ? ` until ${escapeHtml(endsOn)}` : ' until the trial ends'}. You will not be charged.`
+            : `${escapeHtml(name)}, you will keep Pro${endsOn ? ` until ${escapeHtml(endsOn)}` : ' until the end of the period you paid for'}. You will not be charged again.`,
         ),
         paragraph(
           'After that the account moves to Free. Nothing is deleted: every person, conversation and commitment stays readable, and you can export it any time.',
@@ -489,6 +520,122 @@ export function proEndedEmail({
           'Nothing is deleted. Every person, conversation and commitment stays readable, and you can export it any time. Free limits now apply to new work.',
         ),
         button(reason === 'payment' ? 'Restart Pro' : 'See plans', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+/**
+ * THE PRO TRIAL
+ * The three notices of a trial that has no card: it started, it is about to
+ * end, it ended. Each says what happens next and that nothing is deleted.
+ */
+const KEPT =
+  'Nothing you add is deleted. On Free you can still read, edit and export everyone and everything; adding a sixth person, the Relationship Atlas and the larger monthly allowances need Pro.'
+
+export function proTrialStartedEmail({
+  firstName,
+  endsOn,
+  price,
+}: {
+  firstName: string
+  endsOn: string
+  price: string
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: 'Your 14-day Pro trial has started',
+    html: renderEmail({
+      preheader: `Pro until ${endsOn}. No card, nothing charged.`,
+      body: [
+        eyebrow('Your plan'),
+        heading(`${escapeHtml(name)}, Pro is on until ${escapeHtml(endsOn)}`),
+        paragraph(
+          `There is no card on file, so nothing will be charged. When the trial ends your account returns to Free, unless you choose Subscribe to Pro (${escapeHtml(price)} a month).`,
+        ),
+        paragraph(KEPT),
+        button('See your plan', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+export function proTrialEndingEmail({
+  firstName,
+  endsOn,
+  price,
+}: {
+  firstName: string
+  endsOn: string
+  price: string
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: `Your Pro trial ends on ${endsOn}`,
+    html: renderEmail({
+      preheader: 'Then your account returns to Free, unless you subscribe.',
+      body: [
+        eyebrow('Your plan'),
+        heading('Your Pro trial ends soon'),
+        paragraph(
+          `${escapeHtml(name)}, your trial ends on ${escapeHtml(endsOn)}. Then your account returns to Free, unless you subscribe. Nothing is charged unless you do.`,
+        ),
+        paragraph(
+          `Subscribing keeps the rest of your trial: the first charge of ${escapeHtml(price)} is when it ends, then ${escapeHtml(price)} every month until you cancel.`,
+        ),
+        paragraph(KEPT),
+        button('Subscribe to Pro', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+/** Subscribed during the trial: the first charge is two to three days away. */
+export function proFirstChargeSoonEmail({
+  firstName,
+  chargeOn,
+  price,
+}: {
+  firstName: string
+  chargeOn: string
+  price: string
+}): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: `Your first Pro charge is on ${chargeOn}`,
+    html: renderEmail({
+      preheader: `${price} on ${chargeOn}, then ${price} every month until you cancel.`,
+      body: [
+        eyebrow('Your plan'),
+        heading('Your trial ends soon, and your subscription begins'),
+        paragraph(
+          `${escapeHtml(name)}, your Pro trial ends on ${escapeHtml(chargeOn)}. That day your first charge of ${escapeHtml(price)} is taken, then ${escapeHtml(price)} every month until you cancel.`,
+        ),
+        paragraph(
+          `To keep Pro, there is nothing to do. If you do not want to be charged, cancel from Settings before ${escapeHtml(chargeOn)}; Pro stays on until then and nothing is deleted.`,
+        ),
+        button('See your plan', billingUrl),
+      ].join(''),
+      footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
+    }),
+  }
+}
+
+export function proTrialEndedEmail({ firstName }: { firstName: string }): BuiltEmail {
+  const name = firstName.trim() || 'there'
+  return {
+    subject: 'Your Pro trial has ended',
+    html: renderEmail({
+      preheader: 'Your record stays exactly as it is.',
+      body: [
+        eyebrow('Your plan'),
+        heading('Your account is now on Free'),
+        paragraph(`${escapeHtml(name)}, your 14-day Pro trial has ended. Nothing was charged.`),
+        paragraph(KEPT),
+        button('See plans', billingUrl),
       ].join(''),
       footerNote: `A notice about your ${escapeHtml(brand.name)} plan.`,
     }),

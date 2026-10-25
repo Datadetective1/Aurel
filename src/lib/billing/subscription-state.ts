@@ -34,8 +34,10 @@ export function effectivePlan(state: Pick<SubscriptionState, 'plan' | 'status'> 
 }
 
 export type SubscriptionTransition =
-  | { kind: 'activated' }
-  | { kind: 'cancellation_scheduled'; endsAt: string | null }
+  /** `firstChargeAt` when subscribed during the trial: nothing is charged until then. */
+  | { kind: 'activated'; firstChargeAt?: string | null }
+  /** `inTrial` when nothing has been charged yet, so nothing will be. */
+  | { kind: 'cancellation_scheduled'; endsAt: string | null; inTrial?: boolean }
   | { kind: 'cancellation_withdrawn' }
   | { kind: 'ended'; reason: 'canceled' | 'payment' }
   | { kind: 'payment_problem' }
@@ -57,7 +59,11 @@ export function transitionsBetween(
   const out: SubscriptionTransition[] = []
 
   if (!was && is) {
-    out.push({ kind: 'activated' })
+    out.push({
+      kind: 'activated',
+      // Stripe's trial runs to the first charge, and its period ends there.
+      firstChargeAt: after.status === 'trialing' ? after.currentPeriodEnd : null,
+    })
     return out
   }
 
@@ -71,7 +77,11 @@ export function transitionsBetween(
 
   if (was && is) {
     if (!before?.cancelAtPeriodEnd && after.cancelAtPeriodEnd) {
-      out.push({ kind: 'cancellation_scheduled', endsAt: after.currentPeriodEnd })
+      out.push({
+        kind: 'cancellation_scheduled',
+        endsAt: after.currentPeriodEnd,
+        inTrial: after.status === 'trialing',
+      })
     } else if (before?.cancelAtPeriodEnd && !after.cancelAtPeriodEnd) {
       out.push({ kind: 'cancellation_withdrawn' })
     }

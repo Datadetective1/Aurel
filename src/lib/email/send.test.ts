@@ -196,3 +196,40 @@ describe('a provider failure never reaches the caller', () => {
     expect(JSON.stringify(logged)).not.toContain('Maya objected')
   })
 })
+
+describe('one email per idempotency key', () => {
+  async function headersSent(key?: string) {
+    let headers: Record<string, string> = {}
+    vi.stubGlobal('fetch', (async (_url: string, init: RequestInit) => {
+      headers = init.headers as Record<string, string>
+      return new Response('{"id":"em_1"}', { status: 200 })
+    }) as unknown as typeof fetch)
+    vi.stubEnv('RESEND_API_KEY', 're_test_key_not_real')
+    vi.resetModules()
+    const { sendEmail: send } = await import('./send')
+    try {
+      await send({
+        to: 'alex@example.invalid',
+        subject: 'Your Pro trial ends on 8 Nov 2026',
+        html: '<p>hello</p>',
+        kind: 'trial_ending',
+        idempotencyKey: key,
+      })
+      return headers
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  }
+
+  it('passes the key to Resend, which sends once per key for 24 hours', async () => {
+    expect((await headersSent('trial:ending:u-1:2026-11-08T15:00:00Z'))['Idempotency-Key']).toBe(
+      'trial:ending:u-1:2026-11-08T15:00:00Z',
+    )
+  })
+
+  it('sends no key when none is given', async () => {
+    expect(await headersSent()).not.toHaveProperty('Idempotency-Key')
+  })
+})

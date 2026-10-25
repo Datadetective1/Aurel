@@ -4,6 +4,7 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
 import { resolveFace } from '@/lib/conversations/avatars'
+import { getEntitlements } from '@/lib/billing/entitlements'
 
 /**
  * Belt and braces: the signed-in surface is never indexable.
@@ -23,11 +24,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { user, profile } = await requireOnboardedUser()
 
   const supabase = await createClient()
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  // The plan the account has now, not the raw column: a trial that ended is
+  // Free even though its row still says Pro.
+  const entitlements = await getEntitlements()
 
   await recordSession(supabase, user.id, profile.last_seen_at)
   const face = await resolveFace(supabase, profile)
@@ -38,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         name: profile.preferred_name || profile.full_name || 'You',
         email: user.email ?? '',
         avatarUrl: face,
-        plan: subscription?.plan ?? 'free',
+        plan: entitlements.trial?.state === 'active' ? 'pro trial' : entitlements.plan,
       }}
     >
       {children}

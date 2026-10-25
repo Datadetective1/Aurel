@@ -7,12 +7,14 @@ import { requireOnboardedUser } from '@/lib/auth'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
 import { PLANS, foundingProtectionBlurb, formatPrice, type MeterKind } from '@/lib/billing/plans'
 import { foundingPlacesRemaining } from './actions'
-import { ManageBillingButton, UpgradeButton } from '@/components/app/billing-actions'
+import { ManageBillingButton, TrialButton, UpgradeButton } from '@/components/app/billing-actions'
 import { InvitationPanel } from '@/components/app/invitation-panel'
 import { hasFullAccess } from '@/lib/billing/access'
+import { planSummary } from '@/lib/billing/plan-summary'
+import { checkoutAvailable, trialOfferOpen } from '@/lib/billing/stripe'
+import { trialEligibility } from '@/lib/billing/trial'
 import { features } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
-import { formatDate } from '@/lib/format'
 import { brand } from '@/lib/brand'
 import { CheckoutPending } from '@/components/app/checkout-pending'
 
@@ -47,12 +49,11 @@ export default async function BillingSettingsPage({
   const supabase = await createClient()
   const { data: billing } = await supabase
     .from('subscriptions')
-    .select('status, cancel_at_period_end, current_period_end, stripe_customer_id')
+    .select(
+      'status, cancel_at_period_end, current_period_end, stripe_customer_id, stripe_subscription_id, trial_ends_at',
+    )
     .eq('user_id', user.id)
     .maybeSingle()
-  const periodEnd = billing?.current_period_end
-    ? formatDate(billing.current_period_end, timeZone)
-    : null
   const pastDue = billing?.status === 'past_due'
   const hasBillingAccount = Boolean(billing?.stripe_customer_id)
   const plan = PLANS[entitlements.plan]
@@ -69,6 +70,41 @@ export default async function BillingSettingsPage({
   // not apply, so the copy that describes them would contradict the Access
   // section a few lines below it.
   const fullAccess = hasFullAccess(entitlements.tier)
+
+  // What the plan is doing next, in the same words as the iPhone's Account
+  // screen: the trial and its end, the first or next charge, or that nothing
+  // will be charged.
+  const onTrial = entitlements.trial?.state === 'active'
+  const subscribable = checkoutAvailable()
+  const summary = planSummary({
+    plan: entitlements.plan,
+    fullAccess,
+    trial: entitlements.trial,
+    subscription: billing
+      ? {
+          status: billing.status,
+          cancelAtPeriodEnd: billing.cancel_at_period_end,
+          currentPeriodEnd: billing.current_period_end,
+        }
+      : null,
+    trialOffered:
+      trialOfferOpen() &&
+      entitlements.plan === 'free' &&
+      trialEligibility(
+        billing
+          ? {
+              status: billing.status,
+              trialEndsAt: billing.trial_ends_at,
+              stripeSubscriptionId: billing.stripe_subscription_id,
+            }
+          : null,
+        fullAccess,
+      ).eligible,
+    canSubscribe: subscribable && !fullAccess && (entitlements.plan === 'free' || onTrial),
+    timeZone,
+  })
+  // Subscribed at Stripe, as opposed to on the trial Atturel grants itself.
+  const subscribed = entitlements.plan !== 'free' && !onTrial
 
   const usage = await Promise.all(
     metered.map(async (kind) => ({
@@ -88,14 +124,14 @@ export default async function BillingSettingsPage({
           className="border-positive/25 bg-positive-wash text-positive mt-4 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed"
         >
           <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-          {entitlements.plan === 'pro'
-            ? 'Thank you. Pro is on.'
-            : 'Thank you. Your plan changes as soon as Stripe confirms the payment — usually within seconds. This page checks for you.'}
+          {subscribed
+            ? 'Thank you. You are subscribed to Pro.'
+            : 'Thank you. Your subscription starts as soon as Stripe confirms it — usually within seconds. This page checks for you.'}
         </p>
       ) : null}
       {/* Refreshes the page a few times while the webhook lands, so the
-          customer does not have to reload to see what they paid for. */}
-      {checkout === 'success' && entitlements.plan !== 'pro' ? <CheckoutPending /> : null}
+          customer does not have to reload to see what they agreed to. */}
+      {checkout === 'success' && !subscribed ? <CheckoutPending /> : null}
 
       {pastDue ? (
         <p
@@ -115,22 +151,20 @@ export default async function BillingSettingsPage({
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <span className="font-display text-ink text-2xl">{plan.name}</span>
+        <span className="font-display text-ink text-2xl">{summary.label}</span>
         {entitlements.isFounding ? <Badge tone="accent">Founding</Badge> : null}
-        {plan.monthlyPriceCents ? (
+        {subscribed && plan.monthlyPriceCents ? (
           <span className="text-ink-secondary text-sm">
             {formatPrice(plan.monthlyPriceCents)} per month
           </span>
         ) : null}
       </div>
 
-      {entitlements.plan === 'pro' && periodEnd ? (
-        <p className="text-ink mt-2 text-sm">
-          {billing?.cancel_at_period_end
-            ? `Canceled — Pro stays on until ${periodEnd}, then the account moves to Free. Nothing is deleted.`
-            : `Renews on ${periodEnd}.`}
+      {summary.lines.map((line) => (
+        <p key={line} className="text-ink mt-2 max-w-lg text-sm leading-relaxed">
+          {line}
         </p>
-      ) : null}
+      ))}
 
       <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">{plan.tagline}</p>
 
@@ -191,16 +225,37 @@ export default async function BillingSettingsPage({
       {/* No upgrade path is offered to an account that already has everything.
           Nothing here is hidden from them -- Compare plans is still reachable
           from the marketing site -- it is simply not a prompt they need. */}
+      {/* Subscribing is its own explicit action, with the first charge date
+          and the monthly terms beside it -- here and again on Stripe's page.
+          Nothing else (a card saved in Manage billing included) subscribes. */}
       <div className={fullAccess ? 'hidden' : 'mt-10 flex flex-wrap items-start gap-2'}>
-        {features.billing && entitlements.plan === 'free' ? (
+        {summary.offerTrial ? <TrialButton /> : null}
+        {summary.subscribe ? (
           <UpgradeButton
-            label={`Upgrade to ${PLANS.pro.name} — ${formatPrice(PLANS.pro.monthlyPriceCents)} a month`}
+            label={summary.subscribe.label}
+            variant={summary.offerTrial ? 'secondary' : 'primary'}
           />
         ) : null}
         <Button asChild variant="secondary" size="sm">
           <Link href="/pricing">Compare plans</Link>
         </Button>
       </div>
+      {!fullAccess && (summary.offerTrial || summary.subscribe) ? (
+        <div className="text-ink-muted mt-3 grid max-w-lg gap-1 text-xs leading-relaxed">
+          {summary.offerTrial ? (
+            <p>
+              The trial: 14 days of Pro, no card. It returns to Free unless you subscribe, and
+              nothing is deleted.
+            </p>
+          ) : null}
+          {summary.subscribe ? (
+            <p>
+              {summary.offerTrial ? 'Subscribing: ' : ''}
+              {summary.subscribe.terms}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Anyone paying can always reach billing to change or cancel it -- an
           owner or pilot grant included. Hiding this row for full-access
@@ -208,7 +263,8 @@ export default async function BillingSettingsPage({
       {/* Whenever there is a Stripe customer, not only while on Pro: an unpaid
           or ended subscription is exactly when someone needs to fix a card,
           pay an invoice or find a receipt. */}
-      {features.billing && (hasBillingAccount || entitlements.plan !== 'free') ? (
+      {/* Not for the trial alone: it has nothing at Stripe to manage. */}
+      {features.billing && (hasBillingAccount || subscribed) ? (
         <div className={fullAccess ? 'mt-10' : 'mt-2'}>
           <ManageBillingButton />
         </div>
@@ -216,7 +272,7 @@ export default async function BillingSettingsPage({
 
       {/* Only where someone could actually take a place. Advertising scarcity on
           a deployment that cannot sell is a claim with nothing behind it. */}
-      {features.billing && founding !== null && founding > 0 && entitlements.plan === 'free' ? (
+      {features.billing && founding !== null && founding > 0 && summary.subscribe ? (
         <p className="text-ink-muted mt-3 text-xs">
           {founding} founding {founding === 1 ? 'place' : 'places'} left.
           {protection ? ` ${protection}` : ''}
@@ -229,7 +285,7 @@ export default async function BillingSettingsPage({
         </p>
       ) : null}
 
-      {!features.billing ? (
+      {!subscribable ? (
         <p className="border-line bg-bg-sunken text-ink-muted mt-6 flex max-w-lg items-start gap-2 rounded-[var(--radius-md)] border px-3.5 py-3 text-xs leading-relaxed">
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           Upgrading is not available yet. Everything else works normally.
@@ -237,8 +293,8 @@ export default async function BillingSettingsPage({
       ) : null}
 
       <p className="text-ink-muted mt-8 max-w-lg text-xs leading-relaxed">
-        Cancel any time from Manage billing; Pro stays on until the end of the period you paid for.
-        Billing questions:{' '}
+        Cancel any time from Manage billing; Pro stays on until the end of the period you paid for,
+        or of your trial if you subscribed during it. Billing questions:{' '}
         <a
           href={`mailto:${brand.email.support}`}
           className="text-accent underline underline-offset-2"

@@ -7,6 +7,7 @@ import {
   type SubscriptionState,
   type SubscriptionTransition,
 } from './subscription-state'
+import { appTrialActive, isAppTrial } from './trial'
 
 /**
  * STRIPE WEBHOOK, THE PART THAT DECIDES
@@ -65,6 +66,8 @@ export interface CanonicalRow extends SubscriptionState {
   isFounding: boolean
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
+  /** The app's own trial, or Stripe's, as last written. */
+  trialEndsAt: string | null
   stateAt: string | null
 }
 
@@ -115,7 +118,12 @@ export interface WebhookDeps {
   processor: BillingProcessor
   planForPrice: (priceId: string | null) => PlanId
   intervalForPrice: (priceId: string | null) => string | null
-  notify: (userId: string, transition: SubscriptionTransition) => Promise<void>
+  /** `subscriptionId` keys the email, so concurrent events cannot send it twice. */
+  notify: (
+    userId: string,
+    transition: SubscriptionTransition,
+    context?: { subscriptionId: string },
+  ) => Promise<void>
   now?: () => Date
   log?: (event: string, fields: Record<string, unknown>) => void
 }
@@ -226,6 +234,9 @@ async function handle(
   }
 
   const before = await deps.store.getRow(userId)
+  const now = (deps.now ?? (() => new Date()))()
+  // The app's own trial is in this row but is not a Stripe subscription.
+  const appTrial = isAppTrial(before)
 
   const item = subscription.items.data[0]
   const priceId = item?.price?.id ?? null
@@ -257,8 +268,15 @@ async function handle(
     return { status: 'ignored', userId }
   }
 
+  // A subscription that confers nothing -- an abandoned or failed checkout --
+  // must not erase a trial that is still running. Only a subscription that
+  // entitles replaces it (finding: trial PR).
+  if (appTrial && appTrialActive(before, now) && plan === 'free') {
+    deps.log?.('billing.webhook_kept_trial', { type: event.type })
+    return { status: 'ignored', userId }
+  }
+
   const founding = await resolveFounding(before, plan, deps)
-  const now = (deps.now ?? (() => new Date()))()
 
   const applied = await deps.store.apply({
     userId,
@@ -266,18 +284,24 @@ async function handle(
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
+    // Stripe's trial when it has one. Otherwise the app's own trial stays on
+    // record, so a subscription started after the trial does not erase when
+    // the trial was.
     trialEndsAt: subscription.trial_end
       ? new Date(subscription.trial_end * 1000).toISOString()
-      : null,
+      : (before?.trialEndsAt ?? null),
     billingInterval: deps.intervalForPrice(priceId),
     founding,
     stateAt: now.toISOString(),
   })
   if (applied === 'stale') return { status: 'processed', userId }
 
-  for (const transition of transitionsBetween(before, state)) {
+  // Subscribing during the trial is the start of a subscription, and a trial
+  // that ended unsubscribed is Free: either way the trial row is not "before
+  // as a subscriber", or the activation email would never be sent.
+  for (const transition of transitionsBetween(appTrial ? null : before, state)) {
     try {
-      await deps.notify(userId, transition)
+      await deps.notify(userId, transition, { subscriptionId: subscription.id })
     } catch {
       // A failed email must not fail the event: the state is already right,
       // and retrying the whole event would not resend it anyway.

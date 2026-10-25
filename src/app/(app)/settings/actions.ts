@@ -253,7 +253,7 @@ export async function exportMyData(): Promise<
       supabase.from('ai_feedback').select('*').eq('user_id', user.id),
       supabase
         .from('subscriptions')
-        .select('plan, status, current_period_end, cancel_at_period_end, created_at')
+        .select('plan, status, current_period_end, cancel_at_period_end, trial_ends_at, created_at')
         .eq('user_id', user.id)
         .maybeSingle(),
       // Which calendars are connected -- never the tokens, which are secrets

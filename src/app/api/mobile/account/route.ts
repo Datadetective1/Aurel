@@ -2,8 +2,8 @@ import { getOptionalUser, getProfile } from '@/lib/auth'
 import { json, readJson } from '@/lib/mobile/route'
 import { bearerToken, createClient } from '@/lib/supabase/server'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import { PLANS } from '@/lib/billing/plans'
 import { hasFullAccess } from '@/lib/billing/access'
+import { planSummary } from '@/lib/billing/plan-summary'
 import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { mobileCaptureLimits } from '@/lib/capture/limits'
 import { absoluteUrl, brand } from '@/lib/brand'
@@ -32,16 +32,19 @@ export async function GET() {
   const user = await context()
   if (!user) return json({ error: 'unauthenticated' }, 401)
 
-  const [profile, entitlements, { data: calendars }] = await Promise.all([
+  const supabase = await createClient()
+  const [profile, entitlements, { data: calendars }, { data: billing }] = await Promise.all([
     getProfile(),
     getEntitlements(),
     // Read-only status; never the tokens.
-    (await createClient())
-      .from('integration_accounts')
-      .select(CALENDAR_COLUMNS)
-      .eq('user_id', user.id),
+    supabase.from('integration_accounts').select(CALENDAR_COLUMNS).eq('user_id', user.id),
+    // A cancellation changes the plan line: "Pro until …", not "first charge".
+    supabase
+      .from('subscriptions')
+      .select('status, cancel_at_period_end, current_period_end')
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
-  const paid = entitlements.plan !== 'free'
   const limit = entitlements.quotas.transcription_seconds
   const remainingSeconds =
     limit === null || limit === undefined
@@ -54,19 +57,34 @@ export async function GET() {
   const body: AccountResponse = {
     email: user.email ?? null,
     name: profile?.preferred_name || profile?.full_name || 'You',
-    planLabel: paid
-      ? PLANS[entitlements.plan].name
-      : hasFullAccess(entitlements.tier)
-        ? 'Full access'
-        : PLANS.free.name,
+    // The same words as the website's Plan page; plan and access only, no
+    // purchase or payment link (owner decision 3).
+    planLabel: planSummary({
+      plan: entitlements.plan,
+      fullAccess: hasFullAccess(entitlements.tier),
+      trial: entitlements.trial ?? null,
+      subscription: billing
+        ? {
+            status: billing.status ?? null,
+            cancelAtPeriodEnd: Boolean(billing.cancel_at_period_end),
+            currentPeriodEnd: billing.current_period_end ?? null,
+          }
+        : null,
+      trialOffered: false,
+      canSubscribe: false,
+      timeZone: profile?.timezone ?? 'UTC',
+    }).shortLabel,
     billing:
       entitlements.provider === 'apple'
         ? 'apple'
         : entitlements.provider === 'stripe'
           ? 'web'
-          : entitlements.provider === 'manual'
-            ? 'included'
-            : 'none',
+          : entitlements.provider === 'trial'
+            ? 'trial'
+            : entitlements.provider === 'manual'
+              ? 'included'
+              : 'none',
+    trial: entitlements.trial ?? null,
     legal: {
       privacyUrl: absoluteUrl('/privacy'),
       termsUrl: absoluteUrl('/terms'),

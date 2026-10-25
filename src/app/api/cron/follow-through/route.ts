@@ -5,6 +5,7 @@ import { serverEnv, features } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { clampHour, localClock, modeFor, shouldSendNow } from '@/lib/follow-through/schedule'
 import { alreadyServedToday, sendFollowThrough } from '@/lib/follow-through/send'
+import { sendTrialNotices, trialNoticesRun } from '@/lib/billing/trial-notices'
 
 /**
  * THE DAILY FOLLOW-THROUGH JOB
@@ -39,12 +40,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, reason: 'service_role_unavailable' }, { status: 503 })
   }
 
+  const query = request.nextUrl.searchParams.get('mode')
   const mode = modeFor({
-    query: request.nextUrl.searchParams.get('mode'),
+    query,
     scheduleHeader: request.headers.get('x-vercel-cron-schedule'),
   })
   const now = new Date()
   const admin = createServiceRoleClient()
+
+  // The Pro trial's "ends soon" and "ended" notices are billing notices, sent
+  // whatever the email preferences say. They rely on running once a day, so
+  // only on the scheduled run: never on a manual run (which passes ?mode=),
+  // and at 13:00 UTC if the job is ever made hourly.
+  const trialNotices = trialNoticesRun({ query, mode, now })
+    ? await sendTrialNotices(admin, now)
+    : null
 
   // Addresses live in auth, not in profiles. One paged listing, then a map.
   const emails = new Map<string, string>()
@@ -123,9 +133,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  logger.info('follow_through.run', { mode, ...tally })
+  logger.info('follow_through.run', { mode, ...tally, trialNotices })
   return NextResponse.json(
-    { ok: true, mode, ...tally },
+    { ok: true, mode, ...tally, trialNotices },
     { headers: { 'cache-control': 'no-store' } },
   )
 }

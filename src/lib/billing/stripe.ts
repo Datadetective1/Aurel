@@ -43,6 +43,37 @@ export function proPriceId(): string | null {
 }
 
 /**
+ * Whether subscribing works end to end on this deployment: Checkout, the
+ * price, the webhook that records the subscription, and the service role it
+ * writes with. Subscribe to Pro is offered only then -- a button that can only
+ * fail is not an offer -- and so is the trial, so it can always end in a real
+ * choice.
+ */
+export function checkoutAvailable(): boolean {
+  return Boolean(
+    features.billing && features.billingWebhooks && features.serviceRole && proPriceId(),
+  )
+}
+
+/**
+ * Expire every open Checkout session of a customer. Stripe will not complete
+ * an expired session, so nothing opened earlier can still be paid.
+ */
+export async function expireOpenCheckouts(customer: string): Promise<void> {
+  const open = await stripe().checkout.sessions.list({ customer, status: 'open', limit: 10 })
+  for (const session of open.data) await stripe().checkout.sessions.expire(session.id)
+}
+
+/**
+ * Whether a new 14-day trial may be started or advertised: subscribing works,
+ * and the deployment has opted in (`PRO_TRIAL_OFFER=on`). Turning it off is
+ * the rollback switch, and never touches a trial already running.
+ */
+export function trialOfferOpen(): boolean {
+  return features.proTrialOffer && checkoutAvailable()
+}
+
+/**
  * Whether a Stripe price is the one this product sells at the advertised
  * amount: monthly, recurring, in the offer's currency, at the offer's price.
  *

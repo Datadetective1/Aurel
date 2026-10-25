@@ -124,6 +124,53 @@ describe('checkout charges exactly what the page shows', () => {
   })
 })
 
+describe('the 14-day trial', () => {
+  const claim = code(read('lib', 'billing', 'trial-claim.ts'))
+  const actions = code(read('app', '(app)', 'settings', 'billing', 'actions.ts'))
+
+  it('is the only entitlement written outside the webhook, onto an unused Free row, never as a paid plan', () => {
+    expect(claim).toContain("status: 'trialing'")
+    // `plan` stays Free: only the webhook writes a paid plan.
+    expect(claim).not.toMatch(/plan:\s*'pro'/)
+    for (const guard of [
+      ".eq('plan', 'free')",
+      ".is('trial_ends_at', null)",
+      ".is('stripe_subscription_id', null)",
+    ]) {
+      expect(claim).toContain(guard)
+    }
+  })
+
+  it('creates nothing at Stripe: no card, and nothing there that a card update could start', () => {
+    expect(claim).not.toMatch(/stripe\(\)/)
+    const start = actions.slice(
+      actions.indexOf('export async function startProTrial'),
+      actions.indexOf('export async function startCheckout'),
+    )
+    // It creates nothing at Stripe. It only closes Checkouts opened earlier.
+    expect(start).not.toMatch(/stripe\(\)|customers\.create|sessions\.create|subscriptions\.create/)
+    expect(start).toContain('expireOpenCheckouts(')
+  })
+
+  it('has one expiry rule, and the offer switch can never end a running trial', () => {
+    const trial = code(read('lib', 'billing', 'trial.ts'))
+    const sources = code(read('lib', 'billing', 'sources.ts'))
+    const entitlements = code(read('lib', 'billing', 'entitlements.ts'))
+    expect(trial).toContain('export function trialRunning(')
+    expect(sources).toContain('trialRunning(')
+    // Access is computed from trial_ends_at alone: the rollback switch only
+    // only opens or closes new trials (PRO_TRIAL_OFFER), it is not read where access is.
+    for (const source of [trial, sources, entitlements]) {
+      expect(source).not.toMatch(/proTrialOffer|trialOfferOpen|PRO_TRIAL_OFFER/)
+    }
+  })
+
+  it('subscribing during it keeps the rest of it and states the terms on Stripe’s page', () => {
+    expect(actions).toContain('trial_end:')
+    expect(actions).toContain('custom_text:')
+  })
+})
+
 describe('the webhook', () => {
   const route = code(read('app', 'api', 'stripe', 'webhook', 'route.ts'))
 

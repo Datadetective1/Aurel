@@ -181,6 +181,7 @@ export type AnalyticsEvent =
   | 'demo_data_cleared'
   | 'upgrade_viewed'
   | 'checkout_started'
+  | 'trial_started'
   | 'subscription_created'
   | 'limit_reached'
   // Access tiers. Outcomes and counts only -- never a code, never a hash.
