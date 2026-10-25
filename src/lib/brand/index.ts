@@ -41,8 +41,13 @@ export const brand = {
   name: 'Atturel',
   /** Lowercase machine-safe slug (cookies, analytics prefixes, storage keys). */
   slug: 'atturel',
-  /** Registered company name used in legal copy and email footers. */
-  legalEntity: 'Atturel Labs',
+  /**
+   * The operator: the person or company that provides the service and is the
+   * other party to the Terms. Today an individual operating Atturel (owner,
+   * 25 Oct 2026); a company has not been formed yet. Change it only once a
+   * registration is actually complete.
+   */
+  legalEntity: 'Amary Biton Coulibaly',
   /** Primary marketing domain, display form (no protocol). */
   domain: 'atturel.com',
 
@@ -90,8 +95,9 @@ export const brand = {
 
   legal: {
     /**
-     * Not yet supplied. While null, the legal pages omit the line rather than
-     * printing a placeholder. Set both to the real values; never guess them.
+     * The operator's mailing address and the governing law and venue. Not yet
+     * supplied: while null, the legal pages omit the line rather than printing
+     * a placeholder. Set both to the real values; never guess them.
      */
     entityAddress: null as string | null,
     jurisdiction: null as string | null,

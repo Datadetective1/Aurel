@@ -287,7 +287,7 @@ export default function PrivacyPage() {
             .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.legalEntity}
+            {brand.name} is operated by {brand.legalEntity}
             {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}. Last updated{' '}
             {brand.legal.policiesLastUpdated}.
           </p>

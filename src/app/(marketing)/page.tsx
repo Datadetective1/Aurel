@@ -339,7 +339,8 @@ function StructuredData() {
     {
       '@type': 'Organization',
       '@id': absoluteUrl('/#organization'),
-      name: brand.legalEntity,
+      // The brand. The operator (an individual for now) is named on Terms and Privacy.
+      name: brand.name,
       url: siteUrl,
       logo: absoluteUrl('/icon.svg'),
       description: brand.longDescription,

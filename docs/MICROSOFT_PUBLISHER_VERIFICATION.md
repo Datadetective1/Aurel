@@ -84,7 +84,8 @@ Cloud Partner Program (formerly MPN).
 Requirements:
 
 1. A **Microsoft AI Cloud Partner Program** account for the legal entity
-   (e.g. Atturel Labs) that has completed **business verification**. Enroll at
+   (Atturel's operating company, once formed; Atturel is operated today by
+   an individual) that has completed **business verification**. Enroll at
    https://partner.microsoft.com. Verification checks the legal name, address
    and a contact email, and usually takes **a few business days**.
 2. The partner account's verification email must be on a domain the tenant

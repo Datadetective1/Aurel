@@ -72,4 +72,10 @@ describe('the privacy page', () => {
       'Google API Services User Data Policy, including the Limited Use requirements',
     )
   })
+
+  it('names the operator, and presents no company or registration as complete', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}`)
+    expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
+  })
 })

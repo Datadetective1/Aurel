@@ -22,7 +22,8 @@ export default function TermsPage() {
       <Eyebrow>Terms</Eyebrow>
       <h1 className="font-display text-ink mt-4 text-4xl leading-tight">Terms of service</h1>
       <p className="text-ink-secondary mt-6 leading-relaxed">
-        The arrangement between you and {brand.legalEntity}, in plain language.
+        The arrangement between you and {brand.legalEntity}, who operates {brand.name}, in plain
+        language.
       </p>
 
       {!brand.legal.policiesLegallyReviewed ? (
@@ -139,7 +140,7 @@ export default function TermsPage() {
             </a>
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.legalEntity}
+            {brand.name} is operated by {brand.legalEntity}
             {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}.
             {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
             updated {brand.legal.policiesLastUpdated}.
