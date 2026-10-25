@@ -18,13 +18,14 @@ Nothing here is a claim that something works on a device unless it says it was t
 
 ## Where things stand (resume here)
 
-_Updated 24 October 2026._
+_Updated 25 October 2026._
 
-- **Phase 1 (Capture): code complete in PR #16 (draft, unmerged).**
-  - Validated in Jest, against the production server, and end to end on an iOS simulator build against production (§1.1).
-  - **Not yet validated on a physical iPhone.** That needs the next TestFlight build (§1.2).
-- **Phase 2: not started.** By owner instruction it waits until Phase 1 is confirmed on the owner's iPhone.
+- **Phase 1 (Capture): merged (PR #16, `9fb4714`) and shipped in TestFlight build 0.1.0 (3).**
+  - The owner validated it on a physical iPhone (§1.3).
+  - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
+- **Phase 2 (Essential controls): plan written (§5), waiting for owner approval.** No Phase 2 code has been written.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
+- **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
 ---
 
@@ -93,16 +94,41 @@ _Updated 24 October 2026._
 
 **Known minor issue (Phase 2).** When the microphone fails to start, expo-audio leaves an empty 28-byte file in `Documents/ExpoAudio`. It is never sent or shown.
 
-### 1.2 Producing the next TestFlight build
+### 1.2 Producing a TestFlight build
 
-1. Merge PR #16 into `main` once its checks are green. This redeploys the website with the server and privacy changes. The app change ships only through TestFlight.
-2. GitHub → Actions → **iOS TestFlight** → Run workflow on `main`, with build "TestFlight" and submit "true". EAS increments the build number; the workflow uploads to App Store Connect and waits for Apple's processing.
-3. When it reports the build as available to internal testers, update Atturel in TestFlight on the iPhone.
-4. **Before** updating, leave one recording unsent, to check that it survives the update.
-5. Then check on the iPhone:
-   - A live recording of about 30 seconds, then Understand it, then Review, then Keep.
-   - The unsent recording from before the update is offered back and sends.
-   - In airplane mode, Understand it shows "could not be reached" and keeps the recording. Back online, Try again sends it once.
+1. Merge the phase's PR into `main` once its checks are green. Merging redeploys the website; app changes ship only through TestFlight.
+2. GitHub → Actions → **iOS TestFlight** → Run workflow on `main`, with build "TestFlight" and submit "true". EAS increments the build number; the workflow uploads to App Store Connect and waits until Apple has processed the build.
+3. When it reports the build as available to internal testers, run the §1.4 checklist on the iPhone. Leave a recording unsent **before** updating.
+
+Phase 1 shipped this way: PR #16 merged as `9fb4714` on 24 Oct 2026, workflow run #11, build **0.1.0 (3)**, processed and in internal testing at 23:18 UTC.
+
+### 1.3 Physical iPhone validation (owner, build 0.1.0 (3), 25 Oct 2026)
+
+| Check                                                                     | Result                                                                     |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Live microphone recording                                                 | **Pass**                                                                   |
+| Transcription (Understand it)                                             | **Pass**                                                                   |
+| Offline error handling ("could not be reached", recording kept)           | **Pass**                                                                   |
+| Retry after reconnecting                                                  | **Pass**                                                                   |
+| Review of what was found, including decisions                             | **Pass** (but see finding 8.7)                                             |
+| Saving (Keep)                                                             | **Pass**                                                                   |
+| Relationship-memory integration                                           | **Pass**                                                                   |
+| The latest conversation appears exactly once in the person's timeline     | **Pass**                                                                   |
+| An unsent recording survives an update from the previous TestFlight build | **NOT VERIFIED**: could not be confirmed on the device. Carried into §1.4. |
+
+The simulator test of a real reinstall-over-the-top update passed (§1.1, scenario B). It is not a substitute for the device check.
+
+### 1.4 Release validation checklist (every TestFlight build)
+
+Carry these forward until each has passed on a physical iPhone:
+
+1. **Unsent recording across an update.** Not yet verified.
+   - Before installing the new build, record something and do not send it. Close the app.
+   - Install the update from TestFlight and open the app.
+   - Today and Capture should offer the recording back. Understand it should then send it once.
+2. Live recording of about 30 seconds, then Understand it, Review, Keep. The commitments should appear on Today and in the person's timeline, once.
+3. Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
+4. Any checks added by the phase being shipped.
 
 ---
 
@@ -175,14 +201,15 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 
 ### The loop (Capture → Review → Memory → Commitments → Today)
 
-| #   | Finding                                                                                                                                                                                 | Status       | Sev |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --- |
-| 8.1 | Proposals are created as `proposed`. Review confirms or rejects them, and only confirmed items are active. Memory is never written without approval.                                    | Implemented  | —   |
-| 8.2 | **iOS Review is keep-or-reject only**: no editing a loop's text or date. It says memory proposals "wait on each person's page", but the iOS person page cannot show or confirm them.    | Partial      | P1  |
-| 8.3 | **A confirmed loop cannot be edited** on either platform. Reopen exists on web only. Create a loop exists on web only.                                                                  | Partial      | P1  |
-| 8.4 | Dead actions: `addCommitment`, `completeCommitment`, `reopenCommitment`.                                                                                                                | Unused       | P2  |
-| 8.5 | **Web and iOS Today disagree for the same account.** They differ in meeting window, countdown threshold, number of loops and ranking, and which conversations count as awaiting review. | Inconsistent | P2  |
-| 8.6 | Calendar never syncs in the background. There is no cron; it syncs only on connect and on "Sync now".                                                                                   | Partial      | P2  |
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Status         | Sev |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | --- |
+| 8.1 | Proposals are created as `proposed`. Review confirms or rejects them, and only confirmed items are active. Memory is never written without approval.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Implemented    | —   |
+| 8.2 | **iOS Review is keep-or-reject only**: no editing a loop's text or date. It says memory proposals "wait on each person's page", but the iOS person page cannot show or confirm them.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Partial        | P1  |
+| 8.3 | **A confirmed loop cannot be edited** on either platform. Reopen exists on web only. Create a loop exists on web only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Partial        | P1  |
+| 8.4 | Dead actions: `addCommitment`, `completeCommitment`, `reopenCommitment`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Unused         | P2  |
+| 8.5 | **Web and iOS Today disagree for the same account.** They differ in meeting window, countdown threshold, number of loops and ranking, and which conversations count as awaiting review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Inconsistent   | P2  |
+| 8.6 | Calendar never syncs in the background. There is no cron; it syncs only on connect and on "Sync now".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Partial        | P2  |
+| 8.7 | **A proposed action is sometimes read as a confirmed decision.** Observed by the owner on iPhone, 25 Oct 2026. The prompt already says a decision is "Not a proposal, not a preference" (`src/lib/ai/prompts/conversation.ts`, decision rule), so the model does not always follow it. Review pre-ticks every proposal, so a mislabelled one is easy to keep. The debrief heuristics (`debrief.ts`) also match loose words such as "agreed". **Phase 3 (product intelligence):** require the settling words as evidence for a decision, otherwise file it as a question or loop; do not pre-tick low-confidence decisions; add regression cases with proposals ("we could…", "I'd suggest…", "let's consider…"). | Broken (trust) | P1  |
 
 ### iOS quality
 
@@ -216,7 +243,7 @@ Each phase ships as its own PR. Nothing reaches production until it is merged to
 - iOS Account sections: profile, privacy & data with export, notifications (email preferences), calendar status, plan read-only, help.
 - Fix 9.1–9.4.
 
-**Phase 3 — Connected experience.**
+**Phase 3 — Connected experience.** Includes the product-intelligence fix for finding 8.7 (a proposal read as a decision).
 
 - Onboarding: honest "early read" (4.2), summary written reliably (4.1), name asked once (4.3).
 - Calendar: equal-weight manual path, consistent horizon, next-step button (4.4).
@@ -256,29 +283,94 @@ Still open (no decision needed yet):
 
 ## 5. Remaining work, in order
 
-**Phase 2 — Essential controls.** Starts after Phase 1 is confirmed on the owner's iPhone.
+**Phase 2 — Essential controls.** Plan for approval. Phase 1 was confirmed on the iPhone on 25 Oct 2026.
 
-- People:
-  - Archive (default), restore, and a separately confirmed permanent delete.
-  - A visible duplicate warning on create, with the lookup filtered by `user_id`.
-  - Edit pronouns and time zone.
-- iOS people: add a person from the People tab; edit; photo add/replace/remove (needs `expo-image-picker`, a native rebuild).
-- Own profile photo on web and iOS. Reuse `avatars/<uid>/` and `profiles.avatar_path`; no migration.
-- iOS Account:
-  - Profile edit, including time zone.
-  - Privacy & data, with export.
-  - Email notification preferences.
-  - Calendar status.
-  - Plan and access, read-only.
-  - Help.
-- iOS quality:
-  - A failed silent refresh must keep the loaded content (`useApi`).
-  - Ask `?q` and stale Capture `meetingId`.
-  - "Add people" adding the same person twice.
-  - Keyboard avoidance.
-  - An "Open Settings" button when the microphone is denied.
-  - Today's unsent-recording banner should still show when Today fails to load.
-  - Remove the empty file left by a failed microphone start.
+Principles:
+
+- Reuse the existing actions and tables. The web server actions become thin wrappers around shared "core" functions, the way `createPersonCore` already works, so web and iOS run the same code.
+- No schema change and no new paid service.
+- Every new mobile route is bearer-only, filters by `user_id`, and runs under RLS.
+
+**2A — People controls: server and web (one PR, mergeable on its own)**
+
+1. **Remove = archive.** The person page gets "Remove from people", with a confirmation, using the existing `archivePerson` and `archived_at`. The People page gets an "Archived (n)" view with **Restore**.
+2. **Archive must mean archived everywhere.** Of the files that read `people`, about 16 ignore `archived_at` today. Among them:
+   - global search (`search-action.ts`)
+   - Today
+   - follow-through emails (`follow-through/send.ts`)
+   - conversation name matching (`conversations/process.ts`, `attribution.ts`), which would link a new conversation to an archived person
+   - meeting attendee pickers, loops
+
+   Rule for each call site:
+   - **Excluded:** lists, search, pickers, suggestions, name matching, Atlas, brief and Ask context, follow-through.
+   - **Kept, labelled "archived":** past conversations and meetings.
+   - Archived people already do not count toward the Free plan's people limit (`checkPersonLimit`).
+
+3. **Permanent delete.** Only from the Archived view, behind a second, separate confirmation. The confirmation lists what goes:
+   - N observations and notes, N researched facts and sources, the photo;
+   - N meetings attended and N conversations they appear in (those meetings and conversations stay; only this person's place in them is removed);
+   - N open loops: see decision D1.
+
+   An analytics event records the deletion, without names.
+
+4. **Duplicate warning on create** (web and iOS). "You already have Dana Whitfield (Northwind)" with **Open existing** and **Add anyway**. If the match is archived, offer **Restore**. The lookup moves to `user_id` and also checks email and profile URL.
+5. **Person form:** add pronouns and time zone (the columns exist).
+6. **Own profile photo on the web** (Settings › Profile). Upload, replace or remove at `avatars/<uid>/profile.<ext>`; the existing bucket policy already covers the user's folder. Stored in `profiles.avatar_path` and shown only to the user, since discovery is deferred.
+7. **Mobile API (additive)**, reusing the cores:
+   - `PATCH /api/mobile/people/[id]`
+   - `POST /api/mobile/people/[id]/archive` and `/restore`
+   - `DELETE /api/mobile/people/[id]` (needs an explicit confirmation field)
+   - `GET /api/mobile/people?archived=1`
+   - `POST|DELETE /api/mobile/people/[id]/photo`
+   - `PATCH /api/mobile/me`
+   - `POST|DELETE /api/mobile/me/photo`
+   - `GET /api/mobile/export`
+   - `GET|PATCH /api/mobile/preferences` (email notifications)
+   - calendar status added to `GET /api/mobile/account`
+   - The duplicate warning on `POST /api/mobile/people`.
+
+**2B — iOS controls (needs a TestFlight build; adds native modules)**
+
+1. People tab: **Add person**, with the duplicate warning.
+2. Person screen:
+   - **Edit**: name, preferred name, title, organisation, email, profile URL, relationship type, pronouns, time zone, notes.
+   - **Photo**: add, replace or remove. `expo-image-picker`, resized to JPEG under 2 MB.
+   - **Remove**: archive.
+   - People › Archived: **Restore** and **Delete permanently**, with the counts.
+3. Account:
+   - **Profile**: name, preferred name, title, company, pronouns, time zone (the device's zone is offered), own photo.
+   - **Privacy & data**: what is stored, **Export my data** (a JSON file through the share sheet, using `expo-sharing`), delete account (exists).
+   - **Notifications**: email and follow-through email on or off. The delivery hour is left out until Phase 3 fixes the once-a-day cron (finding 3.4).
+   - **Calendar**: connected providers and last sync, read-only; connecting is done on the web.
+   - **Plan & access**: read-only, per decision 3. No purchase or payment links.
+   - **Help**: support, privacy, terms, version.
+4. **App Store.** New permission text: photo library (and camera, if D3 allows). Before any public release, App Store Connect's privacy details must add "Photos", collected for app functionality and linked to the user. This does not block TestFlight.
+
+**2C — iOS quality (small, low risk)**
+
+1. A failed refresh keeps the loaded screen, with a quiet "Couldn't refresh" note (`useApi`, finding 9.1).
+2. Today shows the unsent-recording banner even when Today fails to load.
+3. Ask reads `?q` on every visit. Capture reads `meetingId` and `personId` fresh, so a voice note never attaches to a stale meeting.
+4. Add people hides those already added.
+5. Keyboard avoidance: `automaticallyAdjustKeyboardInsets` on `Screen`, plus Account, Capture notes and Add people.
+6. Microphone denied: an **Open Settings** button.
+7. Remove the empty file a failed microphone start leaves behind.
+8. Pull-to-refresh on Account and Review; refresh on focus for Atlas and Account.
+
+**Order and testing**
+
+- 2A first. It is web plus server and mergeable on its own.
+- Then 2C and 2B together, ending in one TestFlight build that runs the §1.4 checklist plus the Phase 2 checks.
+- Each PR is tested with:
+  - unit tests: vitest for cores and routes, jest for mobile;
+  - route checks against the PR's Vercel preview with the QA account;
+  - for mobile, the iOS simulator against production.
+
+**Decisions within Phase 2**
+
+- **D1. Loops on permanent delete.** Recommended: keep the user's loops, unlinked from the person (the description keeps the name), because "I owe Dana the proposal" should not vanish with the contact. Today the link is `ON DELETE CASCADE`, so they would be deleted. Keeping them needs no migration: the delete unlinks first.
+- **D2. Archived people and the Free limit.** Archived people already do not count toward the 5-person limit, so archiving frees a slot. Confirm this is acceptable commercially.
+- **D3. Camera permission.** Recommended: photo library only for now, to keep permissions minimal. Camera can come later.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.
 
@@ -286,4 +378,4 @@ Still open (no decision needed yet):
 
 **Phase 5 — Validation.** Web end to end (Playwright) and iOS simulator flows per phase, a security review of new routes, then TestFlight and a written report.
 
-**Test assets.** The disposable QA account `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) is deleted after Phase 1 testing. Create a fresh one for each round and delete it afterwards.
+**Test assets.** The disposable QA account `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) **still exists**. Both deletes timed out at Supabase's confirmation prompt. Proposal: reuse it for Phase 2 testing, then delete it with the owner's approval at the end of Phase 2.
