@@ -190,7 +190,7 @@ public link, no build yet); the test information (description, feedback email
 `support@atturel.com`, marketing URL, privacy policy URL); and What to Test on
 build 5.
 
-**Your two steps.**
+**Your two steps (both done 25 Oct 2026).**
 
 1. **The review contact.** Apple accepts no change to the Beta App Review
    details without it. App Store Connect → Apps → Atturel → TestFlight → Test
@@ -203,7 +203,7 @@ build 5.
    `SUPABASE_SECRET_KEY`, paste the key, and save. It goes nowhere else, and
    you can revoke it on its own in Supabase.
 
-Then `prepare` runs again and sets:
+Then `prepare` runs again and sets (done 25 Oct 2026, run #10: sign-in verified, Full access):
 
 - **Sign-in required**, user name `appreview@atturel.com`, and the password.
   The password is generated inside the workflow, set on the reviewer's Atturel

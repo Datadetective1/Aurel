@@ -1199,7 +1199,11 @@ _Owner-authorized for build 0.1.0 (5): prepare now; submit for beta review once 
   - the external group **Atturel Pilot** (no public link, no build yet);
   - the test information: description, feedback email, marketing URL, privacy policy URL;
   - What to Test on build 5.
-- **Not yet set: the Beta App Review details.** Apple refused the change (409) without a contact phone, so nothing in that section was saved. The owner enters the contact (name, phone, email) and adds the `SUPABASE_SECRET_KEY` Actions secret; `prepare` then sets sign-in, the password and the notes, and signs in to prove the password works.
+- **Beta App Review details: set (25 Oct 2026, run #10).** The first attempt was refused (409) without a contact phone. The owner then entered the contact and added the `SUPABASE_SECRET_KEY` Actions secret, and `prepare` set:
+  - sign-in required, with the reviewer account and notes;
+  - a new password, on the Atturel account and in App Store Connect.
+
+  Signing in with App Store Connect's copy works, and the account reads "Full access" (billing `included`) with the sample record loaded. The log shows the key only as `***`, and no password or hash.
 - **Reviewer account:** `appreview@atturel.com` (user `a4fa330a-…`), created 25 Oct 2026. Onboarded, sample record loaded (5 invented people, "Q3 capacity review" on Today), Atturel's emails off.
   - **Access: Full access**, Atturel's existing access tier, granted with `public.set_access_tier` (owner, 25 Oct 2026; revocable, with a note on the grant). Every Pro feature, no monthly limits, no expiry during review, no trial and no purchase. The app shows "Full access" and "Included with your access. Nothing is billed.", and the review notes disclose it. `submit` refuses unless the account reads Full access. An interim plan to use the 14-day trial was dropped: it would expire, and review must not depend on it.
   - **Correction (owner, 25 Oct 2026):** an earlier draft kept the reviewer on Free on the grounds that it avoided the payment-rule question. It does not: Free or Pro settles nothing about guidelines 3.1.1 and 3.1.3(b), and hiding paid features from review is wrong. The review notes instead describe the model accurately: Free, and Pro at $29 a month bought only on the website; no in-app purchases, prices, upgrade buttons or purchase links in the app; Account only displays the plan; and Free accounts see an "Invitation code" field.
