@@ -68,17 +68,4 @@ export async function requireOnboardedUser() {
   return { user, profile }
 }
 
-/**
- * Sanitise a post-auth redirect target.
- *
- * Only same-origin, single-leading-slash paths are allowed. This blocks
- * `//evil.com` and `https://evil.com`, both of which browsers would otherwise
- * happily treat as absolute destinations.
- */
-export function safeRedirectPath(next: string | null | undefined, fallback = '/today'): string {
-  if (!next) return fallback
-  if (!next.startsWith('/')) return fallback
-  if (next.startsWith('//')) return fallback
-  if (next.includes('\\')) return fallback
-  return next
-}
+export { safeRedirectPath } from './safe-redirect'

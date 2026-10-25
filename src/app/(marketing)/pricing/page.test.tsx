@@ -43,7 +43,7 @@ describe('the pricing page', () => {
       ),
     ).toBeTruthy()
     expect(screen.getByRole('link', { name: /Start your 14-day trial/ }).getAttribute('href')).toBe(
-      '/sign-up',
+      '/sign-up?next=/settings/billing',
     )
     expect(screen.getByText('How does the Pro trial work?')).toBeTruthy()
     expect(

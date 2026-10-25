@@ -49,7 +49,8 @@ _Updated 25 October 2026._
 - **TestFlight 0.1.0 (5)** was built from `ea84289` after the live check passed (GitHub run #15, EAS build `0e2f93c5`). Apple processed it as VALID on 25 Oct 2026 at 18:07 UTC. It is in internal testing only and was not submitted for App Store review.
   - It is the first build with People search and research, 8.7's "Proposed, not decided" label, and 8.6's Account calendar with Sync now.
   - **None of its real-device checks has run yet** (§1.4, items 1–8).
-- **Pricing and the 14-day Pro trial: implemented on branch `pro-trial`, in a draft PR, awaiting owner review.** Not merged and not deployed (§5, "Pricing and the Pro trial").
+- **Pricing and the 14-day Pro trial: released.** PR #26 was merged on 25 Oct 2026 (`4295ac6`), owner-approved. The owner turned the trial offer on (`PRO_TRIAL_OFFER=on`) the same day, and both domains show it (§5, "Pricing and the Pro trial", "Release").
+- **Pilot onboarding has started** (owner, 25 Oct 2026). The pilot guide is `docs/PILOT_ONBOARDING.md`. Further feature work follows customer evidence.
 - **Pending, for the next available opportunity (owner approval where noted):**
   - **PR #21's simulator research steps** (§5, "Remaining simulator checks"). They wait until 1 Nov 2026, when the Expo minutes and QA account A's research credits reset; a paid Expo plan needs approval. Grace Hopper stays on QA account A for them.
   - **Real-device checks on build 0.1.0 (5):** the §1.4 checklist, which was not verified on build 4 (§1.5). Item 8 covers 8.7's typed notes, PR #21's search and research, and 8.6's Account calendar and Sync now.
@@ -990,9 +991,9 @@ Further requirements set by the owner:
 - **Merging and releases.** Run automated tests and verify the website preview before merging each implementation PR. **No Phase 2 PR is merged and no TestFlight build is published without presenting the results for owner review first.**
 - The next TestFlight release runs the §1.4 checklist, including the unverified update-survival test. The Phase 3 fix for finding 8.7 stays planned.
 
-### Pricing and the Pro trial (branch `pro-trial`, draft PR, 25 Oct 2026)
+### Pricing and the Pro trial (PR #26, merged 25 Oct 2026, `4295ac6`)
 
-_Implements decision 7 (§4). Not merged, not deployed. Allowances unchanged. No migration: every column already exists in production (checked read-only)._
+_Implements decision 7 (§4). Released 25 Oct 2026 (see "Release" below). Allowances unchanged. No migration: every column already exists in production (checked read-only)._
 
 **How the trial works:**
 
@@ -1104,8 +1105,9 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 **Billing QA accounts (created 25 Oct 2026 at the owner's request; QA account B is untouched):**
 
 - `qa-billing-trial-20261025@atturel-demo.dev` (user `686fddce-…`): the subscribe path. It now has a live Stripe customer from the Checkout check above, and no subscription.
-- `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`): a trial that expires without a subscription.
-- Both are onboarded, in America/Chicago. The credentials are held outside the repository and were never printed.
+- `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`): a trial that expires without a subscription. It now has 8 test people.
+- `qa-billing-start-20261025@atturel-demo.dev` (user `f4a93930-…`): the public "Start your 14-day Pro trial" button. Its trial runs to 8 Nov 2026.
+- All three are onboarded, in America/Chicago. The credentials are held outside the repository and were never printed.
 
 **What still rests on automated tests, not live evidence:** the webhook lifecycle (subscribing during the trial, the first charge at the trial's end, a failed first charge, cancellation before the first charge, repeated and out-of-order events), and the trial-ending emails. In live mode these are verified only by genuine pilot purchases. No artificial charge, declined real card, refund or accelerated billing is run in live mode (owner, 25 Oct 2026).
 
@@ -1127,6 +1129,37 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
   - **A failed first charge keeps Pro while Stripe retries.** This is the existing `past_due` grace for paying customers, now also covering subscriptions started during a trial. Checkout verifies the card when it is saved; a later decline would allow up to Stripe's retry window of unpaid Pro.
   - **A daily job that fails misses that day's notices.** No migration was added for a delivery ledger. The job's own history shows it running daily, and Stripe's 7-day reminder (owner setting) covers subscribed trials.
   - **Two live subscriptions are still possible in two narrow ways:** two presses in the same instant across a minute boundary in a trial's last 48 hours, or a subscription created from the Stripe dashboard. The webhook then follows the newest one that entitles.
+
+**Release (25 Oct 2026).** Merged with the offer off, verified on production through the billing QA accounts, then switched on by the owner.
+
+- **Deployment evidence.** Production served the new code about 45 seconds after the merge: the account response carries `trial`, and the pricing page has the allowance table and no Teams card.
+- **Presentation and Checkout** (`qa-billing-trial`, trial granted in the database with the app's own statement while the offer was off):
+  - The Plan page reads "Your first charge of $29 is on 8 Nov 2026, then $29 every month until you cancel."
+  - Live Checkout reads "13 days free · Then $29.00 per month starting November 8, 2026", with $0 due today, in USD.
+    - The dates match. Stripe counts whole days to a trial end rounded down to the minute, so it shows 13 where the Plan page shows 14.
+  - A second press reused the same session, and the older session from `main` was expired. The abandoned Checkout left the trial unchanged, and Stripe sent no events.
+- **Expiry keeps data** (`qa-billing-expiry`, a 6-minute trial, no job involved). Twenty seconds after the end:
+  - the account read Free and the Atlas answered 403;
+  - all 8 people stayed active and readable, and none were archived;
+  - editing a person beyond the Free limit worked, and the export held everyone;
+  - a ninth person was refused with the Free-plan message;
+  - the Plan page said "Nothing was charged. Nothing is deleted …".
+- **The public offer, on both domains, after the owner enabled it.**
+  - `atturel.com` redirects to `www.atturel.com`. The pricing page shows the trial terms and FAQ, and "Start your 14-day trial" leads a signed-out visitor to sign-up.
+  - An eligible signed-in account (`qa-billing-start-…`, new, never trialed, no Stripe customer) pressed **Start your 14-day Pro trial** on Settings › Plan:
+    - it got the trial at once, ending 8 Nov 2026;
+    - it made **no request to Stripe**, and created no Stripe customer;
+    - the row reads `free` / `trialing`.
+  - **Gap, fixed in the PR after #26:** the same button took a _signed-in_ visitor to `/sign-up`, which middleware sent to Today, not to the trial. It now asks for Settings › Plan (`next`), which middleware honours for signed-in visitors. The sign-up page's "Sign in" link keeps that destination.
+  - The shared redirect check now also refuses whitespace and control characters. The URL parser drops tabs and newlines, so `/<tab>/evil.com` passed the old check and resolved to `evil.com`. This applies to the sign-in form and the email-link callback too.
+  - A new account still finishes onboarding on Today. The pilot guide sends them to Settings › Plan.
+- **Live Stripe objects created for QA:** one customer (`qa-billing-trial`), one expired Checkout session, and one open session that expires unpaid on 26 Oct. No charge, subscription or refund.
+- **Still resting on automated tests, until genuine pilot purchases:**
+  - a completed live subscription;
+  - the webhook secret matching the live endpoint (the first delivery should show 200);
+  - the first charge, a failed charge, and cancellation through to the end of the period;
+  - repeated and out-of-order live events;
+  - the trial reminder emails, whose first natural run is the daily 13:00 UTC job.
 
 **Rollback. No step resets a trial, a QA account or any customer data:**
 

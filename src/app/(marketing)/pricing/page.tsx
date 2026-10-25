@@ -152,7 +152,9 @@ export default function PricingPage() {
               </ul>
 
               <Button asChild size="lg" className="mt-8 w-full">
-                <Link href="/sign-up">
+                {/* Signed in already, the same button goes straight to the trial
+                    on Settings › Plan (the middleware honours `next`). */}
+                <Link href={trial ? '/sign-up?next=/settings/billing' : '/sign-up'}>
                   {trial ? `Start your ${TRIAL_DAYS}-day trial` : 'Start free, move to Pro later'}
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
