@@ -118,7 +118,10 @@ export function ConversationCard({
               <p className="text-ink-muted mt-0.5 text-xs">
                 With{' '}
                 {formatNames(
-                  c.participants.map((p) => p.name),
+                  // First names only; a no-break space keeps the marker with its name.
+                  c.participants.map((p) =>
+                    p.archived ? `${p.name.split(' ')[0]}\u00a0(archived)` : p.name,
+                  ),
                   3,
                 )}
               </p>

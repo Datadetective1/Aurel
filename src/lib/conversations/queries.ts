@@ -26,6 +26,8 @@ export interface Face {
   id: string
   name: string
   src: string | null
+  /** Removed from the user's people; still shown where they took part, marked as such. */
+  archived?: boolean
 }
 
 export interface ConversationSummary {
@@ -172,7 +174,9 @@ async function hydrateConversations(
   const [{ data: participants }, { data: loops }, { data: decisions }] = await Promise.all([
     supabase
       .from('interaction_participants')
-      .select('interaction_id, people(id, full_name, preferred_name, avatar_url, avatar_path)')
+      .select(
+        'interaction_id, people(id, full_name, preferred_name, avatar_url, avatar_path, archived_at)',
+      )
       .eq('user_id', userId)
       .in('interaction_id', ids),
     supabase
@@ -198,7 +202,12 @@ async function hydrateConversations(
     if (!p) continue
     const list = participantsByConversation.get(row.interaction_id) ?? []
     if (!list.some((f) => f.id === p.id)) {
-      list.push({ id: p.id, name: faceName(p), src: faces.get(p.id) ?? null })
+      list.push({
+        id: p.id,
+        name: faceName(p),
+        src: faces.get(p.id) ?? null,
+        ...(p.archived_at ? { archived: true } : {}),
+      })
     }
     participantsByConversation.set(row.interaction_id, list)
   }
