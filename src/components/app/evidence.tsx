@@ -1,6 +1,7 @@
 import { CircleCheck, CircleHelp, Eye, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/types'
+import { EVIDENCE_WORDS } from '@/lib/evidence-words'
 import { ProvenanceLabel, type Provenance } from './provenance'
 
 type EvidenceLevel = Database['public']['Enums']['evidence_level']
@@ -21,30 +22,10 @@ export const EVIDENCE_META: Record<
   EvidenceLevel,
   { label: string; icon: typeof CircleCheck; tone: string; description: string }
 > = {
-  confirmed: {
-    label: 'Confirmed',
-    icon: CircleCheck,
-    tone: 'text-positive',
-    description: 'They said it, or you confirmed it.',
-  },
-  observed: {
-    label: 'Observed',
-    icon: Eye,
-    tone: 'text-info',
-    description: 'Supported by interactions or sources on record.',
-  },
-  inferred: {
-    label: 'Inferred',
-    icon: CircleHelp,
-    tone: 'text-caution',
-    description: 'A reading of limited evidence. Worth checking.',
-  },
-  unknown: {
-    label: 'Unknown',
-    icon: HelpCircle,
-    tone: 'text-ink-muted',
-    description: 'Not enough information to say.',
-  },
+  confirmed: { ...EVIDENCE_WORDS.confirmed, icon: CircleCheck, tone: 'text-positive' },
+  observed: { ...EVIDENCE_WORDS.observed, icon: Eye, tone: 'text-info' },
+  inferred: { ...EVIDENCE_WORDS.inferred, icon: CircleHelp, tone: 'text-caution' },
+  unknown: { ...EVIDENCE_WORDS.unknown, icon: HelpCircle, tone: 'text-ink-muted' },
 }
 
 export function EvidenceBadge({

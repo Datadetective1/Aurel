@@ -164,7 +164,7 @@ export function assessIdentity(
       status: 'probable',
       confidence,
       signals,
-      explanation: explain(subject, signals),
+      explanation: explainMatch(subject, signals),
     }
   }
 
@@ -173,7 +173,7 @@ export function assessIdentity(
       status: 'ambiguous',
       confidence,
       signals,
-      explanation: `This might be ${subject.fullName}, but there is not enough to be sure. ${explain(subject, signals)}`,
+      explanation: `This might be ${subject.fullName}, but there is not enough to be sure. ${explainMatch(subject, signals)}`,
     }
   }
 
@@ -186,7 +186,7 @@ export function assessIdentity(
 }
 
 /** Turn the fired signals into a sentence a user can evaluate. */
-function explain(subject: IdentitySubject, signals: Record<string, boolean>): string {
+export function explainMatch(subject: IdentitySubject, signals: Record<string, boolean>): string {
   const reasons: string[] = []
   if (signals.userSuppliedUrl) reasons.push('you provided this link')
   if (signals.exactNameInTitle) reasons.push('their name is in the page title')
