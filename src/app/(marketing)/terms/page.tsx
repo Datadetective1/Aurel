@@ -12,8 +12,9 @@ export const metadata: Metadata = {
 /**
  * TERMS
  * =============================================================================
- * A plain-language draft describing the actual arrangement. Not legally
- * reviewed; that is stated at the top and tracked in docs/HUMAN_ACTIONS.md.
+ * A plain-language description of the actual arrangement, in effect from
+ * brand.legal.policiesEffective. Not legally reviewed; that is stated at the
+ * top and tracked in docs/LEGAL_REVIEW_REQUIRED.md.
  * =============================================================================
  */
 export default function TermsPage() {
@@ -22,16 +23,17 @@ export default function TermsPage() {
       <Eyebrow>Terms</Eyebrow>
       <h1 className="font-display text-ink mt-4 text-4xl leading-tight">Terms of service</h1>
       <p className="text-ink-secondary mt-6 leading-relaxed">
-        The arrangement between you and {brand.legalEntity}, in plain language.
+        The arrangement between you and {brand.legalEntity}, who operates {brand.name}, in plain
+        language.
       </p>
 
       {!brand.legal.policiesLegallyReviewed ? (
         <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
           <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="text-ink font-medium">Draft.</strong> These terms describe the
-            intended arrangement but have not been reviewed by a lawyer and are not yet a binding
-            legal document.
+            <strong className="text-ink font-medium">Not yet reviewed by a lawyer.</strong> These
+            terms are in effect and describe the actual arrangement in plain language. They have not
+            been reviewed by a lawyer, and may be revised after that review.
           </span>
         </p>
       ) : null}
@@ -90,11 +92,20 @@ export default function TermsPage() {
           <p>
             Your records remain yours. You grant {brand.legalEntity} only the permission needed to
             operate the service for you — storing, processing and displaying your content back to
-            you. It is not used to train shared models and is not sold or shared.
+            you. We do not use it to train models, it is never sold, and it is shared only with the
+            service providers that run {brand.name}, each named in the Privacy policy with what it
+            keeps.
           </p>
         </Section>
 
         <Section title="Payment">
+          <p>
+            Pro can start with a 14-day trial, once per account, with no card. When the trial ends,
+            the account returns to Free unless you subscribe, and nothing is deleted. If you
+            subscribe during the trial, Settings &rarr; Plan shows the first charge date before you
+            confirm: the day the trial would have ended, or two days after you subscribe if that is
+            later.
+          </p>
           <p>
             Pro is billed monthly, in advance, through our payment processor; we never see or store
             your card number. You can cancel at any time from Settings &rarr; Plan and keep access
@@ -129,12 +140,19 @@ export default function TermsPage() {
             >
               {brand.email.support}
             </a>
+            . Privacy questions:{' '}
+            <a
+              href={`mailto:${brand.email.privacy}`}
+              className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
+            >
+              {brand.email.privacy}
+            </a>
+            .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.legalEntity}
-            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}.
-            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
-            updated {brand.legal.policiesLastUpdated}.
+            {brand.name} is operated by {brand.legalEntity}.
+            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''}{' '}
+            Effective {brand.legal.policiesEffective}.
           </p>
         </Section>
       </div>

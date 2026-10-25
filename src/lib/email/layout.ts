@@ -155,7 +155,7 @@ export function renderEmail({ preheader, body, footerNote, unsubscribeUrl }: Ema
                 : ''
             }
             <p style="margin:0 0 6px;font-family:${fonts.body};font-size:12px;line-height:1.6;color:${palette.inkFaint};">
-              ${escapeHtml(brand.legalEntity)} · <a href="${escapeHtml(absoluteUrl('/privacy'))}" style="color:${palette.inkMuted};text-decoration:underline;">Privacy</a> · <a href="${escapeHtml(absoluteUrl('/terms'))}" style="color:${palette.inkMuted};text-decoration:underline;">Terms</a>
+              ${escapeHtml(`${brand.name}, operated by ${brand.legalEntity}`)} · <a href="${escapeHtml(absoluteUrl('/privacy'))}" style="color:${palette.inkMuted};text-decoration:underline;">Privacy</a> · <a href="${escapeHtml(absoluteUrl('/terms'))}" style="color:${palette.inkMuted};text-decoration:underline;">Terms</a>
             </p>
             ${
               unsubscribeUrl

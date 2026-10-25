@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { CircleAlert } from 'lucide-react'
 import { Container, Eyebrow } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
+import { providerConfigured } from '@/lib/calendar/provider'
+import { features } from '@/lib/env'
 
 export const metadata: Metadata = {
   title: 'Privacy',
@@ -36,9 +38,10 @@ export default function PrivacyPage() {
         <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
           <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="text-ink font-medium">Draft.</strong> This describes the
-            product&rsquo;s actual behavior accurately, but it has not yet been reviewed by a lawyer
-            and is not a final legal document.
+            <strong className="text-ink font-medium">Not yet reviewed by a lawyer.</strong> This
+            policy is in effect and describes what the product actually does. It has not been
+            reviewed by a lawyer, and may be revised after that review as described under Changes to
+            this policy.
           </span>
         </p>
       ) : null}
@@ -117,9 +120,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             When a language model is used, only the specific, bounded context needed for that task
-            is sent — not your whole record. Your content is not used to train a shared model, and
-            product analytics deliberately record only counts and enum values, never names, notes or
-            message bodies.
+            is sent — not your whole record. Neither we nor OpenAI use your content to train models;
+            the search terms sent to Exa for public research are handled under Exa&rsquo;s terms,
+            described under How long it is kept. Product analytics deliberately record only counts
+            and enum values, never names, notes or message bodies.
           </p>
         </Section>
 
@@ -169,26 +173,33 @@ export default function PrivacyPage() {
 
         <Section title="Voice recordings">
           <p>
-            When you record a conversation or a voice note, the audio is sent through {brand.name}{' '}
-            to OpenAI&rsquo;s speech-to-text service to be turned into words. {brand.name} does not
-            keep the audio: it passes through our servers for the length of that request and is
-            never written to your record or our database. If a long recording is uploaded in parts,
-            each part waits in private, temporary storage that only {brand.name}&rsquo;s servers can
-            read, is deleted as soon as it has been transcribed, and anything left behind is removed
-            within about a day. On your iPhone, a recording stays in the app&rsquo;s private storage
-            until the conversation is kept or you discard it.
+            <strong className="text-ink font-medium">On your device.</strong> In the iPhone app, a
+            recording is saved as it is made, in the app&rsquo;s private storage on your phone, so
+            closing the app does not lose it. It stays there until the conversation has been kept,
+            or until you discard it, and is then deleted. While it is there, it can be part of your
+            phone&rsquo;s own backup. On the website, a recording is held in your browser tab until
+            it is sent; it is saved on your computer only if you choose to download it after a send
+            fails.
           </p>
           <p>
-            OpenAI handles the audio under its own published API data policy. That policy currently
-            states that audio sent for transcription is not used to train its models and is not
-            retained after it has been transcribed. That is OpenAI&rsquo;s commitment rather than
-            something {brand.name} can verify on its own systems; we rely on the published policy.
+            <strong className="text-ink font-medium">On {brand.name}&rsquo;s servers.</strong> To
+            turn speech into words, the audio is sent through our servers to our speech-to-text
+            provider. It passes through for the length of that request and is never written to your
+            record or our database.{' '}
+            {features.captureStorage
+              ? `If a long recording is uploaded in parts, each part waits in private, temporary storage that only ${brand.name}’s servers can read, is deleted as soon as it has been transcribed, and anything left behind is removed within about a day.`
+              : 'A long recording is sent in parts, and each part is transcribed as it arrives; no part is stored.'}{' '}
+            What is kept is the text, which you review and can edit or delete.
           </p>
           <p>
-            What you keep is the text, which you review and can edit or delete. To find what was
-            promised and decided, that text is sent to OpenAI&rsquo;s language model. Under the same
-            published policy it is not used to train OpenAI&rsquo;s models, and OpenAI may keep it
-            for up to 30 days to monitor for abuse.
+            <strong className="text-ink font-medium">At our service provider.</strong> The audio
+            goes to OpenAI&rsquo;s speech-to-text service. OpenAI&rsquo;s published API data policy
+            currently states that audio sent for transcription is not used to train its models and
+            is not retained once transcribed. To find what was promised and decided, the text is
+            then sent to OpenAI&rsquo;s language model. It is not used to train OpenAI&rsquo;s
+            models, and OpenAI may keep it for up to 30 days: for abuse monitoring, and because our
+            requests store the model&rsquo;s response for that period. These are OpenAI&rsquo;s
+            commitments, which we rely on but cannot verify on our own systems.
           </p>
           <p>
             Before recording other people, you confirm they know. Recording happens only while the
@@ -204,9 +215,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             If you delete your account, a minimal billing record is kept so a billing question can
-            still be answered: that an account was deleted, when, which plan it was on, and what was
-            done to stop its billing. It contains none of your relationship record. Stripe keeps its
-            own records of past payments, as payment processors are required to.
+            still be answered: that an account was deleted, when, which plan it was on, the
+            reference to its Stripe customer record, and what was done to stop its billing. It
+            contains none of your relationship record. Stripe keeps its own records of past
+            payments, as payment processors are required to.
           </p>
         </Section>
 
@@ -224,14 +236,23 @@ export default function PrivacyPage() {
               what is sent.
             </li>
             <li className="list-disc">
-              Exa — finding public professional material when you research someone
+              Exa — finding public professional material when you research someone. It receives the
+              person&rsquo;s name and, where known, their organization and job title.
             </li>
             <li className="list-disc">Resend — sending account and product email</li>
             <li className="list-disc">Stripe — payments</li>
             <li className="list-disc">
               Google and Microsoft — reading your calendar, only if you connect one
+              {providerConfigured('google')
+                ? `. ${brand.name}’s use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.`
+                : ''}
             </li>
           </ul>
+          <p>
+            Each provider receives only what its job needs, and keeps and uses it under its own
+            terms, which are not the same as this policy. What each keeps, and for how long, is set
+            out under How long it is kept.
+          </p>
         </Section>
 
         <Section title="Your control">
@@ -256,6 +277,76 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="How long it is kept">
+          <p>
+            Your record is kept for as long as your account exists, including on Free after a paid
+            plan ends, until you delete it.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">Deleting is permanent.</strong> Whatever you
+            delete, from a single note to your whole account, is removed from our live database
+            straight away, and photos are removed from our file storage. Removing someone from your
+            people is different: it archives them, which hides them but keeps their record so you
+            can restore it, and merging two records archives one of them the same way. Deleting an
+            archived person is permanent: it removes them and everything only about them, while
+            shared items such as meetings, conversations and commitments stay, no longer linked to
+            them. The confirmation screen lists what will go and what will stay.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">Database backups.</strong> Our database
+            provider, Supabase, makes automatic daily backups of our database. On our plan they
+            cover the last 7 days, so something you delete remains in Supabase&rsquo;s automatic
+            database backups until they age out, within 7 days.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">
+              What we keep after you delete your account.
+            </strong>{' '}
+            The minimal billing record described under Payments; the log of billing notifications
+            Stripe sent us about your plan, if you subscribed (their type, time and processing
+            status, with your former account&rsquo;s ID); and, if you ever changed your password,
+            when you did, with a one-way hash of the network address it came from, no longer linked
+            to you. None of these contains your relationship record, and they have no set end date.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">At our service providers.</strong> Each keeps
+            data under its own terms, separately from the backups above:
+          </p>
+          <ul className="grid gap-2 pl-5">
+            <li className="list-disc">
+              OpenAI may keep text sent to its language model for up to 30 days, and its published
+              policy states that it does not keep audio once transcribed (see Voice recordings).
+            </li>
+            <li className="list-disc">
+              Resend keeps a copy of each email we send you, including its content, for 30 days.
+              Some emails, such as meeting reminders and follow-through summaries, include names and
+              commitments from your record.
+            </li>
+            <li className="list-disc">
+              Exa&rsquo;s terms let it store and use the search terms we send it to provide, develop
+              and improve its services, with no set end date.
+            </li>
+            <li className="list-disc">
+              Supabase keeps logs of requests to our database and sign-in service, including network
+              addresses, for 7 days.
+            </li>
+            <li className="list-disc">
+              Vercel, which hosts the application, keeps request logs (such as the page requested,
+              the time and the browser type) for up to 30 days, depending on plan.
+            </li>
+            <li className="list-disc">
+              Stripe keeps its own payment records, as described under Payments.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="Changes to this policy">
+          <p>
+            When this policy changes, the date below changes. If a change is material, we tell
+            account holders by email before it takes effect.
+          </p>
+        </Section>
+
         <Section title="Contact">
           <p>
             Privacy questions:{' '}
@@ -275,9 +366,8 @@ export default function PrivacyPage() {
             .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.legalEntity}
-            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}. Last updated{' '}
-            {brand.legal.policiesLastUpdated}.
+            {brand.name} is operated by {brand.legalEntity}. Effective{' '}
+            {brand.legal.policiesEffective}.
           </p>
         </Section>
       </div>

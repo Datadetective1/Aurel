@@ -41,8 +41,13 @@ export const brand = {
   name: 'Atturel',
   /** Lowercase machine-safe slug (cookies, analytics prefixes, storage keys). */
   slug: 'atturel',
-  /** Registered company name used in legal copy and email footers. */
-  legalEntity: 'Atturel Labs',
+  /**
+   * The operator: the person or company that provides the service and is the
+   * other party to the Terms. Today an individual operating Atturel (owner,
+   * 25 Oct 2026); a company has not been formed yet. Change it only once a
+   * registration is actually complete.
+   */
+  legalEntity: 'Amary Biton Coulibaly',
   /** Primary marketing domain, display form (no protocol). */
   domain: 'atturel.com',
 
@@ -90,13 +95,17 @@ export const brand = {
 
   legal: {
     /**
-     * Not yet supplied. While null, the legal pages omit the line rather than
-     * printing a placeholder. Set both to the real values; never guess them.
+     * Governing law and venue for the Terms. Optional; while null the Terms
+     * omit the line. Never guess it. (No postal address is published: none is
+     * required for the current pages, and contact is by the email addresses
+     * above -- see docs/LEGAL_REVIEW_REQUIRED.md, item 3.)
      */
-    entityAddress: null as string | null,
     jurisdiction: null as string | null,
-    /** Year the policies were last reviewed by a human. */
-    policiesLastUpdated: '2026-08-24',
+    /**
+     * The day the current Terms and Privacy took effect: the day they were
+     * published. Change it with any change to either page.
+     */
+    policiesEffective: '26 October 2026',
     /** Set true only after a lawyer has reviewed Terms + Privacy. */
     policiesLegallyReviewed: false,
   },
