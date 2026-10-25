@@ -235,8 +235,11 @@ export default async function CapabilitiesSettingsPage() {
             env: closestProvider?.missingEnv ?? [],
             nearMatches: closestProvider?.nearMatches ?? [],
           },
-      // Rendered under the card: per-provider connect, sync and disconnect.
-      calendarConnections: anyCalendarConfigured ? connections : undefined,
+      // Rendered under the card: per-provider connect, sync and disconnect. A
+      // saved connection is listed even if no provider is configured any more,
+      // so it can still be disconnected (finding 8.6).
+      calendarConnections:
+        anyCalendarConfigured || calendarCard === 'attention' ? connections : undefined,
     },
     {
       id: 'conversations',

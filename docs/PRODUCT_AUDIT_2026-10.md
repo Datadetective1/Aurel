@@ -366,7 +366,7 @@ _Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. N
     - Sync now, which reads "Try again" after a failure.
     - Reconnect only for an expired or revoked grant, or one waiting on administrator approval.
     - Disconnect in every saved state, including a plan that no longer includes calendars. Before, a connection that needed attention could not be disconnected without reconnecting it first.
-    - A saved connection that is not working is shown to every account, in its own "Needs attention" section at the top of Settings › Capabilities. Before, customer accounts (every account but the owner's) saw the Calendar card only while a connection was fully connected. So a failed or expired connection disappeared from their Settings, with no way there to retry, reconnect or disconnect it.
+    - A saved connection that is not working is shown to every account, in its own "Needs attention" section at the top of Settings › Capabilities. Before, customer accounts (every account but the owner's) saw the Calendar card only while a connection was fully connected. So a failed or expired connection disappeared from their Settings, with no way there to retry, reconnect or disconnect it. It stays listed, with Disconnect, even on a deployment that no longer configures any calendar provider.
   - **iPhone:**
     - Sync now or Try again, through `POST /api/mobile/calendar/:provider/sync`, which runs the website's own action.
     - "Reconnect at atturel.com" opens the website. Reconnect and Disconnect stay on the website.
@@ -388,7 +388,7 @@ _Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. N
   - Tokens never leave the server. The iPhone's answers are built from four columns (provider, status, account email, last sync). Tests confirm no token appears even when the row returned holds one.
   - Logs carry the HTTP status and the OAuth error code only.
 - **Tests:**
-  - **Web: 1255/1255.** The new tests cover freshness and time zones, provider refresh failures, sync and Sync now (including simultaneous presses), the iPhone routes, and the Settings component.
+  - **Web: 1260/1260.** The new tests cover freshness and time zones, provider refresh failures, sync and Sync now (including simultaneous presses), the iPhone routes, the Settings component, and the Settings page as a customer sees it (failed, expired, and with no provider configured).
   - **iPhone: 108/108**, 11 of them new.
   - Typechecks are clean on both. ESLint reports 0 errors. Prettier is clean on the changed web files.
 - **Checked on the Vercel preview (25 Oct), signed in as QA account B, which has no calendar.** QA B's lack of a connection was confirmed read-only first, so nothing could sync.
