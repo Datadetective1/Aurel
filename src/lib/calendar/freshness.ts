@@ -125,6 +125,21 @@ export function calendarActions(state: CalendarState, saved: boolean): CalendarA
   }
 }
 
+/**
+ * The Calendar card's own state in Settings. A saved connection that is not
+ * working is the user's to fix, so it reads as needing attention and stays on
+ * screen with its Try again, Reconnect and Disconnect -- never hidden as a
+ * deployment setting that is "not set up" (finding 8.6).
+ */
+export function calendarCardState(input: {
+  configured: boolean
+  connections: { saved: boolean; status: CalendarState }[]
+}): 'connected' | 'attention' | 'setup' | 'unavailable' {
+  if (input.connections.some((c) => c.status === 'connected')) return 'connected'
+  if (input.connections.some((c) => c.saved)) return 'attention'
+  return input.configured ? 'setup' : 'unavailable'
+}
+
 type Parts = Record<'year' | 'month' | 'day' | 'hour' | 'minute' | 'dayPeriod', string>
 
 function partsIn(date: Date, timeZone: string): Parts {

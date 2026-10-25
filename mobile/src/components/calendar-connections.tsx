@@ -37,7 +37,7 @@ export function CalendarConnections({
   return (
     <Section label="Calendar" icon="calendar">
       {connections.length === 0 ? (
-        <T variant="small" tone="secondary">No calendar connected. Connect one from Settings › Capabilities at atturel.com, read-only.</T>
+        <T variant="small" tone="secondary">No calendar connected. Connect one at atturel.com, read-only.</T>
       ) : (
         <View style={{ gap: 16 }}>
           {connections.map((c) => (

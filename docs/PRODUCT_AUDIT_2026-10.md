@@ -366,6 +366,7 @@ _Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. N
     - Sync now, which reads "Try again" after a failure.
     - Reconnect only for an expired or revoked grant, or one waiting on administrator approval.
     - Disconnect in every saved state, including a plan that no longer includes calendars. Before, a connection that needed attention could not be disconnected without reconnecting it first.
+    - A saved connection that is not working is shown to every account, in its own "Needs attention" section at the top of Settings › Capabilities. Before, customer accounts (every account but the owner's) saw the Calendar card only while a connection was fully connected. So a failed or expired connection disappeared from their Settings, with no way there to retry, reconnect or disconnect it.
   - **iPhone:**
     - Sync now or Try again, through `POST /api/mobile/calendar/:provider/sync`, which runs the website's own action.
     - "Reconnect at atturel.com" opens the website. Reconnect and Disconnect stay on the website.
@@ -387,9 +388,16 @@ _Implemented 25 Oct 2026 on branch `calendar-sync-freshness`, in draft PR #25. N
   - Tokens never leave the server. The iPhone's answers are built from four columns (provider, status, account email, last sync). Tests confirm no token appears even when the row returned holds one.
   - Logs carry the HTTP status and the OAuth error code only.
 - **Tests:**
-  - **Web: 1248/1248.** The new tests cover freshness and time zones, provider refresh failures, sync and Sync now (including simultaneous presses), the iPhone routes, and the Settings component.
+  - **Web: 1255/1255.** The new tests cover freshness and time zones, provider refresh failures, sync and Sync now (including simultaneous presses), the iPhone routes, and the Settings component.
   - **iPhone: 108/108**, 11 of them new.
   - Typechecks are clean on both. ESLint reports 0 errors. Prettier is clean on the changed web files.
+- **Checked on the Vercel preview (25 Oct), signed in as QA account B, which has no calendar.** QA B's lack of a connection was confirmed read-only first, so nothing could sync.
+  - **API, 8/8:**
+    - Sync without a sign-in token is 401, and the route has no GET.
+    - Account returns the calendar block with the Settings link, no connections, and no token fields.
+    - An unknown provider is 404, and a press with no connection is 404 before anything runs.
+  - **Settings › Capabilities** renders with no console errors. As designed, a customer with no connection sees no Calendar card.
+- **Seen, not fixed here (pre-existing):** a customer can connect a calendar only from Today's first-run panel or the empty Meetings page, never from Settings. Once both are past, there is nowhere obvious to connect one.
 - **Not verified (each needs the owner's approval):**
   - **No sync was run on any production account.** Whether the owner's Microsoft refresh token still works is unknown. Microsoft retires an unused one after about 90 days, so around 26 Nov 2026. A manual Sync now before then would confirm it and keep it alive; that is the owner's call.
   - **Real Microsoft and Google failure responses** have only been exercised against stubs.

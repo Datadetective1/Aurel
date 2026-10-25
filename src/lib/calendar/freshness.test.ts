@@ -3,6 +3,7 @@ import {
   CALENDAR_STATE,
   STALE_AFTER_MS,
   calendarActions,
+  calendarCardState,
   calendarFreshness,
   calendarState,
   formatSyncTime,
@@ -149,5 +150,31 @@ describe('what each saved connection offers', () => {
       reconnect: false,
       disconnect: false,
     })
+  })
+})
+
+describe('the Calendar card in Settings', () => {
+  const card = (connections: { saved: boolean; status: CalendarState }[], configured = true) =>
+    calendarCardState({ configured, connections })
+
+  it('a working connection is connected, even with another that is not', () => {
+    expect(
+      card([
+        { saved: true, status: 'connected' },
+        { saved: true, status: 'expired' },
+      ]),
+    ).toBe('connected')
+  })
+
+  it.each(['error', 'expired', 'revoked', 'admin_consent_required', 'plan_required'] as const)(
+    'a saved %s connection needs attention, so it stays on screen to retry or disconnect',
+    (status) => {
+      expect(card([{ saved: true, status }])).toBe('attention')
+    },
+  )
+
+  it('nothing saved is a deployment that is set up, or not', () => {
+    expect(card([{ saved: false, status: 'not_connected' }])).toBe('setup')
+    expect(card([], false)).toBe('unavailable')
   })
 })
