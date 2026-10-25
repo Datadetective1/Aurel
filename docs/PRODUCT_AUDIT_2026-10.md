@@ -31,7 +31,7 @@ _Updated 25 October 2026._
 - **iOS People search and public research: built, in draft PR #21, awaiting the owner's review** (§5, "iOS People search and public research"). Not merged, no build. It holds every page research finds until the owner says it is them.
   - On the simulator, search and adding a profile link passed. The research steps were not run: the Expo account's free simulator minutes are used up until 1 Nov 2026 (§5, "Simulator results").
 - **Open pull requests:**
-  - **PR #20 is doc-only:** this audit, with no code. It goes first.
+  - **PR #20 (doc-only) was merged on 25 Oct 2026** (`df4d3e3`), with the Phase 4 photo decision (§4, item 6).
   - **PR #21** (iOS search and research) is stacked on it, and so is the website follow-up for 5.7 and 5.8.
 - Owner decisions on discovery, removal, billing, notifications, privacy and photos are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.** A reproducible case and the acceptance test are in §2, "Finding 8.7".
@@ -708,6 +708,20 @@ Preview results (25 Oct 2026, PR #21 preview, production database, QA accounts A
   - The simulator session ended.
   - The Expo account's free simulator minutes are used up until 1 Nov 2026. A paid Expo plan needs the owner's approval.
   - QA account A's last research credit was not spent. Grace Hopper stays active, with her profile link, for when it resumes.
+- **Remaining simulator checks, after 1 Nov 2026.** Run them when the Expo simulator minutes and QA account A's research credits reset; both reset on 1 Nov.
+  1. **Build.** Run one EAS simulator build of PR #21's current head, pointed at its preview the same way (the QA branch `qa/pr21-simulator`).
+  2. **Open the research screen.** Sign in as QA account A. On Grace Hopper, open "Research public footprint" and check that opening it searches nothing (no research job).
+  3. **Run research once.** This uses one research credit. Expected:
+     - the page waits, as "Looks like them";
+     - it shows why it matched and the facts it would add, each labelled;
+     - the database shows 0 facts and the link `unreviewed` with the facts held.
+  4. **While it waits:** Ask about Grace and prepare a brief with her. Neither uses the page or its facts. The brief uses one of A's briefs.
+  5. **"This is them":** the facts are saved, and the web page shows them.
+  6. **"Not them":** the facts are withdrawn, and the screen says "Marked as someone else".
+     - Ask and a later brief must no longer use the page. On PR #21 alone, a confirmed-then-rejected page is still cited; PR #22 fixes that and passed this on its preview.
+     - If PR #22 is merged first, run this step on PR #21 with PR #22 merged in.
+  7. **Search again** (a second research credit). Check the rejected page is not offered again. Otherwise this rests on the unit tests and the stored state.
+  8. **Clean up:** archive Grace Hopper (reversible). Do not delete anything.
 - **Already covered elsewhere:**
   - The same flow passed through the routes the app calls (the Ada test above).
   - The research screen has jest tests.
