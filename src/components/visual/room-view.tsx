@@ -42,6 +42,8 @@ function placement(index: number, count: number) {
 }
 
 function personFact(person: VisualPerson, timeZone: string, now: Date): React.ReactNode {
+  // Their "Archived" chip says it all; there is no relationship to summarise.
+  if (person.archived) return null
   if (person.owe > 0) {
     const Icon = DIRECTION_ICON.owe
     return (

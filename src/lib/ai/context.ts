@@ -487,13 +487,17 @@ export async function getMeetingContext(
 
   if (!meeting) return null
 
-  const { data: attendees } = await supabase
+  const { data: rows } = await supabase
     .from('meeting_attendees')
-    .select('person_id, role')
+    .select('person_id, role, people(archived_at)')
     .eq('user_id', userId)
     .eq('meeting_id', meetingId)
 
-  const personIds = (attendees ?? []).map((a) => a.person_id)
+  // Someone the user removed is not a participant of anything new: the brief
+  // does not prepare for them and the debrief records nothing about them.
+  // They stay on the meeting itself, marked archived. Restoring brings them back.
+  const attendees = (rows ?? []).filter((a) => a.people && !a.people.archived_at)
+  const personIds = attendees.map((a) => a.person_id)
   const people = await getPeopleContext(supabase, userId, personIds)
 
   const participants: PersonContext[] = []

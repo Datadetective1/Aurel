@@ -26,6 +26,8 @@ export interface RoomPerson {
   company?: string | null
   /** "Decision maker", "Your manager" -- whatever places them. */
   context?: string | null
+  /** Removed from the user's people; `context` then reads "Archived". */
+  archived?: boolean
 }
 
 const ROLE_LABEL: Record<string, string> = {

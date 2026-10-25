@@ -154,7 +154,9 @@ export async function getCommitments(supabase: Client, userId: string) {
 export async function getUpcomingMeetings(supabase: Client, userId: string, limit = 8) {
   const { data } = await supabase
     .from('meetings')
-    .select('id, title, scheduled_at, objective, importance, meeting_attendees(person_id)')
+    .select(
+      'id, title, scheduled_at, objective, importance, meeting_attendees(person_id, people(archived_at))',
+    )
     .eq('user_id', userId)
     .eq('status', 'upcoming')
     .order('scheduled_at', { ascending: true, nullsFirst: false })
@@ -167,7 +169,10 @@ export async function getUpcomingMeetings(supabase: Client, userId: string, limi
       scheduledAt: m.scheduled_at,
       objective: m.objective,
       importance: m.importance,
-      personIds: (m.meeting_attendees ?? []).map((a) => a.person_id),
+      // Someone the user removed is not someone to prepare for.
+      personIds: (m.meeting_attendees ?? [])
+        .filter((a) => a.people && !a.people.archived_at)
+        .map((a) => a.person_id),
     })),
     citations: (data ?? []).map((m) => ({
       label: `Upcoming: ${m.title}`,

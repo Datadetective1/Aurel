@@ -176,7 +176,9 @@ export function ConversationDetailView({
                     </span>
                     {p.company || p.context ? (
                       <span className="text-ink-muted block text-xs leading-tight">
-                        {p.company ?? p.context}
+                        {p.archived
+                          ? [p.company, 'Archived'].filter(Boolean).join(' · ')
+                          : (p.company ?? p.context)}
                       </span>
                     ) : null}
                   </span>
