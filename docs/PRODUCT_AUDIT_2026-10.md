@@ -301,6 +301,30 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 - Cap any decision whose excerpt lacks settling words below 0.7, on both paths.
 - Label such an item "Proposed, not decided".
 
+**Fix in review (25 Oct 2026, draft PR, not merged, not deployed).**
+
+- **One reading of the words** (`src/lib/conversations/decisions.ts`), used on both extraction paths and again whenever Review shows a decision:
+  - **decided:** settling words ("decided", "agreed to", "we're going with", "it's settled") with nothing hedging them. "As Ravi recommended" after "we decided" is history, not a hedge.
+  - **proposed:** a suggestion, recommendation, proposal, preference, hypothetical, condition, hedge, open question or unsettled outcome ("we haven't decided"). When the words carry both, proposed wins.
+  - **unmarked:** neither. It keeps the confidence it was read with, as before.
+- **Extraction:**
+  - The fallback composer gives a proposal 0.5 and never makes one the conversation's outcome.
+  - Both paths cap a proposal at 0.5 before it is written, whatever confidence it arrived with. It stays above the 0.4 floor, so it is still offered.
+  - The model's instruction now says a proposal is not a decision, with the audit's examples (prompt `conversation@2.1.0`).
+- **Review:**
+  - On the web and the iPhone, a proposal says "Proposed, not decided", never "Likely", and starts unticked. The user can still keep it.
+  - The reading is done again at display time, so proposals written before the fix (at the old composer's 0.7) also start unticked.
+  - The iPhone route adds `proposed` and computes `likely` the same way, so TestFlight 0.1.0 (4) also leaves them unticked.
+- **Tests:**
+  - The test conversation, typed and as a transcript, through the composer.
+  - A simulated model answer that calls every variant a 0.9 decision.
+  - The phone's review route and the web's review action, end to end: keeping the defaults confirms only (A).
+  - The web Review component, and the iPhone Review screen.
+- **Still to do:**
+  - The live model check (five runs of the test conversation). It needs a deployment with the AI key and the owner's approval.
+  - The device check on the next TestFlight build.
+  - Editing and re-filing decisions on the iPhone (8.2), kept out of this PR.
+
 ### iOS quality
 
 | #   | Finding                                                                                                                                                                                                         | Status      | Sev |

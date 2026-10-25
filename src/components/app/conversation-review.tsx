@@ -17,7 +17,12 @@ import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/field'
 import { Badge, Eyebrow } from '@/components/ui/primitives'
-import { confidenceLabel, LOOP_PRESELECT_THRESHOLD } from '@/lib/conversations/loops'
+import {
+  confidenceLabel,
+  decisionPreselected,
+  LOOP_PRESELECT_THRESHOLD,
+} from '@/lib/conversations/loops'
+import { isProposedDecision, PROPOSED_LABEL } from '@/lib/conversations/decisions'
 import type { DecisionRecord, Face, LoopRecord } from '@/lib/conversations/queries'
 import { cn } from '@/lib/utils'
 
@@ -101,7 +106,13 @@ export function ConversationReview({
       {decisions.length > 0 ? (
         <ReviewGroup
           icon={<Scale className="text-accent size-3.5" aria-hidden="true" />}
-          title={decisions.length === 1 ? 'A decision' : `${decisions.length} decisions`}
+          title={
+            decisions.some(isProposedDecision)
+              ? 'Decisions and proposals'
+              : decisions.length === 1
+                ? 'A decision'
+                : `${decisions.length} decisions`
+          }
         >
           {decisions.map((decision) => (
             <DecisionProposal key={decision.id} decision={decision} />
@@ -257,9 +268,11 @@ function LoopProposal({ loop, participants }: { loop: LoopRecord; participants: 
 }
 
 function DecisionProposal({ decision }: { decision: DecisionRecord }) {
-  const preselected = (decision.confidence ?? 0) >= LOOP_PRESELECT_THRESHOLD
-  const [keep, setKeep] = React.useState(preselected)
-  const label = confidenceLabel(decision.confidence)
+  // Something only proposed never starts ticked and never wears "Likely": it
+  // says what it is (finding 8.7). The user can still keep it.
+  const proposed = isProposedDecision(decision)
+  const [keep, setKeep] = React.useState(decisionPreselected(decision))
+  const label = proposed ? null : confidenceLabel(decision.confidence)
   const id = `decision-${decision.id}`
 
   return (
@@ -287,10 +300,11 @@ function DecisionProposal({ decision }: { decision: DecisionRecord }) {
             name={`decision:${decision.id}:description`}
             defaultValue={decision.description}
             maxLength={500}
-            aria-label="What was decided"
+            aria-label={proposed ? 'What was proposed' : 'What was decided'}
             className="text-sm"
           />
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {proposed ? <Badge tone="caution">{PROPOSED_LABEL}</Badge> : null}
             {label ? (
               <Badge tone={label === 'Likely' ? 'positive' : 'caution'}>{label}</Badge>
             ) : null}

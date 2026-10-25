@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import type { ReviewResponse, ReviewResult } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_META } from '@atturel/web/lib/visual/relationship-actions'
+import { PROPOSED_LABEL } from '@atturel/web/lib/conversations/decisions'
 import { api, ApiError, useApi } from '~/lib/api'
 import { Button } from '~/components/button'
 import { DIRECTION_ICON } from '~/components/chip'
@@ -33,7 +34,8 @@ export default function Review() {
 
   React.useEffect(() => {
     if (data && keep === null) {
-      setKeep(new Set([...data.loops.filter((l) => l.likely).map((l) => l.id), ...data.decisions.filter((d) => d.likely).map((d) => d.id)]))
+      // Something only proposed never starts ticked, whatever else the server says.
+      setKeep(new Set([...data.loops.filter((l) => l.likely).map((l) => l.id), ...data.decisions.filter((d) => d.likely && !d.proposed).map((d) => d.id)]))
     }
   }, [data, keep])
 
@@ -58,9 +60,12 @@ export default function Review() {
 
   const commitments = data.loops.filter((l) => l.kind !== 'question')
   const questions = data.loops.filter((l) => l.kind === 'question')
+  const decided = data.decisions.filter((d) => !d.proposed)
+  const proposals = data.decisions.filter((d) => d.proposed)
   const summary = [
     commitments.length ? `${commitments.length} ${commitments.length === 1 ? 'commitment' : 'commitments'}` : null,
-    data.decisions.length ? `${data.decisions.length} ${data.decisions.length === 1 ? 'decision' : 'decisions'}` : null,
+    decided.length ? `${decided.length} ${decided.length === 1 ? 'decision' : 'decisions'}` : null,
+    proposals.length ? `${proposals.length} ${proposals.length === 1 ? 'proposal' : 'proposals'}` : null,
     questions.length ? `${questions.length} open ${questions.length === 1 ? 'question' : 'questions'}` : null,
     data.memoryProposals ? `${data.memoryProposals} possible ${data.memoryProposals === 1 ? 'memory' : 'memories'}` : null,
   ].filter(Boolean)
@@ -133,9 +138,9 @@ export default function Review() {
       ) : null}
 
       {data.decisions.length > 0 ? (
-        <Section label="Decisions" icon="git-commit">
+        <Section label={proposals.length ? 'Decisions and proposals' : 'Decisions'} icon="git-commit">
           {data.decisions.map((d) => (
-            <ReviewItem key={d.id} checked={selected.has(d.id)} onToggle={() => toggle(d.id)} icon="git-commit" title={d.description} excerpt={d.excerpt} />
+            <ReviewItem key={d.id} checked={selected.has(d.id)} onToggle={() => toggle(d.id)} icon="git-commit" title={d.description} flag={d.proposed ? PROPOSED_LABEL : undefined} excerpt={d.excerpt} />
           ))}
         </Section>
       ) : null}
@@ -169,6 +174,7 @@ function ReviewItem({
   onToggle,
   icon,
   title,
+  flag,
   meta,
   excerpt,
 }: {
@@ -176,6 +182,8 @@ function ReviewItem({
   onToggle: () => void
   icon: React.ComponentProps<typeof Feather>['name']
   title: string
+  /** Says what the item is when it is not what its section implies. */
+  flag?: string
   meta?: string
   excerpt?: string | null
 }) {
@@ -184,7 +192,7 @@ function ReviewItem({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
-      accessibilityLabel={`${title}${meta ? `, ${meta}` : ''}`}
+      accessibilityLabel={[title, flag, meta].filter(Boolean).join(', ')}
       onPress={onToggle}
       style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, minHeight: 56 }}
     >
@@ -194,6 +202,7 @@ function ReviewItem({
           <Feather name={icon} size={14} color={c.inkMuted} style={{ marginTop: 3 }} />
           <T variant="small" style={{ flex: 1 }}>{title}</T>
         </View>
+        {flag ? <T variant="meta" tone="caution" style={{ marginTop: 3 }}>{flag}</T> : null}
         {meta ? <T variant="meta" tone="muted" style={{ marginTop: 3 }}>{meta}</T> : null}
         {excerpt ? (
           <View style={{ marginTop: 6, borderLeftWidth: 2, borderLeftColor: c.line, paddingLeft: 8 }}>

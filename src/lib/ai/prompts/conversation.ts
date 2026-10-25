@@ -4,6 +4,7 @@ import { BRAND_VOICE, dateBlock, renderPerson, renderUser, styleBlock } from './
 import { attribute, extractDate, memoryProposalSchema, splitSentences } from './debrief'
 import { fenceUntrusted, UNTRUSTED_CONTENT_RULES } from '../untrusted'
 import { LOOP_PRESELECT_THRESHOLD, LOOP_PROPOSAL_FLOOR } from '@/lib/conversations/loops'
+import { PROPOSED_CONFIDENCE_CAP, readDecision } from '@/lib/conversations/decisions'
 import { isSelfLabel } from '@/lib/conversations/speakers'
 
 /**
@@ -255,12 +256,18 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
     if (CUES.decision.test(text) && !CUES.tentative.test(text) && !endsAsQuestion) {
       if (decisions.length < 8) {
         const who = isKnown(s.speaker) ? s.speaker : attribute(text, participants)
+        const description = clean(text)
+        const excerpt = clean(s.raw).slice(0, 600)
+        // "I'd suggest going with vendor B" carries a decision cue and settles
+        // nothing (finding 8.7). It is offered for review as a proposal, below
+        // pre-selection, rather than as a decision.
+        const proposed = readDecision({ description, excerpt }) === 'proposed'
         decisions.push({
-          description: clean(text),
+          description,
           context: null,
           personIds: who ? [who.id] : [],
-          confidence: 0.7,
-          excerpt: clean(s.raw).slice(0, 600),
+          confidence: proposed ? PROPOSED_CONFIDENCE_CAP : 0.7,
+          excerpt,
         })
       }
       continue
@@ -397,8 +404,9 @@ function composeConversation(input: ConversationInput): ConversationAnalysis {
 
   return {
     summary,
+    // The upshot is something settled; a proposal is never the outcome.
     outcome:
-      decisions[0]?.description ??
+      decisions.find((d) => readDecision(d) !== 'proposed')?.description ??
       (input.priorObjective
         ? `No explicit outcome recorded against the objective: ${input.priorObjective}`
         : 'No explicit outcome recorded.'),
@@ -458,7 +466,7 @@ const SOURCE_LABEL: Record<ConversationInput['conversation']['sourceKind'], stri
 export const conversationPrompt: PromptModule<ConversationInput, ConversationAnalysis> = {
   id: 'conversation',
   kind: 'debrief',
-  version: 'conversation@2.0.0',
+  version: 'conversation@2.1.0',
   schema: conversationSchema,
 
   system: (input) =>
@@ -483,11 +491,14 @@ export const conversationPrompt: PromptModule<ConversationInput, ConversationAna
 - Every loop needs an excerpt: the actual words, or a close paraphrase of one sentence. No excerpt, no loop.
 - Never invent a loop. An empty list is a valid answer.
 
-DECISIONS
-- A decision is an outcome the conversation settled: "we're going with vendor B", "the launch moves to March". Not a proposal, not a preference.
+DECISIONS - A PROPOSAL IS NOT A DECISION
+- A decision is an outcome the conversation settled, in words that settle it: "we decided to move the launch to March", "we're going with vendor B", "agreed: the launch moves to March".
+- A suggestion, recommendation, proposal, preference, hypothetical, condition or open question is NOT a decision, however likely it sounds: "I'd suggest going with vendor B", "Ravi recommended going with vendor B", "we could go with vendor B", "let's consider moving to vendor B", "how about we go with vendor B?", "if we went with vendor B…", "we still need to decide". Leave it out of decisions. If nobody settled it and it matters, file it as a "question" loop ("Decide whether to go with vendor B").
+- If you do include something that was only proposed, its description must say so ("Proposed: go with vendor B") and its confidence must be below 0.5. Never phrase a proposal as an outcome.
+- confidence: 0.8 or more only when the excerpt contains the words that settle it; lower when the settling is indirect.
 - context is why, only if the words give a reason. Otherwise null.
 - personIds are participants the decision concerns, from the ids given. Empty is fine.
-- Every decision needs an excerpt.
+- Every decision needs an excerpt: the words that settle it.
 
 MEMORY PROPOSALS
 - Propose only durable, reusable facts about how a person works. Not what happened once, but what it suggests about working with them.
@@ -498,7 +509,7 @@ MEMORY PROPOSALS
 - personId must be one of the ids given. Never invent one.
 
 SUMMARY
-- summary: what happened, neutrally, in three to five sentences. outcome: the upshot in one.
+- summary: what happened, neutrally, in three to five sentences. outcome: the upshot in one. The outcome states only what was settled; never present a proposal or suggestion as the outcome. If nothing was settled, say what was left open.
 - topics: up to six short noun phrases.
 - objections: things participants pushed back on, as short sentences.
 - nextTime: up to four practical pointers for the next conversation with these people, grounded in what was said.`,
@@ -598,16 +609,33 @@ export function normaliseLoop(
   }
 }
 
+/**
+ * Normalise one extracted decision before it is written.
+ *
+ * A decision whose words only propose -- a suggestion, a recommendation, a
+ * hypothetical, an open question -- keeps a confidence below pre-selection,
+ * whatever it was read with (finding 8.7). The same reading as a tentative
+ * loop: the words are the evidence, and a model that calls "I'd suggest
+ * vendor B" a 0.9 decision has contradicted them. Applied to both paths.
+ */
 export function normaliseDecision(
   decision: ExtractedDecision,
   validPersonIds: ReadonlySet<string>,
 ): ExtractedDecision {
+  const description = decision.description.trim().slice(0, 500)
+  const excerpt = decision.excerpt ? decision.excerpt.trim().slice(0, 600) || null : null
+
+  let confidence = clampConfidence(decision.confidence)
+  if (readDecision({ description, excerpt }) === 'proposed') {
+    confidence = Math.min(confidence, PROPOSED_CONFIDENCE_CAP)
+  }
+
   return {
-    description: decision.description.trim().slice(0, 500),
+    description,
     context: decision.context ? decision.context.trim().slice(0, 1000) || null : null,
     personIds: [...new Set(decision.personIds.filter((id) => validPersonIds.has(id)))].slice(0, 8),
-    confidence: clampConfidence(decision.confidence),
-    excerpt: decision.excerpt ? decision.excerpt.trim().slice(0, 600) || null : null,
+    confidence,
+    excerpt,
   }
 }
 
