@@ -25,7 +25,7 @@ _Updated 25 October 2026._
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
 - **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
   - **2A (people controls, server + web): approved by the owner on 25 Oct 2026 and merged (PR #18).** The owner's clarification on archived people in history and in briefs was verified and corrected before merging (§5, "2A results").
-  - **Next: 2C + 2B (iOS).** Then one TestFlight build, published only after the owner reviews the results. The release checklist (§1.4) keeps the unverified update-survival test.
+  - **2C + 2B (iOS): built, in draft PR #19.** Simulator testing against production is in progress (§5, "2C + 2B status"). Then one TestFlight build, published only after the owner reviews the results. The release checklist (§1.4) keeps the unverified update-survival test.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
@@ -447,6 +447,30 @@ Live evidence on the preview (QA account A):
 6. Microphone denied: an **Open Settings** button.
 7. Remove the empty file a failed microphone start leaves behind.
 8. Pull-to-refresh on Account and Review; refresh on focus for Atlas and Account.
+
+**2C + 2B status (25 Oct 2026, draft PR #19, not merged)**
+
+Built as planned. There is no server or schema change; the only web change moves the relationship list into a shared module.
+
+New native modules, which need the next build:
+
+- `expo-image-picker`, for the system photo picker;
+- `expo-image-manipulator`, which resizes photos to JPEG on the phone, longest side at most 1024 px;
+- `expo-sharing`, for the data export.
+
+Photos and permissions:
+
+- The app never requests photo-library or camera access (D3).
+- iOS still requires purpose strings, because the picker library contains those APIs. Ours say plainly that no library or camera access is used.
+- The privacy manifest now declares photos.
+- **Before a public release**, App Store Connect's privacy details must add "Photos".
+
+Automated checks:
+
+- iOS: 82 jest tests pass, 26 of them new. `tsc` is clean.
+- Web: 1004/1004 pass, `tsc` is clean, lint shows 0 errors.
+
+Simulator results against production are added below when the run completes. No TestFlight build until the owner reviews.
 
 **Order and testing**
 
