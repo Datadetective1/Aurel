@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { Info, Search, UserPlus } from 'lucide-react'
+import { Archive, ArrowLeft, Info, Search, UserPlus } from 'lucide-react'
 import { IllustratedEmpty } from '@/components/app/empty-visual'
 import { PeopleCards, type PersonCardData } from '@/components/app/people-cards'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,8 @@ import { resolveFaces } from '@/lib/conversations/avatars'
 import { brand } from '@/lib/brand'
 import { findDuplicates } from './actions'
 import { DuplicateReview } from '@/components/app/duplicate-review'
+import { RestorePersonButton } from '@/components/app/person-lifecycle'
+import { formatDateIn } from '@/lib/tz'
 
 export const metadata: Metadata = { title: 'People', robots: { index: false, follow: false } }
 
@@ -31,12 +33,28 @@ const RELATIONSHIP_LABEL: Record<string, string> = {
   other: 'Other',
 }
 
-export default async function PeoplePage() {
+export default async function PeoplePage({
+  searchParams,
+}: {
+  /** `view=archived`: the people removed from the active record. */
+  searchParams: Promise<{ view?: string; removed?: string; deleted?: string }>
+}) {
+  const { view, removed, deleted } = await searchParams
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
   const now = new Date()
 
   const supabase = await createClient()
+
+  if (view === 'archived') {
+    return <ArchivedPeople userId={user.id} timeZone={timeZone} deleted={deleted === '1'} />
+  }
+
+  const { count: archivedCount } = await supabase
+    .from('people')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .not('archived_at', 'is', null)
 
   const { data: people } = await supabase
     .from('people')
@@ -154,6 +172,30 @@ export default async function PeoplePage() {
         }
       />
 
+      {removed === '1' ? (
+        <p role="status" className="text-ink-secondary mt-6 text-sm">
+          Removed. They are in{' '}
+          <Link
+            href="/people?view=archived"
+            className="text-accent-text underline-offset-2 hover:underline"
+          >
+            Archived
+          </Link>
+          , where you can restore them.
+        </p>
+      ) : null}
+
+      {(archivedCount ?? 0) > 0 ? (
+        <p className="mt-4">
+          <Button asChild variant="quiet" size="sm" className="-ml-3">
+            <Link href="/people?view=archived">
+              <Archive className="size-3.5" aria-hidden="true" />
+              Archived ({archivedCount})
+            </Link>
+          </Button>
+        </p>
+      ) : null}
+
       {duplicates.length > 0 ? (
         <div className="mt-8">
           <DuplicateReview pairs={duplicates} />
@@ -199,6 +241,86 @@ export default async function PeoplePage() {
           any observation or the whole record at any time.
         </p>
       </details>
+    </Container>
+  )
+}
+
+async function ArchivedPeople({
+  userId,
+  timeZone,
+  deleted,
+}: {
+  userId: string
+  timeZone: string
+  deleted: boolean
+}) {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('people')
+    .select('id, full_name, preferred_name, archived_at, is_demo, organizations(name)')
+    .eq('user_id', userId)
+    .not('archived_at', 'is', null)
+    .order('archived_at', { ascending: false })
+    .limit(500)
+  const archived = data ?? []
+
+  return (
+    <Container size="default" className="py-8 sm:py-12">
+      <Button asChild variant="quiet" size="sm" className="-ml-3">
+        <Link href="/people">
+          <ArrowLeft className="size-3.5" aria-hidden="true" />
+          People
+        </Link>
+      </Button>
+      <SectionHeader
+        as="h1"
+        eyebrow="Relationships"
+        title="Archived"
+        description="People you removed. They are out of search, new meetings, research and reminders, and do not count toward your plan. Their history is unchanged."
+        className="mt-4"
+      />
+
+      {deleted ? (
+        <p role="status" className="text-ink-secondary mt-6 text-sm">
+          Deleted permanently.
+        </p>
+      ) : null}
+
+      {archived.length === 0 ? (
+        <p className="text-ink-muted mt-8 text-sm">Nobody is archived.</p>
+      ) : (
+        <ul className="divide-line border-line mt-8 divide-y rounded-[var(--radius-lg)] border">
+          {archived.map((person) => (
+            <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <Link
+                  href={`/people/${person.id}`}
+                  className="text-ink text-sm font-medium underline-offset-2 hover:underline"
+                >
+                  {person.preferred_name || person.full_name}
+                </Link>
+                <p className="text-ink-muted mt-0.5 text-xs">
+                  {[
+                    person.organizations?.name,
+                    person.is_demo ? 'Sample' : null,
+                    person.archived_at
+                      ? `Removed ${formatDateIn(person.archived_at, timeZone)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-start gap-2">
+                <RestorePersonButton personId={person.id} size="sm" />
+                <Button asChild size="sm" variant="ghost">
+                  <Link href={`/people/${person.id}/delete`}>Delete permanently</Link>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Container>
   )
 }

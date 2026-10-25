@@ -11,6 +11,7 @@ import { seedDemoData } from '@/lib/demo/seed'
 import { isValidTimezone } from '@/lib/timezones'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
+import { clearProfilePhoto, saveProfilePhoto } from '@/lib/people/photos.server'
 
 export interface SettingsState {
   error?: string
@@ -380,4 +381,37 @@ export async function loadDemoData(): Promise<SettingsState> {
 
   revalidatePath('/', 'layout')
   return { message: 'Demo data loaded.' }
+}
+
+/**
+ * Your own photo. Shown to you (in the app header and Settings) and to nobody
+ * else: there is no public profile while member discovery is deferred.
+ */
+export async function uploadProfilePhoto(
+  _prev: SettingsState,
+  formData: FormData,
+): Promise<SettingsState> {
+  const file = formData.get('photo')
+  if (!(file instanceof File) || file.size === 0) return { error: 'Choose an image first.' }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+  const result = await saveProfilePhoto(supabase, user.id, file)
+  if (!result.ok) return { error: result.error }
+
+  await track('profile_photo_uploaded')
+  revalidatePath('/settings')
+  revalidatePath('/', 'layout')
+  return { message: 'Photo saved.' }
+}
+
+export async function removeProfilePhoto(): Promise<SettingsState> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const result = await clearProfilePhoto(supabase, user.id)
+  if (!result.ok) return { error: result.error }
+
+  revalidatePath('/settings')
+  revalidatePath('/', 'layout')
+  return { message: 'Photo removed.' }
 }

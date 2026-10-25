@@ -29,9 +29,13 @@ vi.mock('@/lib/billing/entitlements', () => ({
 function chain(result: unknown) {
   const node: Record<string, unknown> = {}
   for (const method of ['select', 'eq', 'in', 'is', 'order', 'limit']) node[method] = () => node
+  node.maybeSingle = async () => result
   node.then = (resolve: (value: unknown) => unknown) => resolve(result)
   return node
 }
+
+/** Set when the person has been removed from the active record. */
+let archivedAt: string | null = null
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
@@ -39,6 +43,8 @@ vi.mock('@/lib/supabase/server', () => ({
       if (table === 'source_person_links') return chain({ data: rejectedLinks, error: null })
       if (table === 'people') {
         return {
+          // The archived check: research is an active workflow.
+          select: () => chain({ data: { archived_at: archivedAt }, error: null }),
           update: (patch: Record<string, unknown>) => {
             peopleUpdates.push(patch)
             return chain({ error: null })
@@ -56,6 +62,7 @@ const PERSON = '7f0d3c1e-5a4b-4c8d-9e2f-1a2b3c4d5e6f'
 beforeEach(() => {
   peopleUpdates.length = 0
   rejectedLinks = []
+  archivedAt = null
 })
 
 describe('refineIdentityAndResearch', () => {
@@ -85,6 +92,13 @@ describe('refineIdentityAndResearch', () => {
       profileUrl: 'https://example.com/team/maya-chen/',
     })
     expect(result.error).toMatch(/someone else/i)
+    expect(peopleUpdates).toHaveLength(0)
+  })
+
+  it('refuses an archived person, writing nothing: research waits until they are restored', async () => {
+    archivedAt = '2026-10-25T00:00:00Z'
+    const result = await refineIdentityAndResearch({ personId: PERSON, jobTitle: 'VP Engineering' })
+    expect(result.error).toBe('Restore them first to research them.')
     expect(peopleUpdates).toHaveLength(0)
   })
 

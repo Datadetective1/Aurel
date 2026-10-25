@@ -93,7 +93,13 @@ export default async function TodayPage({
         .limit(10),
       getQuietRelationships(supabase, user.id),
       getUserContext(supabase, user.id),
-      listLoops(supabase, user.id, { timeZone, now, scope: 'active', limit: 60 }),
+      listLoops(supabase, user.id, {
+        timeZone,
+        now,
+        scope: 'active',
+        limit: 60,
+        excludeArchivedPeople: true,
+      }),
       listConversations(supabase, user.id, { limit: 3 }),
     ])
 

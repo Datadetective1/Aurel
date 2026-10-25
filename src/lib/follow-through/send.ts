@@ -53,31 +53,34 @@ export async function loadDigestLoops(supabase: Client, userId: string): Promise
   const { data } = await supabase
     .from('commitments')
     .select(
-      'id, description, kind, owner, status, review_status, due_on, deferred_until, created_at, person_id, interaction_id, people!commitments_person_id_fkey(id, full_name, preferred_name, avatar_url, avatar_path), interactions(title, occurred_at)',
+      'id, description, kind, owner, status, review_status, due_on, deferred_until, created_at, person_id, interaction_id, people!commitments_person_id_fkey(id, full_name, preferred_name, avatar_url, avatar_path, archived_at), interactions(title, occurred_at)',
     )
     .eq('user_id', userId)
     .eq('review_status', 'confirmed')
     .in('status', ['open', 'later'])
     .limit(300)
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    description: row.description,
-    kind: row.kind,
-    owner: row.owner,
-    status: row.status,
-    reviewStatus: row.review_status,
-    dueOn: row.due_on,
-    deferredUntil: row.deferred_until,
-    createdAt: row.created_at,
-    personId: row.person_id,
-    personName: row.people ? row.people.preferred_name || row.people.full_name : null,
-    interactionId: row.interaction_id,
-    interactionTitle: row.interactions?.title ?? null,
-    interactionDay: row.interactions?.occurred_at
-      ? row.interactions.occurred_at.slice(0, 10)
-      : null,
-  }))
+  // A loop with someone the user has archived is paused, not nagged about.
+  return (data ?? [])
+    .filter((row) => !row.people?.archived_at)
+    .map((row) => ({
+      id: row.id,
+      description: row.description,
+      kind: row.kind,
+      owner: row.owner,
+      status: row.status,
+      reviewStatus: row.review_status,
+      dueOn: row.due_on,
+      deferredUntil: row.deferred_until,
+      createdAt: row.created_at,
+      personId: row.person_id,
+      personName: row.people ? row.people.preferred_name || row.people.full_name : null,
+      interactionId: row.interaction_id,
+      interactionTitle: row.interactions?.title ?? null,
+      interactionDay: row.interactions?.occurred_at
+        ? row.interactions.occurred_at.slice(0, 10)
+        : null,
+    }))
 }
 
 /**

@@ -403,6 +403,7 @@ export async function getLoops(
       personId: options.personId,
       scope: 'active',
       timeZone: options.timeZone,
+      excludeArchivedPeople: true,
     })
   )
     .filter((l) => (options.owner ? l.owner === options.owner : true))

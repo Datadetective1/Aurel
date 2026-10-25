@@ -101,11 +101,14 @@ export async function addLoop(_prev: LoopState, formData: FormData): Promise<Loo
   if (v.personId) {
     const { data: person } = await supabase
       .from('people')
-      .select('id')
+      .select('id, archived_at')
       .eq('id', v.personId)
       .eq('user_id', user.id)
       .maybeSingle()
-    personId = person?.id ?? null
+    if (!person) return { error: 'That person could not be found.' }
+    // An archived person is out of every new workflow until restored.
+    if (person.archived_at) return { error: 'Restore them first to add a loop with them.' }
+    personId = person.id
   }
 
   const dueOn = v.dueOn && /^\d{4}-\d{2}-\d{2}$/.test(v.dueOn) ? v.dueOn : null
@@ -136,4 +139,61 @@ export async function addLoop(_prev: LoopState, formData: FormData): Promise<Loo
   if (personId) revalidatePath(`/people/${personId}`)
   if (v.interactionId) revalidatePath(`/conversations/${v.interactionId}`)
   return { ok: true, message: 'Added.' }
+}
+
+const textSchema = z.string().trim().min(1, 'What is open?').max(500)
+
+/**
+ * Change what a loop says. Used where a loop's words matter on their own --
+ * before deleting a person, a retained loop that names them can be reworded
+ * so it no longer identifies them.
+ */
+export async function editLoopText(loopId: string, description: string): Promise<LoopState> {
+  const parsed = textSchema.safeParse(description)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the text.' }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('commitments')
+    .update({ description: parsed.data })
+    .eq('id', loopId)
+    .eq('user_id', user.id)
+    .select('id, person_id')
+    .maybeSingle()
+
+  if (error || !data) {
+    if (error) logger.warn('loop.edit_failed', { code: error.code })
+    return { error: 'That loop could not be changed.' }
+  }
+
+  await track('loop_text_edited')
+  revalidatePath('/loops')
+  revalidatePath('/today')
+  if (data.person_id) revalidatePath(`/people/${data.person_id}`)
+  return { ok: true, message: 'Saved.' }
+}
+
+/** Delete a loop outright. A brief that cited it keeps its text; the citation is cleared. */
+export async function deleteLoop(loopId: string): Promise<LoopState> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('commitments')
+    .delete()
+    .eq('id', loopId)
+    .eq('user_id', user.id)
+    .select('id, person_id')
+    .maybeSingle()
+
+  if (error || !data) {
+    if (error) logger.warn('loop.delete_failed', { code: error.code })
+    return { error: 'That loop could not be deleted.' }
+  }
+
+  await track('loop_deleted')
+  revalidatePath('/loops')
+  revalidatePath('/today')
+  if (data.person_id) revalidatePath(`/people/${data.person_id}`)
+  return { ok: true, message: 'Deleted.' }
 }

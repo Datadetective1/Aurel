@@ -47,7 +47,13 @@ export async function loadTodayVisual(
       .lte('scheduled_at', horizon.toISOString())
       .order('scheduled_at', { ascending: true })
       .limit(10),
-    listLoops(supabase, userId, { scope: 'active', timeZone, now, limit: 80 }),
+    listLoops(supabase, userId, {
+      scope: 'active',
+      timeZone,
+      now,
+      limit: 80,
+      excludeArchivedPeople: true,
+    }),
     listConversations(supabase, userId, { limit: 8 }),
   ])
 

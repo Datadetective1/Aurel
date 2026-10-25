@@ -1,6 +1,6 @@
 import { getOptionalUser, getProfile } from '@/lib/auth'
 import { json, readJson } from '@/lib/mobile/route'
-import { bearerToken } from '@/lib/supabase/server'
+import { bearerToken, createClient } from '@/lib/supabase/server'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
 import { PLANS } from '@/lib/billing/plans'
 import { hasFullAccess } from '@/lib/billing/access'
@@ -31,7 +31,15 @@ export async function GET() {
   const user = await context()
   if (!user) return json({ error: 'unauthenticated' }, 401)
 
-  const [profile, entitlements] = await Promise.all([getProfile(), getEntitlements()])
+  const [profile, entitlements, { data: calendars }] = await Promise.all([
+    getProfile(),
+    getEntitlements(),
+    // Read-only status; never the tokens.
+    (await createClient())
+      .from('integration_accounts')
+      .select('provider, status, external_account_email, last_synced_at')
+      .eq('user_id', user.id),
+  ])
   const paid = entitlements.plan !== 'free'
   const limit = entitlements.quotas.transcription_seconds
   const remainingSeconds =
@@ -65,6 +73,14 @@ export async function GET() {
     },
     capture: { ...mobileCaptureLimits(features.captureStorage), remainingSeconds },
     sampleData: { loaded: Boolean(profile?.demo_seeded_at) },
+    calendar: {
+      connections: (calendars ?? []).map((c) => ({
+        provider: c.provider,
+        status: c.status,
+        accountEmail: c.external_account_email,
+        lastSyncedAt: c.last_synced_at,
+      })),
+    },
   }
   return json(body)
 }

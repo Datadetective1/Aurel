@@ -42,6 +42,9 @@ vi.mock('@/lib/mobile/route', async () => {
                 const chain = {
                   select: () => chain,
                   eq: () => chain,
+                  // Archived people are filtered out by the route; the stub's
+                  // "owned" list stands for owned and active.
+                  is: () => chain,
                   in: (_c: string, ids: string[]) => ({
                     then: (r: (v: unknown) => unknown) =>
                       r({

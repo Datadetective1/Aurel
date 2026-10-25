@@ -27,7 +27,8 @@ import {
   type PhotoSuggestionView,
 } from '@/components/visual/photo-suggestion'
 import { Button } from '@/components/ui/button'
-import { Badge, Container, Eyebrow, Rule } from '@/components/ui/primitives'
+import { Badge, Container, Eyebrow, Rule, SectionHeader } from '@/components/ui/primitives'
+import { RestorePersonButton } from '@/components/app/person-lifecycle'
 import { requireOnboardedUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { researchCapability } from '@/lib/research/providers'
@@ -39,6 +40,7 @@ import { pendingSuggestion, photoSuggestionsAvailable } from '@/lib/photos/sugge
 import { AVATAR_BUCKET } from '@/lib/conversations/avatars'
 import { track } from '@/lib/analytics'
 import { formatPublishedDate, pluralise } from '@/lib/format'
+import { formatDateIn } from '@/lib/tz'
 
 export async function generateMetadata({
   params,
@@ -115,14 +117,27 @@ export default async function PersonPage({
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, first_interaction_at, last_interaction_at, last_researched_at, is_demo, organization_id, organizations(name)',
+      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, first_interaction_at, last_interaction_at, last_researched_at, is_demo, archived_at, organization_id, organizations(name)',
     )
     .eq('user_id', user.id)
     .eq('id', id)
-    .is('archived_at', null)
     .maybeSingle()
 
   if (!person) notFound()
+
+  // Removed from the active record: no actions that start new work, only the
+  // way back or the way out. Links from past meetings and conversations still
+  // land somewhere that says what happened.
+  if (person.archived_at) {
+    return (
+      <ArchivedPerson
+        id={person.id}
+        name={person.preferred_name || person.full_name}
+        company={person.organizations?.name ?? null}
+        archivedOn={formatDateIn(person.archived_at, timeZone)}
+      />
+    )
+  }
 
   const name = person.preferred_name || person.full_name
 
@@ -638,6 +653,38 @@ export default async function PersonPage({
       >
         <AddContext personId={id} personName={person.full_name} />
         <AddDocument personId={id} />
+      </div>
+    </Container>
+  )
+}
+
+function ArchivedPerson({
+  id,
+  name,
+  company,
+  archivedOn,
+}: {
+  id: string
+  name: string
+  company: string | null
+  archivedOn: string
+}) {
+  return (
+    <Container size="narrow" className="py-8 sm:py-12">
+      <SectionHeader
+        as="h1"
+        eyebrow="Archived"
+        title={name}
+        description={`${company ? `${company}. ` : ''}Removed from your people on ${archivedOn}. They are out of search, new meetings, research and reminders; their past conversations and meetings are unchanged.`}
+      />
+      <div className="mt-6 flex flex-wrap items-start gap-3">
+        <RestorePersonButton personId={id} />
+        <Button asChild variant="ghost">
+          <Link href={`/people/${id}/delete`}>Delete permanently</Link>
+        </Button>
+        <Button asChild variant="quiet">
+          <Link href="/people?view=archived">All archived people</Link>
+        </Button>
       </div>
     </Container>
   )

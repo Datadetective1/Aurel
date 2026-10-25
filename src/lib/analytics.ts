@@ -80,6 +80,9 @@ export type AnalyticsEvent =
   | 'interaction_profile_refinement_dismissed'
   | 'interaction_profile_updated'
   | 'person_added'
+  | 'person_archived'
+  | 'person_restored'
+  | 'person_deleted'
   // The research funnel. `person_research_started` and `..._completed` are a
   // pair on purpose: the gap between their counts is the failure rate, and the
   // gap between their timestamps is how long a user waits. Before these
@@ -145,9 +148,12 @@ export type AnalyticsEvent =
   | 'loop_rejected'
   | 'loop_status_changed'
   | 'loop_added'
+  | 'loop_text_edited'
+  | 'loop_deleted'
   | 'decision_confirmed'
   | 'decision_rejected'
   | 'person_photo_uploaded'
+  | 'profile_photo_uploaded'
   | 'conversation_participant_added'
   | 'conversation_participant_removed'
   // Follow-through email. Loop counts and the schedule mode; never a loop's

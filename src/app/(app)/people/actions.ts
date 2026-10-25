@@ -9,8 +9,17 @@ import { wallTimeToInstant } from '@/lib/tz'
 import { getProfile, requireUser } from '@/lib/auth'
 import { ownership, ownershipNoVisibility } from '@/lib/workspace'
 import { checkPersonLimit } from '@/lib/billing/entitlements'
+import { isValidTimezone } from '@/lib/timezones'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
+import {
+  archivePersonRecord,
+  deletePersonRecord,
+  findPossibleDuplicate,
+  restorePersonRecord,
+  type PossibleDuplicate,
+} from '@/lib/people/lifecycle.server'
+import { clearPersonPhoto, savePersonPhoto } from '@/lib/people/photos.server'
 
 /**
  * People + relationship record actions.
@@ -30,6 +39,11 @@ export interface ActionState {
    * error or a plan limit wiped company, title, link and notes.
    */
   values?: Record<string, string>
+  /**
+   * A record this new person probably already is. Nothing was created; the
+   * form offers to open (or restore) it, or to add them anyway.
+   */
+  duplicate?: PossibleDuplicate
 }
 
 const PERSON_FIELDS = [
@@ -40,6 +54,8 @@ const PERSON_FIELDS = [
   'email',
   'profileUrl',
   'relationshipType',
+  'pronouns',
+  'timezone',
   'notes',
 ] as const
 
@@ -76,24 +92,18 @@ const personSchema = z.object({
     .optional(),
   relationshipType: z.enum(RELATIONSHIP_TYPES).catch('peer'),
   relevance: z.coerce.number().int().min(1).max(5).catch(3),
+  pronouns: z.string().trim().max(40).optional(),
+  timezone: z
+    .string()
+    .trim()
+    .max(64)
+    .refine(isValidTimezone, 'That is not a time zone we recognize.')
+    .optional(),
   notes: z.string().trim().max(4000).optional(),
 })
 
-export async function createPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const result = await createPersonCore(formData)
-  if (!result.personId) return result
-  redirect(`/people/${result.personId}${result.research ? '?research=1' : ''}`)
-}
-
-/**
- * The person, without the navigation: validated, held to the plan's people
- * limit, written, counted. The web form opens their page afterwards; the
- * native app (`POST /api/mobile/people`) returns to whatever it was doing.
- */
-export async function createPersonCore(
-  formData: FormData,
-): Promise<ActionState & { personId?: string; research?: boolean }> {
-  const parsed = personSchema.safeParse({
+function parsePerson(formData: FormData) {
+  return personSchema.safeParse({
     fullName: formData.get('fullName'),
     preferredName: formData.get('preferredName') || undefined,
     jobTitle: formData.get('jobTitle') || undefined,
@@ -102,8 +112,33 @@ export async function createPersonCore(
     profileUrl: formData.get('profileUrl') || undefined,
     relationshipType: formData.get('relationshipType') ?? 'peer',
     relevance: formData.get('relevance') ?? 3,
+    pronouns: formData.get('pronouns') || undefined,
+    timezone: formData.get('timezone') || undefined,
     notes: formData.get('notes') || undefined,
   })
+}
+
+export async function createPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await createPersonCore(formData, { checkDuplicate: true })
+  if (!result.personId) return result
+  redirect(`/people/${result.personId}${result.research ? '?research=1' : ''}`)
+}
+
+/**
+ * The person, without the navigation: validated, held to the plan's people
+ * limit, written, counted. The web form opens their page afterwards; the
+ * native app (`POST /api/mobile/people`) returns to whatever it was doing.
+ *
+ * With `checkDuplicate`, a likely existing record (same email, profile link
+ * or name, active or archived) stops the create and is returned instead,
+ * unless the form says `confirmDuplicate=yes`. Off by default: builds of the
+ * app already installed call this through their route and expect a person.
+ */
+export async function createPersonCore(
+  formData: FormData,
+  options: { checkDuplicate?: boolean } = {},
+): Promise<ActionState & { personId?: string; research?: boolean }> {
+  const parsed = parsePerson(formData)
 
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values: personValues(formData) }
@@ -118,15 +153,18 @@ export async function createPersonCore(
   const own = await ownership()
   const v = parsed.data
 
-  // Warn about a likely duplicate rather than silently creating one.
-  const { data: possibleDuplicate } = await supabase
-    .from('people')
-    .select('id, full_name')
-    .eq('workspace_id', own.workspace_id)
-    .is('archived_at', null)
-    .ilike('full_name', v.fullName)
-    .limit(1)
-    .maybeSingle()
+  const possibleDuplicate = await findPossibleDuplicate(supabase, own.user_id, {
+    fullName: v.fullName,
+    email: v.email,
+    profileUrl: v.profileUrl,
+  })
+  if (
+    options.checkDuplicate &&
+    possibleDuplicate &&
+    formData.get('confirmDuplicate')?.toString() !== 'yes'
+  ) {
+    return { duplicate: possibleDuplicate, values: personValues(formData) }
+  }
 
   const organizationId = await resolveOrganization(v.organizationName)
 
@@ -142,6 +180,8 @@ export async function createPersonCore(
       profile_url: v.profileUrl || null,
       relationship_type: v.relationshipType,
       relevance: v.relevance,
+      pronouns: v.pronouns || null,
+      timezone: v.timezone || null,
       notes: v.notes || null,
     })
     .select('id')
@@ -167,17 +207,7 @@ export async function updatePerson(_prev: ActionState, formData: FormData): Prom
   const personId = formData.get('personId')?.toString()
   if (!personId) return { error: 'Missing person.' }
 
-  const parsed = personSchema.safeParse({
-    fullName: formData.get('fullName'),
-    preferredName: formData.get('preferredName') || undefined,
-    jobTitle: formData.get('jobTitle') || undefined,
-    organizationName: formData.get('organizationName') || undefined,
-    email: formData.get('email') || undefined,
-    profileUrl: formData.get('profileUrl') || undefined,
-    relationshipType: formData.get('relationshipType') ?? 'peer',
-    relevance: formData.get('relevance') ?? 3,
-    notes: formData.get('notes') || undefined,
-  })
+  const parsed = parsePerson(formData)
 
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values: personValues(formData) }
@@ -199,6 +229,8 @@ export async function updatePerson(_prev: ActionState, formData: FormData): Prom
       profile_url: v.profileUrl || null,
       relationship_type: v.relationshipType,
       relevance: v.relevance,
+      pronouns: v.pronouns || null,
+      timezone: v.timezone || null,
       notes: v.notes || null,
     })
     .eq('id', personId)
@@ -210,33 +242,79 @@ export async function updatePerson(_prev: ActionState, formData: FormData): Prom
   }
 
   revalidatePath(`/people/${personId}`)
+  revalidatePath('/people')
   return { message: 'Saved.' }
 }
 
+/**
+ * Remove someone from the active record. Reversible: they leave every list,
+ * picker and new workflow, and their history stays where it is.
+ */
 export async function archivePerson(personId: string) {
   const user = await requireUser()
   const supabase = await createClient()
 
-  await supabase
-    .from('people')
-    .update({ archived_at: new Date().toISOString() })
-    .eq('id', personId)
-    .eq('user_id', user.id)
+  const outcome = await archivePersonRecord(supabase, user.id, personId)
+  if (outcome === 'archived') await track('person_archived')
 
   revalidatePath('/people')
-  redirect('/people')
+  revalidatePath(`/people/${personId}`)
+  redirect('/people?removed=1')
 }
 
-/** Permanent deletion. Cascades remove observations, sources links and notes. */
-export async function deletePerson(personId: string) {
+/** Bring someone back from the archive, within the plan's people limit. */
+export async function restorePerson(personId: string): Promise<ActionState> {
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { error } = await supabase.from('people').delete().eq('id', personId).eq('user_id', user.id)
-  if (error) logger.warn('person.delete_failed', { code: error.code })
+  const outcome = await restorePersonRecord(supabase, user.id, personId)
+  if (!outcome.ok) {
+    return {
+      error: outcome.reason === 'limit' ? outcome.message : 'That person could not be found.',
+    }
+  }
+  if (!outcome.already) await track('person_restored')
 
   revalidatePath('/people')
-  redirect('/people')
+  revalidatePath(`/people/${personId}`)
+  return { message: 'Restored.' }
+}
+
+/**
+ * Delete someone for good -- only an archived person, only with the
+ * confirmation ticked. What stays and what goes is shown first, on
+ * /people/[id]/delete, from the same record this acts on.
+ */
+export async function deletePersonPermanently(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const personId = formData.get('personId')?.toString() ?? ''
+  if (formData.get('understood')?.toString() !== 'yes') {
+    return { error: 'Tick the box to confirm this cannot be undone.' }
+  }
+
+  const user = await requireUser()
+  const supabase = await createClient()
+
+  const outcome = await deletePersonRecord(supabase, user.id, personId)
+  if (!outcome.ok) {
+    return {
+      error:
+        outcome.reason === 'not_archived'
+          ? 'Remove them from your people first; only an archived person can be deleted.'
+          : outcome.reason === 'not_found'
+            ? 'That person could not be found.'
+            : 'They could not be deleted. Nothing was changed.',
+    }
+  }
+
+  await track('person_deleted', {
+    keptLoops: outcome.keptLoops > 0,
+    removedSources: outcome.removedSources > 0,
+  })
+  revalidatePath('/people')
+  redirect('/people?view=archived&deleted=1')
 }
 
 // =============================================================================
@@ -783,14 +861,9 @@ export async function mergePeople(mergeId: string, keepId: string): Promise<Acti
 // =============================================================================
 
 /**
- * Attach a photo to a person.
- *
- * Stored in the private avatars bucket under the user's own folder, at a
- * deterministic path so a second upload replaces the first. The row keeps the
- * path, never a URL: URLs are signed at render time and expire.
- *
- * The image is the user's to supply. Nothing here fetches a likeness from
- * anywhere; when there is no photo, the initials fallback is the honest face.
+ * Attach a photo to a person. The rules (size, type, private folder, fixed
+ * path, active people only) are in lib/people/photos.server, shared with the
+ * phone's route.
  */
 export async function uploadPersonPhoto(
   _prev: ActionState,
@@ -802,47 +875,10 @@ export async function uploadPersonPhoto(
     return { error: 'Choose an image first.' }
   }
 
-  const { imageExtension, MAX_AVATAR_BYTES, personAvatarPath, AVATAR_BUCKET } =
-    await import('@/lib/conversations/avatars')
-
-  if (file.size > MAX_AVATAR_BYTES) {
-    return { error: 'That image is larger than 2 MB. Choose a smaller one.' }
-  }
-  const extension = imageExtension(file.type)
-  if (!extension) return { error: 'Use a JPEG, PNG or WebP image.' }
-
   const user = await requireUser()
   const supabase = await createClient()
-
-  const { data: person } = await supabase
-    .from('people')
-    .select('id, avatar_path')
-    .eq('id', personId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (!person) return { error: 'That person could not be found.' }
-
-  const path = personAvatarPath(user.id, personId, extension)
-  const { error: uploadError } = await supabase.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' })
-
-  if (uploadError) {
-    logger.warn('person.photo_upload_failed', { message: uploadError.message })
-    return { error: 'The photo could not be uploaded. Try again.' }
-  }
-
-  // A previous photo with a different extension is orphaned otherwise.
-  if (person.avatar_path && person.avatar_path !== path) {
-    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
-  }
-
-  const { error } = await supabase
-    .from('people')
-    .update({ avatar_path: path })
-    .eq('id', personId)
-    .eq('user_id', user.id)
-  if (error) return { error: 'The photo was uploaded but could not be attached.' }
+  const result = await savePersonPhoto(supabase, user.id, personId, file)
+  if (!result.ok) return { error: result.error }
 
   await track('person_photo_uploaded', {
     bytesBucket: file.size < 300_000 ? '<300kb' : '300kb-2mb',
@@ -855,26 +891,10 @@ export async function uploadPersonPhoto(
 }
 
 export async function removePersonPhoto(personId: string): Promise<ActionState> {
-  const { AVATAR_BUCKET } = await import('@/lib/conversations/avatars')
   const user = await requireUser()
   const supabase = await createClient()
-
-  const { data: person } = await supabase
-    .from('people')
-    .select('id, avatar_path')
-    .eq('id', personId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (!person) return { error: 'That person could not be found.' }
-
-  if (person.avatar_path) {
-    await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
-  }
-  await supabase
-    .from('people')
-    .update({ avatar_path: null, avatar_url: null })
-    .eq('id', personId)
-    .eq('user_id', user.id)
+  const result = await clearPersonPhoto(supabase, user.id, personId)
+  if (!result.ok) return { error: result.error }
 
   revalidatePath(`/people/${personId}`)
   revalidatePath(`/people/${personId}/edit`)

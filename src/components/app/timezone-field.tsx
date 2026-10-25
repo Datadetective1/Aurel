@@ -37,6 +37,7 @@ export function TimezoneField({
   label = 'Timezone',
   description,
   className,
+  optional = false,
 }: {
   name?: string
   id?: string
@@ -45,18 +46,23 @@ export function TimezoneField({
   label?: string
   description?: string
   className?: string
+  /**
+   * Someone else's zone, which may be unknown: offers "Not set", starts there
+   * when nothing is stored, and never fills in this device's zone on its own.
+   */
+  optional?: boolean
 }) {
   const mounted = useHasMounted()
   const [override, setOverride] = React.useState<string | null>(null)
 
   const device = mounted ? detectTimezone() : ''
   // Stored preference wins; the device is only a starting point for a new user.
-  const zone = override ?? (defaultValue || device)
+  const zone = override ?? (defaultValue || (optional ? '' : device))
 
   const groups = React.useMemo(() => (mounted ? groupedTimezones() : []), [mounted])
 
   const confirmation = mounted && zone && isValidTimezone(zone) ? timezoneConfirmation(zone) : ''
-  const deviceDiffers = mounted && device !== '' && zone !== '' && device !== zone
+  const deviceDiffers = !optional && mounted && device !== '' && zone !== '' && device !== zone
 
   // A stored zone this runtime does not list (renamed, or hand-edited) still
   // needs an option of its own, or the select would silently snap to a
@@ -73,6 +79,7 @@ export function TimezoneField({
             value={zone}
             onChange={(event) => setOverride(event.currentTarget.value)}
           >
+            {optional ? <option value="">Not set</option> : null}
             {zone && !listed ? <option value={zone}>{timezoneLabel(zone)}</option> : null}
             {groups.map((group) => (
               <optgroup key={group.region} label={group.region}>
