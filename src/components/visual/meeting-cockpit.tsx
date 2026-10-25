@@ -55,8 +55,9 @@ export function MeetingCockpit({
   className?: string
 }) {
   const prepMeta = PREP_META[prep]
+  // The organisations at the table: an archived attendee's is not one of them.
   const companies = [
-    ...new Map(people.filter((p) => p.company).map((p) => [p.company!, p])).values(),
+    ...new Map(people.filter((p) => p.company && !p.archived).map((p) => [p.company!, p])).values(),
   ]
 
   return (
@@ -103,7 +104,9 @@ export function MeetingCockpit({
                 />
               ) : null}
               <span className="truncate">
-                {[people[0]!.title, people[0]!.company].filter(Boolean).join(' · ') ||
+                {[people[0]!.title, people[0]!.company, people[0]!.archived ? 'Archived' : null]
+                  .filter(Boolean)
+                  .join(' · ') ||
                   people[0]!.context ||
                   'No role recorded'}
               </span>
@@ -125,6 +128,9 @@ export function MeetingCockpit({
                   className="group-hover:ring-accent-graphic ring-2 ring-transparent transition-shadow"
                 />
                 <span className="text-ink w-full truncate text-xs">{p.name.split(' ')[0]}</span>
+                {p.archived ? (
+                  <span className="text-ink-muted text-[0.6875rem]">Archived</span>
+                ) : null}
               </Link>
             </li>
           ))}

@@ -47,7 +47,50 @@ export interface MeResponse {
   name: string
   timeZone: string
   onboarded: boolean
+  /** The profile as stored, for the Account screen's editor. Absent on older servers. */
+  profile?: MeProfile
 }
+
+export interface MeProfile {
+  fullName: string
+  preferredName: string | null
+  jobTitle: string | null
+  company: string | null
+  pronouns: string | null
+  timezone: string | null
+  /** Signed, short-lived URL of the user's own photo, or null. */
+  photo: string | null
+}
+
+// --- PATCH /api/mobile/me ------------------------------------------------------
+/** The whole profile form; the same validation as Settings › Profile on the web. */
+export interface UpdateProfileRequest {
+  fullName: string
+  preferredName?: string
+  jobTitle?: string
+  company?: string
+  pronouns?: string
+  timezone?: string
+}
+export type UpdateProfileResponse =
+  { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
+// --- POST / DELETE /api/mobile/me/photo and /api/mobile/people/:id/photo -------
+/** POST is multipart with one `photo` field: JPEG, PNG or WebP, at most 2 MB. */
+export type PhotoResponse = { ok: true; photo: string | null } | { ok: false; error: string }
+
+// --- GET / PATCH /api/mobile/preferences ----------------------------------------
+export interface PreferencesResponse {
+  /** Account and product email (billing, security). */
+  emailNotifications: boolean
+  /** The follow-through digest of open loops. */
+  followThroughEmail: boolean
+}
+export type UpdatePreferencesRequest = Partial<PreferencesResponse>
+
+// --- GET /api/mobile/export ------------------------------------------------------
+/** Everything stored for the account, as the web's export: a JSON document. */
+export type ExportResponse = { ok: true; json: string } | { ok: false; error: string }
 
 // --- POST /api/mobile/sign-up --------------------------------------------------
 /** No bearer token: this is how an account starts. Same rules as the web form. */
@@ -85,6 +128,15 @@ export interface AccountResponse {
   capture: CaptureLimits
   /** Whether the fictional sample record is in this account. Absent on older servers. */
   sampleData?: { loaded: boolean }
+  /** Connected calendars, read-only: connecting is done on the web. Absent on older servers. */
+  calendar?: { connections: CalendarConnection[] }
+}
+
+export interface CalendarConnection {
+  provider: 'google' | 'microsoft' | string
+  status: string
+  accountEmail: string | null
+  lastSyncedAt: string | null
 }
 
 /** What the server will accept for one recording, so the app can say so up front. */
@@ -221,10 +273,90 @@ export interface CreatePersonRequest {
   fullName: string
   jobTitle?: string
   organizationName?: string
+  preferredName?: string
+  email?: string
+  profileUrl?: string
+  relationshipType?: string
+  pronouns?: string
+  timezone?: string
+  notes?: string
+  /**
+   * Ask the server to stop and say so when this person probably exists
+   * already. Off unless sent, so builds that predate it keep their behaviour.
+   */
+  checkDuplicate?: boolean
+  /** "Add as someone new" after a duplicate was shown. */
+  confirmDuplicate?: boolean
 }
 export type CreatePersonResponse =
   | { ok: true; personId: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+  | {
+      ok: false
+      error: string
+      fieldErrors?: Record<string, string[]>
+      duplicate?: PossibleDuplicate
+    }
+
+export interface PossibleDuplicate {
+  id: string
+  name: string
+  organization: string | null
+  archived: boolean
+  reason: 'email' | 'profile' | 'name'
+}
+
+// --- GET /api/mobile/people?archived=1 --------------------------------------------
+export interface ArchivedPeopleResponse {
+  people: {
+    id: string
+    name: string
+    company: string | null
+    archivedAt: string
+    isDemo: boolean
+  }[]
+}
+
+// --- PATCH /api/mobile/people/:id ---------------------------------------------------
+/** The whole person form, as the web's edit page: fields left out are cleared. */
+export interface UpdatePersonRequest {
+  fullName: string
+  preferredName?: string
+  jobTitle?: string
+  organizationName?: string
+  email?: string
+  profileUrl?: string
+  relationshipType?: string
+  relevance?: number
+  pronouns?: string
+  timezone?: string
+  notes?: string
+}
+export type UpdatePersonResponse =
+  { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string[]> }
+
+// --- POST /api/mobile/people/:id/archive | /restore -----------------------------
+export type PersonLifecycleResponse = { ok: true } | { ok: false; error: string }
+
+// --- GET /api/mobile/people/:id/deletion -------------------------------------------
+/** What a permanent delete would do, counted from the record; the confirmation's three lists. */
+export interface DeletionPreviewResponse {
+  person: { id: string; name: string; archivedAt: string | null }
+  deleted: string[]
+  unlinked: string[]
+  retainedLoops: { id: string; description: string; status: string; mentionsPerson: boolean }[]
+}
+
+// --- DELETE /api/mobile/people/:id ---------------------------------------------------
+/** Only an archived person, and only with the confirmation spelled out. */
+export interface DeletePersonRequest {
+  confirm: 'delete'
+}
+export type DeletePersonResponse = { ok: true; keptLoops: number } | { ok: false; error: string }
+
+// --- PATCH / DELETE /api/mobile/loops/:id ----------------------------------------------
+export interface EditLoopRequest {
+  description: string
+}
 
 // --- POST /api/mobile/loops/:id ---------------------------------------------------
 /** Done, Later, Cancel, Reopen: the web's one-tap loop actions. */
@@ -242,7 +374,25 @@ export type LoopActionResponse = { ok: true } | { ok: false; error: string }
 export type SampleDataResponse = { ok: true; message: string } | { ok: false; error: string }
 
 // --- GET /api/mobile/people/:id -----------------------------------------------
-export type PersonResponse = VisualPersonDetail & { timeZone: string }
+export type PersonResponse = VisualPersonDetail & {
+  timeZone: string
+  /** The stored fields, for the person editor. Absent on older servers. */
+  edit?: PersonEditFields
+}
+
+export interface PersonEditFields {
+  fullName: string
+  preferredName: string | null
+  jobTitle: string | null
+  organizationName: string | null
+  email: string | null
+  profileUrl: string | null
+  relationshipType: string
+  relevance: number
+  pronouns: string | null
+  timezone: string | null
+  notes: string | null
+}
 
 // --- POST /api/mobile/ask -----------------------------------------------------
 export interface AskRequest {

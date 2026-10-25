@@ -51,11 +51,46 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentPro
   },
 )
 
+/**
+ * React resets a form after its action succeeds. An input or textarea keeps
+ * what React rendered, because its default follows its value; a select does
+ * not, and falls back to its first option or to the one it was mounted with,
+ * while the page still believes it shows what was just saved. Saving again
+ * would quietly write that back: a person's time zone becomes "Not set", the
+ * user's own becomes the first city in the list. So after a reset, the select
+ * is put back to what React last rendered. One without a value or a default
+ * resets as the browser does.
+ */
 export const Select = React.forwardRef<HTMLSelectElement, React.ComponentProps<'select'>>(
   function Select({ className, children, ...props }, ref) {
+    const node = React.useRef<HTMLSelectElement>(null)
+    React.useImperativeHandle(ref, () => node.current as HTMLSelectElement, [])
+
+    const rendered = props.value ?? props.defaultValue
+    const latest = React.useRef(rendered)
+    // A layout effect, so a reset in the commit that brings new values (the
+    // saved ones) is restored to those, not to the previous render's.
+    React.useLayoutEffect(() => {
+      latest.current = rendered
+    })
+
+    React.useEffect(() => {
+      const select = node.current
+      const form = select?.form
+      if (!select || !form) return
+      // The event fires before the reset happens; restore once it has.
+      const restore = () =>
+        setTimeout(() => {
+          const value = latest.current
+          if (value != null && !Array.isArray(value)) select.value = String(value)
+        })
+      form.addEventListener('reset', restore)
+      return () => form.removeEventListener('reset', restore)
+    }, [])
+
     return (
       <select
-        ref={ref}
+        ref={node}
         className={cn(controlStyles, 'h-11 appearance-none pr-8', className)}
         {...props}
       >

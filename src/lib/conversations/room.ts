@@ -85,7 +85,7 @@ export async function loadConversationRoom(
   const { data } = await supabase
     .from('interaction_participants')
     .select(
-      'people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, organizations(name))',
+      'people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, archived_at, organizations(name))',
     )
     .eq('user_id', userId)
     .eq('interaction_id', interactionId)
@@ -97,6 +97,7 @@ export async function loadConversationRoom(
     (p) => p.id,
   )
 
+  // Someone the user removed was still there: they stay, marked archived.
   return rows.map((r) => ({
     id: r.people!.id,
     name: r.people!.preferred_name || r.people!.full_name,
@@ -104,6 +105,7 @@ export async function loadConversationRoom(
     src: faces.get(r.people!.id) ?? null,
     title: r.people!.job_title,
     company: r.people!.organizations?.name ?? null,
-    context: relationshipLabel(r.people!.relationship_type),
+    context: r.people!.archived_at ? 'Archived' : relationshipLabel(r.people!.relationship_type),
+    ...(r.people!.archived_at ? { archived: true } : {}),
   }))
 }

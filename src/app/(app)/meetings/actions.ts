@@ -180,6 +180,22 @@ export async function createMeetingCore(
         Boolean(a.personId) && (ATTENDEE_ROLES as readonly string[]).includes(a.role),
     )
 
+  // Only the caller's own, active people: the ids arrive from the client, and
+  // an archived person is out of new meetings until restored.
+  if (attendees.length > 0) {
+    const { data: allowed } = await supabase
+      .from('people')
+      .select('id')
+      .eq('user_id', own.user_id)
+      .is('archived_at', null)
+      .in(
+        'id',
+        attendees.map((a) => a.personId),
+      )
+    const allowedIds = new Set((allowed ?? []).map((p) => p.id))
+    attendees.splice(0, attendees.length, ...attendees.filter((a) => allowedIds.has(a.personId)))
+  }
+
   if (attendees.length > 0) {
     await supabase.from('meeting_attendees').insert(
       attendees.map((a) => ({
@@ -264,11 +280,17 @@ export async function addMeetingParticipant(
   // unchecked cross-account reference a good idea.
   const [{ data: meeting }, { data: person }] = await Promise.all([
     supabase.from('meetings').select('id').eq('id', meetingId).eq('user_id', user.id).maybeSingle(),
-    supabase.from('people').select('id').eq('id', personId).eq('user_id', user.id).maybeSingle(),
+    supabase
+      .from('people')
+      .select('id, archived_at')
+      .eq('id', personId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
 
   if (!meeting) return { error: 'That meeting could not be found.' }
   if (!person) return { error: 'That person could not be found.' }
+  if (person.archived_at) return { error: 'Restore them first to add them to a meeting.' }
 
   const { error } = await supabase
     .from('meeting_attendees')

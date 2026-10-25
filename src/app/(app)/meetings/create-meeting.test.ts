@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const inserts: { table: string; row: Record<string, unknown> | Record<string, unknown>[] }[] = []
 let profileTimezone: string | null = 'America/Chicago'
+/** The caller's own, active people; anyone else is dropped from the attendees. */
+let activePeople: string[] = ['person-1']
 
 class Redirect extends Error {
   constructor(public readonly to: string) {
@@ -51,6 +53,17 @@ vi.mock('@/lib/supabase/server', () => ({
         inserts.push({ table, row })
         const result = { data: { id: 'meeting-1' }, error: null }
         return { select: () => ({ single: async () => result }), then: undefined }
+      },
+      // The attendee check: people of this user, not archived, among the ids.
+      select: () => {
+        const chain = {
+          eq: () => chain,
+          is: () => chain,
+          in: async (_column: string, ids: string[]) => ({
+            data: ids.filter((id) => activePeople.includes(id)).map((id) => ({ id })),
+          }),
+        }
+        return chain
       },
     }),
   }),
@@ -90,6 +103,7 @@ const meetingInsert = () =>
 beforeEach(() => {
   inserts.length = 0
   profileTimezone = 'America/Chicago'
+  activePeople = ['person-1']
 })
 
 describe('objective persistence', () => {
@@ -114,6 +128,13 @@ describe('objective persistence', () => {
         role: 'decision_maker',
       }),
     ])
+  })
+
+  it("drops an attendee who is archived or not the caller's own", async () => {
+    activePeople = []
+    await submit(walkthroughForm())
+    expect(meetingInsert()?.title).toBe('Ansys Renewals')
+    expect(inserts.find((i) => i.table === 'meeting_attendees')).toBeUndefined()
   })
 
   it('refuses an empty objective instead of silently storing null', async () => {

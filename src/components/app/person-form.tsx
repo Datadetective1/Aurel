@@ -5,7 +5,10 @@ import * as React from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { CircleAlert, Loader2, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import { createPerson, updatePerson, type ActionState } from '@/app/(app)/people/actions'
+import { RestorePersonButton } from '@/components/app/person-lifecycle'
+import { TimezoneField } from '@/components/app/timezone-field'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { FormField, Input, Select, Textarea } from '@/components/ui/field'
@@ -39,6 +42,8 @@ export interface PersonDefaults {
   profileUrl: string
   relationshipType: string
   relevance: number
+  pronouns: string
+  timezone: string
   notes: string
 }
 
@@ -51,6 +56,8 @@ const EMPTY: PersonDefaults = {
   profileUrl: '',
   relationshipType: 'peer',
   relevance: 3,
+  pronouns: '',
+  timezone: '',
   notes: '',
 }
 
@@ -167,7 +174,7 @@ export function PersonForm({
         open={
           mode === 'edit' ||
           Boolean(state.fieldErrors?.email) ||
-          Boolean(v?.preferredName || v?.email || v?.notes)
+          Boolean(v?.preferredName || v?.email || v?.notes || v?.pronouns || v?.timezone)
         }
       >
         <summary className="text-ink-secondary flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm [&::-webkit-details-marker]:hidden">
@@ -211,6 +218,32 @@ export function PersonForm({
               />
             )}
           </FormField>
+
+          <FormField
+            id="pronouns"
+            label="Pronouns"
+            description="Only if they have told you."
+            error={state.fieldErrors?.pronouns?.[0]}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                name="pronouns"
+                defaultValue={field('pronouns')}
+                placeholder="e.g. she/her"
+                maxLength={40}
+              />
+            )}
+          </FormField>
+
+          <TimezoneField
+            id="person-timezone"
+            name="timezone"
+            label="Their time zone"
+            description="For meeting times and when to follow up."
+            defaultValue={field('timezone')}
+            optional
+          />
 
           <FormField id="relationshipType" label="Relationship">
             {(props) => (
@@ -276,6 +309,37 @@ export function PersonForm({
           <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           {state.error}
         </p>
+      ) : null}
+
+      {state.duplicate ? (
+        <div
+          role="alert"
+          className="border-caution/30 bg-caution-wash mt-5 rounded-[var(--radius-md)] border px-4 py-3"
+        >
+          <p className="text-ink text-sm">
+            You already have {state.duplicate.name}
+            {state.duplicate.organization ? ` (${state.duplicate.organization})` : ''}
+            {state.duplicate.archived ? ', in Archived' : ''}.{' '}
+            <span className="text-ink-secondary">
+              {state.duplicate.reason === 'email'
+                ? 'Same email address.'
+                : state.duplicate.reason === 'profile'
+                  ? 'Same profile link.'
+                  : 'Same name.'}
+            </span>
+          </p>
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            {state.duplicate.archived ? (
+              <RestorePersonButton personId={state.duplicate.id} size="sm" />
+            ) : null}
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`/people/${state.duplicate.id}`}>Open {state.duplicate.name}</Link>
+            </Button>
+            <Button type="submit" size="sm" variant="ghost" name="confirmDuplicate" value="yes">
+              Add as someone new
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {state.message ? (

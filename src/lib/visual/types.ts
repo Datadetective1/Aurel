@@ -31,6 +31,12 @@ export interface VisualPerson {
   owe: number
   /** Part of the fictional sample record. Shown as such wherever the person appears. */
   isDemo?: boolean
+  /**
+   * Removed from the user's people. Still shown where they took part, marked
+   * as archived, but carrying none of their relationship intelligence: no
+   * loops, no last contact, no shared connections.
+   */
+  archived?: boolean
 }
 
 export interface VisualLoop {

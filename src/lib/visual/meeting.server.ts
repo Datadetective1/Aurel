@@ -117,7 +117,7 @@ export async function loadMeetingVisual(
     supabase
       .from('meeting_attendees')
       .select(
-        'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organization_id, organizations(name, domain))',
+        'person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, archived_at, organization_id, organizations(name, domain))',
       )
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),
@@ -125,10 +125,18 @@ export async function loadMeetingVisual(
 
   if (!meeting) return null
 
+  // Someone the user removed stays in the room they were in, marked archived,
+  // after everyone else. Nothing about the relationship is read for them:
+  // loops, conversations, facts and connections come from the active only.
   const rows = (attendees ?? [])
     .filter((a) => a.people)
-    .sort((a, b) => (ROLE_WEIGHT[b.role ?? ''] ?? 0) - (ROLE_WEIGHT[a.role ?? ''] ?? 0))
-  const ids = rows.map((r) => r.person_id)
+    .sort(
+      (a, b) =>
+        Number(Boolean(a.people!.archived_at)) - Number(Boolean(b.people!.archived_at)) ||
+        (ROLE_WEIGHT[b.role ?? ''] ?? 0) - (ROLE_WEIGHT[a.role ?? ''] ?? 0),
+    )
+  const active = rows.filter((r) => !r.people!.archived_at)
+  const ids = active.map((r) => r.person_id)
 
   const [faces, allLoops, participations, facts, coAttendance] = await Promise.all([
     resolveFaces(
@@ -171,7 +179,8 @@ export async function loadMeetingVisual(
 
   const people: VisualPerson[] = rows.map((r) => {
     const p = r.people!
-    const mine = visualLoops.filter((l) => l.personId === p.id)
+    const archived = Boolean(p.archived_at)
+    const mine = archived ? [] : visualLoops.filter((l) => l.personId === p.id)
     return {
       id: p.id,
       name: p.preferred_name || p.full_name,
@@ -180,11 +189,12 @@ export async function loadMeetingVisual(
       title: p.job_title,
       company: p.organizations?.name ?? null,
       companyDomain: p.organizations?.domain ?? null,
-      context: roleLabel(r.role) || relationshipLabel(p.relationship_type),
-      lastInteractionAt: p.last_interaction_at,
+      context: archived ? 'Archived' : roleLabel(r.role) || relationshipLabel(p.relationship_type),
+      lastInteractionAt: archived ? null : p.last_interaction_at,
       openLoops: mine.length,
       owe: mine.filter((l) => l.direction === 'owe').length,
       isDemo: p.is_demo,
+      ...(archived ? { archived: true } : {}),
     }
   })
 
@@ -229,7 +239,7 @@ export async function loadMeetingVisual(
   const connections: VisualConnection[] =
     ids.length > 1
       ? findConnections({
-          people: rows.map((r) => ({
+          people: active.map((r) => ({
             id: r.person_id,
             organizationId: r.people!.organization_id,
             organizationName: r.people!.organizations?.name ?? null,
@@ -253,7 +263,7 @@ export async function loadMeetingVisual(
       : []
 
   const brief = artifact ? normalizeBrief(artifact.content) : null
-  const prep = prepState({ hasBrief: Boolean(artifact), attendeeCount: rows.length })
+  const prep = prepState({ hasBrief: Boolean(artifact), attendeeCount: active.length })
 
   const glance: VisualGlance = {
     objective: brief?.objective ?? meeting.objective ?? null,

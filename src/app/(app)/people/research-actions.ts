@@ -82,6 +82,24 @@ const addContextSchema = z.object({
 })
 
 /**
+ * Research is an active workflow: an archived person is out of it until they
+ * are restored. Returns the refusal, or null to go on.
+ */
+async function archivedRefusal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  personId: string,
+): Promise<ResearchState | null> {
+  const { data } = await supabase
+    .from('people')
+    .select('archived_at')
+    .eq('id', personId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data?.archived_at ? { error: 'Restore them first to research them.' } : null
+}
+
+/**
  * Add a document.
  *
  * The file is turned into text and then goes down exactly the same path as a
@@ -117,6 +135,8 @@ export async function addDocument(
     .maybeSingle()
 
   if (!person) return { error: 'That person could not be found.' }
+  const archived = await archivedRefusal(supabase, user.id, personId)
+  if (archived) return archived
 
   const extraction = await extractDocument(file)
   if (!extraction.ok) return { error: extraction.message }
@@ -200,6 +220,8 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
   const user = await requireUser()
   const { workspaceId } = await getWorkspace()
   const supabase = await createClient()
+  const archived = await archivedRefusal(supabase, user.id, parsed.data.personId)
+  if (archived) return archived
 
   try {
     const result =
@@ -296,6 +318,8 @@ export async function researchPerson(personId: string): Promise<ResearchState> {
     .maybeSingle()
 
   if (!person) return { error: 'That person could not be found.' }
+  const archived = await archivedRefusal(supabase, user.id, personId)
+  if (archived) return archived
 
   const { data: job } = await supabase
     .from('research_jobs')
@@ -796,6 +820,8 @@ export async function refineIdentityAndResearch(
 
   const user = await requireUser()
   const supabase = await createClient()
+  const archived = await archivedRefusal(supabase, user.id, personId)
+  if (archived) return archived
 
   if (profileUrl) {
     const { data: rejected } = await supabase

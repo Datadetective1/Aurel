@@ -26,6 +26,8 @@ export interface Face {
   id: string
   name: string
   src: string | null
+  /** Removed from the user's people; still shown where they took part, marked as such. */
+  archived?: boolean
 }
 
 export interface ConversationSummary {
@@ -69,6 +71,8 @@ export interface LoopRecord {
   meetingId: string | null
   createdAt: string
   completedAt: string | null
+  /** The person it is with has been archived: kept, but out of active surfaces. */
+  personArchived?: boolean
 }
 
 export interface DecisionRecord {
@@ -170,7 +174,9 @@ async function hydrateConversations(
   const [{ data: participants }, { data: loops }, { data: decisions }] = await Promise.all([
     supabase
       .from('interaction_participants')
-      .select('interaction_id, people(id, full_name, preferred_name, avatar_url, avatar_path)')
+      .select(
+        'interaction_id, people(id, full_name, preferred_name, avatar_url, avatar_path, archived_at)',
+      )
       .eq('user_id', userId)
       .in('interaction_id', ids),
     supabase
@@ -196,7 +202,12 @@ async function hydrateConversations(
     if (!p) continue
     const list = participantsByConversation.get(row.interaction_id) ?? []
     if (!list.some((f) => f.id === p.id)) {
-      list.push({ id: p.id, name: faceName(p), src: faces.get(p.id) ?? null })
+      list.push({
+        id: p.id,
+        name: faceName(p),
+        src: faces.get(p.id) ?? null,
+        ...(p.archived_at ? { archived: true } : {}),
+      })
     }
     participantsByConversation.set(row.interaction_id, list)
   }
@@ -273,6 +284,12 @@ export async function listLoops(
     timeZone: string
     now?: Date
     limit?: number
+    /**
+     * Leave out loops with a person who has been archived. For the surfaces
+     * that act -- Today, Ask, follow-through -- not for history or the Loops
+     * page, where they stay visible and can still be closed.
+     */
+    excludeArchivedPeople?: boolean
   },
 ): Promise<LoopRecord[]> {
   const now = options.now ?? new Date()
@@ -280,7 +297,7 @@ export async function listLoops(
   let query = supabase
     .from('commitments')
     .select(
-      'id, description, kind, owner, owner_person_id, person_id, due_on, status, review_status, confidence, excerpt, deferred_until, interaction_id, meeting_id, created_at, completed_at, people!commitments_person_id_fkey(id, full_name, preferred_name, avatar_url, avatar_path), interactions(title)',
+      'id, description, kind, owner, owner_person_id, person_id, due_on, status, review_status, confidence, excerpt, deferred_until, interaction_id, meeting_id, created_at, completed_at, people!commitments_person_id_fkey(id, full_name, preferred_name, avatar_url, avatar_path, archived_at), interactions(title)',
     )
     .eq('user_id', userId)
     .order('due_on', { ascending: true, nullsFirst: false })
@@ -322,18 +339,21 @@ export async function listLoops(
     meetingId: r.meeting_id,
     createdAt: r.created_at,
     completedAt: r.completed_at,
+    personArchived: Boolean(r.people?.archived_at),
   }))
+
+  const visible = options.excludeArchivedPeople ? records.filter((r) => !r.personArchived) : records
 
   const scoped =
     options.scope === 'active' || options.scope === undefined
-      ? records.filter((r) =>
+      ? visible.filter((r) =>
           loopIsActive(
             { status: r.status, deferred_until: r.deferredUntil, review_status: r.reviewStatus },
             options.timeZone,
             now,
           ),
         )
-      : records
+      : visible
 
   return scoped.sort((a, b) =>
     compareLoops(

@@ -93,14 +93,20 @@ export default async function TodayPage({
         .limit(10),
       getQuietRelationships(supabase, user.id),
       getUserContext(supabase, user.id),
-      listLoops(supabase, user.id, { timeZone, now, scope: 'active', limit: 60 }),
+      listLoops(supabase, user.id, {
+        timeZone,
+        now,
+        scope: 'active',
+        limit: 60,
+        excludeArchivedPeople: true,
+      }),
       listConversations(supabase, user.id, { limit: 3 }),
     ])
 
   const meetingIds = (meetings ?? []).map((m) => m.id)
 
   // Which of these meetings already have a brief, and who is attending.
-  const [{ data: briefs }, { data: attendees }] = await Promise.all([
+  const [{ data: briefs }, { data: attendance }] = await Promise.all([
     meetingIds.length
       ? supabase
           .from('ai_artifacts')
@@ -112,11 +118,19 @@ export default async function TodayPage({
     meetingIds.length
       ? supabase
           .from('meeting_attendees')
-          .select('meeting_id, person_id')
+          .select('meeting_id, person_id, people(archived_at)')
           .eq('user_id', user.id)
           .in('meeting_id', meetingIds)
-      : Promise.resolve({ data: [] as { meeting_id: string; person_id: string }[] }),
+      : Promise.resolve({
+          data: [] as {
+            meeting_id: string
+            person_id: string
+            people: { archived_at: string | null } | null
+          }[],
+        }),
   ])
+  // Today prepares for what is next, so someone the user removed is not in it.
+  const attendees = (attendance ?? []).filter((a) => a.people && !a.people.archived_at)
 
   const prepared = new Set((briefs ?? []).map((b) => b.subject_id))
   const attendeesByMeeting = new Map<string, string[]>()

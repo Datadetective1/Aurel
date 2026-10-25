@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Camera, CircleAlert, CircleCheck, Loader2, Trash2 } from 'lucide-react'
 import { removePersonPhoto, uploadPersonPhoto, type ActionState } from '@/app/(app)/people/actions'
+import { removeProfilePhoto, uploadProfilePhoto } from '@/app/(app)/settings/actions'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -27,12 +28,16 @@ export function AvatarUpload({
   src,
   className,
 }: {
-  personId: string
+  /** Whose photo. Omitted: the user's own. */
+  personId?: string
   name: string
   src: string | null
   className?: string
 }) {
-  const [state, formAction] = useActionState<ActionState, FormData>(uploadPersonPhoto, {})
+  const [state, formAction] = useActionState<ActionState, FormData>(
+    personId ? uploadPersonPhoto : uploadProfilePhoto,
+    {},
+  )
   const [preview, setPreview] = React.useState<string | null>(null)
   const [removing, setRemoving] = React.useState(false)
   const [removed, setRemoved] = React.useState(false)
@@ -55,7 +60,7 @@ export function AvatarUpload({
 
   const remove = async () => {
     setRemoving(true)
-    const result = await removePersonPhoto(personId)
+    const result = personId ? await removePersonPhoto(personId) : await removeProfilePhoto()
     setRemoving(false)
     if (!result.error) {
       setRemoved(true)
@@ -67,7 +72,7 @@ export function AvatarUpload({
 
   return (
     <form ref={formRef} action={formAction} className={cn('flex items-center gap-5', className)}>
-      <input type="hidden" name="personId" value={personId} />
+      {personId ? <input type="hidden" name="personId" value={personId} /> : null}
       <Avatar name={name} src={shown} size="xl" />
       <div className="min-w-0">
         <div className="flex flex-wrap gap-2">

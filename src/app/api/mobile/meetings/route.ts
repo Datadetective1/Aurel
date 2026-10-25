@@ -19,7 +19,12 @@ export async function POST(request: Request) {
 
   const requested = [...new Set((body.attendeeIds ?? []).map(String))].slice(0, 12)
   const { data: owned } = requested.length
-    ? await ctx.supabase.from('people').select('id').eq('user_id', ctx.user.id).in('id', requested)
+    ? await ctx.supabase
+        .from('people')
+        .select('id')
+        .eq('user_id', ctx.user.id)
+        .is('archived_at', null)
+        .in('id', requested)
     : { data: [] as { id: string }[] }
 
   const form = new FormData()

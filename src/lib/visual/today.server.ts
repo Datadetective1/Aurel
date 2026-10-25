@@ -47,12 +47,18 @@ export async function loadTodayVisual(
       .lte('scheduled_at', horizon.toISOString())
       .order('scheduled_at', { ascending: true })
       .limit(10),
-    listLoops(supabase, userId, { scope: 'active', timeZone, now, limit: 80 }),
+    listLoops(supabase, userId, {
+      scope: 'active',
+      timeZone,
+      now,
+      limit: 80,
+      excludeArchivedPeople: true,
+    }),
     listConversations(supabase, userId, { limit: 8 }),
   ])
 
   const ids = (meetings ?? []).map((m) => m.id)
-  const [{ data: briefs }, { data: attendees }] = ids.length
+  const [{ data: briefs }, { data: attendeeRows }] = ids.length
     ? await Promise.all([
         supabase
           .from('ai_artifacts')
@@ -63,22 +69,24 @@ export async function loadTodayVisual(
         supabase
           .from('meeting_attendees')
           .select(
-            'meeting_id, person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, organizations(name, domain))',
+            'meeting_id, person_id, role, people(id, full_name, preferred_name, avatar_url, avatar_path, job_title, relationship_type, last_interaction_at, is_demo, archived_at, organizations(name, domain))',
           )
           .eq('user_id', userId)
           .in('meeting_id', ids),
       ])
     : [{ data: [] }, { data: [] }]
 
+  // Today prepares for what is next, so someone the user removed is not in it.
+  const attendees = (attendeeRows ?? []).filter((a) => a.people && !a.people.archived_at)
   const prepared = new Set((briefs ?? []).map((b) => b.subject_id))
   const visualLoops = loops.map((l) => toVisualLoop(l, timeZone, now))
-  const people = (attendees ?? [])
+  const people = attendees
     .map((a) => a.people)
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
   const faces = await resolveFaces(supabase, people, (p) => p.id)
 
   const summaries: VisualMeetingSummary[] = (meetings ?? []).map((m) => {
-    const rows = (attendees ?? []).filter((a) => a.meeting_id === m.id && a.people)
+    const rows = attendees.filter((a) => a.meeting_id === m.id && a.people)
     const room: VisualPerson[] = rows.map((a) => {
       const p = a.people!
       const mine = visualLoops.filter((l) => l.personId === p.id)

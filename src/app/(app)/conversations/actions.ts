@@ -221,11 +221,14 @@ export async function createConversationCore(
       meetingId = meeting.id
       meetingTitle = meeting.title
       if (participantIds.length === 0) {
+        // The meeting's people, except anyone archived since: they are out of
+        // conversation matching until restored.
         const { data: attendees } = await supabase
           .from('meeting_attendees')
-          .select('person_id')
+          .select('person_id, people!inner(archived_at)')
           .eq('user_id', user.id)
           .eq('meeting_id', meeting.id)
+          .is('people.archived_at', null)
         participantIds = (attendees ?? []).map((a) => a.person_id)
       }
     }
@@ -663,10 +666,11 @@ export async function addConversationParticipant(
       .select('id, full_name, preferred_name')
       .eq('id', personId)
       .eq('user_id', user.id)
+      .is('archived_at', null)
       .maybeSingle(),
   ])
   if (!interaction) return { error: 'That conversation could not be found.' }
-  if (!person) return { error: 'That person could not be found.' }
+  if (!person) return { error: 'That person could not be found, or is archived.' }
 
   const own = await ownership()
   try {

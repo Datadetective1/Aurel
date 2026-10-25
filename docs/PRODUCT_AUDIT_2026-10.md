@@ -23,7 +23,9 @@ _Updated 25 October 2026._
 - **Phase 1 (Capture): merged (PR #16, `9fb4714`) and shipped in TestFlight build 0.1.0 (3).**
   - The owner validated it on a physical iPhone (§1.3).
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
-- **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).** 2A (people controls, server + web) is in progress.
+- **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
+  - **2A (people controls, server + web): approved by the owner on 25 Oct 2026 and merged (PR #18).** The owner's clarification on archived people in history and in briefs was verified and corrected before merging (§5, "2A results").
+  - **Next: 2C + 2B (iOS).** Then one TestFlight build, published only after the owner reviews the results. The release checklist (§1.4) keeps the unverified update-survival test.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
@@ -329,6 +331,95 @@ Principles:
    - calendar status added to `GET /api/mobile/account`
    - The duplicate warning on `POST /api/mobile/people`.
 
+**2A results (PR #18, branch `ios-testflight-readiness`, 25 Oct 2026). Not merged; awaiting owner review.**
+
+Built as planned, plus one fix found during preview testing (below). No migration and no new service. The mobile routes are additive, so TestFlight 0.1.0 (3) behaves as before.
+
+Automated checks:
+
+- 993 web tests pass (81 files). New: the lifecycle rules (14), the mobile people routes, and the select-reset tests.
+- Typecheck clean. Lint: 0 errors (5 warnings, all in files this PR does not touch).
+
+Preview checks (Vercel preview against the production database, QA accounts A and B only):
+
+| Check                                                                                                                                            | Result                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Setup: people, meetings, conversations, loops, facts, sources                                                                                    | 9/9                                                                                                                                                                      |
+| Archive, restore, plan limit, delete                                                                                                             | 23/24. The one failure: the delete counted a loop twice when the person was both its person and its owner. Fixed in `7bf2953`; that case re-checked live on its own, 6/6 |
+| Cross-account isolation (account B against A's people, loops, photos, meetings)                                                                  | 19/19                                                                                                                                                                    |
+| Photos (person and own), export, preferences                                                                                                     | 20/20                                                                                                                                                                    |
+| Website, in Chromium: Archived list, archived person page, delete page, edit page, Remove, duplicate warning, Delete permanently, Settings photo | 13/13                                                                                                                                                                    |
+| Selects after saving (person edit and Settings › Profile)                                                                                        | 6/6 after the fix below                                                                                                                                                  |
+
+What the permanent delete did, checked in the database:
+
+- **Deleted:** the person, their person-only note, observation, fact, and the public source only they were linked to.
+- **Kept and unlinked:** their loops (one reworded first from the confirmation page), and the note that was also attached to a meeting.
+- **Untouched:** the meeting, the conversation, the decision, a source shared with another person, and that person's fact and links.
+- **While archived:** a meeting and a conversation created at that time did not include them.
+
+**Found and fixed during preview testing: selects showed the wrong value after saving.**
+
+- After "Save changes", React resets the form. Every select then showed its first option, or the value it was mounted with, although the right value had been saved:
+  - a person's time zone showed "Not set";
+  - their relationship showed the old one;
+  - Settings › Profile showed Africa/Abidjan for the user's own time zone.
+- A second save without reloading wrote that wrong value back. The person time zone was new in this PR; **the relationship and Settings › Profile cases were already in production.**
+- Fixed once in the shared `Select` primitive (`70cea2c`). Three of the four new tests fail without the fix.
+
+Limitations:
+
+- **The iOS screens for these controls come in 2B.** Until then the new mobile routes have been tested by script only.
+- **Name detection in retained loops is word-based.** It catches the full name, first name and preferred name. It can miss initials, nicknames or a role ("the CFO"). Every retained loop is still listed for review, whether or not it is flagged.
+- **A brief written before someone was archived still says what it said then.** Rebuilding it leaves them out.
+- **The iOS app shows the "Archived" label with the next build (2B).** TestFlight 0.1.0 (3) does not display the label field the server now sends. The server already leaves archived people out of briefs and strips their intelligence on the phone too.
+- QA account A holds the test data. Deleting it, and account B, needs owner approval at the end of Phase 2.
+
+**Owner's clarification before merging (25 Oct 2026): archived people in history and in briefs.**
+
+The rule:
+
+- Archived people remain visible in historical meetings and conversations, clearly labelled as archived.
+- Newly generated preparation briefs for upcoming meetings do not treat them as active participants or include their relationship intelligence by default.
+
+What the code did before the fix:
+
+- History kept them, but nothing marked them as archived.
+- A new brief still treated them as participants and used their notes, loops and history. This was the limitation reported with the 2A results.
+- The Prepare screen showed their open loops and last contact, used their conversations for "last conversation", and listed their company at the table.
+
+Corrections (`71aad9e`, `fbb21ee`, `0a2c895`):
+
+| Where                                                                       | Now                                                                                                                                     |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| New briefs and debriefs (`getMeetingContext`)                               | Archived attendees are left out entirely. Nothing about them is read for the prompt.                                                    |
+| Prepare: web brief, glance, quick, and the phone's meeting data             | Kept in the room after everyone else, marked "Archived". No loops, last contact, last conversation, shared connections or company chip. |
+| Conversation page; conversation lists (Today, Conversations); Meetings list | The name is marked archived.                                                                                                            |
+| Today, web and phone (upcoming meetings); Ask's upcoming meetings           | Left out.                                                                                                                               |
+
+Restoring the person brings everything back.
+
+Tests:
+
+- 11 new regression tests: 8 for the loaders, 3 rendering tests. 9 of them fail without the change; the other two check that active people and restored people read as before.
+- Full suite: 1004 pass.
+
+Live evidence on the preview (QA account A):
+
+- **Setup:** a test person, "Quinn Halvorsen", with a company and notes. Quinn was put in an upcoming meeting with Marcus, added to an earlier meeting, given a conversation, then archived.
+
+| Check                                  | Result                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| A new brief, generated after archiving | Its participants are Marcus alone. No mention of Quinn, Halcyon Labs or Quinn's notes. |
+| Prepare                                | Quinn is listed after Marcus, marked "Archived", with 0 loops and no last contact.     |
+| The earlier meeting                    | Quinn is shown, marked "Archived".                                                     |
+| The conversation page                  | "Halcyon Labs · Archived"                                                              |
+| Web Today                              | Quinn appears only on the past conversation, as "With Quinn (archived)".               |
+| Phone Today                            | The upcoming meeting shows Marcus only.                                                |
+| Meetings list                          | "Quinn Halvorsen (archived)"                                                           |
+
+**Dropdown fix, re-confirmed:** the relationship field and the account time zone each kept their value through four saves in a row without reloading, and were stored correctly (12/12). The QA data was put back afterwards.
+
 **2B — iOS controls (needs a TestFlight build; adds native modules)**
 
 1. People tab: **Add person**, with the duplicate warning.
@@ -396,4 +487,7 @@ Further requirements set by the owner:
 
 **Phase 5 — Validation.** Web end to end (Playwright) and iOS simulator flows per phase, a security review of new routes, then TestFlight and a written report.
 
-**Test assets.** The disposable QA account `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) **still exists**. Both deletes timed out at Supabase's confirmation prompt. Proposal: reuse it for Phase 2 testing, then delete it with the owner's approval at the end of Phase 2.
+**Test assets.** Two disposable QA accounts exist; both need the owner's approval to delete, at the end of Phase 2.
+
+- `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) is used for Phase 2 testing and holds its test people and records. Both earlier deletes timed out at Supabase's confirmation prompt.
+- `qa-isolation-20261025@atturel-demo.dev` was created for the cross-account isolation checks.

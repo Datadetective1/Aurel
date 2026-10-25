@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { AvatarUpload } from '@/components/app/avatar-upload'
 import { PersonForm } from '@/components/app/person-form'
+import { RemovePersonButton } from '@/components/app/person-lifecycle'
 import { Button } from '@/components/ui/button'
 import { Container, SectionHeader } from '@/components/ui/primitives'
 import { requireOnboardedUser } from '@/lib/auth'
@@ -36,7 +37,7 @@ export default async function EditPersonPage({ params }: { params: Promise<{ id:
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, notes, avatar_url, avatar_path, organizations(name)',
+      'id, full_name, preferred_name, job_title, email, profile_url, relationship_type, relevance, pronouns, timezone, notes, avatar_url, avatar_path, organizations(name)',
     )
     .eq('user_id', user.id)
     .eq('id', id)
@@ -86,12 +87,25 @@ export default async function EditPersonPage({ params }: { params: Promise<{ id:
             profileUrl: person.profile_url ?? '',
             relationshipType: person.relationship_type ?? 'peer',
             relevance: person.relevance ?? 3,
+            pronouns: person.pronouns ?? '',
+            timezone: person.timezone ?? '',
             notes: person.notes ?? '',
           }}
           canResearch={capability.canAnalyseUrls}
           discoveryHint={capability.discoveryHint}
         />
       </div>
+
+      <section className="border-line mt-12 border-t pt-6" aria-labelledby="remove-heading">
+        <h2 id="remove-heading" className="text-ink text-sm font-medium">
+          Remove {name}
+        </h2>
+        <p className="text-ink-muted mt-1 mb-4 max-w-xl text-xs leading-relaxed">
+          Removing is reversible. To delete someone permanently, remove them first, then delete them
+          from Archived, where you will see exactly what goes and what stays.
+        </p>
+        <RemovePersonButton personId={person.id} name={name} />
+      </section>
     </Container>
   )
 }

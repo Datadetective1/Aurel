@@ -20,6 +20,9 @@ import { brand } from '@/lib/brand'
 
 export const metadata: Metadata = { title: 'Meetings', robots: { index: false, follow: false } }
 
+/** Someone the user removed stays on the meetings they attended, marked as such. */
+type Attendee = FaceStackPerson & { archived: boolean }
+
 export default async function MeetingsPage() {
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
@@ -42,7 +45,9 @@ export default async function MeetingsPage() {
     ids.length
       ? supabase
           .from('meeting_attendees')
-          .select('meeting_id, people(id, full_name, preferred_name, avatar_url, avatar_path)')
+          .select(
+            'meeting_id, people(id, full_name, preferred_name, avatar_url, avatar_path, archived_at)',
+          )
           .eq('user_id', user.id)
           .in('meeting_id', ids)
       : Promise.resolve({
@@ -54,6 +59,7 @@ export default async function MeetingsPage() {
               preferred_name: string | null
               avatar_url: string | null
               avatar_path: string | null
+              archived_at: string | null
             } | null
           }[],
         }),
@@ -73,7 +79,7 @@ export default async function MeetingsPage() {
     (attendees ?? []).map((a) => a.people).filter((p): p is NonNullable<typeof p> => Boolean(p)),
     (p) => p.id,
   )
-  const peopleByMeeting = new Map<string, FaceStackPerson[]>()
+  const peopleByMeeting = new Map<string, Attendee[]>()
   for (const a of attendees ?? []) {
     if (!a.people) continue
     peopleByMeeting.set(a.meeting_id, [
@@ -82,6 +88,7 @@ export default async function MeetingsPage() {
         id: a.people.id,
         name: a.people.preferred_name || a.people.full_name,
         src: faces.get(a.people.id) ?? null,
+        archived: Boolean(a.people.archived_at),
       },
     ])
   }
@@ -244,7 +251,7 @@ function MeetingList({
     importance: number
     status: string
   }[]
-  peopleByMeeting: Map<string, FaceStackPerson[]>
+  peopleByMeeting: Map<string, Attendee[]>
   prepared: Set<string | null>
   /** The account holder's zone, so "Tomorrow" means their tomorrow. */
   timeZone: string
@@ -302,7 +309,7 @@ function MeetingList({
                     <span className="text-ink-muted text-xs">
                       {people
                         .slice(0, 3)
-                        .map((p) => p.name)
+                        .map((p) => (p.archived ? `${p.name} (archived)` : p.name))
                         .join(', ')}
                       {people.length > 3 ? ` and ${people.length - 3} more` : ''}
                     </span>
