@@ -29,6 +29,7 @@ _Updated 25 October 2026._
   - **TestFlight 0.1.0 (4)** was built from `bb9c006` and processed by Apple on 25 Oct 2026, for internal testing only. It was not submitted for App Store review.
     - The owner reports it installed. Four screens were seen; none of the §1.4 checks has passed yet (§1.5).
 - **iOS People search and public research: built, in draft PR #21, awaiting the owner's review** (§5, "iOS People search and public research"). Not merged, no build. It holds every page research finds until the owner says it is them.
+  - On the simulator, search and adding a profile link passed. The research steps were not run: the Expo account's free simulator minutes are used up until 1 Nov 2026 (§5, "Simulator results").
 - **Open pull requests:**
   - **PR #20 is doc-only:** this audit, with no code. It goes first.
   - **PR #21** (iOS search and research) is stacked on it, and so is the website follow-up for 5.7 and 5.8.
@@ -684,13 +685,50 @@ Preview results (25 Oct 2026, PR #21 preview, production database, QA accounts A
   - Account B could not read her research or confirm her page (404). An archived person's research is not found.
   - She is archived afterwards, so QA account A has 4 active people again. The run used 2 of its 3 researches this month.
 
+**Simulator results (25 Oct 2026). Partial: stopped before the research run.**
+
+- **Set-up:**
+  - EAS simulator build `f567b6f0` of PR #21's code (`a67cf96`), iPhone 18 Pro simulator, QA account A.
+  - The app pointed at the PR #21 preview, which uses the production database. Production itself does not have these routes until PR #21 merges.
+  - The preview address is set only on the QA branch `qa/pr21-simulator`, which is never merged.
+
+| Check on the simulator                                                                                          | Result                                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search "north"                                                                                                  | **Pass**: Marcus Lee, found through his company (Northwind QA)                                                                                                                                            |
+| Search "quinn" and "ada" (archived people), and "brightwater" (an archived person's company)                    | **Pass**: no one                                                                                                                                                                                          |
+| Search "person"                                                                                                 | **Pass**: QA Person Six, Five, Seven, in the server's order. The phone's own list sorts differently, so this is the server search                                                                         |
+| Add Grace Hopper (company and role). Then, in Edit details, add her Wikipedia page as the profile link and save | **Pass**: her page shows Public footprint with "Research public footprint". The database after saving: 0 research jobs, 0 linked pages, 0 facts, no research status. Research used is unchanged at 2 of 3 |
+
+- **Not run on the simulator:**
+  - the research run;
+  - pages waiting for review;
+  - Ask and briefs while a page waits;
+  - "This is them" and "Not them".
+- **Why it stopped:**
+  - The simulator session ended.
+  - The Expo account's free simulator minutes are used up until 1 Nov 2026. A paid Expo plan needs the owner's approval.
+  - QA account A's last research credit was not spent. Grace Hopper stays active, with her profile link, for when it resumes.
+- **Already covered elsewhere:**
+  - The same flow passed through the routes the app calls (the Ada test above).
+  - The research screen has jest tests.
+  - Confirm, reject and "never offered again" have unit tests.
+
 Limitations:
 
 - **The preview has neither the search provider nor the AI key.** So the preview research could only read the profile link, and the built-in composer did the reading; its facts were poor. Discovery and model reading run only in production. Judge their quality on the TestFlight build, with the owner's approval.
 - **Held results sit in an existing JSON column.** A dedicated column would be cleaner; it needs a schema change and the owner's approval.
 - **Search finds the same people as the web, plus people at a matching company,** with the web's ranking. The web's search does not match preferred names; neither does this.
 - **Memory proposals from a confirmed page are reviewed on the web.** The iPhone has no memory review yet (8.2).
-- **5.7 and 5.8 are web behaviour, unchanged here.** They need the owner's decision.
+- **5.7 and 5.8 are web behaviour, unchanged here.** The owner decided on 25 Oct 2026 to fix them in a separate follow-up PR, stacked on this one.
+- **After "Not them", Ask and briefs can still name the page** (found by reading the code, not seen live). The facts are withdrawn, but in two cases the page's title stays listed:
+  - **The cases:**
+    - a page the user confirmed and then rejected;
+    - a page read earlier for someone else.
+  - **Where it shows:** under "Public sources read" in Ask, and as a "Public source" citation in a brief.
+  - **Why:** both still count as read, because Ask and briefs check only that a page was read and is not waiting for review.
+  - **Not affected:** a page freshly held and then rejected. It never counts as read.
+  - **On the web:** `main` has the same gap for any page marked "not them".
+  - **The fix:** in the follow-up PR, which counts only pages accepted as this person.
 
 Review plan (no merge, no build without the owner):
 
