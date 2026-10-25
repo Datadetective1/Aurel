@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   row: null as Record<string, unknown> | null,
   pending: 0,
   checkout: true,
+  offer: true,
 }))
 
 vi.mock('server-only', () => ({}))
@@ -45,7 +46,10 @@ vi.mock('./actions', () => ({
   startProTrial: vi.fn(),
   openBillingPortal: vi.fn(),
 }))
-vi.mock('@/lib/billing/stripe', () => ({ checkoutAvailable: () => h.checkout }))
+vi.mock('@/lib/billing/stripe', () => ({
+  checkoutAvailable: () => h.checkout,
+  trialOfferOpen: () => h.checkout && h.offer,
+}))
 vi.mock('@/lib/env', async (original) => ({
   ...(await original<typeof import('@/lib/env')>()),
   features: { billing: true, billingWebhooks: true, serviceRole: true },
@@ -82,6 +86,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-25T15:00:00Z'))
   h.pending = 0
   h.checkout = true
+  h.offer = true
 })
 afterEach(() => {
   cleanup()
@@ -237,5 +242,30 @@ describe('a deployment where subscribing cannot complete', () => {
     await show()
     expect(screen.queryByRole('button', { name: /Start your 14-day|Subscribe to Pro/ })).toBeNull()
     expect(screen.getByText(/Upgrading is not available yet/)).toBeTruthy()
+  })
+})
+
+describe('with new trials switched off (PRO_TRIAL_OFFER=off, the rollback switch)', () => {
+  it('a Free account can still subscribe, but is not offered a trial', async () => {
+    h.offer = false
+    h.entitlements = { plan: 'free', tier: 'standard', provider: 'none', trial: null }
+    h.row = row()
+    await show()
+    expect(screen.queryByRole('button', { name: /Start your 14-day/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Subscribe to Pro — $29/month' })).toBeTruthy()
+  })
+
+  it('a trial already running keeps its end date and its remaining days', async () => {
+    h.offer = false
+    h.entitlements = {
+      plan: 'pro',
+      tier: 'standard',
+      provider: 'trial',
+      trial: { state: 'active', endsAt: trialEnds },
+    }
+    h.row = row({ status: 'trialing', current_period_end: trialEnds, trial_ends_at: trialEnds })
+    await show()
+    expect(screen.getByText('Pro trial')).toBeTruthy()
+    expect(screen.getByText(/ends on 8 Nov 2026 \(14 days left\)/)).toBeTruthy()
   })
 })

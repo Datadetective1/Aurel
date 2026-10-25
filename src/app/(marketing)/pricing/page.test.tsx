@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
-import PricingPage from './page'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const h = vi.hoisted(() => ({ trial: true }))
+vi.mock('server-only', () => ({}))
+vi.mock('@/lib/billing/stripe', () => ({ trialOfferOpen: () => h.trial }))
+
+const { default: PricingPage } = await import('./page')
 
 /**
  * THE PRICING PAGE
@@ -13,7 +18,10 @@ import PricingPage from './page'
  * =============================================================================
  */
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  h.trial = true
+})
 
 describe('the pricing page', () => {
   it('shows Free and Pro at $29 a month, and nothing else to buy', () => {
@@ -73,5 +81,18 @@ describe('the pricing page', () => {
   it('says privacy, evidence, corrections and export are on every plan', () => {
     render(<PricingPage />)
     expect(screen.getByText(/On every plan: your record is private to your account/)).toBeTruthy()
+  })
+})
+
+describe('where the trial cannot be started, or is switched off', () => {
+  it('does not advertise it anywhere, structured data included', () => {
+    h.trial = false
+    const { container } = render(<PricingPage />)
+    expect(container.textContent).not.toMatch(/14-day|14 days|trial/i)
+    expect(container.innerHTML).not.toMatch(/Pro trial/)
+    expect(screen.getByRole('link', { name: /Start free, move to Pro later/ })).toBeTruthy()
+    // Still the same plans and allowances.
+    expect(screen.getByText('$29')).toBeTruthy()
+    expect(screen.getAllByRole('row').length).toBeGreaterThan(10)
   })
 })

@@ -5,8 +5,8 @@ import { resolveEntitlement } from './sources'
 /**
  * WHAT THE TRIAL CONFERS, AND WHEN IT STOPS
  * =============================================================================
- * The trial row says `pro` / `trialing` and keeps saying it after the trial
- * ends -- nothing rewrites it. So every reader must go through entitlements,
+ * The trial row says `free` / `trialing` with `trial_ends_at`, and keeps
+ * saying it after the trial ends -- nothing rewrites it. So every reader must go through entitlements,
  * which reads it as a trial that ends by itself: Pro until `trial_ends_at`,
  * Free after, with the Free limits back and nothing removed.
  * =============================================================================
@@ -31,7 +31,7 @@ const NOW = new Date('2026-10-25T15:00:00Z')
 
 const trialRow = (endsAt: string, over: Row = {}): Row => ({
   user_id: 'u-1',
-  plan: 'pro',
+  plan: 'free',
   status: 'trialing',
   is_founding: false,
   current_period_end: endsAt,
@@ -62,7 +62,7 @@ describe('an account on the trial', () => {
 })
 
 describe('an account whose trial ended without subscribing', () => {
-  it('is Free again, with Free’s limits, although its row still says pro / trialing', async () => {
+  it('is Free again, with Free’s limits, although its row still says trialing', async () => {
     h.subscriptions = [trialRow('2026-10-24T15:00:00Z')]
     const e = await getEntitlements()
     expect(e).toMatchObject({
@@ -80,7 +80,10 @@ describe('an account whose trial ended without subscribing', () => {
 
 describe('an account that subscribed during the trial', () => {
   it('is Pro from Stripe, and the trial reads as subscribed', async () => {
-    h.subscriptions = [trialRow('2026-11-08T15:00:00Z', { stripe_subscription_id: 'sub_1' })]
+    // The webhook's row: Stripe's subscription, trialing to the first charge.
+    h.subscriptions = [
+      trialRow('2026-11-08T15:00:00Z', { plan: 'pro', stripe_subscription_id: 'sub_1' }),
+    ]
     const e = await getEntitlements()
     expect(e).toMatchObject({
       plan: 'pro',
@@ -99,6 +102,17 @@ describe('an account that subscribed during the trial', () => {
     ]
     const e = await getEntitlements()
     expect(e).toMatchObject({ plan: 'free', trial: null, limits: { people: 5 } })
+  })
+})
+
+describe('if this code were ever reverted', () => {
+  it('the code from before the trial reads every trial row as Free, never as endless Pro', async () => {
+    // The pre-trial rule: a row confers its plan while its status is entitled.
+    const { effectivePlan } = await import('./subscription-state')
+    for (const endsAt of ['2026-11-08T15:00:00Z', '2026-10-01T15:00:00Z']) {
+      const row = trialRow(endsAt)
+      expect(effectivePlan({ plan: row.plan as 'free', status: row.status as string })).toBe('free')
+    }
   })
 })
 

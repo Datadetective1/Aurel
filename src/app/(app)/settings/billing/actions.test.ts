@@ -127,6 +127,7 @@ vi.mock('@/lib/billing/stripe', async (original) => ({
   stripe: () => stripeFake,
   proPriceId: () => (h.configured ? 'price_pro' : null),
   checkoutAvailable: () => h.configured,
+  trialOfferOpen: () => h.configured,
 }))
 vi.mock('@/lib/billing/notify', () => ({
   notifyTrial: (...a: unknown[]) => notifyTrial(...(a as [])),
@@ -220,7 +221,8 @@ describe('starting the trial', () => {
       message: 'Your 14-day Pro trial is on. No card, nothing charged.',
     })
     expect(sub()).toMatchObject({
-      plan: 'pro',
+      // `plan` is what is paid for: a trial keeps Free there.
+      plan: 'free',
       status: 'trialing',
       trial_ends_at: '2026-11-08T15:00:00.000Z',
       current_period_end: '2026-11-08T15:00:00.000Z',
@@ -254,9 +256,7 @@ describe('starting the trial', () => {
   })
 
   it('an account whose trial ended cannot start another', async () => {
-    h.subscriptions = [
-      freeRow({ plan: 'pro', status: 'trialing', trial_ends_at: '2026-10-20T15:00:00Z' }),
-    ]
+    h.subscriptions = [freeRow({ status: 'trialing', trial_ends_at: '2026-10-20T15:00:00Z' })]
     expect(await start()).toEqual({
       error: 'This account has already had its Pro trial. Subscribe to Pro to keep using it.',
     })
@@ -353,9 +353,7 @@ describe('subscribing during the trial', () => {
 
 describe('subscribing without a trial running', () => {
   it('after the trial ended: charged today, and Checkout says so', async () => {
-    h.subscriptions = [
-      freeRow({ plan: 'pro', status: 'trialing', trial_ends_at: '2026-10-20T15:00:00Z' }),
-    ]
+    h.subscriptions = [freeRow({ status: 'trialing', trial_ends_at: '2026-10-20T15:00:00Z' })]
     const { url } = await subscribe()
     expect(url).toBeTruthy()
     expect(sessionParams().subscription_data).toEqual({ metadata: { user_id: 'u-1' } })

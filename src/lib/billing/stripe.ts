@@ -56,6 +56,15 @@ export function checkoutAvailable(): boolean {
 }
 
 /**
+ * Whether a new 14-day trial may be started or advertised: subscribing works,
+ * and the offer has not been switched off (`PRO_TRIAL_OFFER=off`, the
+ * rollback switch). Switching it off never touches a trial already running.
+ */
+export function trialOfferOpen(): boolean {
+  return features.proTrialOffer && checkoutAvailable()
+}
+
+/**
  * Whether a Stripe price is the one this product sells at the advertised
  * amount: monthly, recurring, in the offer's currency, at the offer's price.
  *

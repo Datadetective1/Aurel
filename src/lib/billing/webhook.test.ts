@@ -424,7 +424,7 @@ describe('one row, several subscriptions', () => {
 /**
  * THE 14-DAY TRIAL, THROUGH THE WEBHOOK
  * =============================================================================
- * The trial is the app's own row (pro / trialing / trial_ends_at, no Stripe
+ * The trial is the app's own row (free / trialing / trial_ends_at, no Stripe
  * subscription). Stripe only appears when the customer chooses Subscribe to
  * Pro: a Checkout whose subscription carries `trial_end`, so the rest of the
  * trial is kept and the first charge is at its end.
@@ -450,7 +450,7 @@ describe('the Pro trial', () => {
     }
     ctx.store.rows.set(USER, {
       userId: USER,
-      plan: 'pro',
+      plan: 'free',
       status: 'trialing',
       cancelAtPeriodEnd: false,
       currentPeriodEnd: iso(trialEndS),
@@ -573,12 +573,49 @@ describe('the Pro trial', () => {
     expect(transitions).toEqual([])
   })
 
+  it('an abandoned checkout cannot extend a trial either, whatever trial_end it carried', async () => {
+    const end = T0 + 3 * DAY
+    // An incomplete subscription whose trial would run well past the app's.
+    const remote = { current: trialing(end + 30 * DAY, { status: 'incomplete' }) }
+    const { store, transitions, deps } = trialSetup(end, remote)
+    const before = { ...store.rows.get(USER) }
+    await processStripeEvent(
+      event('evt_long', 'customer.subscription.created', { id: 'sub_1', customer: 'cus_1' }),
+      deps,
+    )
+    expect(store.rows.get(USER)).toEqual(before)
+    expect(store.rows.get(USER)?.trialEndsAt).toBe(iso(end))
+    expect(transitions).toEqual([])
+  })
+
+  it('a Checkout session that simply expires is not an event the handler acts on', async () => {
+    const end = T0 + 3 * DAY
+    const remote = { current: trialing(end) }
+    const { store, deps } = trialSetup(end, remote)
+    const before = { ...store.rows.get(USER) }
+    const result = await processStripeEvent(
+      event('evt_expired_session', 'checkout.session.expired', {
+        client_reference_id: USER,
+        subscription: null,
+      }),
+      deps,
+    )
+    expect(result.status).toBe(200)
+    expect(store.events.has('evt_expired_session')).toBe(false)
+    expect(store.rows.get(USER)).toEqual(before)
+  })
+
   it('subscribing after the trial ended starts a subscription, and says so', async () => {
     const remote = { current: subscription({ status: 'active' }) }
     const { store, transitions, deps } = trialSetup(T0 - DAY, remote)
     await processStripeEvent(checkout(), deps)
     expect(transitions).toEqual([{ kind: 'activated', firstChargeAt: null }])
-    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', status: 'active' })
+    // The trial stays on record: when it was is the customer's history.
+    expect(store.rows.get(USER)).toMatchObject({
+      plan: 'pro',
+      status: 'active',
+      trialEndsAt: iso(T0 - DAY),
+    })
   })
 
   it('a failed first charge keeps Pro while Stripe retries, then ends it for payment', async () => {

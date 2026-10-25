@@ -1,6 +1,7 @@
 import type { AccessTier } from './access'
 import type { PlanId } from './plans'
 import { effectivePlan } from './subscription-state'
+import { trialRunning } from './trial'
 
 /**
  * WHERE AN ACCOUNT'S ACCESS COMES FROM
@@ -54,10 +55,9 @@ export interface ResolvedEntitlement {
 export function resolveEntitlement(sources: EntitlementSources): ResolvedEntitlement {
   const stripePlan = effectivePlan(sources.stripe)
   const applePlan = effectivePlan(sources.apple)
-  const now = (sources.now ?? new Date()).getTime()
-  // A trial confers Pro until it ends, and nothing after.
+  // A trial confers Pro until it ends, and nothing after (lib/billing/trial).
   const trialPlan: PlanId =
-    sources.trial && new Date(sources.trial.endsAt).getTime() > now ? 'pro' : 'free'
+    sources.trial && trialRunning(sources.trial.endsAt, sources.now) ? 'pro' : 'free'
 
   const billingProviders: ResolvedEntitlement['billingProviders'] = []
   if (stripePlan !== 'free') billingProviders.push('stripe')

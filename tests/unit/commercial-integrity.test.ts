@@ -128,8 +128,10 @@ describe('the 14-day trial', () => {
   const claim = code(read('lib', 'billing', 'trial-claim.ts'))
   const actions = code(read('app', '(app)', 'settings', 'billing', 'actions.ts'))
 
-  it('is the only entitlement written outside the webhook, and only onto an unused Free row', () => {
-    expect(claim).toMatch(/plan:\s*'pro'/)
+  it('is the only entitlement written outside the webhook, onto an unused Free row, never as a paid plan', () => {
+    expect(claim).toContain("status: 'trialing'")
+    // `plan` stays Free: only the webhook writes a paid plan.
+    expect(claim).not.toMatch(/plan:\s*'pro'/)
     for (const guard of [
       ".eq('plan', 'free')",
       ".is('trial_ends_at', null)",
@@ -146,6 +148,19 @@ describe('the 14-day trial', () => {
       actions.indexOf('export async function startCheckout'),
     )
     expect(start).not.toMatch(/stripe\(\)|checkout\.sessions|customers\.create/)
+  })
+
+  it('has one expiry rule, and the offer switch can never end a running trial', () => {
+    const trial = code(read('lib', 'billing', 'trial.ts'))
+    const sources = code(read('lib', 'billing', 'sources.ts'))
+    const entitlements = code(read('lib', 'billing', 'entitlements.ts'))
+    expect(trial).toContain('export function trialRunning(')
+    expect(sources).toContain('trialRunning(')
+    // Access is computed from trial_ends_at alone: the rollback switch only
+    // stops new trials (PRO_TRIAL_OFFER=off), it is not read where access is.
+    for (const source of [trial, sources, entitlements]) {
+      expect(source).not.toMatch(/proTrialOffer|trialOfferOpen|PRO_TRIAL_OFFER/)
+    }
   })
 
   it('subscribing during it keeps the rest of it and states the terms on Stripe’s page', () => {

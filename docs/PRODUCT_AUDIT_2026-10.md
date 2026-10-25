@@ -54,7 +54,8 @@ _Updated 25 October 2026._
   - **PR #21's simulator research steps** (§5, "Remaining simulator checks"). They wait until 1 Nov 2026, when the Expo minutes and QA account A's research credits reset; a paid Expo plan needs approval. Grace Hopper stays on QA account A for them.
   - **Real-device checks on build 0.1.0 (5):** the §1.4 checklist, which was not verified on build 4 (§1.5). Item 8 covers 8.7's typed notes, PR #21's search and research, and 8.6's Account calendar and Sync now.
   - **Finding 8.6's live provider check:** a manual Sync now on a real connection. Needs the owner's approval.
-  - **The trial's Stripe test-mode run and the live Stripe configuration** (§5, "Pricing and the Pro trial"). Both need an owner step in Stripe or Vercel; no live charge or subscription has been created.
+  - **The trial's Stripe test-mode run is blocked on an owner checklist** (§5, "Pricing and the Pro trial"). This session's Stripe connector reaches only the live account, and it cannot see the Vercel project.
+  - **Which Stripe keys production uses is unconfirmed.** Live objects exist (a $29 price, a portal, a webhook to atturel.com, created 14 Oct), but only test-mode events were ever received. No live charge, live subscription or live Stripe object has been created.
 - Owner decisions on discovery, removal, billing, notifications, privacy, photos and pricing are recorded in §4, with the approved roadmap.
 - **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026). It is fixed and its live AI check passed; the device check on build 5 is pending.
 
@@ -993,12 +994,32 @@ _Implements decision 7 (§4). Not merged, not deployed. Allowances unchanged. No
 
 **How the trial works:**
 
-- **Granted by Atturel, not Stripe.** Start your 14-day Pro trial (Settings › Plan) sets the account's existing `subscriptions` row to `pro` / `trialing` with `trial_ends_at`. It does this in one conditional UPDATE, only on a Free row that has never had a trial or a Stripe subscription (`src/lib/billing/trial-claim.ts`). No card is asked for, and nothing is created at Stripe.
-- **Ends by itself.** Entitlements read that row as a trial: Pro until `trial_ends_at`, Free after. No job has to run. Every reader goes through entitlements, including the sidebar's plan label, which used to read the raw column.
+- **Granted by Atturel, not Stripe.** Start your 14-day Pro trial (Settings › Plan) sets the account's existing `subscriptions` row to `status = 'trialing'` with `trial_ends_at`.
+  - `plan` stays `free`, because `plan` records what is paid for.
+  - It is one conditional UPDATE, only on a Free row that has never had a trial or a Stripe subscription (`src/lib/billing/trial-claim.ts`).
+  - No card is asked for, and nothing is created at Stripe.
+- **Ends by itself, under one rule.** `trialRunning` (`src/lib/billing/trial.ts`) is the only expiry rule: Pro while the time is before `trial_ends_at`, never after.
+  - Every reader uses it: entitlements (so every server capability and limit check, the website, the iPhone account response and the sidebar label), and the webhook's trial guard. The Plan page reads it through entitlements.
+  - It is evaluated on each request, and nothing writes the expiry. So a trial ends on time even if the daily job, a reminder or a webhook never runs.
+  - A date that cannot be read counts as ended.
+  - A test checks that the readers agree to the millisecond at the boundary.
 - **Back to Free keeps everything.** Nothing is deleted or archived. Reading, editing and export are not plan-gated. With more than five active people, adding or restoring one asks for Pro; nobody is hidden.
 - **Consent is structural.** While the trial runs there is no Stripe subscription, so a card added or updated in the billing portal cannot start billing (the portal cannot create a subscription). Only Subscribe to Pro — $29/month does that. It opens Checkout with the first charge date and the monthly terms beside Stripe's button, and on the Plan page before it.
 - **Subscribing keeps the rest of the trial.** The Checkout subscription carries `trial_end`, so the first charge is when the trial would have ended. Stripe requires at least 48 hours, so in the last two days it is 48 hours and 10 minutes away, never sooner. After the trial, subscribing charges today and says so.
-- **Offered only where subscribing works**: Checkout, the price, the webhook and the service role all configured. So a trial can always end in a real choice.
+- **Offered only where it can end in a real choice, and switchable off.** The trial is offered only when subscribing works (Checkout, the price, the webhook and the service role) and `PRO_TRIAL_OFFER` is not `off`. The pricing page advertises the trial only under the same condition.
+
+**Abandoned checkout cannot remove or extend a trial (reviewed 25 Oct 2026):**
+
+- **Nothing happens when Checkout is closed or a card is declined.** No subscription is created, and the trial row is untouched. `checkout.session.expired` is not an event the handler acts on (tested).
+- **An `incomplete` or `incomplete_expired` subscription while the trial runs is ignored**, whatever `trial_end` it carries, so it can neither shorten nor lengthen the trial (tested).
+- **`trial_ends_at` has two writers only:** the trial claim (once, onto an empty value), and the webhook for a subscription that entitles, which needs a completed Checkout with a card.
+- **Known and bounded: up to about two extra days.** Subscribing in the trial's last two days puts the first charge 48 hours and 10 minutes out, Stripe's minimum. So Pro can run up to about two days past the trial's end.
+  - It needs a completed Checkout with a card. Canceling afterwards keeps Pro to that date without a charge.
+  - It happens at most once per account: a later subscription gets no trial.
+  - Accepting it keeps the promise that subscribing never charges before the trial ends.
+- **Canceling keeps the rest of the trial only because the portal cancels at the end of the period.** The live portal is set that way (verified read-only, below). An immediate cancellation, for example from the Stripe dashboard, would end Pro at once.
+
+**The reminder before the first charge stays** (owner, 25 Oct 2026).
 
 **What customers see:**
 
@@ -1030,14 +1051,15 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 
 **Verified:**
 
-- **Web: 1361/1361 tests. iPhone: 108/108.** Typechecks are clean, ESLint reports 0 errors, and Prettier is clean on the changed web files.
+- **Web: 1371/1371 tests. iPhone: 108/108.** Typechecks are clean, ESLint reports 0 errors, and Prettier is clean on the changed web files.
 - **Lifecycle, against the real webhook handler and an in-memory ledger:**
   - subscribe during the trial, with duplicate and late deliveries;
   - the first charge, and a failed first charge (`past_due`, then `unpaid`);
   - cancel during the trial, then end at the trial's end;
   - an abandoned checkout during the trial;
   - subscribing after expiry.
-- **Starting twice, and twice at once:** the server action against a table with Postgres's update semantics. Separately, **the real UPDATE in Postgres 16 under two concurrent sessions:** the second waited on the first's row lock, re-checked the conditions and claimed nothing. A later press also claimed nothing.
+- **Starting twice, and twice at once:** the server action against a table with Postgres's update semantics. Separately, **the real UPDATE in a scratch Postgres 16 under two concurrent sessions,** re-run with the final statement. The second session waited on the first's row lock, re-checked the conditions and claimed nothing. The row ended `free` / `trialing` with one end date.
+- **A revert reads trials as Free:** the pre-trial rule (`effectivePlan`) applied to trial rows, running or ended, returns Free (tested).
 - **Expiry:** entitlements read an expired trial row as Free with Free's limits, and the Plan page, iPhone line and notices follow.
 - **Checkout parameters:** `trial_end`, the 48-hour minimum, the terms text, and no trial after expiry.
 - **Pages:** the Plan page in each state, the pricing page, and the account response.
@@ -1047,32 +1069,67 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
   - Checkout refuses on exactly those conditions, so Subscribe could only have failed there. **Fixed:** Subscribe and the trial now follow one check (`checkoutAvailable`). Where subscribing cannot complete, the page offers neither and says upgrading is not available.
   - No button was pressed and nothing was written.
 
-**Not verified: Stripe test mode, end to end.** This session has no Stripe keys, and the configured test-mode webhook delivers to production, which runs the old handler. A real test-mode run of this branch needs, from the owner:
+**Billing QA accounts (created 25 Oct 2026 at the owner's request; QA account B is untouched):**
 
-1. **In Vercel's Preview environment, test-mode values for:** `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO_MONTHLY` (a test $29 monthly price), `STRIPE_WEBHOOK_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`. One of the last three is missing today (above).
-   - Then a Stripe **test-mode** webhook endpoint pointing at this branch's preview deployment, with Vercel deployment protection bypassed for it. Or use Stripe CLI forwarding with test keys.
-2. Approval to run it on QA account B. That writes a trial and a test-mode Stripe customer to QA B's row. It can be reset afterwards with one documented UPDATE.
-3. Then: start twice; subscribe during the trial with card 4242 4242 4242 4242; resend events from the Stripe dashboard; cancel in the portal; let a second QA trial expire by setting its `trial_ends_at` in the past.
+- `qa-billing-trial-20261025@atturel-demo.dev` (user `686fddce-…`), for subscribing during the trial, abandoned checkout and cancellation.
+- `qa-billing-expiry-20261025@atturel-demo.dev` (user `3b841b8d-…`), for a trial that expires without a subscription.
+- **Why two:** each account gets one trial, and these two paths need separate trials.
+- Both are onboarded, Free, never trialed, in America/Chicago. Both sign in on the PR #26 preview: the account response answers 200 with "Free".
+- The credentials are held outside the repository and were never printed.
 
-No live charge, live subscription or live Stripe object has been created.
+**What this session can reach (25 Oct 2026, observed):**
 
-**Live Stripe and production checks before pilots can subscribe (owner, in the dashboards; no charge needed):**
+- **Stripe:** the connector reaches only the live Atturel account, with no sandbox or test mode. It was used read-only; nothing was written.
+- **Vercel:** the team is visible, but its project list is empty for this session and the Atturel project answers 404. So environment variables can be neither read nor set.
+- **So the test-mode run is blocked** on the owner's checklist below. No live charge, live subscription or live Stripe object has been created.
 
-- **Mode:** production is believed to use test keys; Stripe events so far are test-mode only. Switch production to live keys when ready.
-- **Price:** a live recurring price of $29.00 USD, monthly, interval count 1, set as `STRIPE_PRICE_PRO_MONTHLY`. Checkout refuses any other price before charging.
-- **Webhook:** a live endpoint at `/api/stripe/webhook`, with its secret as `STRIPE_WEBHOOK_SECRET`. Events:
+**Test-mode run: what the owner sets up.** These steps are dashboard-only and leave production untouched.
+
+- **A dedicated Stripe sandbox, "Atturel PR 26".** A sandbox is isolated from whatever production uses. That matters because the preview and production share one database and one event ledger.
+- **The sandbox, granted to the Claude Stripe connector.** Then the assistant can:
+  - create the price, the preview webhook and the portal settings in it;
+  - read Stripe's state;
+  - move time with test clocks.
+- **In Vercel, three variables scoped to Preview and branch `pro-trial` only:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_PRO_MONTHLY`. Also confirm `SUPABASE_SERVICE_ROLE_KEY` reaches Preview. Then redeploy the branch.
+- **The preview webhook URL:** `https://atturel-git-pro-trial-datadetective1s-projects.vercel.app/api/stripe/webhook`. The alias answered without Vercel authentication on 25 Oct.
+- **Events (from `HANDLED_EVENTS` in `src/lib/billing/webhook.ts`):**
   - `checkout.session.completed`;
-  - `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed`;
+  - `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.paused`, `customer.subscription.resumed`;
   - `invoice.paid`, `invoice.payment_failed`.
-- **Customer portal (live):**
-  - cancellation at the end of the period (which for a trial is the trial's end);
-  - payment-method updates and invoice history on;
-  - plan switching off: there is one price.
-- **Stripe emails:** receipts and failed-payment emails on. Consider also turning on Stripe's own reminder before a trial ends, as a second notice beside Atturel's.
-- **Production environment:** `CRON_SECRET`, so the daily job (and the trial notices) runs; Resend sending; the service role key.
-- **Checkout:** the live account's business name and statement descriptor are what customers will see.
+- **Repeated deliveries need the dashboard:** Stripe's API cannot resend an event. The owner uses Resend on the event in the sandbox's Workbench.
+- **The production cron is not run from the preview.** It would also send the day's follow-through emails to real accounts, which share the database. The trial notices are covered by unit tests only.
 
-**Rollback:** revert the PR. Trials already started stay on their rows. With the code reverted they read as `trialing` Pro without an end, so before reverting with active trials, run `update subscriptions set plan = 'free', status = null where status = 'trialing' and stripe_subscription_id is null;`, which needs owner approval.
+**Live Stripe configuration (25 Oct 2026): evidence, then inference**
+
+- **Evidence, live Stripe API (read-only):**
+  - Price `price_1UQHvV…`: $29.00 USD, monthly, interval count 1, active. This matches what checkout requires.
+  - Webhook "Atturel LIVE - production" to `https://www.atturel.com/api/stripe/webhook`: enabled, with exactly the eight handled events.
+  - Default portal configuration: cancel at the end of the period, payment-method updates on, invoice history on, plan switching off, pause off.
+  - All three were created on 14 Oct 2026 at about 02:28 UTC.
+  - No live Checkout session has ever been created.
+- **Evidence, production database (read-only):**
+  - The only Stripe events received are six test-mode events on 14 Oct 2026, between 02:03 and 02:17 UTC: one test checkout and its updates.
+  - No live event has been received, and no account has a Stripe customer.
+- **Unconfirmed: which Stripe keys production uses.**
+  - The earlier note that production "appears to use test keys" was an inference from the test-mode events alone. The live price, portal and webhook created eleven minutes after them suggest a switch to live keys may already have been prepared. Neither is confirmed.
+  - Only the production environment variables can settle it, and this session cannot read them.
+  - If production already holds live keys and the live price, `main`'s Plan page already offers live checkout today. That predates this PR.
+- **For the owner to confirm (no charge needed):**
+  - In Vercel's Production environment: `STRIPE_SECRET_KEY` starts with `sk_live_`; `STRIPE_PRICE_PRO_MONTHLY` is the live price above; `STRIPE_WEBHOOK_SECRET` is the live endpoint's signing secret; `CRON_SECRET`, `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set.
+  - In Stripe: receipts and failed-payment emails, and the business name and statement descriptor customers will see.
+  - Consider Stripe's own trial-ending reminder as a second notice.
+
+**Rollback. No step resets a trial, a QA account or any customer data:**
+
+1. **Stop new trials.** Set `PRO_TRIAL_OFFER=off` in Production and redeploy.
+   - Trials already running keep their end date and remaining days.
+   - The pricing page stops advertising the trial. Subscribe still works.
+   - Nothing in the database changes.
+2. **If the code itself must go,** revert the PR after the trials running at step 1 have ended (at most 14 days later).
+   - A trial row keeps `plan = 'free'`, so the pre-trial code reads every trial row as Free, running or ended (tested). No row needs changing.
+   - Subscriptions started during a trial are ordinary Stripe subscriptions, which the pre-trial webhook already handles.
+3. **Reverting before those trials end would cut them short,** so it is not part of this plan.
+4. **Rows are never rewritten for a rollback.** Each account keeps its trial history (`trial_ends_at`), including after a later subscription.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.
 

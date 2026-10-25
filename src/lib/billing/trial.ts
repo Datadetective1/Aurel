@@ -3,8 +3,8 @@
  * =============================================================================
  * Fourteen days of Pro, once per account, with no card (owner decision,
  * 25 Oct 2026). Atturel grants it itself: the account's row in
- * `subscriptions` says `trialing` with a `trial_ends_at`, and there is no
- * Stripe subscription behind it.
+ * `subscriptions` keeps `plan = 'free'` and says `status = 'trialing'` with a
+ * `trial_ends_at`, and there is no Stripe subscription behind it.
  *
  * That is the consent rule, built in rather than policed. While the trial
  * runs there is nothing at Stripe that could start charging, so adding or
@@ -43,6 +43,21 @@ export interface TrialRow {
  */
 export type TrialState = 'active' | 'ended' | 'subscribed'
 
+/**
+ * THE expiry rule, and the only one: a trial confers Pro while the current
+ * time is before its end, and never after.
+ *
+ * Every reader goes through it -- entitlements (so every server capability
+ * check, the website and the iPhone's account response), the webhook's
+ * trial guard, and the Plan page through entitlements. It is evaluated on
+ * every request against `trial_ends_at`, and nothing writes the expiry: no
+ * reminder, scheduled job or webhook has to run for a trial to end on time.
+ * A date that cannot be read is treated as ended.
+ */
+export function trialRunning(endsAt: string, now: Date = new Date()): boolean {
+  return new Date(endsAt).getTime() > now.getTime()
+}
+
 /** A trial Atturel granted itself: no Stripe subscription behind the row. */
 export function isAppTrial(row: TrialRow | null | undefined): boolean {
   return Boolean(row && !row.stripeSubscriptionId && row.status === 'trialing' && row.trialEndsAt)
@@ -54,7 +69,7 @@ export function trialState(
 ): TrialState | null {
   if (!row?.trialEndsAt) return null
   if (isAppTrial(row)) {
-    return new Date(row.trialEndsAt).getTime() > now.getTime() ? 'active' : 'ended'
+    return trialRunning(row.trialEndsAt, now) ? 'active' : 'ended'
   }
   if (row.stripeSubscriptionId && row.status === 'trialing') return 'subscribed'
   return null

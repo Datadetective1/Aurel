@@ -158,3 +158,33 @@ describe('the daily notices, without a ledger', () => {
     }
   })
 })
+
+describe('one expiry rule for every reader', () => {
+  it('entitlements, the trial state and the webhook guard agree to the millisecond', async () => {
+    const { resolveEntitlement } = await import('./sources')
+    const { trialRunning } = await import('./trial')
+    const end = '2026-11-08T15:00:00.000Z'
+    for (const offset of [-1, 0, 1]) {
+      const now = new Date(Date.parse(end) + offset)
+      const running = trialRunning(end, now)
+      expect(running).toBe(offset < 0)
+      expect(trialState(appTrial(end), now)).toBe(running ? 'active' : 'ended')
+      expect(appTrialActive(appTrial(end), now)).toBe(running)
+      expect(
+        resolveEntitlement({
+          stripe: null,
+          apple: null,
+          trial: { endsAt: end },
+          tier: 'standard',
+          now,
+        }).plan,
+      ).toBe(running ? 'pro' : 'free')
+    }
+  })
+
+  it('a date that cannot be read is an ended trial, never an endless one', async () => {
+    const { trialRunning } = await import('./trial')
+    expect(trialRunning('not a date', NOW)).toBe(false)
+    expect(trialState(appTrial('not a date'), NOW)).toBe('ended')
+  })
+})

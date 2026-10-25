@@ -11,7 +11,7 @@ import { ManageBillingButton, TrialButton, UpgradeButton } from '@/components/ap
 import { InvitationPanel } from '@/components/app/invitation-panel'
 import { hasFullAccess } from '@/lib/billing/access'
 import { planSummary } from '@/lib/billing/plan-summary'
-import { checkoutAvailable } from '@/lib/billing/stripe'
+import { checkoutAvailable, trialOfferOpen } from '@/lib/billing/stripe'
 import { trialEligibility } from '@/lib/billing/trial'
 import { features } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
@@ -88,7 +88,7 @@ export default async function BillingSettingsPage({
         }
       : null,
     trialOffered:
-      subscribable &&
+      trialOfferOpen() &&
       entitlements.plan === 'free' &&
       trialEligibility(
         billing

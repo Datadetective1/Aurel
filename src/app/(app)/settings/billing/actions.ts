@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
 import { formatDate } from '@/lib/format'
 import { FOUNDING_OFFER, PLANS, PRO_PRICE, formatPrice } from '@/lib/billing/plans'
-import { checkoutAvailable, priceMatchesOffer, proPriceId, stripe } from '@/lib/billing/stripe'
+import { priceMatchesOffer, proPriceId, stripe, trialOfferOpen } from '@/lib/billing/stripe'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { hasFullAccess } from '@/lib/billing/access'
 import { notifyTrial } from '@/lib/billing/notify'
@@ -73,7 +73,7 @@ export async function startProTrial(
   _prev: BillingState,
   _formData: FormData,
 ): Promise<BillingState> {
-  if (!checkoutAvailable()) {
+  if (!trialOfferOpen()) {
     return { error: 'The Pro trial is not available right now. Nothing has changed.' }
   }
 

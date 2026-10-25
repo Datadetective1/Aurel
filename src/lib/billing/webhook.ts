@@ -279,9 +279,14 @@ async function handle(
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
+    // Stripe's trial when it has one. Otherwise the app's own trial stays on
+    // record, so a subscription started after the trial does not erase when
+    // the trial was.
     trialEndsAt: subscription.trial_end
       ? new Date(subscription.trial_end * 1000).toISOString()
-      : null,
+      : appTrial
+        ? (before?.trialEndsAt ?? null)
+        : null,
     billingInterval: deps.intervalForPrice(priceId),
     founding,
     stateAt: now.toISOString(),

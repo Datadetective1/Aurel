@@ -50,6 +50,11 @@ const serverSchema = z.object({
   STRIPE_SECRET_KEY: optional,
   STRIPE_WEBHOOK_SECRET: optional,
   STRIPE_PRICE_PRO_MONTHLY: optional,
+  /**
+   * `off` stops new 14-day Pro trials: the trial's rollback switch. Trials
+   * already running continue to their end, and nothing is reset.
+   */
+  PRO_TRIAL_OFFER: optional,
   // Recognised for any subscription already on it; not offered (no annual
   // plan in this launch).
   STRIPE_PRICE_PRO_YEARLY: optional,
@@ -253,6 +258,8 @@ export const features = {
   emailDelivery: Boolean(serverEnv.RESEND_API_KEY),
   billing: Boolean(serverEnv.STRIPE_SECRET_KEY),
   billingWebhooks: Boolean(serverEnv.STRIPE_SECRET_KEY && serverEnv.STRIPE_WEBHOOK_SECRET),
+  /** New trials may be offered (PRO_TRIAL_OFFER is not `off`). */
+  proTrialOffer: serverEnv.PRO_TRIAL_OFFER !== 'off',
   // Calendar support is NOT a flag here. providerConfigured() in
   // lib/calendar/provider.ts is the single answer to "can this deployment
   // offer a calendar", because it is the one that agrees with lib/crypto about

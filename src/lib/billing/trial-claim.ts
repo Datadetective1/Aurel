@@ -9,6 +9,13 @@ import { logger } from '@/lib/logger'
  * payment processor -- because no money is involved. Everything paid is
  * written by the Stripe webhook alone.
  *
+ * The row keeps `plan = 'free'`: `plan` is what is paid for, and a trial is
+ * not paid for. The trial is `status = 'trialing'` with `trial_ends_at` and no
+ * Stripe subscription, which only lib/billing/trial reads as Pro, and only
+ * until it ends. So anything that reads the raw `plan` column -- an export, a
+ * report, or the code from before the trial if it were ever restored -- sees
+ * Free, and never an endless Pro.
+ *
  * One conditional UPDATE: only a Free row that has never had a trial or a
  * Stripe subscription becomes a trial. Postgres takes the row lock, then
  * re-checks those conditions, so of two presses at once exactly one claims
@@ -20,7 +27,6 @@ export type TrialClaim = 'claimed' | 'used' | 'failed'
 
 export async function claimTrial(userId: string, endsAt: string): Promise<TrialClaim> {
   const trial = {
-    plan: 'pro' as const,
     status: 'trialing' as const,
     trial_ends_at: endsAt,
     current_period_end: endsAt,

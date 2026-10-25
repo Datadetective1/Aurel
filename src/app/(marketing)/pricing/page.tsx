@@ -7,6 +7,7 @@ import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
 import { FOUNDING_OFFER, PLANS, foundingProtectionBlurb, formatPrice } from '@/lib/billing/plans'
 import { allowanceRows } from '@/lib/billing/allowances'
 import { TRIAL_DAYS } from '@/lib/billing/trial'
+import { trialOfferOpen } from '@/lib/billing/stripe'
 import { brand, title } from '@/lib/brand'
 
 const PRICE = formatPrice(PLANS.pro.monthlyPriceCents)
@@ -18,7 +19,8 @@ export const metadata: Metadata = {
   openGraph: { title: title('Pricing'), description: brand.description },
 }
 
-const FAQ = [
+/** Asked only where the trial can actually be started. */
+const TRIAL_FAQ = [
   {
     q: 'How does the Pro trial work?',
     a: `${TRIAL_DAYS} days of Pro, once per account, with no card. Start it from Settings › Plan after you sign up. Nothing is charged automatically: when it ends, your account returns to Free unless you choose Subscribe to Pro. We email you two to three days before it ends.`,
@@ -31,6 +33,9 @@ const FAQ = [
     q: 'If I subscribe during the trial, do I lose the rest of it?',
     a: `No. You see the first charge date before you confirm: the day the trial would have ended (at least two days after you subscribe). Then ${PRICE} every month until you cancel. We remind you two to three days before the first charge, and if you cancel before it you pay nothing.`,
   },
+]
+
+const FAQ = [
   {
     q: 'Do I pay per person I add?',
     a: `No, and that is deliberate. ${brand.name} only gets useful when you add the people you actually work with, so charging per person would work against the whole point. Pro has no limit on people. What is metered is the expensive work: researching a public footprint, generating briefs, analyzing transcripts.`,
@@ -49,15 +54,21 @@ const FAQ = [
   },
   {
     q: 'Can I cancel?',
-    a: 'At any time, from Settings › Plan. You keep Pro until the end of the period you have paid for, or of your trial if you subscribed during it.',
+    a: 'At any time, from Settings › Plan. You keep Pro until the end of the period you have paid for.',
   },
 ]
+
+type Faq = { q: string; a: string }[]
 
 export default function PricingPage() {
   const free = PLANS.free
   const pro = PLANS.pro
   const protection = foundingProtectionBlurb()
   const allowances = allowanceRows()
+  // The trial is advertised only where it can be started: subscribing works
+  // and the offer is not switched off (PRO_TRIAL_OFFER=off).
+  const trial = trialOfferOpen()
+  const faq: Faq = trial ? [...TRIAL_FAQ, ...FAQ] : FAQ
 
   return (
     <>
@@ -69,8 +80,9 @@ export default function PricingPage() {
               Priced for the conversations that matter.
             </h1>
             <p className="text-ink-secondary mt-6 leading-relaxed">
-              Start free with five people. Try Pro free for {TRIAL_DAYS} days, no card: it returns
-              to Free unless you subscribe, and nothing is deleted.
+              {trial
+                ? `Start free with five people. Try Pro free for ${TRIAL_DAYS} days, no card: it returns to Free unless you subscribe, and nothing is deleted.`
+                : 'Start free with five people. Move to Pro when it earns it; nothing is deleted if you move back.'}
             </p>
           </div>
 
@@ -126,10 +138,12 @@ export default function PricingPage() {
               ) : null}
               {protection ? <p className="text-ink-muted mt-1 text-xs">{protection}</p> : null}
               <p className="text-ink-muted mt-1 text-xs">Billed monthly. Cancel any time.</p>
-              <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
-                Try it free for {TRIAL_DAYS} days, no card. Start the trial from Settings › Plan
-                after you sign up.
-              </p>
+              {trial ? (
+                <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+                  Try it free for {TRIAL_DAYS} days, no card. Start the trial from Settings › Plan
+                  after you sign up.
+                </p>
+              ) : null}
 
               <ul className="mt-7 grid flex-1 gap-3">
                 {pro.highlights.map((item) => (
@@ -139,7 +153,7 @@ export default function PricingPage() {
 
               <Button asChild size="lg" className="mt-8 w-full">
                 <Link href="/sign-up">
-                  Start your {TRIAL_DAYS}-day trial
+                  {trial ? `Start your ${TRIAL_DAYS}-day trial` : 'Start free, move to Pro later'}
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </Button>
@@ -253,7 +267,7 @@ export default function PricingPage() {
         <Container size="narrow">
           <Eyebrow>Questions</Eyebrow>
           <dl className="mt-8 grid gap-8">
-            {FAQ.map((item) => (
+            {faq.map((item) => (
               <div key={item.q}>
                 <dt className="font-display text-ink text-lg">{item.q}</dt>
                 <dd className="text-ink-secondary mt-2.5 leading-relaxed">{item.a}</dd>
@@ -272,7 +286,7 @@ export default function PricingPage() {
         </Container>
       </section>
 
-      <FaqStructuredData />
+      <FaqStructuredData faq={faq} />
     </>
   )
 }
@@ -286,11 +300,11 @@ function Feature({ children }: { children: React.ReactNode }) {
   )
 }
 
-function FaqStructuredData() {
+function FaqStructuredData({ faq }: { faq: Faq }) {
   const data = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: FAQ.map((item) => ({
+    mainEntity: faq.map((item) => ({
       '@type': 'Question',
       name: item.q,
       acceptedAnswer: { '@type': 'Answer', text: item.a },
