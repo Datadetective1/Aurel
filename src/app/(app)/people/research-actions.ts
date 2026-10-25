@@ -271,6 +271,14 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
     await track('observation_added', { source: kind })
     revalidatePath(`/people/${parsed.data.personId}`)
 
+    // A page the user marked as someone else stays that way, and the answer
+    // says so rather than "added".
+    if (result.reused && result.identity?.status === 'no_match') {
+      return {
+        error:
+          'You marked that page as being about someone else, so it was not used. To use it, choose Reconsider on that page under Sources.',
+      }
+    }
     if (result.held) {
       return {
         ok: true,

@@ -305,6 +305,29 @@ describe('a link added with Add context', () => {
     expect(result).toMatchObject({ ok: true, sourcesHeld: 1, needsReview: true })
     expect(result.message).toMatch(/nothing from it is in their record until you say it is them/)
   })
+
+  it('a page the user marked as someone else is not used, and the answer says so', async () => {
+    answer = () => ({ data: null, error: null })
+    ingestUrl.mockResolvedValue({
+      sourceId: 's-1',
+      accessStatus: 'identity_uncertain',
+      reused: true,
+      held: false,
+      identity: { status: 'no_match', confidence: 0, explanation: 'You already decided.' },
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: null,
+      message: null,
+    })
+    const form = new FormData()
+    form.set('personId', PERSON)
+    form.set('input', 'https://northwind.example/dana')
+    const result = await addContext({}, form)
+
+    expect(result.ok).toBeUndefined()
+    expect(result.error).toMatch(/marked that page as being about someone else/)
+    expect(result.error).toMatch(/Reconsider/)
+  })
 })
 
 describe('Reconsider a page marked "not them"', () => {
