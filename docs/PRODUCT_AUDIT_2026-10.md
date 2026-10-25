@@ -25,9 +25,10 @@ _Updated 25 October 2026._
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
 - **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
   - **2A (people controls, server + web): approved by the owner on 25 Oct 2026 and merged (PR #18).** The owner's clarification on archived people in history and in briefs was verified and corrected before merging (§5, "2A results").
-  - **2C + 2B (iOS): built and tested on the simulator against production; draft PR #19, awaiting the owner's review** (§5, "2C + 2B status"). Then one TestFlight build, published only after the owner approves. The release checklist (§1.4) keeps the unverified update-survival test.
+  - **2C + 2B (iOS): approved by the owner on 25 Oct 2026 and merged (PR #19).** The owner then approved one TestFlight build for internal testing only. Its real-device checks are §1.4, including the unverified update-survival test.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
-- **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
+- **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.**
+- **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026).
 
 ---
 
@@ -122,19 +123,26 @@ The simulator test of a real reinstall-over-the-top update passed (§1.1, scenar
 
 ### 1.4 Release validation checklist (every TestFlight build)
 
-Carry these forward until each has passed on a physical iPhone:
+**Every item is a real-device check.** It passes only on a physical iPhone running the TestFlight build. A simulator run does not count. Carry each item forward until it has passed.
 
-1. **Unsent recording across an update.** Not yet verified.
-   - Before installing the new build, record something and do not send it. Close the app.
-   - Install the update from TestFlight and open the app.
-   - Today and Capture should offer the recording back. Understand it should then send it once.
-2. Live recording of about 30 seconds, then Understand it, Review, Keep. The commitments should appear on Today and in the person's timeline, once.
-3. Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
-4. Any checks added by the phase being shipped.
-5. **Phase 2 (first build with 2C + 2B):**
-   - With microphone access off, Capture's **Open Settings** opens Atturel's own page in Settings. On the simulator it opened the main Settings page.
-   - Add a photo to a person through the system picker: no permission prompt, and the photo appears.
-   - Export my data: the share sheet offers the JSON file.
+1. **Real device: an unsent recording survives an update.** NOT VERIFIED.
+   - On the build installed now, record a short test and leave it unsent. Close the app.
+   - Update to the new build through TestFlight. **Do not delete or reinstall the app.**
+   - Open the app. Today and Capture offer the recording back.
+   - Send it with Understand it. It is sent once, then opens in Review, where it can be reviewed and kept.
+2. **Real device: live recording, a real photo, and export.**
+   - Record about 30 seconds, then Understand it, Review, Keep. The commitments appear on Today and in the person's timeline, once.
+   - On a person's page, add a photo from the real photo library through the system picker. There is no permission prompt, and the photo appears.
+   - Account › Privacy and data › Export my data. The iOS share sheet offers the JSON file, and Save to Files works.
+3. **Real device: Ask opened with a prefilled question.**
+   - On a person's page, tap **Ask**. The question "What should I know about …?" is filled in, and asking it gives an answer.
+   - A later visit from the Ask tab starts with an empty field.
+4. **Real device: Open Settings, and microphone access restored.**
+   - Turn microphone access off (Settings › Atturel › Microphone).
+   - In Capture, Start recording shows "Microphone access is off". **Open Settings** lands on Atturel's own page, not Settings' main page. On the simulator it opened the main page.
+   - Turn Microphone back on and return to Atturel. Start recording now records.
+5. **Real device: offline.** Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
+6. Any checks added by the phase being shipped.
 
 ---
 
