@@ -99,7 +99,15 @@ const stripeFake = {
   customers: { create: vi.fn(async () => ({ id: 'cus_new' })) },
   subscriptions: { list: vi.fn(async () => ({ data: [] as { status: string }[] })) },
   checkout: {
-    sessions: { create: vi.fn(async () => ({ url: 'https://checkout.stripe.test/s' })) },
+    sessions: {
+      create: vi.fn(async () => ({ url: 'https://checkout.stripe.test/s' })),
+      list: vi.fn(
+        async (): Promise<{
+          data: { id: string; url: string | null; metadata: Record<string, string> }[]
+        }> => ({ data: [] }),
+      ),
+      expire: vi.fn(async (_id: string) => ({})),
+    },
   },
 }
 
@@ -193,6 +201,8 @@ const subscribe = async () => {
 }
 interface SessionParams {
   mode: string
+  adaptive_pricing: { enabled: boolean }
+  metadata: Record<string, string>
   line_items: unknown
   subscription_data: { metadata: Record<string, string>; trial_end?: number }
   custom_text: { submit: { message: string } }
@@ -348,6 +358,62 @@ describe('subscribing during the trial', () => {
     const { state } = await subscribe()
     expect(state?.error).toMatch(/already has a subscription/)
     expect(stripeFake.checkout.sessions.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('one open Checkout per customer, so no duplicate subscription', () => {
+  beforeEach(async () => {
+    await start()
+    sub().stripe_customer_id = 'cus_1'
+    vi.clearAllMocks()
+  })
+
+  it('a second press on the same terms reuses the open session instead of opening another', async () => {
+    await subscribe()
+    const created = sessionParams()
+    stripeFake.checkout.sessions.list.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'cs_1',
+          url: 'https://checkout.stripe.test/existing',
+          metadata: created.metadata as Record<string, string>,
+        },
+      ],
+    })
+    const { url } = await subscribe()
+    expect(url).toBe('https://checkout.stripe.test/existing')
+    expect(stripeFake.checkout.sessions.create).toHaveBeenCalledTimes(1)
+    expect(stripeFake.checkout.sessions.expire).not.toHaveBeenCalled()
+  })
+
+  it('an open session on other terms is expired before a new one opens', async () => {
+    stripeFake.checkout.sessions.list.mockResolvedValueOnce({
+      data: [
+        { id: 'cs_old', url: 'https://checkout.stripe.test/old', metadata: { terms: 'now' } },
+        { id: 'cs_legacy', url: 'https://checkout.stripe.test/legacy', metadata: {} },
+      ],
+    })
+    const { url } = await subscribe()
+    expect(stripeFake.checkout.sessions.expire.mock.calls.map((c) => c[0])).toEqual([
+      'cs_old',
+      'cs_legacy',
+    ])
+    expect(stripeFake.checkout.sessions.create).toHaveBeenCalledTimes(1)
+    expect(url).toBe('https://checkout.stripe.test/s')
+  })
+
+  it('charges in the currency the terms state: no Adaptive Pricing conversion', async () => {
+    await subscribe()
+    expect(sessionParams().adaptive_pricing).toEqual({ enabled: false })
+  })
+
+  it('records the terms on the session, so a later press can tell', async () => {
+    await subscribe()
+    expect(sessionParams().metadata).toEqual({
+      user_id: 'u-1',
+      terms: '2026-11-08T15:00:00.000Z',
+      price_id: 'price_pro',
+    })
   })
 })
 

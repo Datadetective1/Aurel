@@ -57,8 +57,8 @@ export function checkoutAvailable(): boolean {
 
 /**
  * Whether a new 14-day trial may be started or advertised: subscribing works,
- * and the offer has not been switched off (`PRO_TRIAL_OFFER=off`, the
- * rollback switch). Switching it off never touches a trial already running.
+ * and the deployment has opted in (`PRO_TRIAL_OFFER=on`). Turning it off is
+ * the rollback switch, and never touches a trial already running.
  */
 export function trialOfferOpen(): boolean {
   return features.proTrialOffer && checkoutAvailable()

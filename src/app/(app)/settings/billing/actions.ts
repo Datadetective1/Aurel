@@ -177,6 +177,7 @@ export async function startCheckout(
     : null
 
   let url: string | null = null
+  let reused = false
 
   try {
     // The price the page advertises is the price Stripe will charge, or
@@ -212,52 +213,81 @@ export async function startCheckout(
       }
     }
 
-    const session = await stripe().checkout.sessions.create(
-      {
-        mode: 'subscription',
-        line_items: [{ price: priceId, quantity: 1 }],
-        // Always our own customer: one billing history per account, and the
-        // id is known before payment, so a deletion mid-checkout can still
-        // find and stop it.
-        ...(customer ? { customer } : { customer_email: user.email ?? undefined }),
+    // One open Checkout per customer. Two completed sessions would be two
+    // subscriptions, and the idempotency key below only joins presses inside
+    // the same ten minutes: a second tab, or coming back later, opened a
+    // second session. An open session on the same terms is reused; one on
+    // other terms (an earlier first charge date, or opened before this code)
+    // is expired first, and Stripe will not complete an expired session.
+    const terms = firstCharge ? firstCharge.toISOString() : 'now'
+    if (customer) {
+      const open = await stripe().checkout.sessions.list({ customer, status: 'open', limit: 10 })
+      const same = open.data.find(
+        (s) => s.metadata?.terms === terms && s.metadata?.price_id === priceId && s.url,
+      )
+      if (same?.url) {
+        url = same.url
+        reused = true
+      } else {
+        for (const s of open.data) await stripe().checkout.sessions.expire(s.id)
+      }
+    }
 
-        // The webhook trusts this, not the redirect, to know whose plan changed.
-        client_reference_id: user.id,
-        subscription_data: {
-          metadata: { user_id: user.id },
-          ...(firstCharge ? { trial_end: Math.floor(firstCharge.getTime() / 1000) } : {}),
-        },
-        metadata: { user_id: user.id },
+    const session = reused
+      ? null
+      : await stripe().checkout.sessions.create(
+          {
+            mode: 'subscription',
+            line_items: [{ price: priceId, quantity: 1 }],
+            // Always our own customer: one billing history per account, and the
+            // id is known before payment, so a deletion mid-checkout can still
+            // find and stop it.
+            ...(customer ? { customer } : { customer_email: user.email ?? undefined }),
 
-        // The terms, on Stripe's page beside the button that agrees to them.
-        custom_text: {
-          submit: {
-            message: firstChargeOn
-              ? `Nothing is charged today. Your first charge of ${PRICE} is on ${firstChargeOn}, then ${PRICE} every month until you cancel.`
-              : `You will be charged ${PRICE} today, then ${PRICE} every month until you cancel.`,
+            // The webhook trusts this, not the redirect, to know whose plan changed.
+            client_reference_id: user.id,
+            subscription_data: {
+              metadata: { user_id: user.id },
+              ...(firstCharge ? { trial_end: Math.floor(firstCharge.getTime() / 1000) } : {}),
+            },
+            // `terms` and `price_id` let a later press reuse this session.
+            metadata: { user_id: user.id, terms, price_id: priceId },
+
+            // The terms, on Stripe's page beside the button that agrees to them.
+            custom_text: {
+              submit: {
+                message: firstChargeOn
+                  ? `Nothing is charged today. Your first charge of ${PRICE} is on ${firstChargeOn}, then ${PRICE} every month until you cancel.`
+                  : `You will be charged ${PRICE} today, then ${PRICE} every month until you cancel.`,
+              },
+            },
+
+            // The terms above say $29 and the price is $29 USD. The live
+            // account has Adaptive Pricing on, which showed a session opened
+            // from abroad in SGD (S$38.55) beside those terms. Consent is to
+            // what is stated.
+            adaptive_pricing: { enabled: false },
+
+            // No promotion is approved; Checkout shows no code field.
+            allow_promotion_codes: false,
+            billing_address_collection: 'auto',
+            automatic_tax: { enabled: false },
+
+            success_url: absoluteUrl('/settings/billing?checkout=success'),
+            cancel_url: absoluteUrl('/settings/billing?checkout=canceled'),
           },
-        },
+          // Idempotent for ten minutes, per customer and price: a double-submitted
+          // form gets the same session back. It used to be per day, and Stripe
+          // replays a cached response -- error or completed session -- for the
+          // whole window, so one failed or finished attempt locked the customer
+          // out of checkout until midnight UTC. The duplicate-subscription guard
+          // above is what actually prevents a second subscription.
+          {
+            idempotencyKey: `checkout:${user.id}:${customer ?? 'new'}:${priceId}:${firstCharge ? firstCharge.getTime() : 'now'}:${Math.floor(Date.now() / 600_000)}`,
+          },
+        )
 
-        // No promotion is approved; Checkout shows no code field.
-        allow_promotion_codes: false,
-        billing_address_collection: 'auto',
-        automatic_tax: { enabled: false },
-
-        success_url: absoluteUrl('/settings/billing?checkout=success'),
-        cancel_url: absoluteUrl('/settings/billing?checkout=canceled'),
-      },
-      // Idempotent for ten minutes, per customer and price: a double-submitted
-      // form gets the same session back. It used to be per day, and Stripe
-      // replays a cached response -- error or completed session -- for the
-      // whole window, so one failed or finished attempt locked the customer
-      // out of checkout until midnight UTC. The duplicate-subscription guard
-      // above is what actually prevents a second subscription.
-      {
-        idempotencyKey: `checkout:${user.id}:${customer ?? 'new'}:${priceId}:${firstCharge ? firstCharge.getTime() : 'now'}:${Math.floor(Date.now() / 600_000)}`,
-      },
-    )
-
-    url = session.url
+    if (session) url = session.url
   } catch (error) {
     logger.error('billing.checkout_failed', {
       error: error instanceof Error ? error.name : 'unknown',
@@ -269,7 +299,11 @@ export async function startCheckout(
 
   if (!url) return { error: 'Checkout could not be opened. Nothing was charged.' }
 
-  await track('checkout_started', { interval: 'monthly', duringTrial: Boolean(firstCharge) })
+  await track('checkout_started', {
+    interval: 'monthly',
+    duringTrial: Boolean(firstCharge),
+    reused,
+  })
   // Outside the try: redirect() signals by throwing, and catching it here would
   // report a successful redirect as a checkout failure.
   redirect(url)

@@ -157,7 +157,7 @@ describe('the 14-day trial', () => {
     expect(trial).toContain('export function trialRunning(')
     expect(sources).toContain('trialRunning(')
     // Access is computed from trial_ends_at alone: the rollback switch only
-    // stops new trials (PRO_TRIAL_OFFER=off), it is not read where access is.
+    // only opens or closes new trials (PRO_TRIAL_OFFER), it is not read where access is.
     for (const source of [trial, sources, entitlements]) {
       expect(source).not.toMatch(/proTrialOffer|trialOfferOpen|PRO_TRIAL_OFFER/)
     }

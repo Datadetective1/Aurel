@@ -245,7 +245,7 @@ describe('a deployment where subscribing cannot complete', () => {
   })
 })
 
-describe('with new trials switched off (PRO_TRIAL_OFFER=off, the rollback switch)', () => {
+describe('with the trial offer closed (PRO_TRIAL_OFFER not "on": the default, and the rollback)', () => {
   it('a Free account can still subscribe, but is not offered a trial', async () => {
     h.offer = false
     h.entitlements = { plan: 'free', tier: 'standard', provider: 'none', trial: null }

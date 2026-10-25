@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resolveAI } from './env'
 
 /**
@@ -73,5 +73,26 @@ describe('resolveAI', () => {
     // Settings shows this string. Naming a model that is not being called
     // would be a false claim about what produced the user's output.
     expect(resolveAI({ model: 'gpt-4.1-mini' }).model).toBe('evidence-composer')
+  })
+})
+
+describe('the 14-day trial offer is opt-in', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  const offer = async (value: string | undefined) => {
+    vi.resetModules()
+    if (value === undefined) vi.stubEnv('PRO_TRIAL_OFFER', '')
+    else vi.stubEnv('PRO_TRIAL_OFFER', value)
+    return (await import('./env')).features.proTrialOffer
+  }
+
+  it('is closed unless PRO_TRIAL_OFFER is exactly "on"', async () => {
+    expect(await offer(undefined)).toBe(false)
+    expect(await offer('off')).toBe(false)
+    expect(await offer('true')).toBe(false)
+    expect(await offer('on')).toBe(true)
   })
 })

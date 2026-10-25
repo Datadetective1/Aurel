@@ -66,7 +66,7 @@ export default function PricingPage() {
   const protection = foundingProtectionBlurb()
   const allowances = allowanceRows()
   // The trial is advertised only where it can be started: subscribing works
-  // and the offer is not switched off (PRO_TRIAL_OFFER=off).
+  // and the deployment has opted in (PRO_TRIAL_OFFER=on).
   const trial = trialOfferOpen()
   const faq: Faq = trial ? [...TRIAL_FAQ, ...FAQ] : FAQ
 
