@@ -23,7 +23,7 @@ _Updated 25 October 2026._
 - **Phase 1 (Capture): merged (PR #16, `9fb4714`) and shipped in TestFlight build 0.1.0 (3).**
   - The owner validated it on a physical iPhone (§1.3).
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
-- **Phase 2 (Essential controls): plan written (§5), waiting for owner approval.** No Phase 2 code has been written.
+- **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).** 2A (people controls, server + web) is in progress.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
@@ -366,11 +366,29 @@ Principles:
   - route checks against the PR's Vercel preview with the QA account;
   - for mobile, the iOS simulator against production.
 
-**Decisions within Phase 2**
+**Phase 2 decisions (owner, 25 Oct 2026). The plan and the order 2A → 2C + 2B → TestFlight are approved.**
 
-- **D1. Loops on permanent delete.** Recommended: keep the user's loops, unlinked from the person (the description keeps the name), because "I owe Dana the proposal" should not vanish with the contact. Today the link is `ON DELETE CASCADE`, so they would be deleted. Keeping them needs no migration: the delete unlinks first.
-- **D2. Archived people and the Free limit.** Archived people already do not count toward the 5-person limit, so archiving frees a slot. Confirm this is acceptable commercially.
-- **D3. Camera permission.** Recommended: photo library only for now, to keep permissions minimal. Camera can come later.
+- **D1. Loops survive a permanent delete, unlinked.**
+  - Before the person is deleted, `person_id` and `owner_person_id` are cleared on their loops.
+  - A retained loop must not expose deleted personal information. Before deleting, the confirmation lists every retained loop whose text mentions the person, and the user can edit or delete each one.
+- **D2. Archived people do not count toward the Free plan's five active people.** Until restored, they are excluded from:
+  - new meetings, research, and conversation matching;
+  - search, pickers, Today, Atlas, brief and Ask context, follow-through;
+  - every other active workflow.
+
+  Restoring someone goes through the plan limit (`checkPersonLimit`).
+
+- **D3. iOS photos come through the system photo picker** (PHPicker, which needs no photo-library permission). No camera access yet.
+
+Further requirements set by the owner:
+
+- **History stays intact.** Meetings, conversations, their text, and decisions are kept when a person is archived or deleted. Only that person's link to them is removed.
+- **Permanent delete never reaches unrelated records.** Test deletion and restoration thoroughly, including cross-account isolation.
+- **The confirmation is exact.** It separates what will be **deleted**, **retained** and **unlinked**, and explains retained text that may identify the person.
+- **No redesigns, new services, database migrations, or destructive rewrites.** Keep the existing design language.
+- **QA account.** Reuse the existing disposable QA account for Phase 2 testing. Do not delete it without the owner's approval at the end.
+- **Merging and releases.** Run automated tests and verify the website preview before merging each implementation PR. **No Phase 2 PR is merged and no TestFlight build is published without presenting the results for owner review first.**
+- The next TestFlight release runs the §1.4 checklist, including the unverified update-survival test. The Phase 3 fix for finding 8.7 stays planned.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.
 
