@@ -6,6 +6,7 @@ import {
   extractMeetingUrl,
   looksLikeResource,
   providerConfigured,
+  tokenFailure,
   type CalendarProvider,
   type ListEventsInput,
   type ListEventsOutput,
@@ -135,13 +136,15 @@ export function googleProvider(): CalendarProvider {
       })
 
       if (!response.ok) {
-        // Status only: the error body echoes the request, which carries the
-        // authorization code.
+        // Status and OAuth code only: the error body echoes the request, which
+        // carries the authorization code.
+        const failure = tokenFailure(response.status, await response.text())
         logger.warn('calendar.token_exchange_failed', {
           provider: 'google',
           status: response.status,
+          oauthError: failure.oauthError,
         })
-        return { ok: false, reason: response.status === 400 ? 'unauthorized' : 'error' }
+        return { ok: false, reason: failure.reason }
       }
 
       const payload = (await response.json()) as {

@@ -9,7 +9,13 @@ import { ownership } from '@/lib/workspace'
 import { calendarProvider } from '@/lib/calendar'
 import type { CalendarProviderId } from '@/lib/calendar'
 import { decryptSecret } from '@/lib/crypto'
-import { MIN_SYNC_INTERVAL_MS, syncCalendar } from '@/lib/calendar/sync'
+import {
+  claimSyncAttempt,
+  syncCalendar,
+  type PreviousAttempt,
+  type SyncOutcome,
+} from '@/lib/calendar/sync'
+import type { CalendarSyncCode } from '@/lib/calendar/freshness'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
 import { brand } from '@/lib/brand'
@@ -25,33 +31,54 @@ export interface CalendarActionState {
   ok?: boolean
   message?: string
   error?: string
+  /** What Sync now came to, for the iPhone's route to answer with. */
+  code?: CalendarSyncCode
 }
 
-/** Pull the next fourteen days. Safe to press repeatedly. */
+/**
+ * Inside the one-minute limit: say how the attempt holding it went, rather
+ * than "already up to date" after one that failed.
+ */
+const RECENT: Record<PreviousAttempt, CalendarActionState> = {
+  succeeded: {
+    ok: true,
+    code: 'recently_synced',
+    message: 'Synced moments ago. Try again in a minute.',
+  },
+  failed: {
+    code: 'recently_failed',
+    error: 'The last attempt, moments ago, did not complete. Try again in a minute.',
+  },
+  in_progress: {
+    ok: true,
+    code: 'in_progress',
+    message: 'A sync is already running. Check back in a moment.',
+  },
+  unknown: { code: 'error', error: 'The sync could not start. Try again in a minute.' },
+}
+
+/** Pull the next fourteen days. Safe to press repeatedly, from any device. */
 export async function syncCalendarNow(provider: CalendarProviderId): Promise<CalendarActionState> {
   const { user } = await requireOnboardedUser()
   const supabase = await createClient()
 
   const { data: integration } = await supabase
     .from('integration_accounts')
-    .select('id, last_sync_attempt_at')
+    .select('id')
     .eq('user_id', user.id)
     .eq('provider', provider)
     .maybeSingle()
 
-  if (!integration) return { error: 'That calendar is not connected.' }
+  if (!integration) return { code: 'not_connected', error: 'That calendar is not connected.' }
 
   const capability = await checkCapability('calendarIntegration')
-  if (!capability.allowed) return { error: capability.message }
+  if (!capability.allowed) return { code: 'plan_required', error: capability.message }
 
-  // Our own rate limit, ahead of the provider's. A user leaning on the button
-  // should not be the reason a tenant gets throttled.
-  const lastAttempt = integration.last_sync_attempt_at
-    ? new Date(integration.last_sync_attempt_at).getTime()
-    : 0
-  if (Date.now() - lastAttempt < MIN_SYNC_INTERVAL_MS) {
-    return { ok: true, message: 'Already up to date. Try again in a minute.' }
-  }
+  // Our own rate limit, ahead of the provider's: one attempt a minute for each
+  // connection, whether pressed on the website or the iPhone. A user leaning
+  // on the button should not be the reason a tenant gets throttled.
+  const claim = await claimSyncAttempt(supabase, integration.id)
+  if (!claim.claimed) return RECENT[claim.previous]
 
   const outcome = await syncCalendar(supabase, user.id, integration.id, {
     ownerEmail: user.email ?? null,
@@ -59,15 +86,7 @@ export async function syncCalendarNow(provider: CalendarProviderId): Promise<Cal
 
   if (!outcome.ok) {
     await track('calendar_sync_failed', { provider, reason: outcome.reason ?? 'error' })
-    const message =
-      outcome.reason === 'admin_consent_required'
-        ? `Your organization requires administrator approval before ${brand.name} can read this calendar.`
-        : outcome.reason === 'needs_reconnect'
-          ? 'That calendar connection needs attention. Reconnect to keep syncing.'
-          : outcome.reason === 'rate_limited'
-            ? 'The calendar provider is rate limiting us. Try again shortly.'
-            : 'The calendar provider could not be reached. Nothing was changed.'
-    return { error: message }
+    return failedSync(outcome.reason)
   }
 
   // Counts only. Never a title, a name or an email.
@@ -93,10 +112,48 @@ export async function syncCalendarNow(provider: CalendarProviderId): Promise<Cal
   const total = outcome.imported + outcome.updated
   return {
     ok: true,
+    code: 'synced',
     message:
       total === 0
         ? 'No new meetings in the next two weeks.'
         : `${total} meeting${total === 1 ? '' : 's'} up to date.`,
+  }
+}
+
+/**
+ * Only a grant the provider refused asks for a reconnect. Everything else
+ * left the connection as it was and is worth trying again.
+ */
+function failedSync(reason: SyncOutcome['reason']): CalendarActionState {
+  switch (reason) {
+    case 'not_connected':
+      return { code: 'not_connected', error: 'That calendar is not connected.' }
+    case 'admin_consent_required':
+      return {
+        code: 'admin_consent_required',
+        error: `Your organization requires administrator approval before ${brand.name} can read this calendar.`,
+      }
+    case 'needs_reconnect':
+      return {
+        code: 'needs_reconnect',
+        error: 'Your calendar no longer accepts this connection. Reconnect to keep syncing.',
+      }
+    case 'rate_limited':
+      return {
+        code: 'rate_limited',
+        error: 'The calendar provider is busy. Nothing was changed. Try again in a few minutes.',
+      }
+    case 'unavailable':
+      return {
+        code: 'unavailable',
+        error:
+          'The calendar provider could not be reached. Nothing was changed. Try again shortly.',
+      }
+    default:
+      return {
+        code: 'error',
+        error: 'The sync did not complete. Nothing was changed. Try again shortly.',
+      }
   }
 }
 
@@ -108,6 +165,9 @@ export async function syncCalendarNow(provider: CalendarProviderId): Promise<Cal
  * the credentials. Synced events go too — they are a mirror of a calendar we no
  * longer have permission to read, and keeping them would be holding onto
  * someone's schedule after they withdrew access.
+ *
+ * Works in every state, plan or no plan: a connection that expired or failed
+ * must still be removable without reconnecting it first (finding 8.6).
  */
 export async function disconnectCalendar(
   provider: CalendarProviderId,

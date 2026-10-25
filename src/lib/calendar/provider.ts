@@ -74,6 +74,42 @@ export interface TokenSet {
 
 export type ProviderResult<T> = { ok: true; value: T } | { ok: false; reason: ProviderFailure }
 
+/**
+ * What a refused token request means (audit finding 8.6).
+ *
+ * Only a grant the provider refused needs the user: `invalid_grant` (the
+ * refresh token expired after long disuse, was withdrawn, or a password
+ * changed) or `interaction_required` (they must sign in again). A busy or
+ * failing provider is temporary, and retrying is the remedy. Anything else --
+ * a client secret left to expire, a scope the app no longer holds -- is ours
+ * to fix, and asking every user to reconnect would neither fix it nor be true.
+ *
+ * Reads the OAuth error code and nothing else. The rest of the body echoes the
+ * request, which carries the code or the refresh token.
+ */
+export function tokenFailure(
+  status: number,
+  body: string,
+): { reason: ProviderFailure; oauthError: string | null } {
+  let oauthError: string | null = null
+  try {
+    const code = (JSON.parse(body) as { error?: unknown }).error
+    // OAuth's codes are short snake_case words; anything else is not one.
+    if (typeof code === 'string' && /^[a-z_]{1,40}$/.test(code)) oauthError = code
+  } catch {
+    // Not JSON: the status alone decides.
+  }
+  const reason: ProviderFailure =
+    oauthError === 'invalid_grant' || oauthError === 'interaction_required'
+      ? 'unauthorized'
+      : status === 429
+        ? 'rate_limited'
+        : status >= 500
+          ? 'unavailable'
+          : 'error'
+  return { reason, oauthError }
+}
+
 export interface ListEventsInput {
   accessToken: string
   from: Date

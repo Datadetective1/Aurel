@@ -20,11 +20,8 @@ import { aiStatus } from '@/lib/ai/provider'
 import { researchCapability } from '@/lib/research/providers'
 import { calendarCapability } from '@/lib/calendar'
 import { createClient } from '@/lib/supabase/server'
-import {
-  CalendarConnections,
-  type CalendarConnection,
-  type CalendarConnectionStatus,
-} from '@/components/app/calendar-connections'
+import { CalendarConnections, type CalendarConnection } from '@/components/app/calendar-connections'
+import { calendarFreshness, calendarState } from '@/lib/calendar/freshness'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { features } from '@/lib/env'
 import { senderAddress } from '@/lib/email/send'
@@ -115,31 +112,30 @@ export default async function CapabilitiesSettingsPage() {
     .eq('status', 'confirmed')
     .gte('starts_at', new Date().toISOString())
 
+  const now = new Date()
   const connections: CalendarConnection[] = providers.map((provider) => {
     const row = (integrations ?? []).find((i) => i.provider === provider.id)
     // Calendar connection is a Pro capability. A connection made before the
     // plan changed still shows, but cannot sync until the plan allows it.
-    const status: CalendarConnectionStatus = !provider.configured
-      ? 'unavailable'
-      : !entitlements.capabilities.calendarIntegration
-        ? 'plan_required'
-        : !row
-          ? 'not_connected'
-          : (row.status as CalendarConnectionStatus)
+    const status = calendarState({
+      stored: row?.status ?? null,
+      configured: provider.configured,
+      planAllows: entitlements.capabilities.calendarIntegration,
+    })
 
     return {
       provider: provider.id,
       label: provider.label,
       status,
+      saved: Boolean(row),
       accountEmail: row?.external_account_email ?? null,
-      // Formatted here, in the account holder's zone, because the component
+      // Worked out here, in the account holder's zone, because the component
       // that shows it renders on both sides -- see CalendarConnection.
-      lastSyncedLabel: row?.last_synced_at
-        ? new Date(row.last_synced_at).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: profile.timezone ?? 'UTC',
-          })
+      freshness: row
+        ? calendarFreshness(
+            { state: status, lastSyncedAt: row.last_synced_at },
+            { timeZone: profile.timezone ?? 'UTC', now },
+          )
         : null,
       eventCount: (eventCounts ?? []).filter((e) => e.provider === provider.id).length,
     }

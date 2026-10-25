@@ -14,6 +14,7 @@
 
 import type { ListeningCue, NormalizedBrief } from '@/lib/brief'
 import type { PrepState } from '@/lib/visual/glance'
+import type { CalendarSyncCode } from '@/lib/calendar/freshness'
 import type {
   VisualConnection,
   VisualGlance,
@@ -128,15 +129,52 @@ export interface AccountResponse {
   capture: CaptureLimits
   /** Whether the fictional sample record is in this account. Absent on older servers. */
   sampleData?: { loaded: boolean }
-  /** Connected calendars, read-only: connecting is done on the web. Absent on older servers. */
-  calendar?: { connections: CalendarConnection[] }
+  /**
+   * Connected calendars. Connecting, reconnecting and disconnecting are done on
+   * the web, at `manageUrl`; Sync now is in the app. Absent on older servers.
+   */
+  calendar?: { connections: CalendarConnection[]; manageUrl?: string }
 }
 
 export interface CalendarConnection {
   provider: 'google' | 'microsoft' | string
+  /** As stored: connected, expired, revoked, error or admin_consent_required. */
   status: string
   accountEmail: string | null
   lastSyncedAt: string | null
+  /**
+   * The website's own description of this connection, worked out on the
+   * server in the account's time zone, so the two say the same thing.
+   * Absent on older servers.
+   */
+  view?: CalendarConnectionView
+}
+
+export interface CalendarConnectionView {
+  /** "Connected", "Sync failed", "Reconnect needed", "Needs approval", "Pro", "Unavailable". */
+  label: string
+  tone: 'positive' | 'caution' | 'neutral'
+  /** One sentence for a state that needs something. Empty when connected. */
+  detail: string
+  /** "Last synced Aug 27, 9:43 PM", or "Never synced". */
+  synced: string
+  /** Over a day since the last sync, or never synced. */
+  stale: boolean
+  /** Why the meetings may be out of date, and what to do. */
+  note: string | null
+  /** The sync button's words, or null when it is not offered: the plan and the state are both checked. */
+  sync: 'Sync now' | 'Try again' | null
+  /** The grant has to be given again, on the website. */
+  reconnect: boolean
+}
+
+/**
+ * `POST /api/mobile/calendar/:provider/sync`: what pressing Sync now came to,
+ * and the connection as it stands after. Never a token.
+ */
+export interface CalendarSyncResponse {
+  outcome: { ok: boolean; code: CalendarSyncCode; message: string }
+  connection: CalendarConnection
 }
 
 /** What the server will accept for one recording, so the app can say so up front. */

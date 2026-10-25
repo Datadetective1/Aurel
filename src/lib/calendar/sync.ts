@@ -27,7 +27,10 @@ type Client = SupabaseClient<Database>
 
 export const SYNC_HORIZON_DAYS = 14
 
-/** Do not re-poll a provider more often than this on manual sync. */
+/**
+ * Do not re-poll a provider more often than this on manual sync, from any
+ * device: enforced by `claimSyncAttempt`.
+ */
 export const MIN_SYNC_INTERVAL_MS = 60_000
 
 export interface SyncOutcome {
@@ -63,8 +66,9 @@ interface IntegrationRow {
  * Refreshed sixty seconds early: a token that expires mid-request is a failure
  * the user sees, and a minute of slack costs nothing.
  *
- * Returns null when the grant is gone. The caller marks the connection as
- * needing attention rather than retrying — a revoked grant does not recover.
+ * Returns null, with the reason, when no token can be had. Only a grant the
+ * provider refused is `needs_reconnect`; a provider that was busy, down, or
+ * answered in a way we did not expect is retryable (audit finding 8.6).
  */
 async function usableAccessToken(
   supabase: Client,
@@ -90,12 +94,14 @@ async function usableAccessToken(
   const refreshed = await provider.refresh({ refreshToken })
 
   if (!refreshed.ok) {
-    const reason =
+    const reason: SyncOutcome['reason'] =
       refreshed.reason === 'admin_consent_required'
         ? 'admin_consent_required'
-        : refreshed.reason === 'unavailable' || refreshed.reason === 'rate_limited'
-          ? refreshed.reason
-          : 'needs_reconnect'
+        : refreshed.reason === 'unauthorized'
+          ? 'needs_reconnect'
+          : refreshed.reason === 'unavailable' || refreshed.reason === 'rate_limited'
+            ? refreshed.reason
+            : 'error'
     return { token: null, reason }
   }
 
@@ -334,7 +340,14 @@ export async function syncCalendar(
     await supabase
       .from('integration_accounts')
       .update({
-        status: token.reason === 'admin_consent_required' ? 'admin_consent_required' : 'expired',
+        // Reconnecting is asked for only when it is the remedy. An outage or
+        // a rate limit leaves the grant alone and offers Try again.
+        status:
+          token.reason === 'admin_consent_required'
+            ? 'admin_consent_required'
+            : token.reason === 'needs_reconnect'
+              ? 'expired'
+              : 'error',
         last_error: token.reason ?? 'error',
         last_sync_attempt_at: new Date().toISOString(),
       })
@@ -414,16 +427,80 @@ export async function syncCalendar(
     else if (result === 'cancelled') outcome.cancelled++
   }
 
+  // One instant for both, so a finished attempt reads as one that succeeded
+  // (`previousAttempt`).
+  const finishedAt = new Date().toISOString()
   await supabase
     .from('integration_accounts')
     .update({
       status: 'connected',
       last_error: null,
-      last_synced_at: new Date().toISOString(),
-      last_sync_attempt_at: new Date().toISOString(),
+      last_synced_at: finishedAt,
+      last_sync_attempt_at: finishedAt,
       sync_cursor: listed.value.cursor,
     })
     .eq('id', integrationId)
 
   return outcome
+}
+
+export type PreviousAttempt = 'succeeded' | 'failed' | 'in_progress' | 'unknown'
+
+export type SyncClaim = { claimed: true } | { claimed: false; previous: PreviousAttempt }
+
+/**
+ * Claim the next manual sync of one connection, or learn why not.
+ *
+ * The one-minute limit has to hold across devices: the website and the iPhone
+ * can both press Sync now in the same second. Reading the last attempt and
+ * then writing it, as this used to, let both through. The limit is now one
+ * conditional UPDATE -- stamp the attempt only if the last one is over a
+ * minute old. Postgres locks the row for it, so of two simultaneous claims
+ * the second re-checks the condition after the first commits, no longer
+ * matches, and updates nothing. No migration: the column and the
+ * update-own policy already exist.
+ *
+ * The claim clears `last_error`, so that a refused claim can tell an attempt
+ * still running (no error yet, no newer sync) from one that failed.
+ */
+export async function claimSyncAttempt(
+  supabase: Client,
+  integrationId: string,
+  now: Date = new Date(),
+): Promise<SyncClaim> {
+  const cutoff = new Date(now.getTime() - MIN_SYNC_INTERVAL_MS).toISOString()
+  const { data, error } = await supabase
+    .from('integration_accounts')
+    .update({ last_sync_attempt_at: now.toISOString(), last_error: null })
+    .eq('id', integrationId)
+    .or(`last_sync_attempt_at.is.null,last_sync_attempt_at.lt.${cutoff}`)
+    .select('id')
+
+  if (error) {
+    logger.warn('calendar.sync_claim_failed', { code: error.code })
+    return { claimed: false, previous: 'unknown' }
+  }
+  if (data && data.length > 0) return { claimed: true }
+
+  const { data: row } = await supabase
+    .from('integration_accounts')
+    .select('last_synced_at, last_sync_attempt_at, last_error')
+    .eq('id', integrationId)
+    .maybeSingle()
+  return { claimed: false, previous: previousAttempt(row) }
+}
+
+/** How the attempt that holds the one-minute limit went, read from its row. */
+export function previousAttempt(
+  row: {
+    last_synced_at: string | null
+    last_sync_attempt_at: string | null
+    last_error: string | null
+  } | null,
+): PreviousAttempt {
+  if (!row?.last_sync_attempt_at) return 'unknown'
+  if (row.last_error) return 'failed'
+  const synced = row.last_synced_at ? new Date(row.last_synced_at).getTime() : Number.NaN
+  if (synced >= new Date(row.last_sync_attempt_at).getTime()) return 'succeeded'
+  return 'in_progress'
 }

@@ -71,6 +71,50 @@ describe('token exchange failures', () => {
   })
 })
 
+describe('refresh failures: only a refused grant needs reconnecting (finding 8.6)', () => {
+  const refresh = async (body: string, status: number, which: 'microsoft' | 'google') => {
+    const provider = await withProvider(reply(body, status), which)
+    const result = await provider.refresh({ refreshToken: 'stored-refresh-token' })
+    expect(result.ok).toBe(false)
+    return result.ok ? null : result.reason
+  }
+
+  describe.each(['microsoft', 'google'] as const)('%s', (which) => {
+    it('an expired or withdrawn grant is unauthorized: the user must reconnect', async () => {
+      expect(await refresh('{"error":"invalid_grant"}', 400, which)).toBe('unauthorized')
+      expect(await refresh('{"error":"interaction_required"}', 400, which)).toBe('unauthorized')
+    })
+
+    it('a rate limit stays a rate limit, which is retryable', async () => {
+      expect(await refresh('{"error":"temporarily_unavailable"}', 429, which)).toBe('rate_limited')
+    })
+
+    it('a provider outage is unavailable, even with no JSON body', async () => {
+      expect(await refresh('{"error":"server_error"}', 503, which)).toBe('unavailable')
+      expect(await refresh('<html>Bad gateway</html>', 502, which)).toBe('unavailable')
+    })
+
+    it('a problem on our side (a client secret left to expire) is not blamed on the grant', async () => {
+      expect(await refresh('{"error":"invalid_client"}', 401, which)).toBe('error')
+      expect(await refresh('{"error":"invalid_client"}', 400, which)).toBe('error')
+    })
+  })
+
+  it('logs the status and the OAuth code, never the body that echoes the token', async () => {
+    const provider = await withProvider(
+      reply('{"error":"invalid_grant","error_description":"stored-refresh-token is bad"}', 400),
+    )
+    // After withProvider, which resets modules: the instance the provider uses.
+    const { logger } = await import('@/lib/logger')
+    const warn = vi.spyOn(logger, 'warn')
+    await provider.refresh({ refreshToken: 'stored-refresh-token' })
+    const logged = JSON.stringify(warn.mock.calls)
+    expect(logged).toContain('invalid_grant')
+    expect(logged).not.toContain('stored-refresh-token')
+    warn.mockRestore()
+  })
+})
+
 describe('listing failures', () => {
   const window = { from: new Date(), to: new Date(Date.now() + 86_400_000) }
 
