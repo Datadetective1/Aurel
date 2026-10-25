@@ -141,7 +141,7 @@ vi.mock('@/lib/sources/extract', () => ({
   extractFromText: () => ({ text: page.text, title: null, contentHash: 'hash-1', wordCount: 400 }),
 }))
 
-const { ingestUrl } = await import('./ingest')
+const { ingestUrl, reholdForReview } = await import('./ingest')
 
 function fresh(over: { existingSource?: object | null; prior?: object | null } = {}) {
   return recordingClient((table, ops) => {
@@ -345,5 +345,68 @@ describe('without the hold, the web’s research is unchanged', () => {
     expect(db.wrote('professional_facts', 'insert')).toHaveLength(2)
     const links = db.wrote('source_person_links', 'upsert') as { identity_match_status: string }[]
     expect(links[0]!.identity_match_status).toBe('probable')
+  })
+})
+
+describe('on the web’s run, the user’s decision stands (finding 5.8)', () => {
+  const web = (client: never) => options(client, { holdForReview: false })
+
+  it('a page the user said is not them is not linked or read again', async () => {
+    const db = fresh({ prior: { identity_match_status: 'no_match', reviewed_by_user: true } })
+    const result = await ingestUrl('https://northwind.example/team', web(db.client))
+    expect(result.identity?.status).toBe('no_match')
+    expect(result.factsCreated).toBe(0)
+    expect(runPrompt).not.toHaveBeenCalled()
+    expect(db.wrote('source_person_links', 'upsert')).toEqual([])
+    expect(db.wrote('professional_facts', 'insert')).toEqual([])
+  })
+
+  it('a page the user confirmed stays confirmed, even when the reading doubts it', async () => {
+    extraction = { ...EXTRACTION, mentionsTarget: false }
+    const db = fresh({ prior: { identity_match_status: 'confirmed', reviewed_by_user: true } })
+    await ingestUrl('https://northwind.example/team', web(db.client))
+    const links = db.wrote('source_person_links', 'upsert') as { identity_match_status: string }[]
+    expect(links[0]!.identity_match_status).toBe('confirmed')
+    expect(db.wrote('source_person_links', 'update')).toEqual([])
+  })
+})
+
+describe('reconsidering a page reads it again and holds it', () => {
+  it('from what was stored, without fetching, and adds nothing yet', async () => {
+    const db = recordingClient((table, ops) => {
+      const last = ops[ops.length - 1]?.[0]
+      if (table === 'sources' && last === 'maybeSingle') {
+        return {
+          data: {
+            id: 'src-1',
+            source_url: 'https://northwind.example/team',
+            source_title: 'Dana Whitfield | Northwind leadership',
+            publisher: 'Northwind',
+            published_at: null,
+            extracted_text: ABOUT_DANA,
+            source_type: 'company_page',
+          },
+          error: null,
+        }
+      }
+      if (table === 'people') return { data: PERSON, error: null }
+      return { data: null, error: null }
+    })
+    const result = await reholdForReview(db.client, {
+      workspaceId: 'ws-1',
+      userId: 'u-1',
+      personId: 'p-1',
+      sourceId: 'src-1',
+    })
+    expect(result.held).toBe(true)
+    const links = db.wrote('source_person_links', 'upsert') as {
+      identity_match_status: string
+      match_signals: { held?: unknown }
+    }[]
+    expect(links[0]!.identity_match_status).toBe('unreviewed')
+    expect(links[0]!.match_signals.held).toBeTruthy()
+    expect(db.wrote('professional_facts', 'insert')).toEqual([])
+    // Its status is left alone: it may stand behind someone else.
+    expect(db.wrote('sources', 'update')).toEqual([])
   })
 })

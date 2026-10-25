@@ -7,7 +7,14 @@ import type { Database } from '@/lib/supabase/types'
 import { requireUser } from '@/lib/auth'
 import { getWorkspace } from '@/lib/workspace'
 import { checkCapability, recordUsage } from '@/lib/billing/entitlements'
-import { addHeldResults, ingestText, ingestUrl, readHeld, withoutHeld } from '@/lib/research/ingest'
+import {
+  addHeldResults,
+  ingestText,
+  ingestUrl,
+  readHeld,
+  reholdForReview,
+  withoutHeld,
+} from '@/lib/research/ingest'
 import { extractDocument } from '@/lib/sources/document'
 import { resolveSearchProvider, researchCapability } from '@/lib/research/providers'
 import {
@@ -234,6 +241,9 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
             userId: user.id,
             personId: parsed.data.personId,
             userSupplied: true,
+            // Read now, because the user asked, but held like any researched
+            // page: adding a link is not checking what the page says.
+            holdForReview: true,
           })
         : await ingestText(parsed.data.input, {
             supabase,
@@ -261,6 +271,23 @@ export async function addContext(_prev: ResearchState, formData: FormData): Prom
     await track('observation_added', { source: kind })
     revalidatePath(`/people/${parsed.data.personId}`)
 
+    // A page the user marked as someone else stays that way, and the answer
+    // says so rather than "added".
+    if (result.reused && result.identity?.status === 'no_match') {
+      return {
+        error:
+          'You marked that page as being about someone else, so it was not used. To use it, choose Reconsider on that page under Sources.',
+      }
+    }
+    if (result.held) {
+      return {
+        ok: true,
+        message:
+          'Read. Check it under Sources: nothing from it is in their record until you say it is them.',
+        sourcesHeld: 1,
+        needsReview: true,
+      }
+    }
     if (result.message) {
       return { ok: false, error: result.message }
     }
@@ -474,9 +501,12 @@ export async function researchPerson(
         workspaceId,
         userId: user.id,
         personId,
-        // Only the profile URL the user themselves supplied gets that trust.
+        // Only the profile URL the user themselves supplied gets that trust --
+        // as a strong identity signal, never as a confirmation. Its page waits
+        // for the user's review on every run, the web's included: typing a
+        // link in is not checking what the page says.
         userSupplied: url === person.profile_url,
-        holdForReview: hold,
+        holdForReview: hold || url === person.profile_url,
       })
 
       if (result.usage) {
@@ -556,9 +586,13 @@ export async function researchPerson(
     revalidatePath(`/people/${personId}`)
 
     if (held > 0) {
+      const check = held === 1 ? 'it' : 'each one'
       return {
         ok: true,
-        message: `Reviewed ${considered} source${considered === 1 ? '' : 's'}. ${held} may be about ${person.full_name}. Nothing is in their record until you check ${held === 1 ? 'it' : 'each one'}.`,
+        message:
+          accepted > 0
+            ? `Reviewed ${considered} source${considered === 1 ? '' : 's'}, used ${accepted}. ${held} more may be about ${person.full_name}: nothing from ${held === 1 ? 'it' : 'them'} is in their record until you check ${check}.`
+            : `Reviewed ${considered} source${considered === 1 ? '' : 's'}. ${held} may be about ${person.full_name}. Nothing is in their record until you check ${check}.`,
         sourcesConsidered: considered,
         sourcesAccepted: accepted,
         sourcesHeld: held,
@@ -774,6 +808,106 @@ export async function confirmSourceMatch(sourceId: string, personId: string) {
 }
 
 /**
+ * RECONSIDER a page the user marked as someone else.
+ *
+ * The only way such a page is ever read for this person again: "not them"
+ * holds against every later research run until the user chooses this. The
+ * page is read once more from what was stored and held for review, as
+ * research holds any page -- nothing reaches the record until the user says
+ * it is them. Reading it is metered as one source read.
+ */
+export async function reconsiderSourceMatch(
+  sourceId: string,
+  personId: string,
+): Promise<ResearchState> {
+  const capability = await checkCapability('researchPerson', 'source_ingest')
+  if (!capability.allowed) return refused(capability)
+
+  const user = await requireUser()
+  const { workspaceId } = await getWorkspace()
+  const supabase = await createClient()
+  const archived = await archivedRefusal(supabase, user.id, personId)
+  if (archived) return archived
+
+  const { data: link } = await supabase
+    .from('source_person_links')
+    .select('identity_match_status, reviewed_by_user, match_signals')
+    .eq('source_id', sourceId)
+    .eq('person_id', personId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!link || link.identity_match_status !== 'no_match' || !link.reviewed_by_user) {
+    return { error: 'Only a page you marked as someone else can be reconsidered.' }
+  }
+
+  const decide = (patch: Database['public']['Tables']['source_person_links']['Update']) =>
+    supabase
+      .from('source_person_links')
+      .update(patch)
+      .eq('source_id', sourceId)
+      .eq('person_id', personId)
+      .eq('user_id', user.id)
+
+  await decide({ identity_match_status: 'unreviewed', reviewed_by_user: false, match_signals: {} })
+
+  let result: Awaited<ReturnType<typeof reholdForReview>> | null = null
+  try {
+    result = await reholdForReview(supabase, {
+      workspaceId,
+      userId: user.id,
+      personId,
+      sourceId,
+    })
+  } catch (error) {
+    logger.error('research.reconsider_failed', {
+      error: error instanceof Error ? error.name : 'unknown',
+    })
+  }
+
+  // Unless the page is now waiting for the user's check, their "not them"
+  // stands exactly as it was, so no later research run can link it.
+  if (!result?.held) {
+    await decide({
+      identity_match_status: 'no_match',
+      reviewed_by_user: true,
+      match_signals: link.match_signals,
+    })
+  }
+
+  if (result?.usage) {
+    await recordUsage({
+      meter: 'source_ingest',
+      subjectKind: 'source',
+      subjectId: sourceId,
+      provider: result.usage.provider,
+      model: result.usage.model,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+    })
+  }
+  await track('research_source_reconsidered', { held: Boolean(result?.held) })
+  revalidatePath(`/people/${personId}`)
+
+  if (result?.held) {
+    return {
+      ok: true,
+      message:
+        'Read again. Check it here: nothing from it is in their record until you say it is them.',
+      sourcesHeld: 1,
+      needsReview: true,
+    }
+  }
+  return {
+    ok: false,
+    error: `${
+      result
+        ? (result.message ?? 'On reading it again, this page does not appear to be about them.')
+        : 'That page could not be read again.'
+    } It stays marked as someone else.`,
+  }
+}
+
+/**
  * Delete a source and clean up after it.
  *
  * Facts that had no other supporting source are removed rather than left
@@ -911,7 +1045,7 @@ export async function refineIdentityAndResearch(
     if (wasRejected) {
       return {
         error:
-          'You marked that page as being about someone else, so it will not be used for this person. Add a different link.',
+          'You marked that page as being about someone else, so it will not be used for this person. To use it, choose Reconsider on that page under Sources, or add a different link.',
       }
     }
   }

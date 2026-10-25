@@ -92,6 +92,7 @@ export type AnalyticsEvent =
   | 'person_research_completed'
   | 'research_source_accepted'
   | 'research_source_rejected'
+  | 'research_source_reconsidered'
   | 'brief_feedback'
   // Emitted when a signed-in page loads after a gap longer than the session
   // window. Retention, without storing anything about what the session did.

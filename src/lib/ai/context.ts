@@ -393,11 +393,16 @@ export async function getPeopleContext(
   const publicSourcesByPerson = new Map<string, PublicSourceContext[]>()
   for (const row of publicSources.data ?? []) {
     const src = row.sources
-    // A source we could not actually read is not evidence, and a page held
-    // for the user's review is not on record until they say it is them.
+    // A source we could not actually read is not evidence; a page held for
+    // review, still waiting for a check, or marked "not them" is not about
+    // them as far as the record goes.
     if (
       !src ||
-      !countsAsPublicSource({ accessStatus: src.access_status, signals: row.match_signals })
+      !countsAsPublicSource({
+        accessStatus: src.access_status,
+        status: row.identity_match_status,
+        signals: row.match_signals,
+      })
     )
       continue
     const list = publicSourcesByPerson.get(row.person_id) ?? []

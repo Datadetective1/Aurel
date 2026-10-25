@@ -41,6 +41,8 @@ import { AVATAR_BUCKET } from '@/lib/conversations/avatars'
 import { track } from '@/lib/analytics'
 import { formatPublishedDate, pluralise } from '@/lib/format'
 import { formatDateIn } from '@/lib/tz'
+import { readHeld } from '@/lib/research/ingest'
+import { factLabel } from '@/lib/research/review'
 
 export async function generateMetadata({
   params,
@@ -99,15 +101,7 @@ const FACT_GROUPS: { kinds: string[]; label: string }[] = [
   { kinds: ['communication_signal'], label: 'Public communication signals' },
 ]
 
-export default async function PersonPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>
-  /** `research=1`: just added with a profile URL -- read it now. */
-  searchParams: Promise<{ research?: string }>
-}) {
-  const { research } = await searchParams
+export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { user, profile } = await requireOnboardedUser()
   const timeZone = profile.timezone ?? 'UTC'
@@ -174,7 +168,7 @@ export default async function PersonPage({
     supabase
       .from('source_person_links')
       .select(
-        'identity_match_status, sources(id, source_title, source_url, publisher, author, source_type, access_status, retrieved_at, published_at)',
+        'identity_match_status, reviewed_by_user, match_signals, sources(id, source_title, source_url, publisher, author, source_type, access_status, retrieved_at, published_at)',
       )
       .eq('user_id', user.id)
       .eq('person_id', id),
@@ -255,7 +249,16 @@ export default async function PersonPage({
   // --- sources, with what each one is actually holding up --------------------
   const sourceRows = (sourceLinks ?? [])
     .flatMap((link) =>
-      link.sources ? [{ status: link.identity_match_status, src: link.sources }] : [],
+      link.sources
+        ? [
+            {
+              status: link.identity_match_status,
+              reviewed: link.reviewed_by_user,
+              held: readHeld(link.match_signals),
+              src: link.sources,
+            },
+          ]
+        : [],
     )
     .sort((a, b) => (b.src.retrieved_at ?? '').localeCompare(a.src.retrieved_at ?? ''))
 
@@ -289,7 +292,7 @@ export default async function PersonPage({
   const factCounts = countBySource(factLinks)
   const observationCounts = countBySource(obsLinks)
 
-  const sources: SourceRowData[] = sourceRows.map(({ status, src }) => ({
+  const sources: SourceRowData[] = sourceRows.map(({ status, reviewed, held, src }) => ({
     id: src.id,
     title: src.source_title,
     url: src.source_url,
@@ -302,6 +305,13 @@ export default async function PersonPage({
     identityStatus: status,
     factCount: factCounts.get(src.id) ?? 0,
     observationCount: observationCounts.get(src.id) ?? 0,
+    reviewedByUser: reviewed,
+    heldFacts: held?.facts.map((fact) => ({
+      label: factLabel(fact.kind),
+      value: fact.value,
+      evidence: fact.evidenceLevel,
+      excerpt: fact.excerpt,
+    })),
   }))
 
   // Excerpts backing each proposal, so the review gate can show its basis.
@@ -542,10 +552,6 @@ export default async function PersonPage({
         discoveryHint={capability.discoveryHint}
         hasProfileUrl={Boolean(person.profile_url)}
         timeZone={timeZone}
-        // createPerson has always added `research=1` when a profile URL was
-        // given, and nothing read it -- so the user pointed at the page to
-        // read and was then left to find a second button to read it.
-        autoStart={research === '1' && Boolean(person.profile_url)}
         lastResearchedAt={person.last_researched_at}
         // Sources actually standing behind a claim: something rests on them,
         // and they have not been marked as somebody else.

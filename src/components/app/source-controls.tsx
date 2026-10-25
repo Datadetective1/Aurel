@@ -2,12 +2,14 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ExternalLink, Loader2, Trash2, UserX } from 'lucide-react'
+import { Check, ExternalLink, Loader2, RotateCcw, Trash2, UserX } from 'lucide-react'
 import {
   confirmSourceMatch,
   deleteSource,
+  reconsiderSourceMatch,
   rejectSourceMatch,
 } from '@/app/(app)/people/research-actions'
+import { EvidenceBadge } from '@/components/app/evidence'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/primitives'
 import { formatPublishedDate } from '@/lib/format'
@@ -25,6 +27,9 @@ import { brand } from '@/lib/brand'
  *                          again. Rejecting TEACHES.
  *   "Delete"               removes the source row entirely. Research may
  *                          rediscover the same URL later. Deleting FORGETS.
+ *   "Reconsider"           on a page marked as someone else, and only there:
+ *                          the one way it is read for this person again. It
+ *                          is held for review, like any page research finds.
  *
  * That last distinction is the one a real user could not make, so it is stated
  * in the confirmation of each rather than left to be inferred from the schema.
@@ -53,6 +58,15 @@ export interface SourceRowData {
   factCount: number
   /** Observations proposed or accepted from it. */
   observationCount: number
+  /** The user decided this one themselves. */
+  reviewedByUser?: boolean
+  /** A page held for review: what it would add if it is them, each with its evidence. */
+  heldFacts?: {
+    label: string
+    value: string
+    evidence: 'confirmed' | 'observed' | 'inferred' | 'unknown'
+    excerpt: string | null
+  }[]
 }
 
 /**
@@ -70,16 +84,18 @@ export interface SourceRowData {
  * one badge that asks the actual question, and the resolved states report what
  * the user themselves decided.
  */
-const IDENTITY_LABEL: Record<string, { label: string; tone: 'positive' | 'caution' | 'outline' } | null> =
-  {
-    // No badge: nothing for the reader to do.
-    confirmed: null,
-    probable: null,
-    ambiguous: { label: 'Check this is them', tone: 'caution' },
-    conflicting: { label: 'Check this is them', tone: 'caution' },
-    unreviewed: { label: 'Check this is them', tone: 'caution' },
-    no_match: { label: 'Marked as someone else', tone: 'outline' },
-  }
+const IDENTITY_LABEL: Record<
+  string,
+  { label: string; tone: 'positive' | 'caution' | 'outline' } | null
+> = {
+  // No badge: nothing for the reader to do.
+  confirmed: null,
+  probable: null,
+  ambiguous: { label: 'Check this is them', tone: 'caution' },
+  conflicting: { label: 'Check this is them', tone: 'caution' },
+  unreviewed: { label: 'Check this is them', tone: 'caution' },
+  no_match: { label: 'Marked as someone else', tone: 'outline' },
+}
 
 export function SourceRow({
   source,
@@ -92,14 +108,19 @@ export function SourceRow({
   personName: string
 }) {
   const router = useRouter()
-  const [busy, setBusy] = React.useState<null | 'confirm' | 'reject' | 'delete'>(null)
+  type Kind = 'confirm' | 'reject' | 'delete' | 'reconsider'
+  const [busy, setBusy] = React.useState<null | Kind>(null)
+  const [note, setNote] = React.useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = React.useState(false)
   const [confirmingReject, setConfirmingReject] = React.useState(false)
 
-  const run = async (kind: 'confirm' | 'reject' | 'delete', fn: () => Promise<unknown>) => {
+  const run = async (kind: Kind, fn: () => Promise<unknown>) => {
+    setNote(null)
     setBusy(kind)
     try {
-      await fn()
+      const outcome = (await fn()) as { error?: string; message?: string } | undefined
+      if (outcome?.error) setNote(outcome.error)
+      else if (outcome?.message) setNote(outcome.message)
       router.refresh()
     } finally {
       setBusy(null)
@@ -158,8 +179,12 @@ export function SourceRow({
           <p className="text-ink-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem]">
             {source.publisher ? <span>{source.publisher}</span> : null}
             {source.author ? <span>· {source.author}</span> : null}
-            {source.publishedAt ? <span>· published {formatPublishedDate(source.publishedAt)}</span> : null}
-            {source.retrievedAt ? <span>· read {formatPublishedDate(source.retrievedAt)}</span> : null}
+            {source.publishedAt ? (
+              <span>· published {formatPublishedDate(source.publishedAt)}</span>
+            ) : null}
+            {source.retrievedAt ? (
+              <span>· read {formatPublishedDate(source.retrievedAt)}</span>
+            ) : null}
           </p>
 
           <p className="text-ink-faint mt-1 text-[0.6875rem]">
@@ -170,6 +195,30 @@ export function SourceRow({
               ? ` · ${source.observationCount} observation${source.observationCount === 1 ? '' : 's'}`
               : ''}
           </p>
+
+          {/* A held page shows what it would add before anyone says it is
+              them, each with its evidence -- the review is of the facts, not
+              only of the page title. */}
+          {needsReview && source.heldFacts?.length ? (
+            <div className="mt-3">
+              <p className="text-ink-muted text-[0.6875rem]">If it is them, this adds:</p>
+              <ul className="mt-1 space-y-1.5">
+                {source.heldFacts.map((fact, i) => (
+                  <li key={i} className="text-ink-secondary text-xs leading-relaxed">
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      <span>
+                        {fact.label}: {fact.value}
+                      </span>
+                      <EvidenceBadge level={fact.evidence} />
+                    </span>
+                    {fact.excerpt ? (
+                      <span className="text-ink-faint block">“{fact.excerpt}”</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -260,6 +309,23 @@ export function SourceRow({
           )
         ) : null}
 
+        {source.identityStatus === 'no_match' && source.reviewedByUser ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-11"
+            disabled={busy !== null}
+            onClick={() => run('reconsider', () => reconsiderSourceMatch(source.id, personId))}
+          >
+            {busy === 'reconsider' ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+            )}
+            Reconsider this page
+          </Button>
+        ) : null}
+
         {confirmingDelete ? (
           <>
             <Button
@@ -306,10 +372,20 @@ export function SourceRow({
         )}
       </div>
 
+      {note ? (
+        <p role="status" className="text-ink-secondary mt-2 text-xs leading-relaxed">
+          {note}
+        </p>
+      ) : null}
+
       {source.identityStatus === 'no_match' ? (
         <p className="text-ink-muted mt-2 text-[0.6875rem] leading-relaxed">
           You marked this as someone else. {brand.name} keeps it on file so it will not use it for{' '}
-          {personName} again, and anything it alone supported has been withdrawn.
+          {personName} again unless you reconsider it, and anything it alone supported has been
+          withdrawn.
+          {source.reviewedByUser
+            ? ' Reconsidering reads it once more and holds it for your review; that uses one source read from your plan.'
+            : ''}
         </p>
       ) : null}
     </li>
