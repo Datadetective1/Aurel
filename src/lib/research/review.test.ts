@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { factLabel, hostOf, matchStrength, nameExcerpt, reviewReason, reviewState } from './review'
+import {
+  countsAsPublicSource,
+  factLabel,
+  hostOf,
+  matchStrength,
+  nameExcerpt,
+  reviewReason,
+  reviewState,
+} from './review'
 
 /**
  * REVIEWING WHAT RESEARCH FOUND
@@ -133,5 +141,23 @@ describe('labels', () => {
     expect(factLabel('something_new')).toBe('Other')
     expect(hostOf('https://www.northwind.example/team')).toBe('northwind.example')
     expect(hostOf('not a url')).toBeNull()
+  })
+})
+
+describe('what Ask and briefs may cite as a public source', () => {
+  it('a page held for review is not cited, even when it was read for someone else', () => {
+    expect(
+      countsAsPublicSource({
+        accessStatus: 'analyzed',
+        signals: { exactNameInTitle: true, held: { facts: [] } },
+      }),
+    ).toBe(false)
+  })
+
+  it('a read page with nothing held is cited, as before; an unreadable one is not', () => {
+    expect(
+      countsAsPublicSource({ accessStatus: 'analyzed', signals: { exactNameInTitle: true } }),
+    ).toBe(true)
+    expect(countsAsPublicSource({ accessStatus: 'identity_uncertain', signals: {} })).toBe(false)
   })
 })

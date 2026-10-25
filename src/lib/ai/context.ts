@@ -5,6 +5,7 @@ import type { Database } from '@/lib/supabase/types'
 import { DIMENSION_BY_ID, type DimensionId } from '@/lib/assessment/instrument'
 import { describeDimension, scoreResponses } from '@/lib/assessment/scoring'
 import { isOverdueIn } from '@/lib/tz'
+import { countsAsPublicSource } from '@/lib/research/review'
 import type {
   CommitmentContext,
   DecisionContext,
@@ -269,7 +270,7 @@ export async function getPeopleContext(
     supabase
       .from('source_person_links')
       .select(
-        'person_id, identity_match_status, sources(id, source_title, source_url, publisher, source_type, retrieved_at, published_at, access_status)',
+        'person_id, identity_match_status, match_signals, sources(id, source_title, source_url, publisher, source_type, retrieved_at, published_at, access_status)',
       )
       .eq('user_id', userId)
       .in('person_id', personIds),
@@ -392,8 +393,13 @@ export async function getPeopleContext(
   const publicSourcesByPerson = new Map<string, PublicSourceContext[]>()
   for (const row of publicSources.data ?? []) {
     const src = row.sources
-    // A source we could not actually read is not evidence.
-    if (!src || src.access_status !== 'analyzed') continue
+    // A source we could not actually read is not evidence, and a page held
+    // for the user's review is not on record until they say it is them.
+    if (
+      !src ||
+      !countsAsPublicSource({ accessStatus: src.access_status, signals: row.match_signals })
+    )
+      continue
     const list = publicSourcesByPerson.get(row.person_id) ?? []
     list.push({
       id: src.id,

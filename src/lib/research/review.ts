@@ -33,6 +33,24 @@ export function reviewState(link: {
   return 'waiting'
 }
 
+/** A page the app's research holds for review: what it would add waits on its link. */
+export function isHeld(signals: unknown): boolean {
+  return Boolean(
+    signals && typeof signals === 'object' && !Array.isArray(signals) && 'held' in signals,
+  )
+}
+
+/**
+ * Whether a linked page may be given to Ask and briefs as a public source:
+ * only one that was actually read, and never one still held for review.
+ */
+export function countsAsPublicSource(link: {
+  accessStatus: string | null
+  signals: unknown
+}): boolean {
+  return link.accessStatus === 'analyzed' && !isHeld(link.signals)
+}
+
 export function matchStrength(confidence: number | null): 'strong' | 'possible' {
   return (confidence ?? 0) >= STRONG_MATCH ? 'strong' : 'possible'
 }
