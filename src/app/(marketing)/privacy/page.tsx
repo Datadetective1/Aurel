@@ -171,27 +171,33 @@ export default function PrivacyPage() {
 
         <Section title="Voice recordings">
           <p>
-            When you record a conversation or a voice note, the audio is sent through {brand.name}{' '}
-            to OpenAI&rsquo;s speech-to-text service to be turned into words. {brand.name} does not
-            keep the audio: it passes through our servers for the length of that request and is
-            never written to your record or our database.{' '}
+            <strong className="text-ink font-medium">On your device.</strong> In the iPhone app, a
+            recording is saved as it is made, in the app&rsquo;s private storage on your phone, so
+            closing the app does not lose it. It stays there until the conversation has been kept,
+            or until you discard it, and is then deleted. While it is there, it can be part of your
+            phone&rsquo;s own backup. On the website, a recording is held in your browser tab until
+            it is sent; it is saved on your computer only if you choose to download it after a send
+            fails.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">On {brand.name}&rsquo;s servers.</strong> To
+            turn speech into words, the audio is sent through our servers to our speech-to-text
+            provider. It passes through for the length of that request and is never written to your
+            record or our database.{' '}
             {features.captureStorage
               ? `If a long recording is uploaded in parts, each part waits in private, temporary storage that only ${brand.name}’s servers can read, is deleted as soon as it has been transcribed, and anything left behind is removed within about a day.`
-              : 'If a long recording is sent in parts, each part is transcribed as it arrives and is not stored.'}{' '}
-            On your iPhone, a recording stays in the app&rsquo;s private storage until the
-            conversation is kept or you discard it.
+              : 'A long recording is sent in parts, and each part is transcribed as it arrives; no part is stored.'}{' '}
+            What is kept is the text, which you review and can edit or delete.
           </p>
           <p>
-            OpenAI handles the audio under its own published API data policy. That policy currently
-            states that audio sent for transcription is not used to train its models and is not
-            retained after it has been transcribed. That is OpenAI&rsquo;s commitment rather than
-            something {brand.name} can verify on its own systems; we rely on the published policy.
-          </p>
-          <p>
-            What you keep is the text, which you review and can edit or delete. To find what was
-            promised and decided, that text is sent to OpenAI&rsquo;s language model. Under the same
-            published policy it is not used to train OpenAI&rsquo;s models, and OpenAI may keep it
-            for up to 30 days to monitor for abuse.
+            <strong className="text-ink font-medium">At our service provider.</strong> The audio
+            goes to OpenAI&rsquo;s speech-to-text service. OpenAI&rsquo;s published API data policy
+            currently states that audio sent for transcription is not used to train its models and
+            is not retained once transcribed. To find what was promised and decided, the text is
+            then sent to OpenAI&rsquo;s language model. It is not used to train OpenAI&rsquo;s
+            models, and OpenAI may keep it for up to 30 days: for abuse monitoring, and because our
+            requests store the model&rsquo;s response for that period. These are OpenAI&rsquo;s
+            commitments, which we rely on but cannot verify on our own systems.
           </p>
           <p>
             Before recording other people, you confirm they know. Recording happens only while the

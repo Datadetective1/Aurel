@@ -18,9 +18,11 @@ const { default: PrivacyPage } = await import('./page')
 /**
  * THE PRIVACY PAGE SAYS WHAT PRODUCTION DOES
  * =============================================================================
- * Two sentences follow configuration instead of describing a setup that may
- * not be live: how long recordings sent in parts are kept, and the Google
- * Limited Use statement, shown only when Google Calendar can be connected.
+ * Recordings are described in three places -- on the device, on Atturel's
+ * servers, at the provider -- and two sentences follow configuration instead
+ * of describing a setup that may not be live: whether parts of a long
+ * recording are stored, and the Google Limited Use statement, shown only when
+ * Google Calendar can be connected.
  * =============================================================================
  */
 
@@ -31,9 +33,26 @@ afterEach(() => {
 })
 
 describe('the privacy page', () => {
-  it('without part storage, says parts are transcribed as they arrive and not stored', () => {
+  it('separates the phone, the servers and the provider', () => {
     const text = render(<PrivacyPage />).container.textContent ?? ''
-    expect(text).toContain('each part is transcribed as it arrives and is not stored')
+    expect(text).toContain('On your device.')
+    expect(text).toContain(
+      'It stays there until the conversation has been kept, or until you discard it',
+    )
+    expect(text).toContain('it can be part of your phone’s own backup')
+    expect(text).toContain('held in your browser tab until it is sent')
+    expect(text).toContain('On Atturel’s servers.')
+    expect(text).toContain('never written to your record or our database')
+    expect(text).toContain('At our service provider.')
+    expect(text).toContain('not retained once transcribed')
+    expect(text).toContain(
+      'for abuse monitoring, and because our requests store the model’s response',
+    )
+  })
+
+  it('without part storage, says each part is transcribed as it arrives and none is stored', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain('each part is transcribed as it arrives; no part is stored')
     expect(text).not.toContain('temporary storage')
   })
 
