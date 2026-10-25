@@ -242,8 +242,8 @@ export function DeletePersonForm({ personId, name }: { personId: string; name: s
           className="mt-1 size-4"
         />
         <span>
-          I understand this permanently deletes {name} and what is listed under &ldquo;Deleted
-          &rdquo;. It cannot be undone.
+          I understand this permanently deletes {name} and what is listed under
+          &ldquo;Deleted&rdquo;. It cannot be undone.
         </span>
       </label>
       <div className="mt-3">
