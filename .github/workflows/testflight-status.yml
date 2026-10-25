@@ -6,6 +6,11 @@ name: TestFlight status
 # secrets as the iOS TestFlight workflow. "Crash reports" also prints the crash
 # logs testers shared. Read-only unless "invite team admins" is ticked: then an
 # empty internal group gets the team's Account Holder and Admins.
+#
+# "External action" runs one external TestFlight step for the given build
+# (scripts/ci/testflight-external.cjs): prepare the "Atturel Pilot" group and
+# its information, verify the reviewer sign-in, submit for beta review, or turn
+# on the public link once approved. Left at "none", nothing external changes.
 
 on:
   workflow_dispatch:
@@ -24,6 +29,15 @@ on:
         default: false
       crash_reports:
         description: Also print the crash reports testers shared from TestFlight
+        type: boolean
+        default: false
+      external_action:
+        description: External TestFlight step for the build above
+        type: choice
+        options: [none, prepare, verify, submit, public-link]
+        default: none
+      rotate_demo_password:
+        description: With "prepare", replace the reviewer password App Store Connect holds
         type: boolean
         default: false
 
@@ -63,3 +77,17 @@ jobs:
           TESTFLIGHT_WAIT_MINUTES: ${{ inputs.wait_minutes }}
           INVITE_TEAM_ADMINS: ${{ inputs.invite_team_admins }}
         run: node scripts/ci/testflight-status.cjs
+
+      # Hashes a new reviewer password in "prepare"; kept out of the app's dependencies.
+      - name: Install bcryptjs
+        if: inputs.external_action == 'prepare'
+        run: npm install --prefix "$RUNNER_TEMP/bcryptjs" --no-save --no-package-lock --no-audit --no-fund bcryptjs@2.4.3
+
+      - name: External TestFlight
+        if: inputs.external_action != 'none'
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          TESTFLIGHT_ACTION: ${{ inputs.external_action }}
+          ROTATE_DEMO_PASSWORD: ${{ inputs.rotate_demo_password }}
+          BCRYPTJS_DIR: ${{ runner.temp }}/bcryptjs
+        run: node scripts/ci/testflight-external.cjs
