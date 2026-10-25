@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Pressable, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
-import type { PeopleResponse } from '@atturel/web/lib/mobile/contracts'
+import type { ArchivedPeopleResponse, PeopleResponse } from '@atturel/web/lib/mobile/contracts'
 import { useApi } from '~/lib/api'
 import { useFresh } from '~/lib/use-fresh'
 import { NewPerson } from '~/components/people-picker'
@@ -17,8 +17,14 @@ export default function People() {
   const { c } = useTheme()
   const [query, setQuery] = React.useState('')
   const { data, error, stale, loading, refreshing, refresh, reload } = useApi<PeopleResponse>('/api/mobile/people')
+  // Only for the count: the archive is its own screen.
+  const archived = useApi<ArchivedPeopleResponse>('/api/mobile/people?archived=1')
   const [adding, setAdding] = React.useState(false)
-  useFresh(reload)
+  useFresh(() => {
+    reload()
+    archived.reload()
+  })
+  const archivedCount = archived.data?.people.length ?? 0
   const now = new Date()
 
   const people = (data?.people ?? []).filter((p) => {
@@ -28,7 +34,14 @@ export default function People() {
   })
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen
+      refreshing={refreshing}
+      onRefresh={() => {
+        void refresh()
+        void archived.reload()
+      }}
+    >
+      <StaleNote failure={stale} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T variant="display" accessibilityRole="header">People</T>
         <Pressable
@@ -47,6 +60,12 @@ export default function People() {
           onAdded={(person) => {
             setAdding(false)
             reload()
+            router.push({ pathname: '/person/[id]', params: { id: person.id } })
+          }}
+          onExisting={(person) => {
+            setAdding(false)
+            reload()
+            archived.reload()
             router.push({ pathname: '/person/[id]', params: { id: person.id } })
           }}
         />
@@ -82,6 +101,20 @@ export default function People() {
           people.map((p) => <PersonRow key={p.id} person={p} timeZone={data?.timeZone ?? 'UTC'} now={now} />)
         )}
       </View>
+
+      {archivedCount > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Archived, ${archivedCount} ${archivedCount === 1 ? 'person' : 'people'}`}
+          accessibilityHint="People you removed. Restore them or delete them permanently."
+          onPress={() => router.push('/archived')}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, minHeight: TOUCH, opacity: pressed ? 0.7 : 1 })}
+        >
+          <Feather name="archive" size={16} color={c.inkMuted} />
+          <T variant="small" tone="secondary" style={{ flex: 1 }}>Archived ({archivedCount})</T>
+          <Feather name="chevron-right" size={16} color={c.inkMuted} />
+        </Pressable>
+      ) : null}
     </Screen>
   )
 }

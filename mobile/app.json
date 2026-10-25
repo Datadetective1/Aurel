@@ -77,6 +77,14 @@
             ]
           },
           {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
@@ -144,6 +152,14 @@
         }
       ],
       "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Atturel opens the system photo picker so you can choose a photo of someone in your relationships, or of yourself. Atturel sees only the photo you choose, never the rest of your library.",
+          "cameraPermission": "Atturel does not use the camera. Photos are chosen from your library with the system photo picker.",
+          "microphonePermission": "Atturel records a conversation only while the app is open on your screen, so it can turn what was said into notes you review. Recording always shows in the app and pauses when you leave it."
+        }
+      ],
       "expo-sharing"
     ],
     "experiments": {

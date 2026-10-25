@@ -28,7 +28,8 @@ export type ApiFailure =
   | { kind: 'plan_required'; message: string }
   /** 409: the server's answer is a question (a possible duplicate, a person not yet removed). */
   | { kind: 'conflict'; message: string; body: unknown }
-  | { kind: 'server'; message: string }
+  /** `body` is the server's answer, for a form to read its field errors from. */
+  | { kind: 'server'; message: string; body?: unknown }
 
 export class ApiError extends Error {
   constructor(public failure: ApiFailure) {
@@ -75,7 +76,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError({ kind: 'conflict', message: body?.error ?? 'That clashes with what is already there.', body })
   }
   if (!response.ok) {
-    throw new ApiError({ kind: 'server', message: body?.error ?? 'Something went wrong.' })
+    throw new ApiError({ kind: 'server', message: body?.error ?? 'Something went wrong.', body })
   }
   return body as T
 }
@@ -285,4 +286,11 @@ export function useApi<T>(path: string | null) {
     /** Fetch again without the pull-to-refresh spinner: on returning to a screen. */
     reload: () => load('silent'),
   }
+}
+
+/** The per-field errors a form route returned with a refusal, if any. */
+export function fieldErrorsOf(e: unknown): Record<string, string[]> {
+  if (!(e instanceof ApiError) || (e.failure.kind !== 'server' && e.failure.kind !== 'conflict')) return {}
+  const body = e.failure.body as { fieldErrors?: Record<string, string[]> } | null | undefined
+  return body?.fieldErrors ?? {}
 }
