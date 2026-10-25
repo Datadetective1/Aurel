@@ -7,7 +7,6 @@ import { File, Paths } from 'expo-file-system'
 import Feather from '@expo/vector-icons/Feather'
 import type {
   AccountResponse,
-  CalendarConnection,
   ExportResponse,
   PreferencesResponse,
   RedeemAccessResponse,
@@ -15,11 +14,11 @@ import type {
 } from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
 import { useFresh } from '~/lib/use-fresh'
-import { formatDate } from '~/lib/format'
 import { useAuth } from '~/lib/auth'
 import { config } from '~/lib/config'
 import { Failure, Loading, Screen, Section, Card, StaleNote } from '~/components/screen'
 import { Button } from '~/components/button'
+import { CalendarConnections } from '~/components/calendar-connections'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -78,7 +77,7 @@ export default function Account() {
 
       <Notifications />
 
-      {data.calendar ? <Calendar connections={data.calendar.connections} /> : null}
+      {data.calendar ? <CalendarConnections connections={data.calendar.connections} manageUrl={data.calendar.manageUrl} onGone={refresh} /> : null}
 
       <PrivacyAndData />
 
@@ -204,34 +203,6 @@ function Toggle({
       </View>
       <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} accessibilityHint={detail} />
     </View>
-  )
-}
-
-const PROVIDER: Record<string, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
-
-/** Connected calendars, read-only: connecting and disconnecting are on the web. */
-function Calendar({ connections }: { connections: CalendarConnection[] }) {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  return (
-    <Section label="Calendar" icon="calendar">
-      {connections.length === 0 ? (
-        <T variant="small" tone="secondary">No calendar connected. Connect one from Settings › Calendar at atturel.com, read-only.</T>
-      ) : (
-        <View style={{ gap: 10 }}>
-          {connections.map((c) => (
-            <View key={`${c.provider}-${c.accountEmail ?? ''}`}>
-              <T variant="small">{PROVIDER[c.provider] ?? c.provider}{c.accountEmail ? ` · ${c.accountEmail}` : ''}</T>
-              <T variant="meta" tone="muted">
-                {[c.status === 'active' ? 'Connected' : c.status.replace(/_/g, ' '), c.lastSyncedAt ? `last synced ${formatDate(c.lastSyncedAt, tz)}` : null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </T>
-            </View>
-          ))}
-          <T variant="meta" tone="muted">Read-only. Atturel never creates, edits or answers anything. Manage it at atturel.com.</T>
-        </View>
-      )}
-    </Section>
   )
 }
 

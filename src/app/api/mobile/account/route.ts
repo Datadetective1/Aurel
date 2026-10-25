@@ -8,6 +8,7 @@ import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { mobileCaptureLimits } from '@/lib/capture/limits'
 import { absoluteUrl, brand } from '@/lib/brand'
 import { features } from '@/lib/env'
+import { CALENDAR_COLUMNS, mobileCalendarConnection } from '@/lib/mobile/calendar'
 import type {
   AccountResponse,
   DeleteAccountRequest,
@@ -37,7 +38,7 @@ export async function GET() {
     // Read-only status; never the tokens.
     (await createClient())
       .from('integration_accounts')
-      .select('provider, status, external_account_email, last_synced_at')
+      .select(CALENDAR_COLUMNS)
       .eq('user_id', user.id),
   ])
   const paid = entitlements.plan !== 'free'
@@ -74,12 +75,13 @@ export async function GET() {
     capture: { ...mobileCaptureLimits(features.captureStorage), remainingSeconds },
     sampleData: { loaded: Boolean(profile?.demo_seeded_at) },
     calendar: {
-      connections: (calendars ?? []).map((c) => ({
-        provider: c.provider,
-        status: c.status,
-        accountEmail: c.external_account_email,
-        lastSyncedAt: c.last_synced_at,
-      })),
+      connections: (calendars ?? []).map((row) =>
+        mobileCalendarConnection(row, {
+          planAllows: entitlements.capabilities.calendarIntegration,
+          timeZone: profile?.timezone ?? 'UTC',
+        }),
+      ),
+      manageUrl: absoluteUrl('/settings/capabilities'),
     },
   }
   return json(body)

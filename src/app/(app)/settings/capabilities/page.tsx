@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import {
   BookOpenText,
   CalendarDays,
+  CircleAlert,
   CircleCheck,
   CreditCard,
   FileText,
@@ -20,11 +21,8 @@ import { aiStatus } from '@/lib/ai/provider'
 import { researchCapability } from '@/lib/research/providers'
 import { calendarCapability } from '@/lib/calendar'
 import { createClient } from '@/lib/supabase/server'
-import {
-  CalendarConnections,
-  type CalendarConnection,
-  type CalendarConnectionStatus,
-} from '@/components/app/calendar-connections'
+import { CalendarConnections, type CalendarConnection } from '@/components/app/calendar-connections'
+import { calendarCardState, calendarFreshness, calendarState } from '@/lib/calendar/freshness'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { features } from '@/lib/env'
 import { senderAddress } from '@/lib/email/send'
@@ -38,7 +36,7 @@ export const metadata: Metadata = { title: 'Capabilities', robots: { index: fals
  * An inventory of what this deployment can actually do, and — where something
  * is off — what would turn it on and who can do that.
  *
- * Five states, defined below. The one that matters most is what "available"
+ * Six states, defined below. The one that matters most is what "available"
  * is NOT allowed to mean: anything needing a credential, or absent from this
  * deployment entirely, must never be shown as available.
  *
@@ -50,7 +48,7 @@ export const metadata: Metadata = { title: 'Capabilities', robots: { index: fals
  * =============================================================================
  */
 
-type Status = 'configured' | 'available' | 'not_connected' | 'setup' | 'unavailable'
+type Status = 'configured' | 'available' | 'attention' | 'not_connected' | 'setup' | 'unavailable'
 
 interface Capability {
   id: string
@@ -73,12 +71,14 @@ interface Capability {
 }
 
 /**
- * Five states, deliberately distinct.
+ * Six states, deliberately distinct.
  *
  * "Available" is reserved for things that genuinely work right now with no
  * setup. Anything requiring a credential is CONFIGURATION REQUIRED, and
  * anything simply absent from this deployment is UNAVAILABLE — labelling either
  * of those "available" would be the misleading state worth avoiding most.
+ * NEEDS ATTENTION is the user's own calendar connection that is not working:
+ * theirs to act on, so it is shown to everyone, first.
  */
 const STATUS_META: Record<
   Status,
@@ -86,6 +86,7 @@ const STATUS_META: Record<
 > = {
   configured: { label: 'Connected', tone: 'positive' },
   available: { label: 'Available', tone: 'accent' },
+  attention: { label: 'Needs attention', tone: 'caution' },
   not_connected: { label: 'Not connected', tone: 'caution' },
   setup: { label: 'Configuration required', tone: 'caution' },
   unavailable: { label: 'Unavailable', tone: 'outline' },
@@ -115,31 +116,30 @@ export default async function CapabilitiesSettingsPage() {
     .eq('status', 'confirmed')
     .gte('starts_at', new Date().toISOString())
 
+  const now = new Date()
   const connections: CalendarConnection[] = providers.map((provider) => {
     const row = (integrations ?? []).find((i) => i.provider === provider.id)
     // Calendar connection is a Pro capability. A connection made before the
     // plan changed still shows, but cannot sync until the plan allows it.
-    const status: CalendarConnectionStatus = !provider.configured
-      ? 'unavailable'
-      : !entitlements.capabilities.calendarIntegration
-        ? 'plan_required'
-        : !row
-          ? 'not_connected'
-          : (row.status as CalendarConnectionStatus)
+    const status = calendarState({
+      stored: row?.status ?? null,
+      configured: provider.configured,
+      planAllows: entitlements.capabilities.calendarIntegration,
+    })
 
     return {
       provider: provider.id,
       label: provider.label,
       status,
+      saved: Boolean(row),
       accountEmail: row?.external_account_email ?? null,
-      // Formatted here, in the account holder's zone, because the component
+      // Worked out here, in the account holder's zone, because the component
       // that shows it renders on both sides -- see CalendarConnection.
-      lastSyncedLabel: row?.last_synced_at
-        ? new Date(row.last_synced_at).toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: profile.timezone ?? 'UTC',
-          })
+      freshness: row
+        ? calendarFreshness(
+            { state: status, lastSyncedAt: row.last_synced_at },
+            { timeZone: profile.timezone ?? 'UTC', now },
+          )
         : null,
       eventCount: (eventCounts ?? []).filter((e) => e.provider === provider.id).length,
     }
@@ -155,7 +155,7 @@ export default async function CapabilitiesSettingsPage() {
   const closestProvider = [...providers].sort(
     (a, b) => a.missingEnv.length - b.missingEnv.length,
   )[0]
-  const anyCalendarConnected = connections.some((c) => c.status === 'connected')
+  const calendarCard = calendarCardState({ configured: anyCalendarConfigured, connections })
 
   const capabilities: Capability[] = [
     {
@@ -206,12 +206,20 @@ export default async function CapabilitiesSettingsPage() {
       icon: CalendarDays,
       // Connected means a working user grant, never a client secret in the
       // environment. Anything else would promise meetings that never arrive.
-      status: anyCalendarConnected ? 'configured' : anyCalendarConfigured ? 'setup' : 'unavailable',
-      detail: anyCalendarConnected
-        ? 'Your upcoming meetings are read so preparation follows your real day. Read-only — nothing is created, edited or answered on your behalf.'
-        : anyCalendarConfigured
-          ? 'Connect a calendar and your next two weeks of meetings appear on Today, with attendees matched to the people you already track.'
-          : 'No calendar provider is configured on this deployment, so meetings are added by hand.',
+      status:
+        calendarCard === 'connected'
+          ? 'configured'
+          : calendarCard === 'attention'
+            ? 'attention'
+            : calendarCard,
+      detail:
+        calendarCard === 'connected'
+          ? 'Your upcoming meetings are read so preparation follows your real day. Read-only — nothing is created, edited or answered on your behalf.'
+          : calendarCard === 'attention'
+            ? 'Your calendar connection needs attention. Below, it says what it needs, and it can be disconnected.'
+            : anyCalendarConfigured
+              ? 'Connect a calendar and your next two weeks of meetings appear on Today, with attendees matched to the people you already track.'
+              : 'No calendar provider is configured on this deployment, so meetings are added by hand.',
       deploymentAction: anyCalendarConfigured
         ? undefined
         : {
@@ -227,8 +235,11 @@ export default async function CapabilitiesSettingsPage() {
             env: closestProvider?.missingEnv ?? [],
             nearMatches: closestProvider?.nearMatches ?? [],
           },
-      // Rendered under the card: per-provider connect, sync and disconnect.
-      calendarConnections: anyCalendarConfigured ? connections : undefined,
+      // Rendered under the card: per-provider connect, sync and disconnect. A
+      // saved connection is listed even if no provider is configured any more,
+      // so it can still be disconnected (finding 8.6).
+      calendarConnections:
+        anyCalendarConfigured || calendarCard === 'attention' ? connections : undefined,
     },
     {
       id: 'conversations',
@@ -310,18 +321,25 @@ export default async function CapabilitiesSettingsPage() {
       ? 'Record a voice note or the conversation itself, upload audio, or paste a transcript. What was promised, decided and left open is proposed for you to confirm.'
       : 'Paste or upload a transcript, or type what happened. What was promised, decided and left open is proposed for you to confirm.',
   }
+  // A connection of the user's own that needs attention is always shown: it is
+  // theirs to retry, reconnect or disconnect (finding 8.6).
   const shown = admin
     ? capabilities
     : capabilities
-        .filter((c) => c.status === 'configured' || c.status === 'available')
+        .filter(
+          (c) => c.status === 'configured' || c.status === 'available' || c.status === 'attention',
+        )
         .map((c) => ({
           ...c,
           deploymentAction: undefined,
           detail: CUSTOMER_DETAIL[c.id] ?? c.detail,
         }))
 
+  const attention = shown.filter((c) => c.status === 'attention')
   const ready = shown.filter((c) => c.status === 'configured' || c.status === 'available')
-  const pending = shown.filter((c) => c.status !== 'configured' && c.status !== 'available')
+  const pending = shown.filter(
+    (c) => c.status !== 'configured' && c.status !== 'available' && c.status !== 'attention',
+  )
 
   return (
     <div>
@@ -331,6 +349,20 @@ export default async function CapabilitiesSettingsPage() {
           ? `What this deployment can actually do. ${brand.name} tells you which parts are running, and what would turn on the rest, rather than degrading quietly.`
           : `What you can do with ${brand.name} today.`}
       </p>
+
+      {attention.length > 0 ? (
+        <section className="mt-8">
+          <div className="flex items-center gap-2">
+            <CircleAlert className="text-caution size-3.5" aria-hidden="true" />
+            <h2 className="label">Needs attention</h2>
+          </div>
+          <ul className="mt-3 grid gap-2.5">
+            {attention.map((capability) => (
+              <CapabilityCard key={capability.id} capability={capability} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {ready.length > 0 ? (
         <section className="mt-8">

@@ -3,6 +3,8 @@ import type {
   ArchivedPeopleResponse,
   AtlasResponse,
   AskResponse,
+  CalendarConnection,
+  CalendarSyncResponse,
   CaptureResponse,
   DeletionPreviewResponse,
   MeResponse,
@@ -142,6 +144,23 @@ function meeting(id: string): MeetingResponse {
   }
 }
 
+const PREVIEW_CALENDAR: CalendarConnection = {
+  provider: 'google',
+  status: 'connected',
+  accountEmail: 'amary@example.com',
+  lastSyncedAt: NOW.toISOString(),
+  view: {
+    label: 'Connected',
+    tone: 'positive',
+    detail: '',
+    synced: 'Last synced just now',
+    stale: false,
+    note: null,
+    sync: 'Sync now',
+    reconnect: false,
+  },
+}
+
 export async function previewResponse<T>(path: string, init: RequestInit): Promise<T> {
   await delay(250)
   const p = path.replace(/^\/api\/mobile/, '')
@@ -159,7 +178,15 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
       },
       capture: { maxSeconds: 2 * 3600, segmentSeconds: 600, partTransport: 'direct' },
       sampleData: { loaded: false },
-      calendar: { connections: [{ provider: 'google', status: 'active', accountEmail: 'amary@example.com', lastSyncedAt: NOW.toISOString() }] },
+      calendar: { connections: [PREVIEW_CALENDAR], manageUrl: 'https://www.atturel.com/settings/capabilities' },
+    }
+    return body as T
+  }
+
+  if (/^\/calendar\/[^/]+\/sync$/.test(p) && init.method === 'POST') {
+    const body: CalendarSyncResponse = {
+      outcome: { ok: true, code: 'synced', message: 'Preview data does not sync a calendar.' },
+      connection: PREVIEW_CALENDAR,
     }
     return body as T
   }

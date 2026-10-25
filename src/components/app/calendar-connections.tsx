@@ -7,6 +7,12 @@ import { disconnectCalendar, syncCalendarNow } from '@/app/(app)/calendar-action
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
+import {
+  CALENDAR_STATE,
+  calendarActions,
+  type CalendarFreshness,
+  type CalendarState,
+} from '@/lib/calendar/freshness'
 
 /**
  * CALENDAR CONNECTIONS
@@ -18,29 +24,30 @@ import { brand } from '@/lib/brand'
  * because claiming otherwise would have someone waiting for meetings that were
  * never going to arrive.
  *
+ * Connected is not current, either. Nothing syncs in the background, so every
+ * saved connection says when it last synced, date included, and flags a sync
+ * more than a day old (finding 8.6). Only a grant the provider refused asks
+ * for a reconnect; a sync that failed offers Try again. Every saved
+ * connection can be disconnected, whatever its state.
+ *
  * `admin_consent_required` gets its own state on purpose. It is the one failure
  * a user genuinely cannot fix by trying again, and treating it as a generic
  * error would leave them clicking Connect until they gave up.
  * =============================================================================
  */
 
-export type CalendarConnectionStatus =
-  | 'connected'
-  | 'not_connected'
-  | 'expired'
-  | 'revoked'
-  | 'admin_consent_required'
-  | 'error'
-  | 'unavailable'
-  | 'plan_required'
+export type CalendarConnectionStatus = CalendarState
 
 export interface CalendarConnection {
   provider: 'microsoft' | 'google'
   label: string
   status: CalendarConnectionStatus
+  /** A grant is stored for this provider, whatever state it is in. */
+  saved: boolean
   accountEmail: string | null
   /**
-   * Formatted on the server, in the account holder's own time zone.
+   * When it last synced, worked out on the server in the account holder's own
+   * time zone. Null when nothing is saved.
    *
    * Not an ISO string formatted here: this is a client component, so it renders
    * on both sides, and toLocaleTimeString with an ambient locale gives en-US/UTC
@@ -48,52 +55,8 @@ export interface CalendarConnection {
    * disagree, React discards the server HTML, and it was throwing #418 on this
    * screen in production.
    */
-  lastSyncedLabel: string | null
+  freshness: CalendarFreshness | null
   eventCount: number
-}
-
-const STATE: Record<
-  CalendarConnectionStatus,
-  { label: string; tone: 'positive' | 'caution' | 'outline' | 'neutral'; detail: string }
-> = {
-  connected: { label: 'Connected', tone: 'positive', detail: '' },
-  not_connected: {
-    label: 'Not connected',
-    tone: 'outline',
-    detail: 'Read-only access to your upcoming meetings. Nothing is ever written back.',
-  },
-  expired: {
-    label: 'Needs attention',
-    tone: 'caution',
-    detail: 'The connection expired. Reconnect to keep meetings up to date.',
-  },
-  revoked: {
-    label: 'Needs attention',
-    tone: 'caution',
-    detail: 'Access was withdrawn in your calendar account. Reconnect to resume.',
-  },
-  admin_consent_required: {
-    label: 'Needs approval',
-    tone: 'caution',
-    detail:
-      'Your organization requires administrator approval before this app can read calendars. Ask your IT administrator to approve it, then reconnect.',
-  },
-  error: {
-    label: 'Needs attention',
-    tone: 'caution',
-    detail: 'The last sync did not complete. Reconnect, or try again shortly.',
-  },
-  unavailable: {
-    label: 'Unavailable',
-    tone: 'outline',
-    detail: 'Not available yet.',
-  },
-  plan_required: {
-    label: 'Pro',
-    tone: 'outline',
-    detail:
-      'Connecting a calendar is part of Pro. Upgrade to bring your meetings in automatically.',
-  },
 }
 
 export function CalendarConnections({ connections }: { connections: CalendarConnection[] }) {
@@ -111,13 +74,12 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
   const [busy, setBusy] = React.useState<'sync' | 'disconnect' | null>(null)
   const [message, setMessage] = React.useState<{ text: string; ok: boolean } | null>(null)
 
-  const state = STATE[connection.status]
+  const state = CALENDAR_STATE[connection.status]
+  const actions = calendarActions(connection.status, connection.saved)
   const isConnected = connection.status === 'connected'
-  const needsAttention = ['expired', 'revoked', 'error', 'admin_consent_required'].includes(
-    connection.status,
-  )
   const canConnect = connection.status !== 'unavailable' && connection.status !== 'plan_required'
   const planRequired = connection.status === 'plan_required'
+  const freshness = connection.freshness
 
   async function run(kind: 'sync' | 'disconnect') {
     setBusy(kind)
@@ -150,21 +112,29 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
             {connection.label}
           </p>
 
-          {isConnected && connection.accountEmail ? (
+          {connection.saved && connection.accountEmail ? (
             <p className="text-ink-muted mt-1 truncate text-xs">{connection.accountEmail}</p>
           ) : null}
 
           <p className="text-ink-secondary mt-1.5 text-xs leading-relaxed">
             {isConnected
-              ? `Reading your next 14 days. ${brand.name} never creates, edits or responds to anything in your calendar.`
+              ? `Reads your next 14 days each time you press Sync now. ${brand.name} never creates, edits or responds to anything in your calendar.`
               : state.detail}
           </p>
 
-          {isConnected ? (
+          {freshness ? (
             <p className="text-ink-faint mt-1 text-[0.6875rem]">
-              {connection.eventCount} upcoming{' '}
-              {connection.eventCount === 1 ? 'meeting' : 'meetings'}
-              {connection.lastSyncedLabel ? ` · synced ${connection.lastSyncedLabel}` : ''}
+              {isConnected
+                ? `${connection.eventCount} upcoming ${connection.eventCount === 1 ? 'meeting' : 'meetings'} · `
+                : ''}
+              {freshness.label}
+            </p>
+          ) : null}
+
+          {freshness?.note ? (
+            <p className="text-ink-secondary mt-1.5 flex items-start gap-2 text-xs leading-relaxed">
+              <CircleAlert className="text-caution mt-px size-3.5 shrink-0" aria-hidden="true" />
+              {freshness.note}
             </p>
           ) : null}
         </div>
@@ -175,54 +145,63 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {isConnected ? (
-          <>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => run('sync')}
-              disabled={busy !== null}
-            >
-              {busy === 'sync' ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  Syncing…
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="size-3.5" aria-hidden="true" />
-                  Sync now
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => run('disconnect')}
-              disabled={busy !== null}
-            >
-              {busy === 'disconnect' ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  Disconnecting…
-                </>
-              ) : (
-                <>
-                  <Unplug className="size-3.5" aria-hidden="true" />
-                  Disconnect
-                </>
-              )}
-            </Button>
-          </>
-        ) : canConnect ? (
-          <Button asChild size="sm" variant={needsAttention ? 'primary' : 'secondary'}>
-            <a href={`/api/calendar/${connection.provider}/connect`}>
-              {needsAttention ? 'Reconnect' : 'Connect'}
-            </a>
+        {actions.sync ? (
+          <Button
+            size="sm"
+            variant={connection.status === 'error' ? 'primary' : 'secondary'}
+            onClick={() => run('sync')}
+            disabled={busy !== null}
+          >
+            {busy === 'sync' ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                Syncing…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+                {actions.sync}
+              </>
+            )}
           </Button>
-        ) : planRequired ? (
+        ) : null}
+
+        {actions.reconnect && canConnect ? (
+          <Button asChild size="sm" variant="primary">
+            <a href={`/api/calendar/${connection.provider}/connect`}>Reconnect</a>
+          </Button>
+        ) : null}
+
+        {!connection.saved && canConnect ? (
+          <Button asChild size="sm" variant="secondary">
+            <a href={`/api/calendar/${connection.provider}/connect`}>Connect</a>
+          </Button>
+        ) : null}
+
+        {planRequired ? (
           <Button asChild size="sm" variant="secondary">
             <a href="/settings/billing">See Pro</a>
+          </Button>
+        ) : null}
+
+        {actions.disconnect ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => run('disconnect')}
+            disabled={busy !== null}
+          >
+            {busy === 'disconnect' ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                Disconnecting…
+              </>
+            ) : (
+              <>
+                <Unplug className="size-3.5" aria-hidden="true" />
+                Disconnect
+              </>
+            )}
           </Button>
         ) : null}
       </div>

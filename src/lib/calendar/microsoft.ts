@@ -6,6 +6,7 @@ import {
   extractMeetingUrl,
   looksLikeResource,
   providerConfigured,
+  tokenFailure,
   type CalendarProvider,
   type ListEventsInput,
   type ListEventsOutput,
@@ -151,12 +152,15 @@ export function microsoftProvider(): CalendarProvider {
           logger.warn('calendar.admin_consent_required', { provider: 'microsoft' })
           return { ok: false, reason: 'admin_consent_required' }
         }
-        // Status only. The body echoes the request, which carries the code.
+        // Status and OAuth code only. The body echoes the request, which
+        // carries the code.
+        const failure = tokenFailure(response.status, text)
         logger.warn('calendar.token_exchange_failed', {
           provider: 'microsoft',
           status: response.status,
+          oauthError: failure.oauthError,
         })
-        return { ok: false, reason: response.status === 400 ? 'unauthorized' : 'error' }
+        return { ok: false, reason: failure.reason }
       }
 
       const payload = JSON.parse(text) as {
