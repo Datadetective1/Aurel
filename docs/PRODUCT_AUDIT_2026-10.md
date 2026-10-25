@@ -29,7 +29,10 @@ _Updated 25 October 2026._
   - **TestFlight 0.1.0 (4)** was built from `bb9c006` and processed by Apple on 25 Oct 2026, for internal testing only. It was not submitted for App Store review.
     - The owner reports it installed. Four screens were seen; none of the §1.4 checks has passed yet (§1.5).
 - **iOS People search and public research: built, in draft PR #21, awaiting the owner's review** (§5, "iOS People search and public research"). Not merged, no build. It holds every page research finds until the owner says it is them.
-- Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
+- **Open pull requests:**
+  - **PR #20 is doc-only:** this audit, with no code. It goes first.
+  - **PR #21** (iOS search and research) is stacked on it, and so is the website follow-up for 5.7 and 5.8.
+- Owner decisions on discovery, removal, billing, notifications, privacy and photos are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.** A reproducible case and the acceptance test are in §2, "Finding 8.7".
 - **Calendar on the owner's account last synced on 27 Aug 2026** and has not synced since (finding 8.6, raised to P1).
 - **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026).
@@ -369,6 +372,12 @@ Each phase ships as its own PR. Nothing reaches production until it is merged to
 3. **iOS billing: show current plan and access only.** No purchasing and no external payment links without first reviewing the applicable App Store requirements.
 4. **Push notifications: deferred** until commitments and follow-through work reliably.
 5. **Privacy: done in PR #16.** The wording distinguishes Atturel's handling from the transcription provider's, with no zero-retention claim unless contractually and technically verified.
+
+6. **Photos and member discovery (owner, 25 Oct 2026; Phase 4, nothing changes now).**
+   - An account holder's own photo may appear on their member profile once they opt into discoverability.
+   - Photos uploaded under the current promise ("Your photo is shown only to you, in Atturel. It is not part of any public profile.") stay private until that person opts in.
+   - Photos attached to private People records stay private to the owner, and are never shared with the pictured person or anyone else.
+   - No discovery or photo-sharing behaviour changes in Phase 2 or 3. The current wording stays accurate until discovery ships; it changes then.
 
 Still open (no decision needed yet):
 
