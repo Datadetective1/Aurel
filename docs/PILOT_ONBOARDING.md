@@ -34,12 +34,12 @@ About 20 minutes, around one real conversation you have coming up.
 ## 4. Prepare for the conversation
 
 1. Go to **Meetings › Prepare for a meeting**.
-2. Choose the person and say what you are preparing for.
+2. Say what the meeting is and what you need from it, then add the person under "Who is in the room?".
 3. Read the brief before you go in.
 
 ## 5. Capture it afterwards
 
-1. Choose **Capture**.
+1. Open capture: **Conversations › Add a conversation** on a laptop, or **Capture** in a phone's browser.
 2. **Paste** your notes or a transcript, **Record**, or **Upload** a file.
 3. Keep it. Atturel reads it for decisions and commitments.
 4. In the iPhone app instead: **Capture**, record or type, then **Understand it**.
