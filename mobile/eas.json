@@ -46,6 +46,9 @@
         "simulator": true,
         "buildConfiguration": "Release",
         "image": "sdk-57"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://atturel-git-ios-search-research-datadetective1s-projects.vercel.app"
       }
     },
     "production": {
