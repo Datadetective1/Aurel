@@ -32,7 +32,8 @@ _Updated 25 October 2026._
   - On the simulator, search and adding a profile link passed. The research steps were not run: the Expo account's free simulator minutes are used up until 1 Nov 2026 (§5, "Simulator results").
 - **Open pull requests:**
   - **PR #20 is doc-only:** this audit, with no code. It goes first.
-  - **PR #21** (iOS search and research) is stacked on it, and so is the website follow-up for 5.7 and 5.8.
+  - **PR #21** (iOS search and research) is stacked on it.
+  - **The website follow-up** (5.7 and 5.8) is stacked on PR #21. It changes web behaviour; PR #21 does not.
 - Owner decisions on discovery, removal, billing, notifications, privacy and photos are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.** A reproducible case and the acceptance test are in §2, "Finding 8.7".
 - **Calendar on the owner's account last synced on 27 Aug 2026** and has not synced since (finding 8.6, raised to P1).
@@ -220,16 +221,16 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 
 ### Public research and identity
 
-| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Status              | Sev |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --- |
-| 5.1 | **The refusal to link unverified identity is correct, and stays.** A name with no company cannot auto-link (0.28 < 0.55).                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Implemented         | —   |
-| 5.2 | Recovery asks for org, title or URL and offers a pasted link. It **never shows which candidates were rejected or why.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Partial             | P1  |
-| 5.3 | **Confirming an uncertain source extracts no facts.** It shows "No facts rest on this". **PR #21:** a page held by the app's research carries what it would add, so confirming it adds those facts, on the web or the phone. A page the web's research was unsure of still adds nothing on confirm.                                                                                                                                                                                                                                                                                                     | Partial             | P1  |
-| 5.4 | The publisher label is heuristic. A loose JSON-LD match can name a host or platform instead of the original publisher. No code labels a source with the search provider.                                                                                                                                                                                                                                                                                                                                                                                                                                | Partial             | P2  |
-| 5.5 | **Placeholder URLs look real.** `add-context.tsx` builds `https://acme.com/leadership/<real person's name>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Broken (trust)      | P1  |
-| 5.6 | Each refine re-runs research and counts against the quota again. People actions have no `maxDuration`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | P2                  | P2  |
-| 5.7 | **Web: entering a profile link starts research by itself.** After adding a person with a profile link, their page opens with `?research=1` and research runs on arrival (`autoStart`). That page is then linked as a confirmed match ("You provided this directly"), and its facts are added without review. This conflicts with the owner's rule of 25 Oct 2026: entering details must not silently start research or treat unverified information as confirmed. The phone does neither. **Owner decision:** remove `autoStart` on the web and hold the typed link's page for review, as the app does. | Conflicts with rule | P1  |
-| 5.8 | **Web research can re-link a page the user marked "not them"** when the page's content has changed: its fresh path writes the identity status again. The app's held research checks the user's earlier decision first. Fix: the same check on the web path.                                                                                                                                                                                                                                                                                                                                             | Broken (trust)      | P1  |
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Status         | Sev |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --- |
+| 5.1 | **The refusal to link unverified identity is correct, and stays.** A name with no company cannot auto-link (0.28 < 0.55).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Implemented    | —   |
+| 5.2 | Recovery asks for org, title or URL and offers a pasted link. It **never shows which candidates were rejected or why.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Partial        | P1  |
+| 5.3 | **Confirming an uncertain source extracts no facts.** It shows "No facts rest on this". **PR #21:** a page held by the app's research carries what it would add, so confirming it adds those facts, on the web or the phone. A page the web's research was unsure of still adds nothing on confirm.                                                                                                                                                                                                                                                                                                                                                                                  | Partial        | P1  |
+| 5.4 | The publisher label is heuristic. A loose JSON-LD match can name a host or platform instead of the original publisher. No code labels a source with the search provider.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Partial        | P2  |
+| 5.5 | **Placeholder URLs look real.** `add-context.tsx` builds `https://acme.com/leadership/<real person's name>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Broken (trust) | P1  |
+| 5.6 | Each refine re-runs research and counts against the quota again. People actions have no `maxDuration`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | P2             | P2  |
+| 5.7 | **Web: entering a profile link starts research by itself.** After adding a person with a profile link, their page opens with `?research=1` and research runs on arrival (`autoStart`). That page is then linked as a confirmed match ("You provided this directly"), and its facts are added without review. This conflicts with the owner's rule of 25 Oct 2026: entering details must not silently start research or treat unverified information as confirmed. The phone does neither. **Owner decision:** remove `autoStart` on the web and hold the typed link's page for review, as the app does. **Fixed in the website follow-up PR** (§5, "Website follow-up"), not merged. | Fix in review  | P1  |
+| 5.8 | **Web research can re-link a page the user marked "not them"** when the page's content has changed: its fresh path writes the identity status again. The app's held research checks the user's earlier decision first. Fix: the same check on the web path. **Fixed in the website follow-up PR**, not merged: "Not them" holds until the user chooses Reconsider.                                                                                                                                                                                                                                                                                                                   | Fix in review  | P1  |
 
 ### Prepare (brief engine)
 
@@ -739,6 +740,58 @@ Review plan (no merge, no build without the owner):
    - Reject one page, then search again: it is not offered again.
 2. **iOS simulator build** against production (the workflow's simulator option), with the same steps on the phone.
 3. **Real-device checks** (§1.4) once the owner approves a TestFlight build.
+
+**Website follow-up: findings 5.7 and 5.8 (25 Oct 2026, draft PR stacked on PR #21, not merged)**
+
+The owner's rules:
+
+- Adding a profile link must not start research or save research facts automatically.
+- "Not them" holds unless the user explicitly chooses to reconsider that page.
+- Evidence labels and per-page review stay.
+
+What changed on the web:
+
+- **Adding someone with a profile link opens their page, and nothing more.**
+  - The redirect no longer carries `?research=1`, and the research panel no longer starts on arrival.
+  - Research runs only from its button.
+- **The typed link's page waits for review on every run, the web's included.** The same goes for a link added with Add context.
+  - Typing a link in counts as a strong identity signal, never as a confirmation.
+  - Pages found by search keep the review they had: linked when research is confident, "Check this is them" when it is not. Facts stay labelled observed or inferred.
+- **A waiting page lists what it would add**, each fact with its evidence badge, above "Yes, this is them".
+- **"Not them" stands.**
+  - The web's research now checks the user's decision before anything else. A page marked "not them" is never linked again.
+  - A page the user confirmed is never downgraded by a later reading.
+- **"Reconsider this page"** appears only on a page the user marked as someone else.
+  - It re-reads the stored page, holds it for review and uses one source read from the plan.
+  - If the page still does not read as them, or cannot be read, "not them" stays exactly as it was.
+- **Ask and briefs use only pages accepted as this person.** That means confirmed or probable, and never a page that is held, unreviewed, ambiguous or marked "not them".
+  - This closes the gap recorded under PR #21's limitations.
+  - On the web, a page marked "not them" is no longer listed in Ask or cited in briefs.
+
+Tests:
+
+- Adding with a link: no research flag, and no research on arrival.
+- The typed link held on the web's run; discovered pages not held.
+- Add context held.
+- Reconsider, four tests:
+  - offered only on a page the user marked;
+  - held and metered;
+  - "not them" restored when the page still does not match;
+  - "not them" restored when reading fails.
+- The web path keeps "not them" and "this is them".
+- Ask and briefs count only accepted pages.
+- The source row shows evidence labels and offers Reconsider only on the user's own "not them".
+- 15 of the new tests fail against PR #21's code. The rest pin behaviour that already held there.
+- Full web suite passes. `tsc`, eslint and prettier are clean.
+
+Not covered yet:
+
+- **Preview check, on a QA account:**
+  - add with a link, and check nothing runs;
+  - research, and check the typed page waits;
+  - mark "not them", research again, and check it is not linked;
+  - Reconsider, and check it waits again.
+- The iPhone has no Reconsider button. A page marked "not them" there can be reconsidered on the web.
 
 **Order and testing**
 
