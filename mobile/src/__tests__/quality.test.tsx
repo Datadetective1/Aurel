@@ -276,3 +276,55 @@ describe('a meeting with someone since removed', () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/archived/[id]', params: { id: 'p-gone' } })
   })
 })
+
+describe('Ask, opened with a question', () => {
+  const expoRouter = require('expo-router') as {
+    router: { setParams: jest.Mock }
+    useFocusEffect: jest.Mock
+  }
+  const Ask = require('../app/(tabs)/ask').default as React.ComponentType
+  beforeEach(() => {
+    // Run the focus effect as a plain effect: each render is a visit.
+    expoRouter.useFocusEffect.mockImplementation((effect: () => void) =>
+      React.useEffect(effect, [effect]),
+    )
+    expoRouter.router.setParams.mockClear()
+  })
+  afterEach(() => expoRouter.useFocusEffect.mockReset())
+
+  const show = () =>
+    render(
+      <ThemeProvider force="pearl">
+        <Ask />
+      </ThemeProvider>,
+    )
+
+  it('fills in the question, then takes it off the route', async () => {
+    mockParams = { q: 'What should I know about Dana?' }
+    await show()
+    expect(screen.getByLabelText('Your question').props.value).toBe(
+      'What should I know about Dana?',
+    )
+    expect(expoRouter.router.setParams).toHaveBeenCalledWith({ q: undefined })
+  })
+
+  it('a later visit with another question replaces the first', async () => {
+    mockParams = { q: 'What do I owe Marcus?' }
+    const view = await show()
+    mockParams = { q: 'When did I last speak with Dana?' }
+    await view.rerender(
+      <ThemeProvider force="pearl">
+        <Ask />
+      </ThemeProvider>,
+    )
+    expect(screen.getByLabelText('Your question').props.value).toBe(
+      'When did I last speak with Dana?',
+    )
+  })
+
+  it('a visit from the tab bar leaves the field empty', async () => {
+    await show()
+    expect(screen.getByLabelText('Your question').props.value).toBe('')
+    expect(expoRouter.router.setParams).not.toHaveBeenCalled()
+  })
+})
