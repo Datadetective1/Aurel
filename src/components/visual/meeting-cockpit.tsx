@@ -55,8 +55,9 @@ export function MeetingCockpit({
   className?: string
 }) {
   const prepMeta = PREP_META[prep]
+  // The organisations at the table: an archived attendee's is not one of them.
   const companies = [
-    ...new Map(people.filter((p) => p.company).map((p) => [p.company!, p])).values(),
+    ...new Map(people.filter((p) => p.company && !p.archived).map((p) => [p.company!, p])).values(),
   ]
 
   return (

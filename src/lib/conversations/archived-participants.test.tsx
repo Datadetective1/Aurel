@@ -21,6 +21,7 @@ afterEach(cleanup)
 const { listConversations } = await import('./queries')
 const { ConversationCard } = await import('@/components/app/conversation-card')
 const { CONVERSATION } = await import('@/app/dev/preview/fixtures-conversation')
+const { MeetingCockpit } = await import('@/components/visual/meeting-cockpit')
 
 const person = (id: string, name: string, archivedAt: string | null) => ({
   id,
@@ -86,5 +87,45 @@ describe('a conversation with someone the user has since removed', () => {
       />,
     )
     expect(screen.getByText(/^With /).textContent).not.toContain('archived')
+  })
+})
+
+describe('the meeting header, with an archived attendee', () => {
+  const seat = (id: string, name: string, company: string, archived: boolean) => ({
+    id,
+    name,
+    fullName: name,
+    src: null,
+    title: null,
+    company,
+    companyDomain: null,
+    context: archived ? 'Archived' : 'Decision maker',
+    lastInteractionAt: null,
+    openLoops: 0,
+    owe: 0,
+    ...(archived ? { archived: true } : {}),
+  })
+
+  it('shows them, marked archived, without listing their organisation at the table', () => {
+    render(
+      <MeetingCockpit
+        title="Renewal scope"
+        scheduledAt={null}
+        people={[
+          seat('m', 'Marcus Lee', 'Northwind', false),
+          seat('q', 'Quinn Halvorsen', 'Halcyon Labs', true),
+        ]}
+        prep="ready"
+        openLoops={0}
+        owe={0}
+        timeZone="UTC"
+        now={new Date('2026-10-25T12:00:00Z')}
+      />,
+    )
+    const room = screen.getByRole('list', { name: 'In the room' })
+    expect(room.textContent).toContain('Quinn')
+    expect(room.textContent).toContain('Archived')
+    expect(screen.queryByText('Halcyon Labs')).toBeNull()
+    expect(screen.getByText('Northwind')).toBeTruthy()
   })
 })
