@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
   ArrowDown,
   CircleAlert,
@@ -58,7 +58,6 @@ export function ResearchPanel({
   sourceCount,
   storedSourceCount,
   timeZone,
-  autoStart = false,
 }: {
   personId: string
   personName: string
@@ -75,15 +74,8 @@ export function ResearchPanel({
    * differs between the two.
    */
   timeZone: string
-  /**
-   * Run once on arrival. Set when the person was just added with a profile
-   * URL: the user has already pointed at the page to read, so making them find
-   * and press a second button to read it was a second workflow for one intent.
-   */
-  autoStart?: boolean
 }) {
   const router = useRouter()
-  const pathname = usePathname()
   const [running, setRunning] = React.useState(false)
   const [stage, setStage] = React.useState(0)
   const [result, setResult] = React.useState<ResearchState | null>(null)
@@ -129,15 +121,9 @@ export function ResearchPanel({
     }
   }
 
-  // Once per mount; the flag is stripped first so a refresh does not run a
-  // second, metered research job.
-  const started = React.useRef(false)
-  React.useEffect(() => {
-    if (!autoStart || started.current) return
-    started.current = true
-    router.replace(pathname, { scroll: false })
-    void run()
-  }, [autoStart, pathname, router, run])
+  // Research runs only from the button. It used to start on arrival when a
+  // person had just been added with a profile link; entering a link must not
+  // start research (owner's rule, 25 Oct 2026).
 
   // Nothing to research from, and no way to discover sources.
   const blocked = !canDiscover && !hasProfileUrl

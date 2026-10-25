@@ -121,7 +121,9 @@ function parsePerson(formData: FormData) {
 export async function createPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const result = await createPersonCore(formData, { checkDuplicate: true })
   if (!result.personId) return result
-  redirect(`/people/${result.personId}${result.research ? '?research=1' : ''}`)
+  // Their page, and nothing more: a profile link entered here is never read
+  // until the user asks for research (owner's rule, 25 Oct 2026).
+  redirect(`/people/${result.personId}`)
 }
 
 /**
@@ -137,7 +139,7 @@ export async function createPerson(_prev: ActionState, formData: FormData): Prom
 export async function createPersonCore(
   formData: FormData,
   options: { checkDuplicate?: boolean } = {},
-): Promise<ActionState & { personId?: string; research?: boolean }> {
+): Promise<ActionState & { personId?: string }> {
   const parsed = parsePerson(formData)
 
   if (!parsed.success) {
@@ -200,7 +202,7 @@ export async function createPersonCore(
   })
 
   revalidatePath('/people')
-  return { personId: person.id, research: Boolean(v.profileUrl) }
+  return { personId: person.id }
 }
 
 export async function updatePerson(_prev: ActionState, formData: FormData): Promise<ActionState> {

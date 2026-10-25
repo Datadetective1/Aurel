@@ -488,7 +488,37 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
     })
   }
 
-  const assessment = assessIdentity(
+  // The user's own decision about this page stands. "Not them" is never
+  // linked again by a later run, and "this is them" is never downgraded,
+  // until the user chooses to reconsider the page (`reconsiderSourceMatch`).
+  const { data: prior } = await supabase
+    .from('source_person_links')
+    .select('identity_match_status, reviewed_by_user')
+    .eq('source_id', sourceId)
+    .eq('person_id', personId)
+    .maybeSingle()
+  if (prior?.reviewed_by_user && prior.identity_match_status === 'no_match') {
+    return {
+      sourceId,
+      accessStatus: 'identity_uncertain',
+      title: extracted.title,
+      sourceType,
+      reused: false,
+      identity: {
+        status: 'no_match',
+        confidence: 0,
+        explanation: 'You said this page is about someone else.',
+      },
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: null,
+      message: 'You said this page is about someone else, so it was not used.',
+    }
+  }
+  const userConfirmed =
+    prior?.reviewed_by_user === true && prior.identity_match_status === 'confirmed'
+
+  const checked = assessIdentity(
     {
       fullName: person.full_name,
       organization: person.organizations?.name ?? null,
@@ -503,6 +533,14 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
     },
     { userSuppliedUrl: options.userSupplied ?? false },
   )
+  const assessment = userConfirmed
+    ? {
+        ...checked,
+        status: 'confirmed' as const,
+        confidence: 1,
+        explanation: 'You confirmed this is them.',
+      }
+    : checked
 
   await supabase.from('source_person_links').upsert(
     {
@@ -570,7 +608,8 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
     logger.warn('research.source_contained_instructions', { sourceId, personId })
   }
 
-  if (!generation.output.mentionsTarget) {
+  // A page the user confirmed stays theirs to undo, whatever the reading says.
+  if (!generation.output.mentionsTarget && !userConfirmed) {
     await supabase
       .from('sources')
       .update({ access_status: 'identity_uncertain' })
@@ -964,6 +1003,47 @@ async function holdForReview(
     message: `${assessment.explanation} Check it is them before ${brand.name} adds anything.`,
     held: true,
   }
+}
+
+/**
+ * Read a stored page again for one person and hold it for review -- the
+ * second half of "Reconsider", after the caller has cleared the user's
+ * earlier "not them". Read from what was stored: nothing is fetched.
+ */
+export async function reholdForReview(
+  supabase: Client,
+  input: { workspaceId: string; userId: string; personId: string; sourceId: string },
+): Promise<IngestResult> {
+  const { data: source } = await supabase
+    .from('sources')
+    .select('id, source_url, source_title, publisher, published_at, extracted_text, source_type')
+    .eq('id', input.sourceId)
+    .maybeSingle()
+  if (!source?.extracted_text || !source.source_url) {
+    return emptyResult(
+      'content_unavailable',
+      'There is no stored text for that page to read again.',
+    )
+  }
+  const person = await loadSubject(supabase, input.personId)
+  if (!person) return emptyResult('error', 'That person could not be found.')
+  return holdForReview(supabase, {
+    workspaceId: input.workspaceId,
+    userId: input.userId,
+    personId: input.personId,
+    person,
+    source: {
+      id: source.id,
+      title: source.source_title,
+      text: source.extracted_text,
+      url: source.source_url,
+      publisher: source.publisher,
+      publishedAt: source.published_at,
+      sourceType: source.source_type,
+    },
+    userSupplied: false,
+    markSource: false,
+  })
 }
 
 /**

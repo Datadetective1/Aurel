@@ -145,19 +145,31 @@ describe('labels', () => {
 })
 
 describe('what Ask and briefs may cite as a public source', () => {
-  it('a page held for review is not cited, even when it was read for someone else', () => {
-    expect(
-      countsAsPublicSource({
-        accessStatus: 'analyzed',
-        signals: { exactNameInTitle: true, held: { facts: [] } },
-      }),
-    ).toBe(false)
+  const cite = (status: string, over: { accessStatus?: string; signals?: object } = {}) =>
+    countsAsPublicSource({ accessStatus: 'analyzed', status, signals: {}, ...over })
+
+  it('a page accepted as them -- confirmed, or linked by research -- is cited', () => {
+    expect(cite('confirmed')).toBe(true)
+    expect(cite('probable')).toBe(true)
   })
 
-  it('a read page with nothing held is cited, as before; an unreadable one is not', () => {
-    expect(
-      countsAsPublicSource({ accessStatus: 'analyzed', signals: { exactNameInTitle: true } }),
-    ).toBe(true)
-    expect(countsAsPublicSource({ accessStatus: 'identity_uncertain', signals: {} })).toBe(false)
+  it('a page marked "not them" is never cited, even after it was read', () => {
+    expect(cite('no_match')).toBe(false)
+  })
+
+  it('a page still waiting for a check is not cited', () => {
+    for (const status of ['unreviewed', 'ambiguous', 'conflicting'])
+      expect(cite(status), status).toBe(false)
+  })
+
+  it('a page held for review is not cited, even when it was read for someone else', () => {
+    expect(cite('unreviewed', { signals: { exactNameInTitle: true, held: { facts: [] } } })).toBe(
+      false,
+    )
+    expect(cite('probable', { signals: { held: { facts: [] } } })).toBe(false)
+  })
+
+  it('an unreadable page is not cited', () => {
+    expect(cite('confirmed', { accessStatus: 'identity_uncertain' })).toBe(false)
   })
 })

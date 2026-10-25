@@ -42,13 +42,20 @@ export function isHeld(signals: unknown): boolean {
 
 /**
  * Whether a linked page may be given to Ask and briefs as a public source:
- * only one that was actually read, and never one still held for review.
+ * one that was actually read and is accepted as this person -- confirmed by
+ * the user, or linked by research -- and never one held for review, still
+ * waiting for a check, or marked as someone else.
  */
 export function countsAsPublicSource(link: {
   accessStatus: string | null
+  status: string | null
   signals: unknown
 }): boolean {
-  return link.accessStatus === 'analyzed' && !isHeld(link.signals)
+  return (
+    link.accessStatus === 'analyzed' &&
+    (link.status === 'confirmed' || link.status === 'probable') &&
+    !isHeld(link.signals)
+  )
 }
 
 export function matchStrength(confidence: number | null): 'strong' | 'possible' {

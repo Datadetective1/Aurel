@@ -52,6 +52,13 @@ const wrote = (table: string, method: string) =>
     .flatMap((c) => c.ops.filter(([m]) => m === method).map(([, a]) => a[0]))
 
 const ingestUrl = vi.fn()
+const reholdForReview = vi.fn()
+const recordUsage = vi.fn()
+const search = vi.fn()
+let discovery: { canDiscover: boolean; discoveryHint: string | null } = {
+  canDiscover: false,
+  discoveryHint: 'Add a link.',
+}
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
@@ -60,19 +67,21 @@ vi.mock('@/lib/workspace', () => ({ getWorkspace: async () => ({ workspaceId: 'w
 vi.mock('@/lib/organizations', () => ({ resolveOrganization: async () => 'org-1' }))
 vi.mock('@/lib/billing/entitlements', () => ({
   checkCapability: async () => ({ allowed: true }),
-  recordUsage: vi.fn(),
+  recordUsage: (...args: unknown[]) => recordUsage(...args),
 }))
 vi.mock('@/lib/research/providers', () => ({
-  resolveSearchProvider: () => ({ id: 'none', search: vi.fn() }),
-  researchCapability: () => ({ canDiscover: false, discoveryHint: 'Add a link.' }),
+  resolveSearchProvider: () => ({ id: 'test', search: (q: string) => search(q) }),
+  researchCapability: () => discovery,
 }))
 vi.mock('@/lib/research/ingest', async (original) => ({
   ...(await original<typeof import('@/lib/research/ingest')>()),
   ingestUrl,
+  reholdForReview,
 }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => client() }))
 
-const { confirmSourceMatch, rejectSourceMatch, researchPerson } = await import('./research-actions')
+const { addContext, confirmSourceMatch, reconsiderSourceMatch, rejectSourceMatch, researchPerson } =
+  await import('./research-actions')
 
 const PERSON = '7f0d3c1e-5a4b-4c8d-9e2f-1a2b3c4d5e6f'
 const HELD = {
@@ -114,6 +123,10 @@ function linkWith(signals: object) {
 beforeEach(() => {
   calls = []
   ingestUrl.mockReset()
+  reholdForReview.mockReset()
+  recordUsage.mockReset()
+  search.mockReset()
+  discovery = { canDiscover: false, discoveryHint: 'Add a link.' }
 })
 
 describe('"This is them" on a held page', () => {
@@ -224,18 +237,165 @@ describe('a research run that holds', () => {
     )
   })
 
-  it('the web’s run does not hold', async () => {
+  it('the web’s run holds the profile link’s page too: typing a link in is not checking it', async () => {
     ingestUrl.mockResolvedValue({
       sourceId: 's-1',
-      accessStatus: 'analyzed',
-      factsCreated: 1,
+      accessStatus: 'identity_uncertain',
+      held: true,
+      factsCreated: 0,
       observationsProposed: 0,
       usage: null,
     })
-    await researchPerson(PERSON)
+    const result = await researchPerson(PERSON)
     expect(ingestUrl).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ holdForReview: false }),
+      'https://northwind.example/dana',
+      expect.objectContaining({ holdForReview: true, userSupplied: true }),
     )
+    expect(result).toMatchObject({ ok: true, sourcesHeld: 1, factsCreated: 0, needsReview: true })
+  })
+
+  it('pages the web’s search finds keep per-page review as before; only the typed link is held', async () => {
+    discovery = { canDiscover: true, discoveryHint: null }
+    search.mockResolvedValue({
+      ok: true,
+      costUnits: 1,
+      results: [{ url: 'https://northwind.example/team/dana-whitfield' }],
+    })
+    ingestUrl.mockImplementation(async (url: string) =>
+      url === 'https://northwind.example/dana'
+        ? { sourceId: 's-1', accessStatus: 'identity_uncertain', held: true, factsCreated: 0 }
+        : { sourceId: 's-2', accessStatus: 'analyzed', factsCreated: 1, observationsProposed: 0 },
+    )
+    const result = await researchPerson(PERSON)
+
+    expect(ingestUrl).toHaveBeenCalledWith(
+      'https://northwind.example/dana',
+      expect.objectContaining({ holdForReview: true }),
+    )
+    expect(ingestUrl).toHaveBeenCalledWith(
+      'https://northwind.example/team/dana-whitfield',
+      expect.objectContaining({ holdForReview: false, userSupplied: false }),
+    )
+    expect(result).toMatchObject({ ok: true, sourcesHeld: 1, sourcesAccepted: 1 })
+    expect(result.message).toMatch(/1 more may be about Dana Whitfield/)
+  })
+})
+
+describe('a link added with Add context', () => {
+  it('is read because the user asked, and held for their check', async () => {
+    answer = () => ({ data: null, error: null })
+    ingestUrl.mockResolvedValue({
+      sourceId: 's-1',
+      accessStatus: 'identity_uncertain',
+      held: true,
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: null,
+      message: 'Strong match. Check it is them before Atturel adds anything.',
+    })
+    const form = new FormData()
+    form.set('personId', PERSON)
+    form.set('input', 'https://northwind.example/dana')
+    const result = await addContext({}, form)
+
+    expect(ingestUrl).toHaveBeenCalledWith(
+      'https://northwind.example/dana',
+      expect.objectContaining({ holdForReview: true, userSupplied: true }),
+    )
+    expect(result).toMatchObject({ ok: true, sourcesHeld: 1, needsReview: true })
+    expect(result.message).toMatch(/nothing from it is in their record until you say it is them/)
+  })
+})
+
+describe('Reconsider a page marked "not them"', () => {
+  function decided(status: string, reviewed: boolean) {
+    answer = (table, ops) => {
+      if (table === 'source_person_links' && ops.some(([op]) => op === 'maybeSingle')) {
+        return {
+          data: {
+            identity_match_status: status,
+            reviewed_by_user: reviewed,
+            match_signals: { exactNameInTitle: true },
+          },
+          error: null,
+        }
+      }
+      return { data: null, error: null }
+    }
+  }
+
+  it('is offered only for a page the user marked as someone else', async () => {
+    decided('confirmed', true)
+    const result = await reconsiderSourceMatch('s-1', PERSON)
+    expect(result.error).toMatch(/Only a page you marked as someone else/)
+    expect(wrote('source_person_links', 'update')).toEqual([])
+    expect(reholdForReview).not.toHaveBeenCalled()
+
+    decided('no_match', false)
+    expect((await reconsiderSourceMatch('s-1', PERSON)).error).toMatch(/Only a page you marked/)
+    expect(reholdForReview).not.toHaveBeenCalled()
+  })
+
+  it('lifts "not them" and holds the page for review, metered as one source read', async () => {
+    decided('no_match', true)
+    reholdForReview.mockResolvedValue({
+      sourceId: 's-1',
+      held: true,
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: { provider: 'anthropic', model: 'm', inputTokens: 10, outputTokens: 5 },
+    })
+    const result = await reconsiderSourceMatch('s-1', PERSON)
+
+    expect(result).toMatchObject({ ok: true, sourcesHeld: 1, needsReview: true })
+    expect(wrote('source_person_links', 'update')).toEqual([
+      { identity_match_status: 'unreviewed', reviewed_by_user: false, match_signals: {} },
+    ])
+    expect(reholdForReview).toHaveBeenCalledWith(expect.anything(), {
+      workspaceId: 'ws-1',
+      userId: 'u-1',
+      personId: PERSON,
+      sourceId: 's-1',
+    })
+    expect(recordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ meter: 'source_ingest', subjectId: 's-1' }),
+    )
+    // Nothing reaches the record until the user says it is them.
+    expect(wrote('professional_facts', 'insert')).toEqual([])
+  })
+
+  const RESTORED = {
+    identity_match_status: 'no_match',
+    reviewed_by_user: true,
+    match_signals: { exactNameInTitle: true },
+  }
+
+  it('when the page still does not read as them, says so, adds nothing, and "not them" stands', async () => {
+    decided('no_match', true)
+    reholdForReview.mockResolvedValue({
+      sourceId: 's-1',
+      factsCreated: 0,
+      observationsProposed: 0,
+      usage: { provider: 'anthropic', model: 'm', inputTokens: 10, outputTokens: 5 },
+      message: 'On reading it, this source does not appear to be about Dana Whitfield.',
+    })
+    const result = await reconsiderSourceMatch('s-1', PERSON)
+    expect(result).toMatchObject({ ok: false })
+    expect(result.error).toMatch(/does not appear to be about Dana Whitfield/)
+    expect(result.error).toMatch(/It stays marked as someone else/)
+    // The user's decision is put back exactly, so no later run can link it.
+    expect(wrote('source_person_links', 'update').at(-1)).toEqual(RESTORED)
+    // The reading happened, so it is metered.
+    expect(recordUsage).toHaveBeenCalledWith(expect.objectContaining({ meter: 'source_ingest' }))
+    expect(wrote('professional_facts', 'insert')).toEqual([])
+  })
+
+  it('if reading it again fails, "not them" stands and nothing is charged', async () => {
+    decided('no_match', true)
+    reholdForReview.mockRejectedValue(new Error('network'))
+    const result = await reconsiderSourceMatch('s-1', PERSON)
+    expect(result.error).toMatch(/could not be read again\. It stays marked as someone else/)
+    expect(wrote('source_person_links', 'update').at(-1)).toEqual(RESTORED)
+    expect(recordUsage).not.toHaveBeenCalled()
   })
 })
