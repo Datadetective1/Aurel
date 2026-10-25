@@ -24,8 +24,8 @@ _Updated 25 October 2026._
   - The owner validated it on a physical iPhone (§1.3).
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
 - **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
-  - **2A (people controls, server + web): built and verified on the PR #18 preview (§5, "2A results"). Awaiting owner review. Not merged.**
-  - Next: 2C + 2B (iOS), then one TestFlight build after owner review.
+  - **2A (people controls, server + web): approved by the owner on 25 Oct 2026 and merged (PR #18).** The owner's clarification on archived people in history and in briefs was verified and corrected before merging (§5, "2A results").
+  - **Next: 2C + 2B (iOS).** Then one TestFlight build, published only after the owner reviews the results. The release checklist (§1.4) keeps the unverified update-survival test.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
@@ -371,8 +371,54 @@ Limitations:
 
 - **The iOS screens for these controls come in 2B.** Until then the new mobile routes have been tested by script only.
 - **Name detection in retained loops is word-based.** It catches the full name, first name and preferred name. It can miss initials, nicknames or a role ("the CFO"). Every retained loop is still listed for review, whether or not it is flagged.
-- **A brief for a meeting that already listed someone still includes them after they are archived.** New meetings exclude them, and their place in existing meetings is kept as history.
+- **A brief written before someone was archived still says what it said then.** Rebuilding it leaves them out.
+- **The iOS app shows the "Archived" label with the next build (2B).** TestFlight 0.1.0 (3) does not display the label field the server now sends. The server already leaves archived people out of briefs and strips their intelligence on the phone too.
 - QA account A holds the test data. Deleting it, and account B, needs owner approval at the end of Phase 2.
+
+**Owner's clarification before merging (25 Oct 2026): archived people in history and in briefs.**
+
+The rule:
+
+- Archived people remain visible in historical meetings and conversations, clearly labelled as archived.
+- Newly generated preparation briefs for upcoming meetings do not treat them as active participants or include their relationship intelligence by default.
+
+What the code did before the fix:
+
+- History kept them, but nothing marked them as archived.
+- A new brief still treated them as participants and used their notes, loops and history. This was the limitation reported with the 2A results.
+- The Prepare screen showed their open loops and last contact, used their conversations for "last conversation", and listed their company at the table.
+
+Corrections (`71aad9e`, `fbb21ee`, `0a2c895`):
+
+| Where                                                                       | Now                                                                                                                                     |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| New briefs and debriefs (`getMeetingContext`)                               | Archived attendees are left out entirely. Nothing about them is read for the prompt.                                                    |
+| Prepare: web brief, glance, quick, and the phone's meeting data             | Kept in the room after everyone else, marked "Archived". No loops, last contact, last conversation, shared connections or company chip. |
+| Conversation page; conversation lists (Today, Conversations); Meetings list | The name is marked archived.                                                                                                            |
+| Today, web and phone (upcoming meetings); Ask's upcoming meetings           | Left out.                                                                                                                               |
+
+Restoring the person brings everything back.
+
+Tests:
+
+- 11 new regression tests: 8 for the loaders, 3 rendering tests. 9 of them fail without the change; the other two check that active people and restored people read as before.
+- Full suite: 1004 pass.
+
+Live evidence on the preview (QA account A):
+
+- **Setup:** a test person, "Quinn Halvorsen", with a company and notes. Quinn was put in an upcoming meeting with Marcus, added to an earlier meeting, given a conversation, then archived.
+
+| Check                                  | Result                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------- |
+| A new brief, generated after archiving | Its participants are Marcus alone. No mention of Quinn, Halcyon Labs or Quinn's notes. |
+| Prepare                                | Quinn is listed after Marcus, marked "Archived", with 0 loops and no last contact.     |
+| The earlier meeting                    | Quinn is shown, marked "Archived".                                                     |
+| The conversation page                  | "Halcyon Labs · Archived"                                                              |
+| Web Today                              | Quinn appears only on the past conversation, as "With Quinn (archived)".               |
+| Phone Today                            | The upcoming meeting shows Marcus only.                                                |
+| Meetings list                          | "Quinn Halvorsen (archived)"                                                           |
+
+**Dropdown fix, re-confirmed:** the relationship field and the account time zone each kept their value through four saves in a row without reloading, and were stored correctly (12/12). The QA data was put back afterwards.
 
 **2B — iOS controls (needs a TestFlight build; adds native modules)**
 
