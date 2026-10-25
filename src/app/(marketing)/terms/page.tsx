@@ -12,8 +12,9 @@ export const metadata: Metadata = {
 /**
  * TERMS
  * =============================================================================
- * A plain-language draft describing the actual arrangement. Not legally
- * reviewed; that is stated at the top and tracked in docs/HUMAN_ACTIONS.md.
+ * A plain-language description of the actual arrangement, in effect from
+ * brand.legal.policiesEffective. Not legally reviewed; that is stated at the
+ * top and tracked in docs/LEGAL_REVIEW_REQUIRED.md.
  * =============================================================================
  */
 export default function TermsPage() {
@@ -30,9 +31,9 @@ export default function TermsPage() {
         <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
           <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="text-ink font-medium">Draft.</strong> These terms describe the
-            intended arrangement but have not been reviewed by a lawyer and are not yet a binding
-            legal document.
+            <strong className="text-ink font-medium">Not yet reviewed by a lawyer.</strong> These
+            terms are in effect and describe the actual arrangement in plain language. They have not
+            been reviewed by a lawyer, and may be revised after that review.
           </span>
         </p>
       ) : null}
@@ -91,8 +92,9 @@ export default function TermsPage() {
           <p>
             Your records remain yours. You grant {brand.legalEntity} only the permission needed to
             operate the service for you — storing, processing and displaying your content back to
-            you. It is not used to train shared models, it is never sold, and it is shared only with
-            the service providers that run {brand.name}, each named in the Privacy policy.
+            you. We do not use it to train models, it is never sold, and it is shared only with the
+            service providers that run {brand.name}, each named in the Privacy policy with what it
+            keeps.
           </p>
         </Section>
 
@@ -149,8 +151,8 @@ export default function TermsPage() {
           </p>
           <p className="text-ink-muted text-xs">
             {brand.name} is operated by {brand.legalEntity}.
-            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
-            updated {brand.legal.policiesLastUpdated}.
+            {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''}{' '}
+            Effective {brand.legal.policiesEffective}.
           </p>
         </Section>
       </div>

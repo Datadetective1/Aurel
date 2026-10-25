@@ -38,9 +38,10 @@ export default function PrivacyPage() {
         <p className="border-caution/25 bg-caution-wash text-ink-secondary mt-8 flex items-start gap-2.5 rounded-[var(--radius-md)] border px-4 py-3.5 text-sm leading-relaxed">
           <CircleAlert className="text-caution mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong className="text-ink font-medium">Draft.</strong> This describes the
-            product&rsquo;s actual behavior accurately, but it has not yet been reviewed by a lawyer
-            and is not a final legal document.
+            <strong className="text-ink font-medium">Not yet reviewed by a lawyer.</strong> This
+            policy is in effect and describes what the product actually does. It has not been
+            reviewed by a lawyer, and may be revised after that review as described under Changes to
+            this policy.
           </span>
         </p>
       ) : null}
@@ -119,9 +120,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             When a language model is used, only the specific, bounded context needed for that task
-            is sent — not your whole record. Your content is not used to train a shared model, and
-            product analytics deliberately record only counts and enum values, never names, notes or
-            message bodies.
+            is sent — not your whole record. Neither we nor OpenAI use your content to train models;
+            the search terms sent to Exa for public research are handled under Exa&rsquo;s terms,
+            described under How long it is kept. Product analytics deliberately record only counts
+            and enum values, never names, notes or message bodies.
           </p>
         </Section>
 
@@ -213,9 +215,10 @@ export default function PrivacyPage() {
           </p>
           <p>
             If you delete your account, a minimal billing record is kept so a billing question can
-            still be answered: that an account was deleted, when, which plan it was on, and what was
-            done to stop its billing. It contains none of your relationship record. Stripe keeps its
-            own records of past payments, as payment processors are required to.
+            still be answered: that an account was deleted, when, which plan it was on, the
+            reference to its Stripe customer record, and what was done to stop its billing. It
+            contains none of your relationship record. Stripe keeps its own records of past
+            payments, as payment processors are required to.
           </p>
         </Section>
 
@@ -233,7 +236,8 @@ export default function PrivacyPage() {
               what is sent.
             </li>
             <li className="list-disc">
-              Exa — finding public professional material when you research someone
+              Exa — finding public professional material when you research someone. It receives the
+              person&rsquo;s name and, where known, their organization and job title.
             </li>
             <li className="list-disc">Resend — sending account and product email</li>
             <li className="list-disc">Stripe — payments</li>
@@ -245,8 +249,9 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p>
-            Each provider receives only what its job needs, and we use only providers that protect
-            that data at least as well as this policy does.
+            Each provider receives only what its job needs, and keeps and uses it under its own
+            terms, which are not the same as this policy. What each keeps, and for how long, is set
+            out under How long it is kept.
           </p>
         </Section>
 
@@ -275,14 +280,64 @@ export default function PrivacyPage() {
         <Section title="How long it is kept">
           <p>
             Your record is kept for as long as your account exists, including on Free after a paid
-            plan ends, until you delete it. Whatever you delete, up to your whole account, is
-            removed from our live database straight away. Copies in our database provider&rsquo;s
-            daily backups expire within 7 days, its current backup window.
+            plan ends, until you delete it.
           </p>
           <p>
-            The exceptions are the minimal billing record described under Payments, and what our
-            service providers keep under their own terms, described under Voice recordings.
+            <strong className="text-ink font-medium">Deleting is permanent.</strong> Whatever you
+            delete, from a single note to your whole account, is removed from our live database
+            straight away, and photos are removed from our file storage. Removing someone from your
+            people is different: it archives them, which hides them but keeps their record so you
+            can restore it, and merging two records archives one of them the same way. Deleting an
+            archived person is permanent: it removes them and everything only about them, while
+            shared items such as meetings, conversations and commitments stay, no longer linked to
+            them. The confirmation screen lists what will go and what will stay.
           </p>
+          <p>
+            <strong className="text-ink font-medium">Database backups.</strong> Our database
+            provider, Supabase, makes automatic daily backups of our database. On our plan they
+            cover the last 7 days, so something you delete remains in Supabase&rsquo;s automatic
+            database backups until they age out, within 7 days.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">
+              What we keep after you delete your account.
+            </strong>{' '}
+            The minimal billing record described under Payments; the log of billing notifications
+            Stripe sent us about your plan, if you subscribed (their type, time and processing
+            status, with your former account&rsquo;s ID); and, if you ever changed your password,
+            when you did, with a one-way hash of the network address it came from, no longer linked
+            to you. None of these contains your relationship record, and they have no set end date.
+          </p>
+          <p>
+            <strong className="text-ink font-medium">At our service providers.</strong> Each keeps
+            data under its own terms, separately from the backups above:
+          </p>
+          <ul className="grid gap-2 pl-5">
+            <li className="list-disc">
+              OpenAI may keep text sent to its language model for up to 30 days, and its published
+              policy states that it does not keep audio once transcribed (see Voice recordings).
+            </li>
+            <li className="list-disc">
+              Resend keeps a copy of each email we send you, including its content, for 30 days.
+              Some emails, such as meeting reminders and follow-through summaries, include names and
+              commitments from your record.
+            </li>
+            <li className="list-disc">
+              Exa&rsquo;s terms let it store and use the search terms we send it to provide, develop
+              and improve its services, with no set end date.
+            </li>
+            <li className="list-disc">
+              Supabase keeps logs of requests to our database and sign-in service, including network
+              addresses, for 7 days.
+            </li>
+            <li className="list-disc">
+              Vercel, which hosts the application, keeps request logs (such as the page requested,
+              the time and the browser type) for up to 30 days, depending on plan.
+            </li>
+            <li className="list-disc">
+              Stripe keeps its own payment records, as described under Payments.
+            </li>
+          </ul>
         </Section>
 
         <Section title="Changes to this policy">
@@ -311,8 +366,8 @@ export default function PrivacyPage() {
             .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.name} is operated by {brand.legalEntity}. Last updated{' '}
-            {brand.legal.policiesLastUpdated}.
+            {brand.name} is operated by {brand.legalEntity}. Effective{' '}
+            {brand.legal.policiesEffective}.
           </p>
         </Section>
       </div>

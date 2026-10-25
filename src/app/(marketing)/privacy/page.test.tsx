@@ -79,18 +79,63 @@ describe('the privacy page', () => {
     expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
   })
 
-  it('states what Apple 5.1.1(i) and CalOPPA ask for: retention, provider protection, changes', () => {
+  it('states what Apple 5.1.1(i) and CalOPPA ask for: retention, provider terms, changes', () => {
     const text = render(<PrivacyPage />).container.textContent ?? ''
     expect(text).toContain('kept for as long as your account exists')
-    expect(text).toContain('daily backups expire within 7 days')
-    expect(text).toContain('protect that data at least as well as this policy does')
     expect(text).toContain('If a change is material, we tell account holders by email')
+    expect(text).toContain('under its own terms, which are not the same as this policy')
+    expect(text).not.toContain('at least as well as this policy')
+  })
+
+  it('scopes the 7 days to Supabase’s automatic database backups, and lists providers separately', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain(
+      'remains in Supabase’s automatic database backups until they age out, within 7 days',
+    )
+    expect(text).toContain('separately from the backups above')
+    expect(text).toContain('OpenAI may keep text sent to its language model for up to 30 days')
+    expect(text).toContain(
+      'Resend keeps a copy of each email we send you, including its content, for 30 days',
+    )
+    expect(text).toContain('Exa’s terms let it store and use the search terms we send it')
+    expect(text).toContain('including network addresses, for 7 days')
+    expect(text).toContain('for up to 30 days, depending on plan')
+  })
+
+  it('separates permanent deletion from archiving, and names what is kept after deletion', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain('Deleting is permanent.')
+    expect(text).toContain(
+      'it archives them, which hides them but keeps their record so you can restore it',
+    )
+    expect(text).toContain('merging two records archives one of them')
+    expect(text).toContain('shared items such as meetings, conversations and commitments stay')
+    expect(text).toContain('What we keep after you delete your account.')
+    expect(text).toContain('the log of billing notifications Stripe sent us')
+    expect(text).toContain(
+      'a one-way hash of the network address it came from, no longer linked to you',
+    )
+    expect(text).toContain('the reference to its Stripe customer record')
+  })
+
+  it('makes no training claim for Exa, and says what Exa receives', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain('Neither we nor OpenAI use your content to train models')
+    expect(text).not.toContain('Your content is not used to train a shared model')
+    expect(text).toContain('the person’s name and, where known, their organization and job title')
+  })
+
+  it('is in effect from a stated date, and does not claim a lawyer reviewed it', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain(`Effective ${brand.legal.policiesEffective}.`)
+    expect(text).toContain('Not yet reviewed by a lawyer.')
+    expect(text).not.toContain('Draft.')
   })
 
   it('gives contact by email, and publishes no postal address', () => {
     const text = render(<PrivacyPage />).container.textContent ?? ''
     expect(text).toContain(brand.email.privacy)
     expect(text).toContain(brand.email.support)
-    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}. Last updated`)
+    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}. Effective`)
   })
 })

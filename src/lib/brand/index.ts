@@ -101,8 +101,11 @@ export const brand = {
      * above -- see docs/LEGAL_REVIEW_REQUIRED.md, item 3.)
      */
     jurisdiction: null as string | null,
-    /** Year the policies were last reviewed by a human. */
-    policiesLastUpdated: '2026-10-25',
+    /**
+     * The day the current Terms and Privacy took effect: the day they were
+     * published. Change it with any change to either page.
+     */
+    policiesEffective: '26 October 2026',
     /** Set true only after a lawyer has reviewed Terms + Privacy. */
     policiesLegallyReviewed: false,
   },
