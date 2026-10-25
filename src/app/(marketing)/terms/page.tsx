@@ -138,10 +138,17 @@ export default function TermsPage() {
             >
               {brand.email.support}
             </a>
+            . Privacy questions:{' '}
+            <a
+              href={`mailto:${brand.email.privacy}`}
+              className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
+            >
+              {brand.email.privacy}
+            </a>
+            .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.name} is operated by {brand.legalEntity}
-            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}.
+            {brand.name} is operated by {brand.legalEntity}.
             {brand.legal.jurisdiction ? ` Governing law: ${brand.legal.jurisdiction}.` : ''} Last
             updated {brand.legal.policiesLastUpdated}.
           </p>

@@ -244,6 +244,10 @@ export default function PrivacyPage() {
                 : ''}
             </li>
           </ul>
+          <p>
+            Each provider receives only what its job needs, and we use only providers that protect
+            that data at least as well as this policy does.
+          </p>
         </Section>
 
         <Section title="Your control">
@@ -268,6 +272,26 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="How long it is kept">
+          <p>
+            Your record is kept for as long as your account exists, including on Free after a paid
+            plan ends, until you delete it. Whatever you delete, up to your whole account, is
+            removed from our live database straight away. Copies in our database provider&rsquo;s
+            daily backups expire within 7 days, its current backup window.
+          </p>
+          <p>
+            The exceptions are the minimal billing record described under Payments, and what our
+            service providers keep under their own terms, described under Voice recordings.
+          </p>
+        </Section>
+
+        <Section title="Changes to this policy">
+          <p>
+            When this policy changes, the date below changes. If a change is material, we tell
+            account holders by email before it takes effect.
+          </p>
+        </Section>
+
         <Section title="Contact">
           <p>
             Privacy questions:{' '}
@@ -287,8 +311,7 @@ export default function PrivacyPage() {
             .
           </p>
           <p className="text-ink-muted text-xs">
-            {brand.name} is operated by {brand.legalEntity}
-            {brand.legal.entityAddress ? `, ${brand.legal.entityAddress}` : ''}. Last updated{' '}
+            {brand.name} is operated by {brand.legalEntity}. Last updated{' '}
             {brand.legal.policiesLastUpdated}.
           </p>
         </Section>

@@ -35,4 +35,11 @@ describe('the terms', () => {
     expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}`)
     expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
   })
+
+  it('give contact by email, and publish no postal address', () => {
+    const text = render(<TermsPage />).container.textContent ?? ''
+    expect(text).toContain(brand.email.support)
+    expect(text).toContain(brand.email.privacy)
+    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}. Last`)
+  })
 })

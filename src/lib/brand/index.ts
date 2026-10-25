@@ -95,11 +95,11 @@ export const brand = {
 
   legal: {
     /**
-     * The operator's mailing address and the governing law and venue. Not yet
-     * supplied: while null, the legal pages omit the line rather than printing
-     * a placeholder. Set both to the real values; never guess them.
+     * Governing law and venue for the Terms. Optional; while null the Terms
+     * omit the line. Never guess it. (No postal address is published: none is
+     * required for the current pages, and contact is by the email addresses
+     * above -- see docs/LEGAL_REVIEW_REQUIRED.md, item 3.)
      */
-    entityAddress: null as string | null,
     jurisdiction: null as string | null,
     /** Year the policies were last reviewed by a human. */
     policiesLastUpdated: '2026-10-25',

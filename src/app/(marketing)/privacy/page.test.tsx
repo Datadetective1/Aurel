@@ -78,4 +78,19 @@ describe('the privacy page', () => {
     expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}`)
     expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
   })
+
+  it('states what Apple 5.1.1(i) and CalOPPA ask for: retention, provider protection, changes', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain('kept for as long as your account exists')
+    expect(text).toContain('daily backups expire within 7 days')
+    expect(text).toContain('protect that data at least as well as this policy does')
+    expect(text).toContain('If a change is material, we tell account holders by email')
+  })
+
+  it('gives contact by email, and publishes no postal address', () => {
+    const text = render(<PrivacyPage />).container.textContent ?? ''
+    expect(text).toContain(brand.email.privacy)
+    expect(text).toContain(brand.email.support)
+    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}. Last updated`)
+  })
 })
