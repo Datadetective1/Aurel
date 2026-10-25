@@ -13,7 +13,9 @@
  * written before this rule existed are read the same way.
  *
  *   decided   settling words ("decided", "agreed to", "we're going with"),
- *             and nothing that hedges them
+ *             and nothing that hedges them. A reason given after them is
+ *             not a hedge: "we agreed to go with vendor B because it could
+ *             scale" was agreed. A proposal anywhere still is.
  *   proposed  a suggestion, recommendation, hypothetical, condition, hedge,
  *             open question or unsettled outcome ("not decided yet")
  *   unmarked  neither. Left to the confidence it was read with, as before.
@@ -60,7 +62,10 @@ const UNSETTLED = new RegExp(
     ')\\b',
 )
 
-/** Somebody put an option forward, hedged it, or made it conditional. */
+/**
+ * Somebody put an option forward, or made it conditional. Counts wherever it
+ * appears: "we agreed, so maybe we should go with vendor B" is not settled.
+ */
 const PROPOSAL = new RegExp(
   '\\b(?:' +
     [
@@ -76,22 +81,12 @@ const PROPOSAL = new RegExp(
       'can we',
       "why don't we",
       'why not',
-      'could',
-      'might',
       'maybe',
       'perhaps',
-      'possibly',
-      'potentially',
-      'probably',
       'consider(?:s|ed|ing|ation)?',
       "let's (?:consider|think|explore|look|discuss|talk|see|revisit)",
       'think(?:ing)? about',
       'thinking of',
-      "i'd",
-      "we'd",
-      "you'd",
-      "they'd",
-      'would',
       'prefer(?:s|red|ence|able)?',
       'lean(?:s|ing|ed)? (?:towards?|to)',
       'in favou?r of',
@@ -116,6 +111,32 @@ const PROPOSAL = new RegExp(
     ].join('|') +
     ')\\b',
 )
+
+/**
+ * Words that soften. They hedge the decision itself -- "we agreed it might be
+ * worth trying" -- but not a reason given for it after the fact: "we agreed
+ * to go with vendor B because it could scale" was agreed.
+ */
+const SOFTENER = new RegExp(
+  '\\b(?:' +
+    [
+      'could',
+      'might',
+      'would',
+      'probably',
+      'possibly',
+      'potentially',
+      "i'd",
+      "we'd",
+      "you'd",
+      "they'd",
+    ].join('|') +
+    ')\\b',
+)
+
+/** Where the decision ends and a reason, result or concession about it begins. */
+const REASON =
+  /\b(?:because|since|so that|so|which|given that|given|in order to|although|though|even though|while)\b/
 
 /** Words that settle an outcome. */
 const SETTLED = new RegExp(
@@ -156,7 +177,13 @@ const SETTLED = new RegExp(
  * settling words are present.
  */
 const ATTRIBUTED =
-  /\b(?:as (?:\w+ )?(?:suggested|recommended|proposed)|(?:\w+'s|his|her|their|my|our|your|the) (?:suggestion|recommendation|proposal)s?|(?:after|having) consider(?:ed|ing)\b[^,.;]*)/g
+  /\b(?:(?:as|because|since) (?:\w+ )?(?:suggested|recommended|proposed)(?: it)?|(?:\w+'s|his|her|their|my|our|your|the) (?:suggestion|recommendation|proposal)s?|(?:after|having) consider(?:ed|ing)\b[^,.;]*)/g
+
+/**
+ * A decision reported in the future tense: "we decided we would launch in
+ * March" was decided. The softener after it belongs to the report.
+ */
+const REPORTED = /\b(decided|agreed)(?: that)? (?:we|they|you|i|he|she|it)(?:'d| would)\b/g
 
 // Speaker labels ("Ravi Menon: …") are read along with the words. They are
 // names, and stripping them would also strip a line that opens "Approved: …".
@@ -170,10 +197,18 @@ export function readDecisionText(text: string | null | undefined): DecisionReadi
   if (!said) return 'unmarked'
   if (UNSETTLED.test(said) || /\?\s*$/.test(said)) return 'proposed'
 
-  const settled = SETTLED.test(said)
-  const hedged = PROPOSAL.test(settled ? said.replace(ATTRIBUTED, ' ') : said)
-  if (hedged) return 'proposed'
-  return settled ? 'decided' : 'unmarked'
+  const neutral = said.replace(ATTRIBUTED, ' ').replace(REPORTED, '$1')
+  const settled = SETTLED.exec(neutral)
+  if (!settled) return PROPOSAL.test(said) || SOFTENER.test(said) ? 'proposed' : 'unmarked'
+
+  // The decision itself is everything up to a reason, result or concession
+  // given after its settling words. Any hedge in it, or any proposal at all,
+  // means it was not settled.
+  const after = settled.index + settled[0].length
+  const reason = REASON.exec(neutral.slice(after))
+  const decision = reason ? neutral.slice(0, after + reason.index) : neutral
+  if (PROPOSAL.test(neutral) || SOFTENER.test(decision)) return 'proposed'
+  return 'decided'
 }
 
 /**

@@ -52,6 +52,7 @@ const ROWS: Row[] = [
   },
 ]
 
+let rows: Row[] = ROWS
 let updates: { table: string; patch: Record<string, unknown>; id: unknown }[] = []
 
 function database() {
@@ -75,7 +76,7 @@ function database() {
             updates.push({ table, patch, id: filters.id })
             return resolve({ error: null })
           }
-          if (table === 'decisions') return resolve({ data: ROWS })
+          if (table === 'decisions') return resolve({ data: rows })
           return resolve({ data: [], count: 0 })
         },
       }
@@ -134,6 +135,7 @@ async function keep(keepDecisions: string[]) {
 }
 
 beforeEach(() => {
+  rows = ROWS
   updates = []
 })
 
@@ -170,5 +172,51 @@ describe('the user still decides', () => {
       ['d-legacy', 'rejected'],
       ['d-model', 'rejected'],
     ])
+  })
+})
+
+describe('every kind of proposal, stored as confidently as a decision', () => {
+  // All at 0.9, as a model that got them wrong would leave them. The server
+  // reads the words, so the confidence alone never pre-ticks them.
+  const KINDS: [string, string][] = [
+    ['suggestion', "I'd suggest going with vendor B."],
+    ['recommendation', 'Ravi recommended going with vendor B.'],
+    ['hypothetical', 'What if we moved the launch to March?'],
+    ['condition', 'If the launch moves to March, marketing needs a new date.'],
+    ['open question', 'Should we go with vendor B?'],
+    ['not decided yet', "We haven't decided on the vendor yet."],
+  ]
+
+  beforeEach(() => {
+    rows = [
+      {
+        id: 'd-reasoned',
+        description: 'Go with vendor B',
+        confidence: 0.9,
+        excerpt: 'We agreed to go with vendor B because it could scale.',
+      },
+      ...KINDS.map(([kind, words]) => ({
+        id: `d-${kind}`,
+        description: words,
+        confidence: 0.9,
+        excerpt: words,
+      })),
+    ]
+  })
+
+  it('only the settled decision is likely; every proposal is marked proposed', async () => {
+    const { decisions } = await review()
+    expect(decisions.map((d) => [d.id, d.likely, d.proposed])).toEqual([
+      ['d-reasoned', true, false],
+      ...KINDS.map(([kind]) => [`d-${kind}`, false, true]),
+    ])
+  })
+
+  it('keeping the defaults confirms only the settled decision', async () => {
+    const { decisions } = await review()
+    const confirmed = (await keep(decisions.filter((d) => d.likely).map((d) => d.id)))
+      .filter(([, status]) => status === 'confirmed')
+      .map(([id]) => id)
+    expect(confirmed).toEqual(['d-reasoned'])
   })
 })

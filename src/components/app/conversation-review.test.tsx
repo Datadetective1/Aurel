@@ -94,3 +94,42 @@ describe('decisions and proposals in Review', () => {
     expect(screen.queryByText('Proposed, not decided')).toBeNull()
   })
 })
+
+describe('every kind of proposal, each stored as confidently as a decision', () => {
+  // All at 0.9, as a model that got them wrong would leave them.
+  const KINDS: [string, string][] = [
+    ['suggestion', "I'd suggest going with vendor B."],
+    ['recommendation', 'Ravi recommended going with vendor B.'],
+    ['hypothetical', 'What if we moved the launch to March?'],
+    ['condition', 'If the launch moves to March, marketing needs a new date.'],
+    ['open question', 'Should we go with vendor B?'],
+    ['not decided yet', "We haven't decided on the vendor yet."],
+  ]
+  const rows = [
+    decision(
+      'd-reasoned',
+      'Go with vendor B',
+      0.9,
+      'We agreed to go with vendor B because it could scale.',
+    ),
+    ...KINDS.map(([kind, words]) => decision(`d-${kind}`, words, 0.9, words)),
+  ]
+
+  it('each starts unticked and says "Proposed, not decided"', async () => {
+    await show(rows)
+    for (const [kind] of KINDS) {
+      const box = screen
+        .getAllByRole('checkbox')
+        .find((b) => (b as HTMLInputElement).value === `d-${kind}`) as HTMLInputElement
+      expect(box.checked).toBe(false)
+    }
+    expect(screen.getAllByText('Proposed, not decided')).toHaveLength(KINDS.length)
+  })
+
+  it('a decision with a reason that softens nothing starts ticked, as a decision', async () => {
+    const form = await show(rows)
+    expect(new FormData(form).getAll('keepDecision')).toEqual(['d-reasoned'])
+    expect(screen.getAllByLabelText('What was decided')).toHaveLength(1)
+    expect(screen.getAllByText('Likely')).toHaveLength(1)
+  })
+})

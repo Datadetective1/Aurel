@@ -304,7 +304,10 @@ Severity: **P0** breaks the core loop or risks data; **P1** blocks an essential 
 **Fix in review (25 Oct 2026, draft PR, not merged, not deployed).**
 
 - **One reading of the words** (`src/lib/conversations/decisions.ts`), used on both extraction paths and again whenever Review shows a decision:
-  - **decided:** settling words ("decided", "agreed to", "we're going with", "it's settled") with nothing hedging them. "As Ravi recommended" after "we decided" is history, not a hedge.
+  - **decided:** settling words ("decided", "agreed to", "we're going with", "it's settled") with nothing hedging them.
+    - "As Ravi recommended" after "we decided" is history, not a hedge.
+    - A reason given after the settling words is not a hedge either: "we agreed to go with vendor B because it could scale" was agreed.
+    - A proposal word anywhere still makes it a proposal: "we agreed, so maybe we should go with vendor B".
   - **proposed:** a suggestion, recommendation, proposal, preference, hypothetical, condition, hedge, open question or unsettled outcome ("we haven't decided"). When the words carry both, proposed wins.
   - **unmarked:** neither. It keeps the confidence it was read with, as before.
 - **Extraction:**

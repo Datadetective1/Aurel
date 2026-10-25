@@ -71,6 +71,36 @@ describe('proposals, hypotheticals, conditions and open questions', () => {
   })
 })
 
+describe('a reason given for a decision does not hedge it', () => {
+  it.each([
+    'We decided to move the launch to March so the team would have time.',
+    'We agreed to go with vendor B because it could scale.',
+    'We decided to go with vendor B, which will probably cost less.',
+    'We decided to go with vendor B since they could start in March.',
+    'We agreed to go with vendor B, although it might cost more.',
+    'We decided to go with vendor B because Ravi suggested it.',
+    // A decision reported in the future tense.
+    'We decided we would launch in March.',
+    "We agreed we'd revisit pricing in Q3.",
+  ])('"%s" is decided', (phrase) => {
+    expect(readDecisionText(phrase)).toBe('decided')
+  })
+})
+
+describe('a hedge on the decision itself still makes it a proposal', () => {
+  it.each([
+    'We agreed it might be worth trying vendor B.',
+    'We agreed to consider vendor B.',
+    'We agreed, so maybe we should go with vendor B.',
+    "We decided we'd probably go with vendor B.",
+    'We agreed to delay the launch if QA is not done.',
+    "I'd suggest going with vendor B, since finance approved it.",
+    'Vendor B would be best.',
+  ])('"%s" is proposed', (phrase) => {
+    expect(readDecisionText(phrase)).toBe('proposed')
+  })
+})
+
 describe('neither: left to the confidence it was read with', () => {
   it.each(['Vendor B for the pilot.', 'Go with vendor B', '', null])('"%s" is unmarked', (t) => {
     expect(readDecisionText(t)).toBe('unmarked')

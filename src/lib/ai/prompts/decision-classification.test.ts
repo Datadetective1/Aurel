@@ -208,6 +208,29 @@ describe('a model answer that calls every variant a decision', () => {
     }
   })
 
+  it('a clear decision with a reason that softens nothing keeps its confidence', () => {
+    const [reasoned] = written(
+      conversationPrompt.reconcile!(
+        {
+          ...answer,
+          decisions: [
+            {
+              description: 'Go with vendor B',
+              context: 'It could scale.',
+              personIds: [],
+              confidence: 0.9,
+              excerpt: 'We agreed to go with vendor B because it could scale.',
+            },
+          ],
+        },
+        input(TRANSCRIPT, 'pasted_transcript'),
+      ),
+    )
+    expect(reasoned!.reading).toBe('decided')
+    expect(reasoned!.confidence).toBe(0.9)
+    expect(reasoned!.preselected).toBe(true)
+  })
+
   it('still drops a name given where an id belongs', () => {
     expect(decisions.every((d) => d.personIds.join() === 'p-ravi')).toBe(true)
   })
