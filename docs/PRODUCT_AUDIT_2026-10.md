@@ -784,14 +784,36 @@ Tests:
 - 15 of the new tests fail against PR #21's code. The rest pin behaviour that already held there.
 - Full web suite passes. `tsc`, eslint and prettier are clean.
 
-Not covered yet:
+Preview results (25 Oct 2026, PR #22 preview, production database, QA account B):
 
-- **Preview check, on a QA account:**
-  - add with a link, and check nothing runs;
-  - research, and check the typed page waits;
-  - mark "not them", research again, and check it is not linked;
-  - Reconsider, and check it waits again.
-- The iPhone has no Reconsider button. A page marked "not them" there can be reconsidered on the web.
+- **Set-up:**
+  - A test person, Katherine Johnson (NASA, mathematician), with her Wikipedia page.
+  - No research run was used: the page was added through Add context, which is a source read.
+  - QA account A's last research credit was not touched.
+- **Brief checks:** each brief's citations were read from the database (`artifact_sources`). Briefs build their citations on every path, including the preview's built-in composer.
+
+| Step                                                    | What happened                                                                                                                                                                       | Result                                                                                                                                                                                                                          |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add the person with her Wikipedia link                  | Her page opened with no `?research=1` and "Research public footprint" waiting. After 8 s: 0 research jobs, 0 linked pages, 0 facts, no usage                                        | **Pass**                                                                                                                                                                                                                        |
+| Add the same link with Add context                      | The page waits for review: link `unreviewed`, 1 fact held (labelled observed), 0 facts in her record. The row lists "If it is them, this adds:" with the Observed label and excerpt | **Pass**                                                                                                                                                                                                                        |
+| Ask and brief 1, while it waits                         | Ask: nothing known about her. Brief 1: no citations, and none of the page's text                                                                                                    | **Pass**                                                                                                                                                                                                                        |
+| "Yes, this is them" (positive control)                  | 1 fact saved; the page counts as read. Brief 2 cites "Public source: Katherine Johnson - Wikipedia — Wikimedia Foundation, Inc."                                                    | **Pass**                                                                                                                                                                                                                        |
+| "This is someone else", after confirming                | Link `no_match`, reviewed; the fact withdrawn. The page still counts as read: this is the state PR #21 and `main` still cite                                                        | **Pass**                                                                                                                                                                                                                        |
+| Ask and brief 3, after rejecting                        | Ask: nothing known about her. Brief 3: no citations and no mention of the page                                                                                                      | **Pass** (the fix)                                                                                                                                                                                                              |
+| Reconsider this page                                    | Waits again: `unreviewed`, 1 fact held, 0 in the record. One source read charged                                                                                                    | **Pass**                                                                                                                                                                                                                        |
+| Reconsider after renaming her to a name not on the page | "This source does not mention Kay Quillfeather. It stays marked as someone else." Link back to `no_match`, reviewed, with its original signals. No charge                           | **Pass**                                                                                                                                                                                                                        |
+| Reconsider when the stored text is gone                 | "There is no stored text for that page to read again. It stays marked as someone else." Link `no_match`, reviewed; no facts; no charge                                              | **Pass**                                                                                                                                                                                                                        |
+| Add the rejected link again                             | Decision kept: `no_match`, reviewed, nothing held, no charge. **But the message said "Added as a source. Nothing new was extractable from it."**                                    | **Fixed** in `1efd9b3` and rechecked on the preview: it now says "You marked that page as being about someone else, so it was not used. To use it, choose Reconsider on that page under Sources." Decision unchanged, no charge |
+
+- **How the "stored text is gone" case was produced:**
+  - The test page's stored text was moved to a key in the same row, for that one step.
+  - It was then put back, with its fingerprint (md5, length, content hash) checked unchanged.
+  - Nothing else was written by hand.
+- **Not verified on the preview:**
+  - **Ask with the AI model.** The preview has no AI key, so Ask answered from saved facts. The "Public sources read" list that the model sees comes from the same function as the brief citations above.
+  - **A full research run.** One would charge a research credit. With no search provider, it would read only the typed link, through the same held path that Add context used.
+  - **The web's fresh path when a "not them" page's content has changed** (5.8). This needs discovery, which the preview does not have. Unit tests cover it.
+- **The iPhone has no Reconsider button.** A page marked "not them" there can be reconsidered on the web.
 
 **Order and testing**
 
