@@ -44,6 +44,9 @@ export function Screen({
       style={{ flex: 1, backgroundColor: c.bg }}
       contentContainerStyle={padding}
       keyboardShouldPersistTaps="handled"
+      // The field being typed in scrolls clear of the keyboard, on every screen.
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={c.accentGraphic} /> : undefined
       }
@@ -95,6 +98,28 @@ export function Card({ children, tone = 'surface', style }: { children: React.Re
   const bg = tone === 'accent' ? c.accentWash : tone === 'critical' ? c.criticalWash : tone === 'caution' ? c.cautionWash : tone === 'sunken' ? c.bgSunken : c.surface
   const border = tone === 'surface' || tone === 'sunken' ? c.line : 'transparent'
   return <View style={[{ backgroundColor: bg, borderColor: border, borderWidth: 1, borderRadius: 14, padding: 16 }, style]}>{children}</View>
+}
+
+/**
+ * A refresh that failed while the screen still shows what it loaded before:
+ * said quietly, above the content, which stays.
+ */
+export function StaleNote({ failure }: { failure: ApiFailure | null }) {
+  const { c } = useTheme()
+  if (!failure) return null
+  const offline = failure.kind === 'offline'
+  return (
+    <View
+      accessibilityRole="text"
+      accessibilityLiveRegion="polite"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}
+    >
+      <Feather name={offline ? 'wifi-off' : 'refresh-cw'} size={12} color={c.inkMuted} />
+      <T variant="meta" tone="muted">
+        {offline ? 'You are offline. Showing what was loaded earlier.' : 'Couldn’t refresh. Showing what was loaded earlier.'}
+      </T>
+    </View>
+  )
 }
 
 export function Loading({ label = 'Loading' }: { label?: string }) {

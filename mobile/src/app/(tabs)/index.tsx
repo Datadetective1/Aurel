@@ -10,7 +10,7 @@ import { recordedSeconds } from '~/lib/pending-capture'
 import { useRecordingState } from '~/lib/recording-state'
 import { elapsed } from '~/lib/capture'
 import { countdown, formatDayLabel } from '~/lib/format'
-import { Failure, Loading, Screen, Section, Empty, Card } from '~/components/screen'
+import { Failure, Loading, Screen, Section, Empty, Card, StaleNote } from '~/components/screen'
 import { LoopRow, MeetingCard } from '~/components/relationship'
 import { Notice } from '~/components/notice'
 import { Button } from '~/components/button'
@@ -29,7 +29,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
  */
 export default function Today() {
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh, reload } = useApi<TodayResponse>('/api/mobile/today')
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<TodayResponse>('/api/mobile/today')
   const [notice, setNotice] = React.useState<string | null>(null)
   const [unsent, setUnsent] = React.useState(() => pendingStore().load())
   const recording = useRecordingState()
@@ -42,7 +42,11 @@ export default function Today() {
     reload()
   }
 
-  if (loading) return <Screen><Loading /></Screen>
+  // A recording waiting on this iPhone is said whatever else loads: it lives on
+  // the phone, not on the server, so Today failing to load changes nothing about it.
+  const waiting = unsent && unsent.parts.length > 0 && recording === 'idle' ? <UnsentCard seconds={recordedSeconds(unsent)} /> : null
+
+  if (loading) return <Screen>{waiting}<Loading /></Screen>
   if (error || !data) {
     // Account stays reachable when the record is not -- someone who never
     // finished onboarding can still sign out or delete their account.
@@ -51,6 +55,7 @@ export default function Today() {
         <View style={{ alignItems: 'flex-end' }}>
           <AccountButton />
         </View>
+        {waiting}
         {error ? <Failure failure={error} onRetry={refresh} /> : null}
       </Screen>
     )
@@ -67,6 +72,7 @@ export default function Today() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T variant="label" tone="muted">{formatDayLabel(data.now, tz)}</T>
         <View style={{ flexDirection: 'row' }}>
@@ -80,16 +86,7 @@ export default function Today() {
       </T>
       {notice ? <Notice text={notice} onDone={() => setNotice(null)} /> : null}
 
-      {unsent && unsent.parts.length > 0 && recording === 'idle' ? (
-        <View style={{ marginTop: 16 }}>
-          <Card tone="caution">
-            <T variant="small">A {elapsed(recordedSeconds(unsent))} recording has not been sent yet. It is safe on this iPhone.</T>
-            <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
-              <Button label="Open it in Capture" icon="mic" variant="secondary" onPress={() => router.push('/capture')} />
-            </View>
-          </Card>
-        </View>
-      ) : null}
+      {waiting}
 
       {data.meetings.length === 0 && data.loops.length === 0 && data.awaitingReview.length === 0 ? (
         <StartHere onLoaded={changed} />
@@ -238,4 +235,18 @@ function StartHere({ onLoaded }: { onLoaded: (message: string) => void }) {
 function greeting(now: Date, timeZone: string) {
   const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone }).format(now))
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+}
+
+/** A recording kept on this iPhone that has not reached Atturel yet. */
+function UnsentCard({ seconds }: { seconds: number }) {
+  return (
+    <View style={{ marginTop: 16 }}>
+      <Card tone="caution">
+        <T variant="small">A {elapsed(seconds)} recording has not been sent yet. It is safe on this iPhone.</T>
+        <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+          <Button label="Open it in Capture" icon="mic" variant="secondary" onPress={() => router.push('/capture')} />
+        </View>
+      </Card>
+    </View>
+  )
 }

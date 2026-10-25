@@ -12,7 +12,7 @@ import { Button } from '~/components/button'
 import { Chip, ChipRow, DirectionChip } from '~/components/chip'
 import { CompanyLine, LoopRow, SampleChip, Timeline } from '~/components/relationship'
 import { Notice } from '~/components/notice'
-import { Card, Failure, Loading, Screen, Section } from '~/components/screen'
+import { Card, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -28,7 +28,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 export default function Person() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh, reload } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
   const [notice, setNotice] = React.useState<string | null>(null)
   useFresh(reload)
   const changed = (message: string) => {
@@ -49,6 +49,7 @@ export default function Person() {
 
   return (
     <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <View style={{ alignItems: 'center', paddingTop: 4 }}>
         <Avatar name={person.fullName} src={person.src} size={112} />
         <T variant="display" style={{ marginTop: 14, textAlign: 'center' }} accessibilityRole="header">{person.name}</T>

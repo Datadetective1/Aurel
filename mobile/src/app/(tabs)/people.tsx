@@ -6,7 +6,7 @@ import type { PeopleResponse } from '@atturel/web/lib/mobile/contracts'
 import { useApi } from '~/lib/api'
 import { useFresh } from '~/lib/use-fresh'
 import { NewPerson } from '~/components/people-picker'
-import { Empty, Failure, Loading, Screen } from '~/components/screen'
+import { Empty, Failure, Loading, Screen, StaleNote } from '~/components/screen'
 import { PersonRow } from '~/components/relationship'
 import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
@@ -16,7 +16,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 export default function People() {
   const { c } = useTheme()
   const [query, setQuery] = React.useState('')
-  const { data, error, loading, refreshing, refresh, reload } = useApi<PeopleResponse>('/api/mobile/people')
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<PeopleResponse>('/api/mobile/people')
   const [adding, setAdding] = React.useState(false)
   useFresh(reload)
   const now = new Date()

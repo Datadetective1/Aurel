@@ -18,10 +18,13 @@ import { T } from './text'
  */
 export function PeoplePicker({
   selected,
+  hidden = [],
   onToggle,
   onTimeZone,
 }: {
   selected: string[]
+  /** People not to offer: already in the meeting. */
+  hidden?: string[]
   onToggle: (person: Pick<VisualPerson, 'id' | 'name' | 'fullName' | 'src'>) => void
   /** The account's time zone, which the people list happens to carry. */
   onTimeZone?: (tz: string) => void
@@ -37,7 +40,9 @@ export function PeoplePicker({
 
   const q = query.trim().toLowerCase()
   const people = (data?.people ?? []).filter(
-    (p) => !q || [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q)),
+    (p) =>
+      !hidden.includes(p.id) &&
+      (!q || [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q))),
   )
 
   return (
