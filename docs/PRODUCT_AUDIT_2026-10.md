@@ -23,7 +23,9 @@ _Updated 25 October 2026._
 - **Phase 1 (Capture): merged (PR #16, `9fb4714`) and shipped in TestFlight build 0.1.0 (3).**
   - The owner validated it on a physical iPhone (§1.3).
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
-- **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).** 2A (people controls, server + web) is in progress.
+- **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
+  - **2A (people controls, server + web): built and verified on the PR #18 preview (§5, "2A results"). Awaiting owner review. Not merged.**
+  - Next: 2C + 2B (iOS), then one TestFlight build after owner review.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
 - **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
 
@@ -329,6 +331,49 @@ Principles:
    - calendar status added to `GET /api/mobile/account`
    - The duplicate warning on `POST /api/mobile/people`.
 
+**2A results (PR #18, branch `ios-testflight-readiness`, 25 Oct 2026). Not merged; awaiting owner review.**
+
+Built as planned, plus one fix found during preview testing (below). No migration and no new service. The mobile routes are additive, so TestFlight 0.1.0 (3) behaves as before.
+
+Automated checks:
+
+- 993 web tests pass (81 files). New: the lifecycle rules (14), the mobile people routes, and the select-reset tests.
+- Typecheck clean. Lint: 0 errors (5 warnings, all in files this PR does not touch).
+
+Preview checks (Vercel preview against the production database, QA accounts A and B only):
+
+| Check                                                                                                                                            | Result                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Setup: people, meetings, conversations, loops, facts, sources                                                                                    | 9/9                                                                                                                                                                      |
+| Archive, restore, plan limit, delete                                                                                                             | 23/24. The one failure: the delete counted a loop twice when the person was both its person and its owner. Fixed in `7bf2953`; that case re-checked live on its own, 6/6 |
+| Cross-account isolation (account B against A's people, loops, photos, meetings)                                                                  | 19/19                                                                                                                                                                    |
+| Photos (person and own), export, preferences                                                                                                     | 20/20                                                                                                                                                                    |
+| Website, in Chromium: Archived list, archived person page, delete page, edit page, Remove, duplicate warning, Delete permanently, Settings photo | 13/13                                                                                                                                                                    |
+| Selects after saving (person edit and Settings › Profile)                                                                                        | 6/6 after the fix below                                                                                                                                                  |
+
+What the permanent delete did, checked in the database:
+
+- **Deleted:** the person, their person-only note, observation, fact, and the public source only they were linked to.
+- **Kept and unlinked:** their loops (one reworded first from the confirmation page), and the note that was also attached to a meeting.
+- **Untouched:** the meeting, the conversation, the decision, a source shared with another person, and that person's fact and links.
+- **While archived:** a meeting and a conversation created at that time did not include them.
+
+**Found and fixed during preview testing: selects showed the wrong value after saving.**
+
+- After "Save changes", React resets the form. Every select then showed its first option, or the value it was mounted with, although the right value had been saved:
+  - a person's time zone showed "Not set";
+  - their relationship showed the old one;
+  - Settings › Profile showed Africa/Abidjan for the user's own time zone.
+- A second save without reloading wrote that wrong value back. The person time zone was new in this PR; **the relationship and Settings › Profile cases were already in production.**
+- Fixed once in the shared `Select` primitive (`70cea2c`). Three of the four new tests fail without the fix.
+
+Limitations:
+
+- **The iOS screens for these controls come in 2B.** Until then the new mobile routes have been tested by script only.
+- **Name detection in retained loops is word-based.** It catches the full name, first name and preferred name. It can miss initials, nicknames or a role ("the CFO"). Every retained loop is still listed for review, whether or not it is flagged.
+- **A brief for a meeting that already listed someone still includes them after they are archived.** New meetings exclude them, and their place in existing meetings is kept as history.
+- QA account A holds the test data. Deleting it, and account B, needs owner approval at the end of Phase 2.
+
 **2B — iOS controls (needs a TestFlight build; adds native modules)**
 
 1. People tab: **Add person**, with the duplicate warning.
@@ -396,4 +441,7 @@ Further requirements set by the owner:
 
 **Phase 5 — Validation.** Web end to end (Playwright) and iOS simulator flows per phase, a security review of new routes, then TestFlight and a written report.
 
-**Test assets.** The disposable QA account `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) **still exists**. Both deletes timed out at Supabase's confirmation prompt. Proposal: reuse it for Phase 2 testing, then delete it with the owner's approval at the end of Phase 2.
+**Test assets.** Two disposable QA accounts exist; both need the owner's approval to delete, at the end of Phase 2.
+
+- `qa-capture-20261024@atturel-demo.dev` (user `5e9d5f6c-…`) is used for Phase 2 testing and holds its test people and records. Both earlier deletes timed out at Supabase's confirmation prompt.
+- `qa-isolation-20261025@atturel-demo.dev` was created for the cross-account isolation checks.
