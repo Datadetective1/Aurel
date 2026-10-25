@@ -7,7 +7,7 @@ import { DIRECTION_META } from '@atturel/web/lib/visual/relationship-actions'
 import { api, ApiError, useApi } from '~/lib/api'
 import { Button } from '~/components/button'
 import { DIRECTION_ICON } from '~/components/chip'
-import { Card, Empty, Failure, Loading, Screen, Section } from '~/components/screen'
+import { Card, Empty, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -25,7 +25,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 export default function Review() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
-  const { data, error, loading, refresh } = useApi<ReviewResponse>(id ? `/api/mobile/conversations/${id}/review` : null)
+  const { data, error, stale, loading, refreshing, refresh } = useApi<ReviewResponse>(id ? `/api/mobile/conversations/${id}/review` : null)
   const [keep, setKeep] = React.useState<Set<string> | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [result, setResult] = React.useState<string | null>(null)
@@ -98,7 +98,8 @@ export default function Review() {
   }
 
   return (
-    <Screen topInset={false}>
+    <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <T variant="display" accessibilityRole="header">{data.conversation.title}</T>
       {data.conversation.outcome || data.conversation.summary ? (
         <T variant="small" tone="secondary" style={{ marginTop: 8 }}>{data.conversation.outcome ?? data.conversation.summary}</T>

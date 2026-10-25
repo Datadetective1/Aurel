@@ -13,7 +13,7 @@ import { Chip, ChipRow, DIRECTION_ICON, PrepChip } from '~/components/chip'
 import { CompanyLine, LoopRow, SampleChip } from '~/components/relationship'
 import { PeoplePicker } from '~/components/people-picker'
 import { Notice } from '~/components/notice'
-import { Card, Empty, Failure, Loading, Screen, Section } from '~/components/screen'
+import { Card, Empty, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -43,7 +43,7 @@ export default function Prepare() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
   const [depth, setDepth] = React.useState<Depth>('glance')
-  const { data, error, loading, refreshing, refresh, reload } = useApi<MeetingResponse>(id ? `/api/mobile/meetings/${id}` : null)
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<MeetingResponse>(id ? `/api/mobile/meetings/${id}` : null)
   const [notice, setNotice] = React.useState<string | null>(null)
   useFresh(reload)
   const changed = (message: string) => {
@@ -61,6 +61,7 @@ export default function Prepare() {
 
   return (
     <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <Stack.Screen options={{ title: '' }} />
 
       {/* --- the cockpit: who, when, what state ------------------------------- */}
@@ -79,8 +80,8 @@ export default function Prepare() {
       {data.people.length === 1 ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${data.people[0]!.name}, open their page`}
-          onPress={() => router.push({ pathname: '/person/[id]', params: { id: data.people[0]!.id } })}
+          accessibilityLabel={`${data.people[0]!.name}${data.people[0]!.archived ? ', archived' : ''}, open their page`}
+          onPress={() => openPerson(data.people[0]!)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 16 }}
         >
           <Avatar name={data.people[0]!.fullName} src={data.people[0]!.src} size={72} />
@@ -88,6 +89,7 @@ export default function Prepare() {
             <T variant="title">{data.people[0]!.name}</T>
             {data.people[0]!.title ? <T variant="small" tone="secondary">{data.people[0]!.title}</T> : null}
             {data.people[0]!.company ? <View style={{ marginTop: 4 }}><CompanyLine name={data.people[0]!.company} /></View> : null}
+            {data.people[0]!.archived ? <View style={{ marginTop: 6, alignSelf: 'flex-start' }}><Chip icon="archive">Archived</Chip></View> : null}
           </View>
         </Pressable>
       ) : data.people.length > 1 ? (
@@ -96,12 +98,13 @@ export default function Prepare() {
             <Pressable
               key={p.id}
               accessibilityRole="button"
-              accessibilityLabel={`${p.name}, open their page`}
-              onPress={() => router.push({ pathname: '/person/[id]', params: { id: p.id } })}
+              accessibilityLabel={`${p.name}${p.archived ? ', archived' : ''}, open their page`}
+              onPress={() => openPerson(p)}
               style={{ alignItems: 'center', width: 64, gap: 6 }}
             >
               <Avatar name={p.fullName} src={p.src} size={56} />
               <T variant="meta" numberOfLines={1}>{firstName(p.name)}</T>
+              {p.archived ? <T variant="meta" tone="muted" numberOfLines={1}>Archived</T> : null}
             </Pressable>
           ))}
         </View>
@@ -224,14 +227,23 @@ function Glance({ data }: { data: MeetingResponse }) {
 function Unprepared({ data, onChanged }: { data: MeetingResponse; onChanged: (message: string) => void }) {
   const [adding, setAdding] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  // Whoever is already in the meeting, or was just added, is not offered again.
+  const [added, setAdded] = React.useState<string[]>([])
+  const hidden = [...data.people.map((p) => p.id), ...added]
   if (data.prep === 'needs_people') {
     const add = async (personId: string, name: string) => {
       setError(null)
       try {
+        if (hidden.includes(personId)) return
+        setAdded((a) => [...a, personId])
         const result = await api.post<AddAttendeeResponse>(`/api/mobile/meetings/${data.meeting.id}/attendees`, { personId })
         if (result.ok) onChanged(`${firstName(name)} added. Prepare when everyone is in.`)
-        else setError(result.error)
+        else {
+          setAdded((a) => a.filter((id) => id !== personId))
+          setError(result.error)
+        }
       } catch (e) {
+        setAdded((a) => a.filter((id) => id !== personId))
         setError(
           e instanceof ApiError && e.failure.kind === 'offline'
             ? 'You are offline.'
@@ -245,7 +257,7 @@ function Unprepared({ data, onChanged }: { data: MeetingResponse; onChanged: (me
       <View>
         <Empty icon="user-plus" title="No one is in this meeting yet" body="The brief is built from what you know about the people in the room. Add who will be there." />
         {adding ? (
-          <PeoplePicker selected={[]} onToggle={(p) => void add(p.id, p.name)} />
+          <PeoplePicker selected={[]} hidden={hidden} onToggle={(p) => void add(p.id, p.name)} />
         ) : (
           <Button label="Add people" icon="user-plus" variant="secondary" onPress={() => setAdding(true)} />
         )}
@@ -503,4 +515,10 @@ function Disclosure({ title, subtitle, children }: { title: string; subtitle?: s
       {open ? <View style={{ paddingBottom: 14 }}>{children}</View> : null}
     </View>
   )
+}
+
+/** Someone removed from the user's people opens on their archived page. */
+function openPerson(p: { id: string; archived?: boolean }) {
+  if (p.archived) router.push({ pathname: '/archived/[id]', params: { id: p.id } })
+  else router.push({ pathname: '/person/[id]', params: { id: p.id } })
 }

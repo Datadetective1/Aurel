@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Alert, AppState, Pressable, Switch, TextInput, View } from 'react-native'
-import { router, useLocalSearchParams } from 'expo-router'
+import { Alert, AppState, Linking, Pressable, Switch, TextInput, View } from 'react-native'
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import * as Haptics from 'expo-haptics'
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
@@ -19,9 +19,12 @@ import {
   composeCaptureText,
   elapsed,
   MAX_RECORDING_SECONDS,
+  nextTarget,
   PART_SECONDS,
+  startPart,
   VOICE_RECORDING,
   type CaptureMode,
+  type CaptureTarget,
 } from '~/lib/capture'
 import {
   closePart,
@@ -98,6 +101,16 @@ export default function Capture() {
   const [sendFailed, setSendFailed] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<string | null>(null)
+  // Microphone access was refused: the error offers the way to Settings.
+  const [micDenied, setMicDenied] = React.useState(false)
+
+  // Who or what this capture is for: read from the route on each visit, kept
+  // while a recording or typed note is under way, cleared on leaving.
+  const [target, setTarget] = React.useState<CaptureTarget>({
+    meetingId: params.meetingId || null,
+    personId: params.personId || null,
+  })
+  const engagedRef = React.useRef(false)
   // Re-render when the pending record changes; the record itself lives in a ref.
   const [, setVersion] = React.useState(0)
   const bump = () => setVersion((v) => v + 1)
@@ -106,6 +119,30 @@ export default function Capture() {
   const queueRef = React.useRef<Promise<unknown>>(Promise.resolve())
   const busyRef = React.useRef(false)
   const lastTransitionRef = React.useRef(0)
+
+  // A recording or a typed note under way keeps what it was started for.
+  engagedRef.current = phase !== 'ready' || typing || Boolean(pendingRef.current)
+  const targetRef = React.useRef(target)
+  targetRef.current = target
+  useFocusEffect(
+    React.useCallback(() => {
+      const current = targetRef.current
+      const next = nextTarget(current, { meetingId: params.meetingId, personId: params.personId }, engagedRef.current)
+      if (next.meetingId !== current.meetingId || next.personId !== current.personId) {
+        setTarget(next)
+        setMode(next.meetingId ? 'meeting_recording' : 'voice_note')
+      }
+    }, [params.meetingId, params.personId]),
+  )
+  // Leaving clears what was passed in, so the tab bar later opens Capture clean.
+  const navigation = useNavigation()
+  React.useEffect(
+    () =>
+      navigation.addListener('blur', () => {
+        if (!engagedRef.current) router.setParams({ meetingId: undefined, personId: undefined })
+      }),
+    [navigation],
+  )
   const [recheck, setRecheck] = React.useState(0)
 
   // Preview data never touches the microphone: the clock is simulated.
@@ -191,11 +228,11 @@ export default function Capture() {
       store.save(p)
       return
     }
-    // Options every time: without them expo-audio reuses the previous file,
-    // and the next part would overwrite one not yet sent.
-    await recorder.prepareToRecordAsync(VOICE_RECORDING)
-    recorder.record()
-    p.current = recorder.uri
+    p.current = await startPart(
+      recorder,
+      p.parts.map((part) => part.uri),
+      (uri) => store.removeAudio(uri),
+    )
     store.save(p)
   }, [recorder, store])
 
@@ -355,16 +392,18 @@ export default function Capture() {
       const permission = await requestRecordingPermissionsAsync()
       if (!permission.granted) {
         setError('Microphone access is off. Turn it on in Settings › Atturel › Microphone, or type notes instead.')
+        setMicDenied(true)
         return
       }
+      setMicDenied(false)
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: false })
     }
     pendingRef.current = newPending({
       id: captureId(),
       now: new Date(),
       mode,
-      meetingId: params.meetingId ?? null,
-      personId: params.personId ?? null,
+      meetingId: target.meetingId,
+      personId: target.personId,
       consent: mode === 'meeting_recording' ? othersKnow : false,
     })
     store.save(pendingRef.current)
@@ -462,8 +501,8 @@ export default function Capture() {
       setStatus('Reading it for what was promised and decided…')
       // A recording carries the meeting and person it was started from, even
       // when it is sent later (after a failure, or from a reopened app).
-      const meetingId = fromTyping ? params.meetingId : p?.meetingId
-      const personId = fromTyping ? params.personId : p?.personId
+      const meetingId = fromTyping ? target.meetingId : p?.meetingId
+      const personId = fromTyping ? target.personId : p?.personId
       const body: CaptureRequest = {
         text,
         sourceKind: fromTyping ? 'typed_notes' : (p?.mode ?? mode),
@@ -667,6 +706,11 @@ export default function Capture() {
 
       {error ? (
         <T variant="small" tone="critical" style={{ marginTop: 14 }} accessibilityRole="alert">{error}</T>
+      ) : null}
+      {error && micDenied ? (
+        <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+          <Button label="Open Settings" icon="settings" variant="secondary" onPress={() => void Linking.openSettings()} />
+        </View>
       ) : null}
       {error && errorDetail ? (
         <T variant="meta" tone="muted" style={{ marginTop: 6 }} selectable>

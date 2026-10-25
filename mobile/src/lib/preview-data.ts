@@ -1,11 +1,15 @@
 import type {
   AccountResponse,
+  ArchivedPeopleResponse,
   AtlasResponse,
   AskResponse,
   CaptureResponse,
+  DeletionPreviewResponse,
+  MeResponse,
   MeetingResponse,
   PeopleResponse,
   PersonResponse,
+  PreferencesResponse,
   ReviewResponse,
   TodayResponse,
 } from '@atturel/web/lib/mobile/contracts'
@@ -93,11 +97,45 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
       },
       capture: { maxSeconds: 2 * 3600, segmentSeconds: 600, partTransport: 'direct' },
       sampleData: { loaded: false },
+      calendar: { connections: [{ provider: 'google', status: 'active', accountEmail: 'amary@example.com', lastSyncedAt: NOW.toISOString() }] },
     }
     return body as T
   }
 
-  if (p === '/me') return { id: 'preview', name: 'Amary', timeZone: TZ, onboarded: true } as T
+  if (p === '/me' && init.method === 'PATCH') return { ok: true } as T
+  if (p === '/me') {
+    const body: MeResponse = {
+      id: 'preview',
+      name: 'Amary',
+      timeZone: TZ,
+      onboarded: true,
+      profile: { fullName: 'Amary Coulibaly', preferredName: 'Amary', jobTitle: 'Head of Partnerships', company: 'Atturel', pronouns: null, timezone: TZ, photo: null },
+    }
+    return body as T
+  }
+  if (p === '/me/photo' || /^\/people\/[^/]+\/photo$/.test(p)) return { ok: true, photo: null } as T
+  if (p === '/preferences') {
+    const body: PreferencesResponse = { emailNotifications: true, followThroughEmail: true }
+    return (init.method === 'PATCH' ? { ...body, ...(JSON.parse(String(init.body ?? '{}')) as object) } : body) as T
+  }
+  if (p === '/export') return { ok: true, json: JSON.stringify({ preview: true, note: 'Invented people only.' }, null, 2) } as T
+  if (/^\/people\/[^/]+\/(archive|restore)$/.test(p)) return { ok: true } as T
+  if (p === '/people?archived=1') {
+    const body: ArchivedPeopleResponse = {
+      people: [{ id: 'p-archived', name: 'Rhea Okafor', company: 'Northwind Labs', archivedAt: NOW.toISOString(), isDemo: true }],
+    }
+    return body as T
+  }
+  const deletionMatch = p.match(/^\/people\/([^/]+)\/deletion$/)
+  if (deletionMatch) {
+    const body: DeletionPreviewResponse = {
+      person: { id: deletionMatch[1]!, name: 'Rhea Okafor', archivedAt: NOW.toISOString() },
+      deleted: ["Rhea Okafor's record: name, role, contact details and notes", '2 things you noted about them'],
+      unlinked: ['1 loop', '1 meeting'],
+      retainedLoops: [{ id: 'l-rhea', description: 'Send Rhea the pilot summary', status: 'open', mentionsPerson: true }],
+    }
+    return body as T
+  }
   if (p === '/sample-data') return { ok: true, message: 'Preview data is already invented.' } as T
   if (p === '/onboarding') return { ok: true } as T
   if (p === '/access') return { ok: true, message: 'Preview: nothing was redeemed.' } as T
@@ -139,6 +177,8 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
   }
 
   const personMatch = p.match(/^\/people\/([^/]+)$/)
+  if (personMatch && init.method === 'PATCH') return { ok: true } as T
+  if (personMatch && init.method === 'DELETE') return { ok: true, keptLoops: 1 } as T
   if (personMatch) {
     const x = PEOPLE.find((q) => q.id === personMatch[1]) ?? PEOPLE[0]!
     const body: PersonResponse = {
@@ -152,6 +192,19 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
       loops: LOOPS.filter((l) => l.personId === x.id),
       timeline: x.id === 'p-columbus' ? TIMELINE : [],
       themes: x.id === 'p-columbus' ? ['Relationship map', 'Pilot scope', 'Data residency'] : [],
+      edit: {
+        fullName: x.fullName,
+        preferredName: x.name !== x.fullName ? x.name : null,
+        jobTitle: x.title,
+        organizationName: x.company,
+        email: null,
+        profileUrl: null,
+        relationshipType: 'customer',
+        relevance: 4,
+        pronouns: null,
+        timezone: null,
+        notes: null,
+      },
     }
     return body as T
   }

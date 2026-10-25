@@ -48,6 +48,10 @@ function Navigator() {
           <Stack.Screen name="person/[id]" options={{ title: '' }} />
           <Stack.Screen name="review/[id]" options={{ title: 'What happened', presentation: 'modal' }} />
           <Stack.Screen name="account" options={{ title: 'Account' }} />
+          <Stack.Screen name="profile" options={{ title: 'Profile', presentation: 'modal' }} />
+          <Stack.Screen name="edit-person/[id]" options={{ title: 'Edit', presentation: 'modal' }} />
+          <Stack.Screen name="archived/index" options={{ title: 'Archived' }} />
+          <Stack.Screen name="archived/[id]" options={{ title: '' }} />
         </Stack.Protected>
         <Stack.Protected guard={settingUp}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />

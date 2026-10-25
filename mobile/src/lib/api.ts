@@ -26,7 +26,10 @@ export type ApiFailure =
   | { kind: 'onboarding_required' }
   | { kind: 'not_found' }
   | { kind: 'plan_required'; message: string }
-  | { kind: 'server'; message: string }
+  /** 409: the server's answer is a question (a possible duplicate, a person not yet removed). */
+  | { kind: 'conflict'; message: string; body: unknown }
+  /** `body` is the server's answer, for a form to read its field errors from. */
+  | { kind: 'server'; message: string; body?: unknown }
 
 export class ApiError extends Error {
   constructor(public failure: ApiFailure) {
@@ -69,8 +72,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError({ kind: 'plan_required', message: body.error ?? 'This is part of Pro.' })
   }
   if (response.status === 404) throw new ApiError({ kind: 'not_found' })
+  if (response.status === 409) {
+    throw new ApiError({ kind: 'conflict', message: body?.error ?? 'That clashes with what is already there.', body })
+  }
   if (!response.ok) {
-    throw new ApiError({ kind: 'server', message: body?.error ?? 'Something went wrong.' })
+    throw new ApiError({ kind: 'server', message: body?.error ?? 'Something went wrong.', body })
   }
   return body as T
 }
@@ -106,7 +112,15 @@ export const api = {
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
 
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** A DELETE that carries a confirmation in its body. */
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'DELETE', ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
+
+  /** Multipart: the photo routes take one file field, sent as the phone's own file. */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 
   /**
    * Create an account. The one call made without a session, so it cannot go
@@ -215,25 +229,38 @@ export function segmentedDeps(): SegmentedDeps {
   }
 }
 
-/** A small fetch-on-mount hook with pull-to-refresh, typed by the contract. */
+/**
+ * A small fetch-on-mount hook with pull-to-refresh, typed by the contract.
+ *
+ * What a screen has loaded stays on it when a later refresh fails: `error` is
+ * only for a screen with nothing to show, and a failed refresh of a loaded
+ * screen comes back as `stale`, for a quiet note. Everything is keyed to the
+ * path, so one person's record never shows, even for a frame, on another's
+ * screen, and an answer that arrives after the path changed is dropped.
+ */
 export function useApi<T>(path: string | null) {
-  const [data, setData] = React.useState<T | null>(null)
-  const [error, setError] = React.useState<ApiFailure | null>(null)
-  const [loading, setLoading] = React.useState(Boolean(path))
+  const [result, setResult] = React.useState<{ path: string; data: T } | null>(null)
+  const [failure, setFailure] = React.useState<{ path: string; failure: ApiFailure } | null>(null)
   const [refreshing, setRefreshing] = React.useState(false)
+  const current = React.useRef(path)
+
+  React.useEffect(() => {
+    current.current = path
+  }, [path])
 
   const load = React.useCallback(
     async (mode: 'initial' | 'refresh' | 'silent') => {
       if (!path) return
       if (mode === 'refresh') setRefreshing(true)
       try {
-        const result = await api.get<T>(path)
-        setData(result)
-        setError(null)
+        const data = await api.get<T>(path)
+        if (current.current !== path) return
+        setResult({ path, data })
+        setFailure(null)
       } catch (e) {
-        setError(e instanceof ApiError ? e.failure : { kind: 'server', message: 'Something went wrong.' })
+        if (current.current !== path) return
+        setFailure({ path, failure: e instanceof ApiError ? e.failure : { kind: 'server', message: 'Something went wrong.' } })
       } finally {
-        setLoading(false)
         setRefreshing(false)
       }
     },
@@ -244,13 +271,26 @@ export function useApi<T>(path: string | null) {
     void load('initial')
   }, [load])
 
+  const data = path && result?.path === path ? result.data : null
+  const failed = path && failure?.path === path ? failure.failure : null
+
   return {
     data,
-    error,
-    loading,
+    /** Nothing to show, and why. */
+    error: data ? null : failed,
+    /** Something is shown, but the latest refresh of it failed. */
+    stale: data ? failed : null,
+    loading: Boolean(path) && !data && !failed,
     refreshing,
     refresh: () => load('refresh'),
     /** Fetch again without the pull-to-refresh spinner: on returning to a screen. */
     reload: () => load('silent'),
   }
+}
+
+/** The per-field errors a form route returned with a refusal, if any. */
+export function fieldErrorsOf(e: unknown): Record<string, string[]> {
+  if (!(e instanceof ApiError) || (e.failure.kind !== 'server' && e.failure.kind !== 'conflict')) return {}
+  const body = e.failure.body as { fieldErrors?: Record<string, string[]> } | null | undefined
+  return body?.fieldErrors ?? {}
 }

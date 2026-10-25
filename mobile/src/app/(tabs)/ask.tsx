@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import type { AskResponse } from '@atturel/web/lib/mobile/contracts'
 import { brand } from '@atturel/web/lib/brand'
@@ -38,6 +38,16 @@ export default function Ask() {
   const { c } = useTheme()
   const params = useLocalSearchParams<{ q?: string }>()
   const [question, setQuestion] = React.useState(params.q ?? '')
+  // A question passed in ("What should I know about Dana?") fills the field
+  // on every visit that brings one, then leaves the route, so the next visit
+  // from the tab bar does not bring it back.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!params.q) return
+      setQuestion(params.q)
+      router.setParams({ q: undefined })
+    }, [params.q]),
+  )
   const [asked, setAsked] = React.useState<string | null>(null)
   const [answer, setAnswer] = React.useState<AskResponse | null>(null)
   const [busy, setBusy] = React.useState(false)

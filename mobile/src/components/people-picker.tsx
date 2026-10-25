@@ -1,7 +1,13 @@
 import * as React from 'react'
 import { Pressable, TextInput, View } from 'react-native'
 import Feather from '@expo/vector-icons/Feather'
-import type { CreatePersonResponse, PeopleResponse, VisualPerson } from '@atturel/web/lib/mobile/contracts'
+import type {
+  CreatePersonResponse,
+  PeopleResponse,
+  PersonLifecycleResponse,
+  PossibleDuplicate,
+  VisualPerson,
+} from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
 import { fonts, TOUCH, useTheme } from '~/theme'
 import { Avatar } from './avatar'
@@ -18,10 +24,13 @@ import { T } from './text'
  */
 export function PeoplePicker({
   selected,
+  hidden = [],
   onToggle,
   onTimeZone,
 }: {
   selected: string[]
+  /** People not to offer: already in the meeting. */
+  hidden?: string[]
   onToggle: (person: Pick<VisualPerson, 'id' | 'name' | 'fullName' | 'src'>) => void
   /** The account's time zone, which the people list happens to carry. */
   onTimeZone?: (tz: string) => void
@@ -37,7 +46,9 @@ export function PeoplePicker({
 
   const q = query.trim().toLowerCase()
   const people = (data?.people ?? []).filter(
-    (p) => !q || [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q)),
+    (p) =>
+      !hidden.includes(p.id) &&
+      (!q || [p.name, p.fullName, p.company, p.title].some((v) => v?.toLowerCase().includes(q))),
   )
 
   return (
@@ -89,11 +100,18 @@ export function PeoplePicker({
       {adding ? (
         <NewPerson
           initialName={query}
+          existingLabel="Choose them"
           onCancel={() => setAdding(false)}
           onAdded={(person) => {
             setAdding(false)
             setQuery('')
             onToggle(person)
+            reload()
+          }}
+          onExisting={(person) => {
+            setAdding(false)
+            setQuery('')
+            if (!selected.includes(person.id)) onToggle(person)
             reload()
           }}
         />
@@ -106,14 +124,33 @@ export function PeoplePicker({
   )
 }
 
+type NewPersonResult = { id: string; name: string; fullName: string; src: null }
+
+const MATCHED_ON: Record<PossibleDuplicate['reason'], string> = {
+  email: 'Same email.',
+  profile: 'Same profile link.',
+  name: 'Same name.',
+}
+
+/**
+ * Someone new, by name. Before anything is created the server says whether
+ * this person is probably already on record -- same email, profile link or
+ * name, kept or archived -- and the choice is the user's: the existing
+ * record (restored, if it was archived), or someone new after all.
+ */
 export function NewPerson({
   initialName,
   onCancel,
   onAdded,
+  onExisting,
+  existingLabel = 'Open',
 }: {
   initialName: string
   onCancel: () => void
-  onAdded: (person: { id: string; name: string; fullName: string; src: null }) => void
+  onAdded: (person: NewPersonResult) => void
+  /** The person already on record was chosen instead. */
+  onExisting: (person: NewPersonResult) => void
+  existingLabel?: string
 }) {
   const { c } = useTheme()
   const [fullName, setFullName] = React.useState(initialName.trim())
@@ -121,8 +158,21 @@ export function NewPerson({
   const [title, setTitle] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [duplicate, setDuplicate] = React.useState<PossibleDuplicate | null>(null)
 
-  const add = async () => {
+  const say = (e: unknown, fallback: string) =>
+    setError(
+      e instanceof ApiError && e.failure.kind === 'offline'
+        ? 'You are offline.'
+        : e instanceof ApiError && (e.failure.kind === 'server' || e.failure.kind === 'conflict')
+          ? // The web's limit wording may suggest upgrading; the app sells nothing.
+            /upgrade|pro\b/i.test(e.failure.message)
+            ? 'This account already holds as many people as its plan includes.'
+            : e.failure.message
+          : fallback,
+    )
+
+  const add = async (confirmDuplicate: boolean) => {
     setBusy(true)
     setError(null)
     try {
@@ -130,20 +180,37 @@ export function NewPerson({
         fullName: fullName.trim(),
         organizationName: company.trim() || undefined,
         jobTitle: title.trim() || undefined,
+        checkDuplicate: true,
+        confirmDuplicate: confirmDuplicate || undefined,
       })
       if (result.ok) onAdded({ id: result.personId, name: fullName.trim(), fullName: fullName.trim(), src: null })
       else setError(result.error)
     } catch (e) {
-      setError(
-        e instanceof ApiError && e.failure.kind === 'offline'
-          ? 'You are offline.'
-          : e instanceof ApiError && e.failure.kind === 'server'
-            ? // The web's limit wording may suggest upgrading; the app sells nothing.
-              /upgrade|pro\b/i.test(e.failure.message)
-              ? 'This account already holds as many people as its plan includes.'
-              : e.failure.message
-            : 'That person could not be added. Try again.',
-      )
+      const found =
+        e instanceof ApiError && e.failure.kind === 'conflict'
+          ? (e.failure.body as { duplicate?: PossibleDuplicate } | null)?.duplicate
+          : undefined
+      if (found) setDuplicate(found)
+      else say(e, 'That person could not be added. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const useExisting = async (found: PossibleDuplicate) => {
+    setBusy(true)
+    setError(null)
+    try {
+      if (found.archived) {
+        const restored = await api.post<PersonLifecycleResponse>(`/api/mobile/people/${found.id}/restore`, {})
+        if (!restored.ok) {
+          setError(restored.error)
+          return
+        }
+      }
+      onExisting({ id: found.id, name: found.name, fullName: found.name, src: null })
+    } catch (e) {
+      say(e, 'That did not work. Try again.')
     } finally {
       setBusy(false)
     }
@@ -152,18 +219,52 @@ export function NewPerson({
   return (
     <View style={{ marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.bgSunken, gap: 12 }}>
       <T variant="label" tone="muted">Someone new</T>
-      <Field label="Name" value={fullName} onChangeText={setFullName} autoCapitalize="words" textContentType="name" />
+      <Field
+        label="Name"
+        value={fullName}
+        onChangeText={(v) => {
+          setFullName(v)
+          setDuplicate(null)
+        }}
+        autoCapitalize="words"
+        textContentType="name"
+      />
       <Field label="Company (optional)" value={company} onChangeText={setCompany} textContentType="organizationName" />
       <Field label="Role (optional)" value={title} onChangeText={setTitle} textContentType="jobTitle" />
+      {duplicate ? (
+        <View
+          accessibilityRole="alert"
+          style={{ padding: 12, borderRadius: 12, backgroundColor: c.cautionWash, gap: 10 }}
+        >
+          <T variant="small">
+            You already have {duplicate.name}
+            {duplicate.organization ? ` (${duplicate.organization})` : ''}
+            {duplicate.archived ? ', removed from your people' : ''}. {MATCHED_ON[duplicate.reason]}
+          </T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Button
+              label={duplicate.archived ? `Restore ${duplicate.name.split(' ')[0]}` : existingLabel}
+              icon={duplicate.archived ? 'rotate-ccw' : 'user'}
+              variant="secondary"
+              busy={busy}
+              onPress={() => void useExisting(duplicate)}
+            />
+            <Button label="Add as someone new" variant="ghost" disabled={busy} onPress={() => void add(true)} />
+          </View>
+        </View>
+      ) : null}
       {error ? <T variant="small" tone="critical" accessibilityRole="alert">{error}</T> : null}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Button label="Add" icon="check" busy={busy} disabled={!fullName.trim()} onPress={() => void add()} />
+      {duplicate ? null : (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Button label="Add" icon="check" busy={busy} disabled={!fullName.trim()} onPress={() => void add(false)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button label="Cancel" variant="secondary" onPress={onCancel} />
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Button label="Cancel" variant="secondary" onPress={onCancel} />
-        </View>
-      </View>
+      )}
+      {duplicate ? <Button label="Cancel" variant="ghost" onPress={onCancel} disabled={busy} /> : null}
     </View>
   )
 }

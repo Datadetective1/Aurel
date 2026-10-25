@@ -1,10 +1,11 @@
 import * as React from 'react'
-import { Pressable, View } from 'react-native'
+import { Alert, Pressable, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
-import type { PersonResponse } from '@atturel/web/lib/mobile/contracts'
+import type { PersonLifecycleResponse, PersonResponse, PhotoResponse } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_ORDER } from '@atturel/web/lib/visual/relationship-actions'
-import { useApi } from '~/lib/api'
+import { api, ApiError, useApi } from '~/lib/api'
+import { photoForm, pickPhoto } from '~/lib/photo'
 import { useFresh } from '~/lib/use-fresh'
 import { formatTime, relativeDay, firstName } from '~/lib/format'
 import { Avatar } from '~/components/avatar'
@@ -12,7 +13,7 @@ import { Button } from '~/components/button'
 import { Chip, ChipRow, DirectionChip } from '~/components/chip'
 import { CompanyLine, LoopRow, SampleChip, Timeline } from '~/components/relationship'
 import { Notice } from '~/components/notice'
-import { Card, Failure, Loading, Screen, Section } from '~/components/screen'
+import { Card, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -28,7 +29,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 export default function Person() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh, reload } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<PersonResponse>(id ? `/api/mobile/people/${id}` : null)
   const [notice, setNotice] = React.useState<string | null>(null)
   useFresh(reload)
   const changed = (message: string) => {
@@ -49,6 +50,7 @@ export default function Person() {
 
   return (
     <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <View style={{ alignItems: 'center', paddingTop: 4 }}>
         <Avatar name={person.fullName} src={person.src} size={112} />
         <T variant="display" style={{ marginTop: 14, textAlign: 'center' }} accessibilityRole="header">{person.name}</T>
@@ -122,6 +124,11 @@ export default function Person() {
         </Section>
       ) : null}
 
+      <Manage
+        person={{ id: person.id, name: person.name, hasPhoto: Boolean(person.src), editable: Boolean(data.edit) }}
+        onChanged={changed}
+      />
+
       <Section label="Relationship memory" icon="clock">
         {timeline.length > 0 ? (
           <Timeline entries={timeline} timeZone={tz} />
@@ -144,5 +151,107 @@ function Fact({ icon, label, value, detail, muted }: { icon: React.ComponentProp
       <T variant="small" tone={muted ? 'muted' : 'ink'} style={{ marginTop: 6 }}>{value}</T>
       {detail ? <T variant="meta" tone="muted" numberOfLines={1}>{detail}</T> : null}
     </View>
+  )
+}
+
+function problem(e: unknown, fallback: string): string {
+  if (e instanceof ApiError && e.failure.kind === 'offline') return 'You are offline. Nothing changed.'
+  if (e instanceof ApiError && (e.failure.kind === 'server' || e.failure.kind === 'conflict')) return e.failure.message
+  return fallback
+}
+
+/**
+ * Correct the record, set their photo, or remove them. Removing archives:
+ * out of the user's people and every new workflow, history untouched, and
+ * reversible from People › Archived. Deleting is a separate step, there.
+ */
+function Manage({
+  person,
+  onChanged,
+}: {
+  person: { id: string; name: string; hasPhoto: boolean; editable: boolean }
+  onChanged: (message: string) => void
+}) {
+  const [busy, setBusy] = React.useState<'photo' | 'unphoto' | 'remove' | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const first = firstName(person.name)
+
+  const choosePhoto = async () => {
+    setError(null)
+    setBusy('photo')
+    try {
+      const uri = await pickPhoto()
+      if (!uri) return
+      const result = await api.upload<PhotoResponse>(`/api/mobile/people/${person.id}/photo`, photoForm(uri))
+      if (result.ok) onChanged('Photo saved. Visible only to you.')
+      else setError(result.error)
+    } catch (e) {
+      setError(problem(e, 'The photo could not be saved. Try again.'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const clearPhoto = async () => {
+    setError(null)
+    setBusy('unphoto')
+    try {
+      const result = await api.delete<PhotoResponse>(`/api/mobile/people/${person.id}/photo`)
+      if (result.ok) onChanged('Photo removed.')
+      else setError(result.error)
+    } catch (e) {
+      setError(problem(e, 'The photo could not be removed. Try again.'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const archive = async () => {
+    setError(null)
+    setBusy('remove')
+    try {
+      const result = await api.post<PersonLifecycleResponse>(`/api/mobile/people/${person.id}/archive`, {})
+      if (result.ok) router.back()
+      else setError(result.error)
+    } catch (e) {
+      setError(problem(e, 'That did not work. Try again.'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const confirmRemove = () =>
+    Alert.alert(
+      `Remove ${person.name}?`,
+      `${first} leaves your people, search, new meetings, research and reminders. Past conversations and meetings stay as they are, and you can restore ${first} from People › Archived at any time.`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        { text: `Remove ${first}`, style: 'destructive', onPress: () => void archive() },
+      ],
+    )
+
+  return (
+    <Section label="Manage" icon="sliders">
+      <View style={{ gap: 8, alignItems: 'flex-start' }}>
+        {person.editable ? (
+          <Button label="Edit details" icon="edit-2" variant="secondary" onPress={() => router.push({ pathname: '/edit-person/[id]', params: { id: person.id } })} />
+        ) : null}
+        <Button
+          label={person.hasPhoto ? 'Change photo' : 'Add a photo'}
+          icon="image"
+          variant="secondary"
+          busy={busy === 'photo'}
+          disabled={busy !== null && busy !== 'photo'}
+          accessibilityHint="Opens your photo library. Atturel sees only the photo you choose."
+          onPress={() => void choosePhoto()}
+        />
+        {person.hasPhoto ? (
+          <Button label="Remove photo" icon="x" variant="ghost" busy={busy === 'unphoto'} disabled={busy !== null && busy !== 'unphoto'} onPress={() => void clearPhoto()} />
+        ) : null}
+        <Button label="Remove from people" icon="archive" variant="ghost" busy={busy === 'remove'} disabled={busy !== null && busy !== 'remove'} onPress={confirmRemove} />
+      </View>
+      <T variant="meta" tone="muted" style={{ marginTop: 8 }}>Photos are visible only to you. Without one, initials stand in.</T>
+      {error ? <T variant="small" tone="critical" style={{ marginTop: 8 }} accessibilityRole="alert">{error}</T> : null}
+    </Section>
   )
 }

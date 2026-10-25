@@ -15,22 +15,7 @@ import { FormField, Input, Select, Textarea } from '@/components/ui/field'
 import { Eyebrow } from '@/components/ui/primitives'
 import { cn } from '@/lib/utils'
 import { brand } from '@/lib/brand'
-
-const RELATIONSHIP_OPTIONS = [
-  { value: 'manager', label: 'My manager' },
-  { value: 'report', label: 'My direct report' },
-  { value: 'skip_level', label: 'My skip-level' },
-  { value: 'peer', label: 'A peer' },
-  { value: 'cross_functional', label: 'Cross-functional partner' },
-  { value: 'customer', label: 'A customer' },
-  { value: 'prospect', label: 'A prospect' },
-  { value: 'vendor', label: 'A vendor' },
-  { value: 'partner', label: 'A partner' },
-  { value: 'candidate', label: 'A candidate' },
-  { value: 'mentor', label: 'My mentor' },
-  { value: 'external', label: 'External contact' },
-  { value: 'other', label: 'Other' },
-]
+import { RELATIONSHIP_OPTIONS } from '@/lib/people/relationship-options'
 
 export interface PersonDefaults {
   id?: string

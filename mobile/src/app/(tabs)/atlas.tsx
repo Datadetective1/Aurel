@@ -5,9 +5,10 @@ import Feather from '@expo/vector-icons/Feather'
 import type { AtlasResponse } from '@atturel/web/lib/mobile/contracts'
 import type { ConnectionKind } from '@atturel/web/lib/visual/commonality'
 import { useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
 import { firstName, relativeDay } from '~/lib/format'
 import { Avatar } from '~/components/avatar'
-import { Empty, Failure, Loading, Screen, Section } from '~/components/screen'
+import { Empty, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { CompanyLine } from '~/components/relationship'
 import { T } from '~/components/text'
 import { useTheme } from '~/theme'
@@ -33,7 +34,9 @@ const CONNECTION_ICON: Record<ConnectionKind, React.ComponentProps<typeof Feathe
 
 export default function Atlas() {
   const { c } = useTheme()
-  const { data, error, loading, refreshing, refresh } = useApi<AtlasResponse>('/api/mobile/atlas')
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<AtlasResponse>('/api/mobile/atlas')
+  // Someone added, removed or met since the last visit shows on return.
+  useFresh(reload)
 
   if (loading) return <Screen><Loading /></Screen>
   if (error || !data) return <Screen onRefresh={refresh}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
@@ -53,6 +56,7 @@ export default function Atlas() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <T variant="display" accessibilityRole="header">Atlas</T>
       <T variant="small" tone="secondary" style={{ marginTop: 6 }}>Who you know, where, and what connects them — only what your record holds.</T>
 

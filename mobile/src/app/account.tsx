@@ -1,12 +1,24 @@
 import * as React from 'react'
-import { Alert, Linking, TextInput, View } from 'react-native'
+import { Alert, Linking, Switch, TextInput, View } from 'react-native'
+import { router } from 'expo-router'
 import * as Application from 'expo-application'
+import * as Sharing from 'expo-sharing'
+import { File, Paths } from 'expo-file-system'
 import Feather from '@expo/vector-icons/Feather'
-import type { AccountResponse, RedeemAccessResponse, SampleDataResponse } from '@atturel/web/lib/mobile/contracts'
+import type {
+  AccountResponse,
+  CalendarConnection,
+  ExportResponse,
+  PreferencesResponse,
+  RedeemAccessResponse,
+  SampleDataResponse,
+} from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
+import { useFresh } from '~/lib/use-fresh'
+import { formatDate } from '~/lib/format'
 import { useAuth } from '~/lib/auth'
 import { config } from '~/lib/config'
-import { Failure, Loading, Screen, Section, Card } from '~/components/screen'
+import { Failure, Loading, Screen, Section, Card, StaleNote } from '~/components/screen'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { TOUCH, useTheme } from '~/theme'
@@ -29,12 +41,14 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 export default function Account() {
   const { c } = useTheme()
   const { signOut } = useAuth()
-  const { data, error, loading, refresh } = useApi<AccountResponse>('/api/mobile/account')
+  const { data, error, stale, loading, refreshing, refresh, reload } = useApi<AccountResponse>('/api/mobile/account')
   const [confirming, setConfirming] = React.useState(false)
+  // Back from the profile editor, or from the web: show what is current.
+  useFresh(reload)
 
   if (loading) return <Screen topInset={false}><Loading /></Screen>
   if (error || !data) {
-    return <Screen topInset={false}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
+    return <Screen topInset={false} onRefresh={refresh}>{error ? <Failure failure={error} onRetry={refresh} /> : null}</Screen>
   }
 
   const billingLine =
@@ -47,7 +61,8 @@ export default function Account() {
           : 'Nothing is billed.'
 
   return (
-    <Screen topInset={false}>
+    <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
+      <StaleNote failure={stale} />
       <Card>
         <T variant="title" accessibilityRole="header">{data.name}</T>
         {data.email ? <T variant="small" tone="secondary" style={{ marginTop: 2 }}>{data.email}</T> : null}
@@ -56,16 +71,25 @@ export default function Account() {
           <T variant="small">{data.planLabel}</T>
         </View>
         <T variant="meta" tone="muted" style={{ marginTop: 4 }}>{billingLine}</T>
+        <View style={{ marginTop: 14, alignItems: 'flex-start' }}>
+          <Button label="Edit profile" icon="user" variant="secondary" onPress={() => router.push('/profile')} />
+        </View>
       </Card>
 
-      <Section label="Privacy and terms" icon="shield">
-        <LinkRow icon="lock" label="Privacy" onPress={() => void Linking.openURL(data.legal.privacyUrl)} />
-        <LinkRow icon="file-text" label="Terms" onPress={() => void Linking.openURL(data.legal.termsUrl)} />
+      <Notifications />
+
+      {data.calendar ? <Calendar connections={data.calendar.connections} /> : null}
+
+      <PrivacyAndData />
+
+      <Section label="Help" icon="help-circle">
         <LinkRow
           icon="mail"
           label={`Contact ${data.legal.supportEmail}`}
           onPress={() => void Linking.openURL(`mailto:${data.legal.supportEmail}`)}
         />
+        <LinkRow icon="lock" label="Privacy" onPress={() => void Linking.openURL(data.legal.privacyUrl)} />
+        <LinkRow icon="file-text" label="Terms" onPress={() => void Linking.openURL(data.legal.termsUrl)} />
       </Section>
 
       {data.planLabel === 'Free' ? <PilotCode onRedeemed={refresh} /> : null}
@@ -100,6 +124,160 @@ export default function Account() {
           .join(' · ')}
       </T>
     </Screen>
+  )
+}
+
+/**
+ * Which emails Atturel sends. The delivery hour is not offered yet: it waits
+ * on the daily schedule's fix (audit finding 3.4).
+ */
+function Notifications() {
+  const { data, error, reload } = useApi<PreferencesResponse>('/api/mobile/preferences')
+  const [shown, setShown] = React.useState<PreferencesResponse | null>(null)
+  const [message, setMessage] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    if (data) setShown(data)
+  }, [data])
+
+  const change = async (key: keyof PreferencesResponse, value: boolean) => {
+    if (!shown) return
+    const before = shown
+    setShown({ ...shown, [key]: value })
+    setMessage(null)
+    try {
+      setShown(await api.patch<PreferencesResponse>('/api/mobile/preferences', { [key]: value }))
+    } catch (e) {
+      setShown(before)
+      setMessage(e instanceof ApiError && e.failure.kind === 'offline' ? 'You are offline. Nothing changed.' : 'That could not be changed. Try again.')
+    }
+  }
+
+  return (
+    <Section label="Notifications" icon="bell">
+      {shown ? (
+        <View style={{ gap: 4 }}>
+          <Toggle
+            label="Useful Atturel email"
+            detail="The daily follow-through below. Never marketing. Plan, billing and security notices are always sent, because they are about your account."
+            value={shown.emailNotifications}
+            onChange={(v) => void change('emailNotifications', v)}
+          />
+          <Toggle
+            label="Daily follow-through"
+            detail="One short email on days something you confirmed is due, overdue, or waiting on someone."
+            value={shown.emailNotifications && shown.followThroughEmail}
+            disabled={!shown.emailNotifications}
+            onChange={(v) => void change('followThroughEmail', v)}
+          />
+        </View>
+      ) : error ? (
+        <View style={{ alignItems: 'flex-start' }}>
+          <T variant="small" tone="secondary">Your email settings could not be loaded.</T>
+          <Button label="Try again" variant="ghost" onPress={() => void reload()} />
+        </View>
+      ) : (
+        <Loading label="Loading email settings" />
+      )}
+      {message ? <T variant="small" tone="critical" style={{ marginTop: 6 }} accessibilityRole="alert">{message}</T> : null}
+    </Section>
+  )
+}
+
+function Toggle({
+  label,
+  detail,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string
+  detail: string
+  value: boolean
+  onChange: (v: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: TOUCH, paddingVertical: 6, opacity: disabled ? 0.5 : 1 }}>
+      <View style={{ flex: 1 }}>
+        <T variant="small">{label}</T>
+        <T variant="meta" tone="muted">{detail}</T>
+      </View>
+      <Switch value={value} disabled={disabled} onValueChange={onChange} accessibilityLabel={label} accessibilityHint={detail} />
+    </View>
+  )
+}
+
+const PROVIDER: Record<string, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
+
+/** Connected calendars, read-only: connecting and disconnecting are on the web. */
+function Calendar({ connections }: { connections: CalendarConnection[] }) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return (
+    <Section label="Calendar" icon="calendar">
+      {connections.length === 0 ? (
+        <T variant="small" tone="secondary">No calendar connected. Connect one from Settings › Calendar at atturel.com, read-only.</T>
+      ) : (
+        <View style={{ gap: 10 }}>
+          {connections.map((c) => (
+            <View key={`${c.provider}-${c.accountEmail ?? ''}`}>
+              <T variant="small">{PROVIDER[c.provider] ?? c.provider}{c.accountEmail ? ` · ${c.accountEmail}` : ''}</T>
+              <T variant="meta" tone="muted">
+                {[c.status === 'active' ? 'Connected' : c.status.replace(/_/g, ' '), c.lastSyncedAt ? `last synced ${formatDate(c.lastSyncedAt, tz)}` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </T>
+            </View>
+          ))}
+          <T variant="meta" tone="muted">Read-only. Atturel never creates, edits or answers anything. Manage it at atturel.com.</T>
+        </View>
+      )}
+    </Section>
+  )
+}
+
+/**
+ * What is kept, and a copy of all of it. The export is the web's own
+ * Privacy & data export: one JSON file, handed to the share sheet to save to
+ * Files or send on. It is written to the app's cache only for that moment.
+ */
+function PrivacyAndData() {
+  const [busy, setBusy] = React.useState(false)
+  const [message, setMessage] = React.useState<string | null>(null)
+  const exportData = async () => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = await api.get<ExportResponse>('/api/mobile/export')
+      if (!result.ok) {
+        setMessage(result.error)
+        return
+      }
+      const day = new Date().toISOString().slice(0, 10)
+      const file = new File(Paths.cache, `atturel-export-${day}.json`)
+      if (file.exists) file.delete()
+      file.create()
+      file.write(result.json)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Your Atturel data' })
+      } else {
+        setMessage('Sharing is not available on this device. Export from Settings › Privacy & data at atturel.com.')
+      }
+    } catch (e) {
+      setMessage(e instanceof ApiError && e.failure.kind === 'offline' ? 'You are offline.' : 'Your data could not be exported. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section label="Privacy and data" icon="shield">
+      <T variant="small" tone="secondary">
+        Atturel keeps the people you add, the conversations and loops you keep, your meetings and briefs, and your settings. Atturel does not keep audio: it is used only to make the transcript. The Privacy page says how the transcription provider handles it.
+      </T>
+      <View style={{ marginTop: 12, alignItems: 'flex-start' }}>
+        <Button label="Export my data" icon="download" variant="secondary" busy={busy} onPress={() => void exportData()} />
+      </View>
+      {message ? <T variant="small" tone="secondary" style={{ marginTop: 8 }} accessibilityLiveRegion="polite">{message}</T> : null}
+    </Section>
   )
 }
 

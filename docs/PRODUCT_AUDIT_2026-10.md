@@ -25,9 +25,10 @@ _Updated 25 October 2026._
   - **One test is NOT VERIFIED:** whether an unsent recording survives an update from the previous TestFlight build. It is part of the next release validation (§1.4).
 - **Phase 2 (Essential controls): plan and decisions approved 25 Oct 2026 (§5).**
   - **2A (people controls, server + web): approved by the owner on 25 Oct 2026 and merged (PR #18).** The owner's clarification on archived people in history and in briefs was verified and corrected before merging (§5, "2A results").
-  - **Next: 2C + 2B (iOS).** Then one TestFlight build, published only after the owner reviews the results. The release checklist (§1.4) keeps the unverified update-survival test.
+  - **2C + 2B (iOS): approved by the owner on 25 Oct 2026 and merged (PR #19).** The owner then approved one TestFlight build for internal testing only. Its real-device checks are §1.4, including the unverified update-survival test.
 - Owner decisions on discovery, removal, billing, notifications and privacy are recorded in §4.
-- **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. Scheduled for Phase 3.
+- **New product-intelligence finding** (§2, 8.7): a proposed action is sometimes read as a confirmed decision. **A Phase 3 priority.**
+- **Atturel is not launch-ready.** Do not describe it as fully launch-ready until finding 8.7 is fixed and validated (owner, 25 Oct 2026).
 
 ---
 
@@ -122,15 +123,26 @@ The simulator test of a real reinstall-over-the-top update passed (§1.1, scenar
 
 ### 1.4 Release validation checklist (every TestFlight build)
 
-Carry these forward until each has passed on a physical iPhone:
+**Every item is a real-device check.** It passes only on a physical iPhone running the TestFlight build. A simulator run does not count. Carry each item forward until it has passed.
 
-1. **Unsent recording across an update.** Not yet verified.
-   - Before installing the new build, record something and do not send it. Close the app.
-   - Install the update from TestFlight and open the app.
-   - Today and Capture should offer the recording back. Understand it should then send it once.
-2. Live recording of about 30 seconds, then Understand it, Review, Keep. The commitments should appear on Today and in the person's timeline, once.
-3. Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
-4. Any checks added by the phase being shipped.
+1. **Real device: an unsent recording survives an update.** NOT VERIFIED.
+   - On the build installed now, record a short test and leave it unsent. Close the app.
+   - Update to the new build through TestFlight. **Do not delete or reinstall the app.**
+   - Open the app. Today and Capture offer the recording back.
+   - Send it with Understand it. It is sent once, then opens in Review, where it can be reviewed and kept.
+2. **Real device: live recording, a real photo, and export.**
+   - Record about 30 seconds, then Understand it, Review, Keep. The commitments appear on Today and in the person's timeline, once.
+   - On a person's page, add a photo from the real photo library through the system picker. There is no permission prompt, and the photo appears.
+   - Account › Privacy and data › Export my data. The iOS share sheet offers the JSON file, and Save to Files works.
+3. **Real device: Ask opened with a prefilled question.**
+   - On a person's page, tap **Ask**. The question "What should I know about …?" is filled in, and asking it gives an answer.
+   - A later visit from the Ask tab starts with an empty field.
+4. **Real device: Open Settings, and microphone access restored.**
+   - Turn microphone access off (Settings › Atturel › Microphone).
+   - In Capture, Start recording shows "Microphone access is off". **Open Settings** lands on Atturel's own page, not Settings' main page. On the simulator it opened the main page.
+   - Turn Microphone back on and return to Atturel. Start recording now records.
+5. **Real device: offline.** Airplane mode, then Understand it: "could not be reached", and the recording is kept. Back online, Try again sends it once.
+6. Any checks added by the phase being shipped.
 
 ---
 
@@ -447,6 +459,58 @@ Live evidence on the preview (QA account A):
 6. Microphone denied: an **Open Settings** button.
 7. Remove the empty file a failed microphone start leaves behind.
 8. Pull-to-refresh on Account and Review; refresh on focus for Atlas and Account.
+
+**2C + 2B status (25 Oct 2026, draft PR #19, not merged)**
+
+Built as planned. There is no server or schema change; the only web change moves the relationship list into a shared module.
+
+New native modules, which need the next build:
+
+- `expo-image-picker`, for the system photo picker;
+- `expo-image-manipulator`, which resizes photos to JPEG on the phone, longest side at most 1024 px;
+- `expo-sharing`, for the data export.
+
+Photos and permissions:
+
+- The app never requests photo-library or camera access (D3).
+- iOS still requires purpose strings, because the picker library contains those APIs. Ours say plainly that no library or camera access is used.
+- The privacy manifest now declares photos.
+- **Before a public release**, App Store Connect's privacy details must add "Photos".
+
+Automated checks:
+
+- iOS: 85 jest tests pass, 29 of them new (14 for 2C, 15 for 2B). `tsc` is clean. The 2C tests fail against the old code.
+- Web: 1004/1004 pass, `tsc` is clean, lint shows 0 errors.
+
+**Simulator results (25 Oct 2026).** EAS simulator build `0165d1ed` of commit `6bf0cef`, iPhone 18 Pro simulator, production backend, QA account A. No TestFlight build until the owner reviews.
+
+| Check                                                                                                                                                     | Result                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Built `Info.plist`: photo and camera purpose strings present, microphone string unchanged                                                                 | **Pass**                                                                                                                              |
+| Sign in; Today shows the upcoming "QA archived brief check" with Marcus only (Quinn is archived)                                                          | **Pass**                                                                                                                              |
+| People shows "Archived, 2 people"; the Archived list shows both with Restore                                                                              | **Pass**                                                                                                                              |
+| Delete preview for Quinn: deleted (record, 1 thing noted); kept but unlinked (1 loop, 2 meetings, 1 conversation); the flagged loop, with Edit and Delete | **Pass**                                                                                                                              |
+| Delete needs the confirmation switch; cancelling deletes nothing                                                                                          | **Pass**                                                                                                                              |
+| Restore within the limit: "QA is back in your people."                                                                                                    | **Pass**                                                                                                                              |
+| Restore at the Free limit: refused, in plain words                                                                                                        | **Pass**: "Your plan holds as many people as it includes. Archive someone else to make room."                                         |
+| Edit details: company, relationship, pronouns, time zone (Europe/Lisbon)                                                                                  | **Pass**: saved, confirmed in the database; "It is 2:19 AM on Sunday there" shown                                                     |
+| Person photo through the system picker                                                                                                                    | **Pass**: iOS showed "Private Access to Photos" and no permission prompt; stored 1024×768 JPEG (412 KB) at `<uid>/people/<id>.jpg`    |
+| Remove photo; "Remove from people" with its confirmation                                                                                                  | **Pass**: archived, back on People with "Archived, 2 people"                                                                          |
+| Add someone who already exists                                                                                                                            | **Pass**: "You already have Marcus Lee (Northwind QA). Same name." with Open                                                          |
+| Meeting: archived attendee marked "Archived"; tapping opens the archived page                                                                             | **Pass**                                                                                                                              |
+| Account: Plan (Free, read-only), Edit profile, Notifications, Calendar ("No calendar connected"), Privacy and data, Help                                  | **Pass**                                                                                                                              |
+| Notification switch saves (follow-through off, then back on)                                                                                              | **Pass**: confirmed in the database, restored to on                                                                                   |
+| Export my data                                                                                                                                            | **Pass**: share sheet with "atturel-export-2026-10-25", JSON, 65 KB, and Save to Files                                                |
+| Profile: time zone shown as "New York — GMT−04:00"; own photo upload                                                                                      | **Pass**: 684×1024 JPEG, 195 kB                                                                                                       |
+| Location removed from photos                                                                                                                              | **Pass**: the source photo carried Lisbon GPS (38°43′N 9°8′W); the uploaded copy has no GPS fields (`exiftool -GPS:all` empty)        |
+| Microphone off: message and **Open Settings**                                                                                                             | **Pass**: "Microphone access is off. Turn it on in Settings › Atturel › Microphone, or type notes instead." The button opens Settings |
+| Atturel's page in iOS Settings                                                                                                                            | **Pass**: Microphone, Siri, Search, Cellular Data. **No Photos or Camera entry**, so the app never asked for either                   |
+
+Limitations:
+
+- On the simulator, **Open Settings** opened the main Settings page rather than Atturel's own page. On a physical iPhone, iOS normally opens the app's page. This goes on the next TestFlight checklist (§1.4).
+- Not run on the simulator: Ask opened with a question. Three jest tests cover it, added after the run; two of them fail against the old code.
+- Test data was restored afterwards: own photo removed, no avatar files left for QA account A, both email switches on. QA Person Three stays archived with the edited fields. QA accounts A and B are kept until the owner approves deleting them.
 
 **Order and testing**
 
