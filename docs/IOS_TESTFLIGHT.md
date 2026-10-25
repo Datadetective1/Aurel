@@ -190,31 +190,47 @@ public link, no build yet); the test information (description, feedback email
 `support@atturel.com`, marketing URL, privacy policy URL); and What to Test on
 build 5.
 
-**Your step: the review contact.** Apple accepts no change to the Beta App
-Review details without it. App Store Connect → Apps → Atturel → TestFlight →
-Test Information → **Beta App Review Information**: enter your first name,
-last name, phone and email, and save. Then `prepare` runs again and sets:
+**Your two steps.**
+
+1. **The review contact.** Apple accepts no change to the Beta App Review
+   details without it. App Store Connect → Apps → Atturel → TestFlight → Test
+   Information → **Beta App Review Information**: enter your first name, last
+   name, phone and email, and save.
+2. **A Supabase secret key for the workflow.** Supabase → project Aurel →
+   Project Settings → API Keys → Secret keys → **Add new secret key**, named
+   `github-testflight`, and copy it. GitHub → Datadetective1/Aurel → Settings
+   → Secrets and variables → Actions → **New repository secret**: name
+   `SUPABASE_SECRET_KEY`, paste the key, and save. It goes nowhere else, and
+   you can revoke it on its own in Supabase.
+
+Then `prepare` runs again and sets:
 
 - **Sign-in required**, user name `appreview@atturel.com`, and the password.
-  The password is generated inside the workflow and sent only to App Store
-  Connect, which keeps it and shows it to Apple; you can read it on that page.
-  Only its bcrypt hash is logged, to set the reviewer account's database row.
-  To replace it, run `prepare` with **rotate demo password**. Optionally, make
-  `appreview@atturel.com` a Cloudflare Email Routing address for atturel.com
-  that forwards to you, so **Forgot your password?** on www.atturel.com also
-  works.
+  The password is generated inside the workflow, set on the reviewer's Atturel
+  account through Supabase Auth's admin API, then stored in App Store Connect,
+  which keeps it for Apple; you can read it on that page. The run then signs in
+  with App Store Connect's copy to prove it works. No password, hash or key is
+  printed. To replace the password, run `prepare` with **rotate demo
+  password**. Optionally, make `appreview@atturel.com` a Cloudflare Email
+  Routing address for atturel.com that forwards to you, so **Forgot your
+  password?** on www.atturel.com also works.
 - **Review notes**, describing the plans as they are: Free, and Pro at $29 a
   month, bought only on the website. The app has no in-app purchases, prices,
   upgrade buttons or purchase links; Account only displays the plan, and Free
-  accounts see an "Invitation code" field. The notes give the paths to try.
+  accounts see an "Invitation code" field. They disclose the reviewer's Full
+  access, say how audio is handled, and give the paths to try.
 
-**Reviewer access: Pro, not hidden.** The account (created 25 Oct 2026:
-onboarded, sample record loaded, emails off) is given Atturel's standard
-14-day Pro trial, without payment, just before submission, so Apple can review
-every paid feature. `submit` refuses to run unless the account signs in with
-the App Store Connect password and reads Pro. Being on Free or Pro settles
-nothing about Apple's payment rules: that question stays open for the App
-Store (IOS_READINESS.md §5, item 1).
+**Reviewer access: Full access, disclosed.** The account (created 25 Oct 2026:
+onboarded, sample record loaded, emails off) has Atturel's existing **Full
+access** tier, granted with `public.set_access_tier` (owner, 25 Oct 2026). It
+has every Pro feature and no monthly limits, does not expire during review, and
+involves no trial and no purchase. The app shows "Full access" and "Included
+with your access. Nothing is billed.", and the review notes say so. `submit`
+refuses unless the account signs in with the App Store Connect password and
+reads Full access. When review access is no longer needed, revoke it:
+`select public.set_access_tier('appreview@atturel.com', 'standard');`. Neither
+Free nor Full access settles Apple's payment rules: that question stays open
+for the App Store (IOS_READINESS.md §5, item 1).
 
 **Before submitting:** the policy corrections are approved and published
 (their own draft PR), and the core real-device checks on build 5 have passed

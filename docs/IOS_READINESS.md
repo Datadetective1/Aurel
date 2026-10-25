@@ -102,16 +102,16 @@ Delete Account route. The deletion workflow kept its one minimal audit row in
 
 ## 4. Apple compliance audit (checked against the live guidelines)
 
-| Area                              | Status                                                                                                                  |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Bundle id, signing                | `com.atturel.app`; certificates and profiles are created by EAS on the first build                                      |
-| Microphone permission             | Purpose string present and accurate; foreground only; no `UIBackgroundModes`                                            |
-| Privacy manifest                  | `PrivacyInfo.xcprivacy` generated from `ios.privacyManifests`; no tracking                                              |
-| Account deletion (5.1.1(v))       | In the app: Account › Delete account, typed confirmation, billing stopped first                                         |
-| Sign in with Apple (4.8)          | **Not required**: the app uses only Atturel's own email-and-password accounts                                           |
-| Encryption export compliance      | `ITSAppUsesNonExemptEncryption = false` (HTTPS only)                                                                    |
-| Demo account for review (2.1)     | `appreview@atturel.com`: Pro via the standard 14-day trial at submission, sample data, emails off; IOS_TESTFLIGHT.md §6 |
-| In-app purchase (3.1.1, 3.1.3(b)) | **Owner decision before App Store submission** — see §5                                                                 |
+| Area                              | Status                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Bundle id, signing                | `com.atturel.app`; certificates and profiles are created by EAS on the first build                                 |
+| Microphone permission             | Purpose string present and accurate; foreground only; no `UIBackgroundModes`                                       |
+| Privacy manifest                  | `PrivacyInfo.xcprivacy` generated from `ios.privacyManifests`; no tracking                                         |
+| Account deletion (5.1.1(v))       | In the app: Account › Delete account, typed confirmation, billing stopped first                                    |
+| Sign in with Apple (4.8)          | **Not required**: the app uses only Atturel's own email-and-password accounts                                      |
+| Encryption export compliance      | `ITSAppUsesNonExemptEncryption = false` (HTTPS only)                                                               |
+| Demo account for review (2.1)     | `appreview@atturel.com`: Full access (`set_access_tier`, revocable), sample data, emails off; IOS_TESTFLIGHT.md §6 |
+| In-app purchase (3.1.1, 3.1.3(b)) | **Owner decision before App Store submission** — see §5                                                            |
 
 ### App Privacy answers for App Store Connect (draft, for you to confirm)
 
