@@ -404,7 +404,8 @@ export async function deletePersonRecord(
     await supabase.storage.from(AVATAR_BUCKET).remove([person.avatar_path])
   }
 
-  return { ok: true, keptLoops: loopIds.length + ownedLoopIds.length, removedSources }
+  // A loop can name them as both its person and its owner: count it once.
+  return { ok: true, keptLoops: new Set([...loopIds, ...ownedLoopIds]).size, removedSources }
 }
 
 export interface PossibleDuplicate {
