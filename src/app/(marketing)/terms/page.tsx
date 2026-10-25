@@ -90,11 +90,19 @@ export default function TermsPage() {
           <p>
             Your records remain yours. You grant {brand.legalEntity} only the permission needed to
             operate the service for you — storing, processing and displaying your content back to
-            you. It is not used to train shared models and is not sold or shared.
+            you. It is not used to train shared models, it is never sold, and it is shared only with
+            the service providers that run {brand.name}, each named in the Privacy policy.
           </p>
         </Section>
 
         <Section title="Payment">
+          <p>
+            Pro can start with a 14-day trial, once per account, with no card. When the trial ends,
+            the account returns to Free unless you subscribe, and nothing is deleted. If you
+            subscribe during the trial, Settings &rarr; Plan shows the first charge date before you
+            confirm: the day the trial would have ended, or two days after you subscribe if that is
+            later.
+          </p>
           <p>
             Pro is billed monthly, in advance, through our payment processor; we never see or store
             your card number. You can cancel at any time from Settings &rarr; Plan and keep access

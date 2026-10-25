@@ -96,7 +96,7 @@ export const brand = {
     entityAddress: null as string | null,
     jurisdiction: null as string | null,
     /** Year the policies were last reviewed by a human. */
-    policiesLastUpdated: '2026-08-24',
+    policiesLastUpdated: '2026-10-25',
     /** Set true only after a lawyer has reviewed Terms + Privacy. */
     policiesLegallyReviewed: false,
   },

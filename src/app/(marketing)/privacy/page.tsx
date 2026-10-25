@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { CircleAlert } from 'lucide-react'
 import { Container, Eyebrow } from '@/components/ui/primitives'
 import { brand } from '@/lib/brand'
+import { providerConfigured } from '@/lib/calendar/provider'
+import { features } from '@/lib/env'
 
 export const metadata: Metadata = {
   title: 'Privacy',
@@ -172,11 +174,12 @@ export default function PrivacyPage() {
             When you record a conversation or a voice note, the audio is sent through {brand.name}{' '}
             to OpenAI&rsquo;s speech-to-text service to be turned into words. {brand.name} does not
             keep the audio: it passes through our servers for the length of that request and is
-            never written to your record or our database. If a long recording is uploaded in parts,
-            each part waits in private, temporary storage that only {brand.name}&rsquo;s servers can
-            read, is deleted as soon as it has been transcribed, and anything left behind is removed
-            within about a day. On your iPhone, a recording stays in the app&rsquo;s private storage
-            until the conversation is kept or you discard it.
+            never written to your record or our database.{' '}
+            {features.captureStorage
+              ? `If a long recording is uploaded in parts, each part waits in private, temporary storage that only ${brand.name}’s servers can read, is deleted as soon as it has been transcribed, and anything left behind is removed within about a day.`
+              : 'If a long recording is sent in parts, each part is transcribed as it arrives and is not stored.'}{' '}
+            On your iPhone, a recording stays in the app&rsquo;s private storage until the
+            conversation is kept or you discard it.
           </p>
           <p>
             OpenAI handles the audio under its own published API data policy. That policy currently
@@ -230,6 +233,9 @@ export default function PrivacyPage() {
             <li className="list-disc">Stripe — payments</li>
             <li className="list-disc">
               Google and Microsoft — reading your calendar, only if you connect one
+              {providerConfigured('google')
+                ? `. ${brand.name}’s use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.`
+                : ''}
             </li>
           </ul>
         </Section>
