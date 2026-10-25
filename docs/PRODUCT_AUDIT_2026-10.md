@@ -1184,31 +1184,29 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 
 ### External TestFlight (prepared 25 Oct 2026, not submitted)
 
-_The owner asked for this to be prepared in parallel, with no beta review submission and no new build._
+_Owner-authorized for build 0.1.0 (5): prepare now; submit for beta review once the policy corrections are approved and the core device checks pass; turn on a 10-tester public link after approval. No new build._
 
 - **Build 0.1.0 (5) is eligible.** The read-only TestFlight status workflow (run #4) reports:
   - processed (`VALID`) and in internal testing;
   - `READY_FOR_BETA_SUBMISSION` for external testing;
   - export compliance answered, with no non-exempt encryption;
   - it expires on 23 Jan 2027.
-- **Still missing in App Store Connect** (owner steps, `docs/IOS_TESTFLIGHT.md` §6):
-  - an external group;
-  - the test information (description, feedback email, privacy policy URL);
-  - the Beta App Review information (contact, sign-in, notes);
-  - What to Test for the build.
 - **A new build is not necessary.** The only app change since build 5 (`ea84289`) is PR #26's Account screen: a trial billing line, and the invitation-code field shown to trial users.
   - On build 5, a trial account still reads "Pro trial · ends …" from the server. Its billing line falls back to "Nothing is billed", which is true of the trial.
-  - Build 5 not showing the code field to trial users matches the owner's no-codes default.
   - Everything else testers use runs on the server, which is already live.
-  - A new build is needed only for a fix the real-device checks turn up, or before 23 Jan 2027.
-- **Reviewer account:** `appreview@atturel.com` (user `a4fa330a-…`), created 25 Oct 2026.
-  - Onboarded, in America/Los_Angeles, on Free, with no trial, no code and no Stripe customer. Atturel's emails are switched off.
-  - The sample record is loaded: 5 invented people, and "Q3 capacity review" on Today. The Atlas answers `plan_required`, which the app shows as "Not part of your current plan" with no purchase prompt.
-  - Its first password is random, held outside the repository and never printed. The owner sets their own with "Forgot your password?" once `appreview@atturel.com` routes to them (Cloudflare Email Routing), and enters it only in App Store Connect.
-  - Free, not a trial or a code: the app then unlocks nothing obtained outside the App Store, which avoids the 3.1.1 / 3.1.3(b) question (IOS_READINESS.md §5, item 1). No account gets ongoing pilot access (owner, 25 Oct 2026).
-- **Before submitting (owner):**
-  - the build 5 real-device checks (§1.4) have passed;
-  - the Terms and Privacy pages no longer say "Draft". They still do on production (IOS_READINESS.md §5, item 4).
+  - A new build is needed only for a fix the device checks turn up, or before 23 Jan 2027.
+- **Set in App Store Connect (25 Oct 2026, `prepare`, PR #29's workflow step):**
+  - the external group **Atturel Pilot** (no public link, no build yet);
+  - the test information: description, feedback email, marketing URL, privacy policy URL;
+  - What to Test on build 5.
+- **Not yet set: the Beta App Review details.** Apple refused the change (409) without a contact phone, so nothing in that section was saved. The owner enters the contact (name, phone, email); `prepare` then sets sign-in, the password and the notes.
+- **Reviewer account:** `appreview@atturel.com` (user `a4fa330a-…`), created 25 Oct 2026. Onboarded, sample record loaded (5 invented people, "Q3 capacity review" on Today), Atturel's emails off.
+  - **Access:** Atturel's standard 14-day Pro trial, without payment, started just before submission, so Apple reviews every paid feature. `submit` refuses unless the account reads Pro.
+  - **Correction (owner, 25 Oct 2026):** an earlier draft kept the reviewer on Free on the grounds that it avoided the payment-rule question. It does not: Free or Pro settles nothing about guidelines 3.1.1 and 3.1.3(b), and hiding paid features from review is wrong. The review notes instead describe the model accurately: Free, and Pro at $29 a month bought only on the website; no in-app purchases, prices, upgrade buttons or purchase links in the app; Account only displays the plan; and Free accounts see an "Invitation code" field.
+  - **Password:** generated inside the workflow and sent only to App Store Connect, which keeps it durably and shows it to Apple and the owner. Only its bcrypt hash is logged, to set the database row. The first, temporary password from the session's scratch space is replaced and was never printed. Optional recovery: a Cloudflare Email Routing address for `appreview@atturel.com`, then "Forgot your password?".
+- **Before submitting:**
+  - the policy corrections are approved and published (their own draft PR);
+  - the core build 5 device checks (§1.4) pass, reported by the owner.
 - **Testers' access:** the standard 14-day Pro trial from the website, then $29 a month. No invitation codes by default.
 
 **Phase 3 — Connected experience.** See §3. It covers onboarding honesty and reliability, calendar next steps, emails, research recovery, Prepare without padding, Ask with next actions, editing confirmed loops, iOS memory review, and one definition of Today.

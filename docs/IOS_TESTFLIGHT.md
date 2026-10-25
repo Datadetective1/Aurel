@@ -179,60 +179,52 @@ Answer EAS's questions yourself, in the terminal:
 
 ## 6. Early testers outside your team (external testing, Apple beta review)
 
-**Prepared 25 Oct 2026, not submitted.** Build 0.1.0 (5) is eligible: Apple
-reports it `READY_FOR_BETA_SUBMISSION`, export compliance answered, expiring
-23 Jan 2027. No new build is needed (audit §5, "External TestFlight"). The
-**TestFlight status** workflow reports what is still missing, without printing
-any contact details or the demo password.
+**Build 0.1.0 (5), no new build.** Apple reports it `READY_FOR_BETA_SUBMISSION`,
+export compliance answered, expiring 23 Jan 2027 (audit §5, "External
+TestFlight"). The steps run from the **TestFlight status** workflow's
+**External action** (PR #29), so the App Store Connect key never leaves GitHub.
+Nothing secret is printed.
 
-**Before you submit:**
+**Done (25 Oct 2026, `prepare`):** the external group **Atturel Pilot** (no
+public link, no build yet); the test information (description, feedback email
+`support@atturel.com`, marketing URL, privacy policy URL); and What to Test on
+build 5.
 
-- the real-device checks on the build you submit have passed (audit §1.4);
-- the Terms and Privacy pages no longer say "Draft" (IOS_READINESS.md §5,
-  item 4).
+**Your step: the review contact.** Apple accepts no change to the Beta App
+Review details without it. App Store Connect → Apps → Atturel → TestFlight →
+Test Information → **Beta App Review Information**: enter your first name,
+last name, phone and email, and save. Then `prepare` runs again and sets:
 
-1. **Group.** TestFlight → **External Testing** → **+** → `Early testers`.
-2. **Test Information** (TestFlight → Test Information, once per app):
-   - beta app description: "Atturel prepares you for important conversations
-     and keeps track of what was agreed. Add the people you meet, read a short
-     brief before a meeting, and capture what happened afterwards. Atturel
-     finds the decisions and commitments and asks before keeping any of them.";
-   - feedback email: `support@atturel.com`;
-   - marketing URL: `https://www.atturel.com`;
-   - privacy policy URL: `https://www.atturel.com/privacy`.
-3. **Beta App Review Information** (same page):
-   - contact name, email and phone: yours;
-   - **Sign-in required**: on. User name `appreview@atturel.com`.
-   - **Password: set it yourself.** In Cloudflare, add `appreview@atturel.com`
-     as an Email Routing address for atturel.com that forwards to you. Then
-     use **Forgot your password?** on www.atturel.com and type the new password
-     straight into App Store Connect. It never goes in chat, the repository or
-     an email.
-   - review notes: "Sign in with the account provided. It is on the Free plan
-     and holds an invented sample record; every sample person is labelled
-     'Sample · invented'. Try: Today → Q3 capacity review → Prepare now
-     (Free includes 3 briefs a month); People → a person; Capture → record or
-     type a short note → Understand it → Keep. Recording needs microphone
-     access and is used only to make a transcript; audio is not kept. The app
-     sells nothing: plans are managed on the website. Account → Delete account
-     deletes the account."
+- **Sign-in required**, user name `appreview@atturel.com`, and the password.
+  The password is generated inside the workflow and sent only to App Store
+  Connect, which keeps it and shows it to Apple; you can read it on that page.
+  Only its bcrypt hash is logged, to set the reviewer account's database row.
+  To replace it, run `prepare` with **rotate demo password**. Optionally, make
+  `appreview@atturel.com` a Cloudflare Email Routing address for atturel.com
+  that forwards to you, so **Forgot your password?** on www.atturel.com also
+  works.
+- **Review notes**, describing the plans as they are: Free, and Pro at $29 a
+  month, bought only on the website. The app has no in-app purchases, prices,
+  upgrade buttons or purchase links; Account only displays the plan, and Free
+  accounts see an "Invitation code" field. The notes give the paths to try.
 
-   The account (created 25 Oct 2026) is onboarded, on Free, with the sample
-   record loaded and Atturel's emails switched off. It has no invitation code
-   and no trial: the app unlocks nothing, so it raises no in-app purchase
-   question (IOS_READINESS.md §5, item 1). Its Atlas tab says "Not part of
-   your current plan". Never use your own account here.
+**Reviewer access: Pro, not hidden.** The account (created 25 Oct 2026:
+onboarded, sample record loaded, emails off) is given Atturel's standard
+14-day Pro trial, without payment, just before submission, so Apple can review
+every paid feature. `submit` refuses to run unless the account signs in with
+the App Store Connect password and reads Pro. Being on Free or Pro settles
+nothing about Apple's payment rules: that question stays open for the App
+Store (IOS_READINESS.md §5, item 1).
 
-4. **What to Test** (on the build): "Prepare for a meeting with someone you
-   are about to see, then capture the conversation afterwards (record, or
-   type notes) and keep the commitments. Tell us what was wrong or missing:
-   use TestFlight's feedback, or write to support@atturel.com."
-5. Add build 0.1.0 (5) to the group → **Submit for Review** (you, when ready).
-   Beta review usually takes about a day. Then invite testers by email or
-   share the public TestFlight link.
-6. **Access for testers.** Testers create an account and use the standard
-   14-day Pro trial from the website (Settings › Plan), then $29 a month if
-   they subscribe. No invitation codes by default (owner, 25 Oct 2026).
+**Before submitting:** the policy corrections are approved and published
+(their own draft PR), and the core real-device checks on build 5 have passed
+(audit §1.4). Then `submit` adds build 5 to Atturel Pilot and submits it
+for beta review, which usually takes about a day.
+
+**After approval:** `public-link` turns on the group's public link, limited to
+10 testers. Testers create an account and use the standard 14-day Pro trial
+from the website (Settings › Plan), then $29 a month if they subscribe. No
+invitation codes by default (owner, 25 Oct 2026).
 
 Do not submit for App Store review yet. See the payment-rule decision in
 IOS_READINESS.md §5.
