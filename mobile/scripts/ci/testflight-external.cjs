@@ -169,22 +169,19 @@ function newPassword() {
 async function setReviewDetails(key) {
   const detail = await reviewDetail(key)
   const a = detail.attributes
-  const attributes = { demoAccountRequired: true, demoAccountName: REVIEWER, notes: REVIEW_NOTES }
-
-  // The contact is the team's Account Holder, unless someone already filled it in.
-  if (!isSet(a.contactFirstName) || !isSet(a.contactLastName) || !isSet(a.contactEmail)) {
-    try {
-      const users = (await asc(key, '/v1/users?limit=200')).data
-      const holder = users.find((u) => (u.attributes.roles ?? []).includes('ACCOUNT_HOLDER'))
-      if (holder) {
-        if (!isSet(a.contactFirstName) && isSet(holder.attributes.firstName)) attributes.contactFirstName = holder.attributes.firstName
-        if (!isSet(a.contactLastName) && isSet(holder.attributes.lastName)) attributes.contactLastName = holder.attributes.lastName
-        if (!isSet(a.contactEmail) && isSet(holder.attributes.username)) attributes.contactEmail = holder.attributes.username
-      }
-    } catch (e) {
-      say(`Could not read the Account Holder for the contact (${e.message}); enter the contact in App Store Connect.`)
-    }
+  // Apple refuses any change to these details without the full contact, phone
+  // included, and the contact is the owner's to give. So it is entered once in
+  // App Store Connect, and every change here carries it back unchanged.
+  const contact = ['contactFirstName', 'contactLastName', 'contactEmail', 'contactPhone']
+  const missing = contact.filter((f) => !isSet(a[f]))
+  if (missing.length) {
+    fail(
+      `Beta App Review contact incomplete (${missing.join(', ')}). In App Store Connect: Apps > Atturel > TestFlight > Test Information > ` +
+        'Beta App Review Information, enter your first name, last name, phone and email, and save. Then run "prepare" again.',
+    )
   }
+  const attributes = { demoAccountRequired: true, demoAccountName: REVIEWER, notes: REVIEW_NOTES }
+  for (const f of contact) attributes[f] = a[f]
 
   let hash = null
   if (!isSet(a.demoAccountPassword) || process.env.ROTATE_DEMO_PASSWORD === 'true') {
