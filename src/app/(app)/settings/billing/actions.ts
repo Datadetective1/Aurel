@@ -10,7 +10,13 @@ import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
 import { formatDate } from '@/lib/format'
 import { FOUNDING_OFFER, PLANS, PRO_PRICE, formatPrice } from '@/lib/billing/plans'
-import { priceMatchesOffer, proPriceId, stripe, trialOfferOpen } from '@/lib/billing/stripe'
+import {
+  expireOpenCheckouts,
+  priceMatchesOffer,
+  proPriceId,
+  stripe,
+  trialOfferOpen,
+} from '@/lib/billing/stripe'
 import { getEntitlements } from '@/lib/billing/entitlements'
 import { hasFullAccess } from '@/lib/billing/access'
 import { notifyTrial } from '@/lib/billing/notify'
@@ -91,7 +97,7 @@ export async function startProTrial(
   const supabase = await createClient()
   const { data: row } = await supabase
     .from('subscriptions')
-    .select('status, trial_ends_at, stripe_subscription_id')
+    .select('status, trial_ends_at, stripe_subscription_id, stripe_customer_id')
     .eq('user_id', user.id)
     .maybeSingle()
   const eligibility = trialEligibility(trialRowOf(row), hasFullAccess(entitlements.tier))
@@ -111,6 +117,17 @@ export async function startProTrial(
   if (claim === 'used') return { error: 'This account has already had its Pro trial.' }
   if (claim === 'failed') {
     return { error: 'The trial could not start. Nothing has changed. Try again in a moment.' }
+  }
+
+  // A Checkout opened before the trial still says "charged today". Close it,
+  // so paying in a forgotten tab cannot replace the trial with a charge.
+  // Nothing is created at Stripe; a failure here does not undo the trial.
+  if (row?.stripe_customer_id) {
+    try {
+      await expireOpenCheckouts(row.stripe_customer_id)
+    } catch {
+      logger.warn('billing.trial_checkout_expire_failed')
+    }
   }
 
   await notifyTrial(user.id, 'started', endsAt)

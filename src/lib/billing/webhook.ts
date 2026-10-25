@@ -118,7 +118,12 @@ export interface WebhookDeps {
   processor: BillingProcessor
   planForPrice: (priceId: string | null) => PlanId
   intervalForPrice: (priceId: string | null) => string | null
-  notify: (userId: string, transition: SubscriptionTransition) => Promise<void>
+  /** `subscriptionId` keys the email, so concurrent events cannot send it twice. */
+  notify: (
+    userId: string,
+    transition: SubscriptionTransition,
+    context?: { subscriptionId: string },
+  ) => Promise<void>
   now?: () => Date
   log?: (event: string, fields: Record<string, unknown>) => void
 }
@@ -284,9 +289,7 @@ async function handle(
     // the trial was.
     trialEndsAt: subscription.trial_end
       ? new Date(subscription.trial_end * 1000).toISOString()
-      : appTrial
-        ? (before?.trialEndsAt ?? null)
-        : null,
+      : (before?.trialEndsAt ?? null),
     billingInterval: deps.intervalForPrice(priceId),
     founding,
     stateAt: now.toISOString(),
@@ -298,7 +301,7 @@ async function handle(
   // as a subscriber", or the activation email would never be sent.
   for (const transition of transitionsBetween(appTrial ? null : before, state)) {
     try {
-      await deps.notify(userId, transition)
+      await deps.notify(userId, transition, { subscriptionId: subscription.id })
     } catch {
       // A failed email must not fail the event: the state is already right,
       // and retrying the whole event would not resend it anyway.

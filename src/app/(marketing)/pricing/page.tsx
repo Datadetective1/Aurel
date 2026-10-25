@@ -31,7 +31,7 @@ const TRIAL_FAQ = [
   },
   {
     q: 'If I subscribe during the trial, do I lose the rest of it?',
-    a: `No. You see the first charge date before you confirm: the day the trial would have ended (at least two days after you subscribe). Then ${PRICE} every month until you cancel. We remind you two to three days before the first charge, and if you cancel before it you pay nothing.`,
+    a: `No. You see the first charge date before you confirm: the day the trial would have ended (at least two days after you subscribe). Then ${PRICE} every month until you cancel. Your confirmation names the date, we remind you two to three days before it, and if you cancel before it you pay nothing.`,
   },
 ]
 

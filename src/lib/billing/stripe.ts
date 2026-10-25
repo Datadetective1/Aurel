@@ -56,6 +56,15 @@ export function checkoutAvailable(): boolean {
 }
 
 /**
+ * Expire every open Checkout session of a customer. Stripe will not complete
+ * an expired session, so nothing opened earlier can still be paid.
+ */
+export async function expireOpenCheckouts(customer: string): Promise<void> {
+  const open = await stripe().checkout.sessions.list({ customer, status: 'open', limit: 10 })
+  for (const session of open.data) await stripe().checkout.sessions.expire(session.id)
+}
+
+/**
  * Whether a new 14-day trial may be started or advertised: subscribing works,
  * and the deployment has opted in (`PRO_TRIAL_OFFER=on`). Turning it off is
  * the rollback switch, and never touches a trial already running.

@@ -1109,6 +1109,25 @@ Ordering, the event ledger and replays needed no change. A late or repeated even
 
 **What still rests on automated tests, not live evidence:** the webhook lifecycle (subscribing during the trial, the first charge at the trial's end, a failed first charge, cancellation before the first charge, repeated and out-of-order events), and the trial-ending emails. In live mode these are verified only by genuine pilot purchases. No artificial charge, declined real card, refund or accelerated billing is run in live mode (owner, 25 Oct 2026).
 
+**Independent code review before release (25 Oct 2026).** A separate reviewer read the final diff for trial expiry, consent, remaining trial time, abandoned checkout, duplicate subscriptions and webhook handling.
+
+- **Confirmed correct:**
+  - one expiry rule for every reader;
+  - one trial per account;
+  - nothing but a completed Checkout starts billing;
+  - `trial_end` and every displayed first-charge date use the same instant and time zone;
+  - an abandoned Checkout cannot shorten, extend or erase a trial;
+  - the ledger, re-reads and old-subscription guard.
+- **Defects found and fixed in this PR:**
+  - **Duplicate "You are subscribed" emails.** Stripe's near-simultaneous events for one checkout could each send it. Billing emails and trial notices now carry an idempotency key (subscription, transition, date), and Resend sends one email per key for 24 hours. The same key stops a rerun of the daily job from repeating a notice.
+  - **The iPhone showed "Pro · first charge …" after a cancellation.** It now reads the subscription and says "Pro until …".
+  - **A Checkout opened before the trial could still be paid afterwards,** charging today and ending the trial. Starting a trial now closes the account's open Checkouts.
+  - **The trial's date was kept on record for one event only.** It now persists through later events.
+- **Known and accepted, for the owner to weigh:**
+  - **A failed first charge keeps Pro while Stripe retries.** This is the existing `past_due` grace for paying customers, now also covering subscriptions started during a trial. Checkout verifies the card when it is saved; a later decline would allow up to Stripe's retry window of unpaid Pro.
+  - **A daily job that fails misses that day's notices.** No migration was added for a delivery ledger. The job's own history shows it running daily, and Stripe's 7-day reminder (owner setting) covers subscribed trials.
+  - **Two live subscriptions are still possible in two narrow ways:** two presses in the same instant across a minute boundary in a trial's last 48 hours, or a subscription created from the Stripe dashboard. The webhook then follows the newest one that entitles.
+
 **Rollback. No step resets a trial, a QA account or any customer data:**
 
 1. **Stop new trials.** Remove `PRO_TRIAL_OFFER` (or set it to anything but `on`) in Production and redeploy.

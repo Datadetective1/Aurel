@@ -52,9 +52,31 @@ async function recipient(userId: string) {
 
 const PRO_PRICE_LABEL = formatPrice(PLANS.pro.monthlyPriceCents)
 
+/**
+ * One email per subscription, transition and date, for 24 hours. Stripe sends
+ * several events for one checkout within a second, and each can compute the
+ * same transition from the row it read; the key makes Resend send it once.
+ */
+export function transitionEmailKey(
+  userId: string,
+  transition: SubscriptionTransition,
+  subscriptionId: string | undefined,
+): string {
+  const detail =
+    transition.kind === 'activated'
+      ? (transition.firstChargeAt ?? 'charged')
+      : transition.kind === 'cancellation_scheduled'
+        ? (transition.endsAt ?? 'unknown')
+        : transition.kind === 'ended'
+          ? transition.reason
+          : ''
+  return `billing:${subscriptionId ?? userId}:${transition.kind}:${detail}`
+}
+
 export async function notifyBillingTransition(
   userId: string,
   transition: SubscriptionTransition,
+  context?: { subscriptionId: string },
 ): Promise<void> {
   if (!['activated', 'cancellation_scheduled', 'ended'].includes(transition.kind)) return
 
@@ -87,6 +109,7 @@ export async function notifyBillingTransition(
     subject: built.subject,
     html: built.html,
     kind: `billing_${transition.kind}`,
+    idempotencyKey: transitionEmailKey(userId, transition, context?.subscriptionId),
   })
   if (!result.ok) logger.warn('billing.email_failed', { kind: transition.kind })
 }
@@ -120,6 +143,8 @@ export async function notifyTrial(
       subject: built.subject,
       html: built.html,
       kind: `trial_${notice}`,
+      // A rerun of the daily job, or a duplicated cron delivery, sends nothing.
+      idempotencyKey: `trial:${notice}:${userId}:${endsAt}`,
     })
     if (!result.ok) logger.warn('billing.trial_email_failed', { notice })
     return result.ok

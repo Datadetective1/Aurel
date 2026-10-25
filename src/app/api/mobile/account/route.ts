@@ -32,14 +32,18 @@ export async function GET() {
   const user = await context()
   if (!user) return json({ error: 'unauthenticated' }, 401)
 
-  const [profile, entitlements, { data: calendars }] = await Promise.all([
+  const supabase = await createClient()
+  const [profile, entitlements, { data: calendars }, { data: billing }] = await Promise.all([
     getProfile(),
     getEntitlements(),
     // Read-only status; never the tokens.
-    (await createClient())
-      .from('integration_accounts')
-      .select(CALENDAR_COLUMNS)
-      .eq('user_id', user.id),
+    supabase.from('integration_accounts').select(CALENDAR_COLUMNS).eq('user_id', user.id),
+    // A cancellation changes the plan line: "Pro until …", not "first charge".
+    supabase
+      .from('subscriptions')
+      .select('status, cancel_at_period_end, current_period_end')
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
   const limit = entitlements.quotas.transcription_seconds
   const remainingSeconds =
@@ -59,7 +63,13 @@ export async function GET() {
       plan: entitlements.plan,
       fullAccess: hasFullAccess(entitlements.tier),
       trial: entitlements.trial ?? null,
-      subscription: null,
+      subscription: billing
+        ? {
+            status: billing.status ?? null,
+            cancelAtPeriodEnd: Boolean(billing.cancel_at_period_end),
+            currentPeriodEnd: billing.current_period_end ?? null,
+          }
+        : null,
       trialOffered: false,
       canSubscribe: false,
       timeZone: profile?.timezone ?? 'UTC',

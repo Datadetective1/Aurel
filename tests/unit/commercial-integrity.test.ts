@@ -141,13 +141,15 @@ describe('the 14-day trial', () => {
     }
   })
 
-  it('never touches Stripe: no card, and nothing there that a card update could start', () => {
+  it('creates nothing at Stripe: no card, and nothing there that a card update could start', () => {
     expect(claim).not.toMatch(/stripe\(\)/)
     const start = actions.slice(
       actions.indexOf('export async function startProTrial'),
       actions.indexOf('export async function startCheckout'),
     )
-    expect(start).not.toMatch(/stripe\(\)|checkout\.sessions|customers\.create/)
+    // It creates nothing at Stripe. It only closes Checkouts opened earlier.
+    expect(start).not.toMatch(/stripe\(\)|customers\.create|sessions\.create|subscriptions\.create/)
+    expect(start).toContain('expireOpenCheckouts(')
   })
 
   it('has one expiry rule, and the offer switch can never end a running trial', () => {

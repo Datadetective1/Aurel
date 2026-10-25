@@ -605,6 +605,27 @@ describe('the Pro trial', () => {
     expect(store.rows.get(USER)).toEqual(before)
   })
 
+  it('tells the notifier which subscription, so concurrent events share one email key', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { deps } = trialSetup(end, remote)
+    const contexts: unknown[] = []
+    deps.notify = async (_u, _t, context) => {
+      contexts.push(context)
+    }
+    await processStripeEvent(checkout(), deps)
+    expect(contexts).toEqual([{ subscriptionId: 'sub_1' }])
+  })
+
+  it('keeps the trial on record through every later event of a subscription', async () => {
+    const remote = { current: subscription({ status: 'active' }) }
+    const { store, deps } = trialSetup(T0 - DAY, remote)
+    await processStripeEvent(checkout(), deps)
+    remote.current = subscription({ status: 'active', cancel_at_period_end: true })
+    await processStripeEvent(updated('evt_later'), deps)
+    expect(store.rows.get(USER)?.trialEndsAt).toBe(iso(T0 - DAY))
+  })
+
   it('subscribing after the trial ended starts a subscription, and says so', async () => {
     const remote = { current: subscription({ status: 'active' }) }
     const { store, transitions, deps } = trialSetup(T0 - DAY, remote)

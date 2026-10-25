@@ -29,6 +29,12 @@ export interface OutgoingEmail {
   replyTo?: string
   /** Categorises the send in logs and metrics. Never contains user content. */
   kind: string
+  /**
+   * Resend sends one email per key for 24 hours, whatever the number of
+   * requests: a duplicated cron run or webhook delivery cannot send twice.
+   * Ids and dates only, never content.
+   */
+  idempotencyKey?: string
 }
 
 export type SendResult =
@@ -59,6 +65,7 @@ export async function sendEmail(message: OutgoingEmail): Promise<SendResult> {
       headers: {
         Authorization: `Bearer ${serverEnv.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
+        ...(message.idempotencyKey ? { 'Idempotency-Key': message.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from: senderAddress(),

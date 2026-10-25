@@ -12,11 +12,16 @@ import { fakeClient } from '../../../../../tests/stubs/fake-supabase'
 
 const h = vi.hoisted(() => ({
   entitlements: {} as Record<string, unknown>,
+  subscription: null as Record<string, unknown> | null,
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
   bearerToken: async () => 'a.b.c',
-  createClient: async () => fakeClient({ integration_accounts: [] }).client,
+  createClient: async () =>
+    fakeClient({
+      integration_accounts: [],
+      subscriptions: h.subscription ? [h.subscription] : [],
+    }).client,
 }))
 vi.mock('@/lib/auth', () => ({
   getOptionalUser: async () => ({ id: 'u-1', email: 'qa@example.com' }),
@@ -48,6 +53,7 @@ async function account() {
 }
 
 beforeEach(() => {
+  h.subscription = null
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-25T15:00:00Z'))
 })
@@ -89,6 +95,21 @@ describe('GET /api/mobile/account: the plan', () => {
       planLabel: 'Pro · first charge 8 Nov 2026',
       billing: 'web',
     })
+  })
+
+  it('subscribed during the trial and then canceled: Pro until the date, no charge implied', async () => {
+    h.entitlements = {
+      plan: 'pro',
+      tier: 'standard',
+      provider: 'stripe',
+      trial: { state: 'subscribed', endsAt: '2026-11-08T15:00:00Z' },
+    }
+    h.subscription = {
+      status: 'trialing',
+      cancel_at_period_end: true,
+      current_period_end: '2026-11-08T15:00:00Z',
+    }
+    expect(await account()).toMatchObject({ planLabel: 'Pro until 8 Nov 2026', billing: 'web' })
   })
 
   it('paying, pilot and Free read as before', async () => {

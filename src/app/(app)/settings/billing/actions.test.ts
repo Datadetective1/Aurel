@@ -102,7 +102,11 @@ const stripeFake = {
     sessions: {
       create: vi.fn(async () => ({ url: 'https://checkout.stripe.test/s' })),
       list: vi.fn(
-        async (): Promise<{
+        async (_params?: {
+          customer: string
+          status: string
+          limit: number
+        }): Promise<{
           data: { id: string; url: string | null; metadata: Record<string, string> }[]
         }> => ({ data: [] }),
       ),
@@ -133,6 +137,10 @@ vi.mock('@/lib/env', async (original) => ({
 vi.mock('@/lib/billing/stripe', async (original) => ({
   ...(await original<typeof import('@/lib/billing/stripe')>()),
   stripe: () => stripeFake,
+  expireOpenCheckouts: async (customer: string) => {
+    const open = await stripeFake.checkout.sessions.list({ customer, status: 'open', limit: 10 })
+    for (const session of open.data) await stripeFake.checkout.sessions.expire(session.id)
+  },
   proPriceId: () => (h.configured ? 'price_pro' : null),
   checkoutAvailable: () => h.configured,
   trialOfferOpen: () => h.configured,
@@ -295,6 +303,27 @@ describe('starting the trial', () => {
     h.configured = false
     expect((await start()).error).toMatch(/not available/)
     expect(sub().plan).toBe('free')
+  })
+
+  it('closes a Checkout opened before the trial, so a forgotten tab cannot charge today', async () => {
+    sub().stripe_customer_id = 'cus_1'
+    stripeFake.checkout.sessions.list.mockResolvedValueOnce({
+      data: [
+        { id: 'cs_before', url: 'https://checkout.stripe.test/before', metadata: { terms: 'now' } },
+      ],
+    })
+    expect((await start()).message).toBeTruthy()
+    expect(stripeFake.checkout.sessions.expire).toHaveBeenCalledExactlyOnceWith('cs_before')
+    // Still nothing created at Stripe.
+    expect(stripeFake.checkout.sessions.create).not.toHaveBeenCalled()
+    expect(stripeFake.customers.create).not.toHaveBeenCalled()
+  })
+
+  it('a Stripe failure while closing old Checkouts does not undo the trial', async () => {
+    sub().stripe_customer_id = 'cus_1'
+    stripeFake.checkout.sessions.list.mockRejectedValueOnce(new Error('stripe down'))
+    expect((await start()).message).toBeTruthy()
+    expect(sub()).toMatchObject({ status: 'trialing' })
   })
 
   it('an account that predates the sign-up row gets one, once', async () => {
