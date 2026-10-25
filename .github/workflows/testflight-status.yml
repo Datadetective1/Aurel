@@ -78,16 +78,13 @@ jobs:
           INVITE_TEAM_ADMINS: ${{ inputs.invite_team_admins }}
         run: node scripts/ci/testflight-status.cjs
 
-      # Hashes a new reviewer password in "prepare"; kept out of the app's dependencies.
-      - name: Install bcryptjs
-        if: inputs.external_action == 'prepare'
-        run: npm install --prefix "$RUNNER_TEMP/bcryptjs" --no-save --no-package-lock --no-audit --no-fund bcryptjs@2.4.3
-
       - name: External TestFlight
         if: inputs.external_action != 'none'
         env:
           BUILD_NUMBER: ${{ inputs.build_number }}
           TESTFLIGHT_ACTION: ${{ inputs.external_action }}
           ROTATE_DEMO_PASSWORD: ${{ inputs.rotate_demo_password }}
-          BCRYPTJS_DIR: ${{ runner.temp }}/bcryptjs
+          # Sets the reviewer's password through Supabase Auth's admin API. A
+          # dedicated secret key, revocable on its own; GitHub masks it in logs.
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: node scripts/ci/testflight-external.cjs

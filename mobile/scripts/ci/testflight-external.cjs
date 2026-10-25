@@ -6,22 +6,25 @@
  *
  *   prepare      Create the group if it is missing (no public link, no build
  *                added), then set the test information, What to Test for
- *                BUILD_NUMBER, and the review details. Contact fields already
- *                filled in are left alone; the contact phone is the owner's to
- *                enter. The demo password is set only when none is set yet (or
- *                ROTATE_DEMO_PASSWORD=true): it is generated here, sent only to
- *                App Store Connect, and only its bcrypt hash is printed, for the
- *                reviewer account's database row.
+ *                BUILD_NUMBER, and the review details. The contact (name,
+ *                email, phone) is the owner's, entered once in App Store
+ *                Connect; Apple accepts no change here without it. When no
+ *                demo password is set yet (or ROTATE_DEMO_PASSWORD=true), one
+ *                is generated here, set on the reviewer's Atturel account
+ *                through Supabase Auth's admin API (SUPABASE_SECRET_KEY), then
+ *                stored in App Store Connect, which keeps it for Apple and the
+ *                owner. Then it signs in with it to prove it works.
  *   verify       Sign in to Atturel as the reviewer with the password App Store
  *                Connect holds, and report the account's plan.
- *   submit       Check that everything is in place and the reviewer account is
- *                on Pro, add the build to the group, and submit it for beta
- *                review.
+ *   submit       Check that everything is in place and the reviewer account has
+ *                Full access, add the build to the group, and submit it for
+ *                beta review.
  *   public-link  Once Apple has approved the build, turn on the group's public
  *                link, limited to PUBLIC_LINK_LIMIT testers (default 10).
  *
- * Never printed: the demo password, contact details, or any sign-in token.
- * Runs after asc-setup.cjs, like testflight-status.cjs.
+ * Never printed: the demo password, any hash of it, the Supabase key, contact
+ * details, or any sign-in token. Runs after asc-setup.cjs, like
+ * testflight-status.cjs.
  */
 
 const fs = require('fs')
@@ -29,11 +32,14 @@ const path = require('path')
 const crypto = require('crypto')
 const { asc } = require('./asc-api.cjs')
 
-const { EXPO_ASC_API_KEY_PATH, EXPO_ASC_KEY_ID, EXPO_ASC_ISSUER_ID, ASC_APP_ID, BUILD_NUMBER, TESTFLIGHT_ACTION } = process.env
+const { EXPO_ASC_API_KEY_PATH, EXPO_ASC_KEY_ID, EXPO_ASC_ISSUER_ID, ASC_APP_ID, BUILD_NUMBER, TESTFLIGHT_ACTION, SUPABASE_SECRET_KEY } = process.env
 
 const GROUP = 'Atturel Pilot'
 const LOCALE = 'en-US'
 const REVIEWER = 'appreview@atturel.com'
+// The reviewer's Atturel account. The password step checks that this id still
+// belongs to REVIEWER before changing anything, so it can touch no one else.
+const REVIEWER_USER_ID = 'a4fa330a-383f-4c35-973e-fbbd138fbd22'
 
 const TEST_INFO = {
   description:
@@ -49,8 +55,8 @@ const WHAT_TO_TEST =
 const REVIEW_NOTES = [
   'Atturel has two plans. Free is limited (for example 5 people and 3 meeting briefs a month, and no Relationship Atlas). Pro costs $29 a month and adds the Relationship Atlas, deep research, weekly intelligence and higher monthly allowances.',
   'Plans are bought only on our website, atturel.com. The iOS app contains no in-app purchases: it shows no prices, no purchase or upgrade buttons, and no links to buy. The Account screen only displays the current plan; for someone already paying on the website it reads "Billed on the web. Change or cancel it from Settings › Plan at atturel.com." Free accounts also see an "Invitation code" field, used only by people we invite to a free pilot; codes are not sold.',
-  'This review account has Pro: it is on Atturel\'s standard 14-day Pro trial, started without payment, so every paid feature can be reviewed. It holds an invented sample record; every sample person is labelled "Sample · invented".',
-  'To try it: Today → Q3 capacity review → Prepare now. People → open a person. The Atlas tab. Capture → record or type a short note → Understand it → review and Keep. Recording needs microphone access and is used only to make a transcript; the audio is not kept. Account → Delete account deletes the account and its data.',
+  'This review account has "Full access": an access level we grant by hand, at no charge and with no purchase, to accounts we invite. It includes every Pro feature with no monthly limits, so everything can be reviewed. The Account screen shows "Full access" and "Included with your access. Nothing is billed." The account holds an invented sample record; every sample person is labelled "Sample · invented".',
+  'To try it: Today → Q3 capacity review → Prepare now. People → open a person. The Atlas tab. Capture → record or type a short note → Understand it → review and Keep. Recording needs microphone access. The audio is sent to our server to be transcribed and is not stored there; a recording not yet sent stays on the phone until it is kept or discarded. Account → Delete account deletes the account and its data.',
 ].join('\n\n')
 
 let summaryLines = []
@@ -70,6 +76,13 @@ function fail(message) {
 }
 
 const isSet = (v) => v !== null && v !== undefined && v !== ''
+
+// The app's own public configuration: where it signs in and which API it calls.
+function appConfig() {
+  const eas = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'eas.json'), 'utf8'))
+  const env = eas.build.base.env
+  return { supabaseUrl: env.EXPO_PUBLIC_SUPABASE_URL, publishableKey: env.EXPO_PUBLIC_SUPABASE_ANON_KEY, apiUrl: env.EXPO_PUBLIC_API_URL }
+}
 
 async function build(key) {
   if (!BUILD_NUMBER) fail('BUILD_NUMBER is required.')
@@ -152,18 +165,37 @@ async function reviewDetail(key) {
   return (await asc(key, `/v1/apps/${ASC_APP_ID}/betaAppReviewDetail`)).data
 }
 
-function bcryptjs() {
-  // Installed by the workflow into a scratch prefix; the app's own dependencies are not touched.
-  const dir = process.env.BCRYPTJS_DIR
-  if (!dir) fail('BCRYPTJS_DIR is not set: the workflow installs bcryptjs before "prepare".')
-  return require(path.join(dir, 'node_modules', 'bcryptjs'))
-}
-
 function newPassword() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
   let out = ''
   for (const byte of crypto.randomBytes(28)) out += alphabet[byte % alphabet.length]
   return out
+}
+
+// Supabase Auth's admin API, with a secret key that exists only as a GitHub
+// Actions secret. Nothing it returns is printed.
+async function authAdmin(method, route, body) {
+  const { supabaseUrl } = appConfig()
+  const res = await fetch(`${supabaseUrl}/auth/v1/admin/${route}`, {
+    method,
+    // A secret key (sb_secret_…) goes on `apikey` alone: the platform rejects it as
+    // a Bearer token. A legacy service_role key is a JWT and goes on both.
+    headers: {
+      apikey: SUPABASE_SECRET_KEY,
+      ...(SUPABASE_SECRET_KEY.startsWith('eyJ') ? { authorization: `Bearer ${SUPABASE_SECRET_KEY}` } : {}),
+      'content-type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) fail(`Supabase Auth refused ${method} ${route.split('/')[0]} (${res.status}${json?.msg || json?.message ? `: ${json.msg ?? json.message}` : ''}).`)
+  return json
+}
+
+async function setReviewerPassword(password) {
+  const user = await authAdmin('GET', `users/${REVIEWER_USER_ID}`)
+  if ((user?.email ?? '').toLowerCase() !== REVIEWER) fail(`Account ${REVIEWER_USER_ID} is not ${REVIEWER}; nothing was changed.`)
+  await authAdmin('PUT', `users/${REVIEWER_USER_ID}`, { password })
 }
 
 async function setReviewDetails(key) {
@@ -183,10 +215,14 @@ async function setReviewDetails(key) {
   const attributes = { demoAccountRequired: true, demoAccountName: REVIEWER, notes: REVIEW_NOTES }
   for (const f of contact) attributes[f] = a[f]
 
-  let hash = null
-  if (!isSet(a.demoAccountPassword) || process.env.ROTATE_DEMO_PASSWORD === 'true') {
+  const rotate = !isSet(a.demoAccountPassword) || process.env.ROTATE_DEMO_PASSWORD === 'true'
+  if (rotate) {
+    if (!isSet(SUPABASE_SECRET_KEY)) {
+      fail('The SUPABASE_SECRET_KEY Actions secret is not set, so the reviewer password cannot be set. Nothing was changed.')
+    }
+    // Atturel first: App Store Connect then never holds a password that does not work.
     const password = newPassword()
-    hash = bcryptjs().hashSync(password, 10)
+    await setReviewerPassword(password)
     attributes.demoAccountPassword = password
   }
 
@@ -197,33 +233,24 @@ async function setReviewDetails(key) {
 
   const after = (await reviewDetail(key)).attributes
   say(
-    `Beta App Review details: contact name ${isSet(after.contactFirstName) && isSet(after.contactLastName) ? 'set' : 'missing'}, ` +
-      `contact email ${isSet(after.contactEmail) ? 'set' : 'missing'}, contact phone ${isSet(after.contactPhone) ? 'set' : 'missing (owner)'}, ` +
+    `Beta App Review details: contact ${contact.every((f) => isSet(after[f])) ? 'set' : 'incomplete'}, ` +
       `sign-in required ${after.demoAccountRequired ? 'yes' : 'no'}, demo account ${isSet(after.demoAccountName) && isSet(after.demoAccountPassword) ? 'set' : 'missing'}, notes ${isSet(after.notes) ? 'set' : 'missing'}.`,
   )
-  if (hash) {
-    // Only the hash, for the reviewer account's row, and only in the job log; the
-    // password itself stays in App Store Connect.
-    say('New demo password set in App Store Connect. Its bcrypt hash is in the job log.')
-    console.log(`bcrypt hash for ${REVIEWER}: ${hash}`)
-  } else {
-    say('Demo password: unchanged (already set in App Store Connect).')
-  }
+  say(rotate ? 'Reviewer password: new, set on the Atturel account and stored in App Store Connect.' : 'Reviewer password: unchanged (already in App Store Connect).')
 }
 
 async function signInAsReviewer(key) {
   const a = (await reviewDetail(key)).attributes
   if (!isSet(a.demoAccountName) || !isSet(a.demoAccountPassword)) return { ok: false, why: 'no demo account in App Store Connect' }
-  const eas = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'eas.json'), 'utf8'))
-  const env = eas.build.base.env
-  const res = await fetch(`${env.EXPO_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+  const { supabaseUrl, publishableKey, apiUrl } = appConfig()
+  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
-    headers: { apikey: env.EXPO_PUBLIC_SUPABASE_ANON_KEY, 'content-type': 'application/json' },
+    headers: { apikey: publishableKey, 'content-type': 'application/json' },
     body: JSON.stringify({ email: a.demoAccountName, password: a.demoAccountPassword }),
   })
   const session = await res.json().catch(() => null)
   if (!session?.access_token) return { ok: false, why: `sign-in refused (${res.status})` }
-  const account = await fetch(`${env.EXPO_PUBLIC_API_URL}/api/mobile/account`, { headers: { authorization: `Bearer ${session.access_token}` } })
+  const account = await fetch(`${apiUrl}/api/mobile/account`, { headers: { authorization: `Bearer ${session.access_token}` } })
   const body = await account.json().catch(() => null)
   if (!account.ok || !body) return { ok: false, why: `account request failed (${account.status})` }
   return { ok: true, plan: body.planLabel, billing: body.billing, sample: body.sampleData?.loaded === true }
@@ -251,8 +278,11 @@ async function submit(key) {
   const wtt = (await asc(key, `/v1/builds/${b.id}/betaBuildLocalizations?limit=20`)).data.find((l) => l.attributes.locale === LOCALE)
   if (!wtt || !isSet(wtt.attributes.whatsNew)) fail('What to Test is missing. Run "prepare".')
 
+  // The review notes promise Full access; submit only while that is true.
   const r = await verify(key)
-  if (!/^Pro\b/.test(r.plan ?? '')) fail(`The reviewer account is on "${r.plan}", not Pro: start its 14-day trial before submitting, so review sees every paid feature.`)
+  if (r.plan !== 'Full access' || r.billing !== 'included') {
+    fail(`The reviewer account reads "${r.plan}" (billing ${r.billing}), not Full access, which the review notes describe. Restore its grant before submitting.`)
+  }
 
   const inGroup = (await asc(key, `/v1/betaGroups/${group.id}/builds?limit=50`)).data.some((x) => x.id === b.id)
   if (!inGroup) {
@@ -290,6 +320,7 @@ async function main() {
       await setTestInformation(key)
       await setWhatToTest(key, b)
       await setReviewDetails(key)
+      await verify(key)
       break
     }
     case 'verify':
