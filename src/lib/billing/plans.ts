@@ -138,10 +138,10 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     limits: { people: 5 },
     highlights: [
       'Your Interaction Profile',
-      'Up to 5 people',
-      '3 researched people and 3 meeting briefs a month',
-      'Connect your calendar',
+      'Up to 5 active people',
+      '3 AI meeting briefs and 3 researched people a month, and unlimited Quick Briefs',
       'Keep 10 conversations a month and confirm what they left open',
+      'Connect your calendar',
       '60 minutes of voice transcription a month',
       `20 questions to ${brand.assistantName} a month`,
       'Export or delete everything, any time',
@@ -151,7 +151,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    tagline: 'The full relationship record, and preparation for every room.',
+    tagline: 'Preparation, relationship memory and follow-through for everyone you work with.',
     // $29 a month, monthly only: there is no annual plan in this launch. The
     // Stripe price is checked against this before checkout (PRO_PRICE).
     monthlyPriceCents: 2900,
@@ -191,15 +191,17 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     },
     limits: { people: null },
     highlights: [
-      'Unlimited people and relationship memory',
-      'Research a person’s public professional footprint',
-      'Meeting briefs, Quick Brief and debriefs',
-      'Keep up to 60 conversations a month',
+      'Prepare: 150 AI meeting briefs and 60 researched people a month',
+      'Remember: unlimited people, and the Relationship Atlas',
+      'Follow through: keep 60 conversations a month and confirm what they left open',
       '600 minutes of voice transcription a month',
-      'The Relationship Atlas',
+      `600 questions to ${brand.assistantName} a month`,
+      'Export or delete everything, any time',
     ],
   },
 
+  // Not offered: nothing sells it and the pricing page does not show it
+  // (owner decision, 25 Oct 2026). Kept so the plan type stays complete.
   team: {
     id: 'team',
     name: 'Teams',

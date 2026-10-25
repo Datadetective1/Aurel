@@ -2,8 +2,8 @@ import { getOptionalUser, getProfile } from '@/lib/auth'
 import { json, readJson } from '@/lib/mobile/route'
 import { bearerToken, createClient } from '@/lib/supabase/server'
 import { getEntitlements, usageInPeriod } from '@/lib/billing/entitlements'
-import { PLANS } from '@/lib/billing/plans'
 import { hasFullAccess } from '@/lib/billing/access'
+import { planSummary } from '@/lib/billing/plan-summary'
 import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { mobileCaptureLimits } from '@/lib/capture/limits'
 import { absoluteUrl, brand } from '@/lib/brand'
@@ -41,7 +41,6 @@ export async function GET() {
       .select(CALENDAR_COLUMNS)
       .eq('user_id', user.id),
   ])
-  const paid = entitlements.plan !== 'free'
   const limit = entitlements.quotas.transcription_seconds
   const remainingSeconds =
     limit === null || limit === undefined
@@ -54,19 +53,28 @@ export async function GET() {
   const body: AccountResponse = {
     email: user.email ?? null,
     name: profile?.preferred_name || profile?.full_name || 'You',
-    planLabel: paid
-      ? PLANS[entitlements.plan].name
-      : hasFullAccess(entitlements.tier)
-        ? 'Full access'
-        : PLANS.free.name,
+    // The same words as the website's Plan page; plan and access only, no
+    // purchase or payment link (owner decision 3).
+    planLabel: planSummary({
+      plan: entitlements.plan,
+      fullAccess: hasFullAccess(entitlements.tier),
+      trial: entitlements.trial ?? null,
+      subscription: null,
+      trialOffered: false,
+      canSubscribe: false,
+      timeZone: profile?.timezone ?? 'UTC',
+    }).shortLabel,
     billing:
       entitlements.provider === 'apple'
         ? 'apple'
         : entitlements.provider === 'stripe'
           ? 'web'
-          : entitlements.provider === 'manual'
-            ? 'included'
-            : 'none',
+          : entitlements.provider === 'trial'
+            ? 'trial'
+            : entitlements.provider === 'manual'
+              ? 'included'
+              : 'none',
+    trial: entitlements.trial ?? null,
     legal: {
       privacyUrl: absoluteUrl('/privacy'),
       termsUrl: absoluteUrl('/terms'),

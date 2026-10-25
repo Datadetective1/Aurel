@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth'
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
@@ -7,21 +8,115 @@ import { absoluteUrl, brand } from '@/lib/brand'
 import { features } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
-import { FOUNDING_OFFER, PRO_PRICE } from '@/lib/billing/plans'
-import { priceMatchesOffer, proPriceId, stripe } from '@/lib/billing/stripe'
+import { formatDate } from '@/lib/format'
+import { FOUNDING_OFFER, PLANS, PRO_PRICE, formatPrice } from '@/lib/billing/plans'
+import { priceMatchesOffer, proPriceId, stripe, trialAvailable } from '@/lib/billing/stripe'
+import { getEntitlements } from '@/lib/billing/entitlements'
+import { hasFullAccess } from '@/lib/billing/access'
+import { notifyTrial } from '@/lib/billing/notify'
+import { claimTrial } from '@/lib/billing/trial-claim'
+import {
+  appTrialActive,
+  firstChargeAt,
+  isAppTrial,
+  trialEligibility,
+  trialEndsAt,
+  type TrialRow,
+} from '@/lib/billing/trial'
 
 /**
  * CHECKOUT AND PORTAL
  * =============================================================================
  * Two server actions, both of which end in a redirect to Stripe. Neither ever
- * writes an entitlement: the webhook is the only thing that may change a plan,
- * because a client that can grant itself Pro by finishing a redirect has no
- * paywall at all.
+ * writes an entitlement: the webhook is the only thing that may change a paid
+ * plan, because a client that can grant itself Pro by finishing a redirect has
+ * no paywall at all.
+ *
+ * The one exception is the trial, which involves no money: `startProTrial`
+ * grants it once per account through lib/billing/trial-claim, and it ends by
+ * itself.
  * =============================================================================
  */
 
 export interface BillingState {
   error?: string
+  message?: string
+}
+
+const PRICE = formatPrice(PLANS.pro.monthlyPriceCents)
+
+function trialRowOf(
+  row: {
+    status: string | null
+    trial_ends_at: string | null
+    stripe_subscription_id: string | null
+  } | null,
+): TrialRow | null {
+  return row
+    ? {
+        status: row.status,
+        trialEndsAt: row.trial_ends_at,
+        stripeSubscriptionId: row.stripe_subscription_id,
+      }
+    : null
+}
+
+/**
+ * Start the 14-day Pro trial: once per account, no card, nothing at Stripe.
+ *
+ * Offered only where subscribing works, so the trial can end in a choice.
+ * Claimed in one conditional UPDATE (lib/billing/trial-claim), so two presses
+ * at once start one trial; an account that has had a trial or any
+ * subscription is refused.
+ */
+export async function startProTrial(
+  _prev: BillingState,
+  _formData: FormData,
+): Promise<BillingState> {
+  if (!trialAvailable()) {
+    return { error: 'The Pro trial is not available right now. Nothing has changed.' }
+  }
+
+  const user = await requireUser()
+  const entitlements = await getEntitlements()
+  if (entitlements.plan !== 'free') {
+    return {
+      error:
+        entitlements.trial?.state === 'active'
+          ? 'Your Pro trial is already on.'
+          : 'This account is already on Pro.',
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: row } = await supabase
+    .from('subscriptions')
+    .select('status, trial_ends_at, stripe_subscription_id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  const eligibility = trialEligibility(trialRowOf(row), hasFullAccess(entitlements.tier))
+  if (!eligibility.eligible) {
+    return {
+      error:
+        eligibility.reason === 'full_access'
+          ? 'Your account already has full access.'
+          : eligibility.reason === 'subscribed'
+            ? 'This account has had a subscription, so the trial is not available. Subscribe to Pro to use it again.'
+            : 'This account has already had its Pro trial. Subscribe to Pro to keep using it.',
+    }
+  }
+
+  const endsAt = trialEndsAt().toISOString()
+  const claim = await claimTrial(user.id, endsAt)
+  if (claim === 'used') return { error: 'This account has already had its Pro trial.' }
+  if (claim === 'failed') {
+    return { error: 'The trial could not start. Nothing has changed. Try again in a moment.' }
+  }
+
+  await notifyTrial(user.id, 'started', endsAt)
+  await track('trial_started', {})
+  revalidatePath('/settings/billing')
+  return { message: 'Your 14-day Pro trial is on. No card, nothing charged.' }
 }
 
 const ENTITLED = ['trialing', 'active', 'past_due']
@@ -51,15 +146,35 @@ export async function startCheckout(
   const user = await requireUser()
   const supabase = await createClient()
 
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('stripe_customer_id, plan, status')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const [{ data: subscription }, { data: profile }] = await Promise.all([
+    supabase
+      .from('subscriptions')
+      .select('stripe_customer_id, plan, status, trial_ends_at, stripe_subscription_id')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle(),
+  ])
+  const trialRow = trialRowOf(subscription ?? null)
 
-  if (subscription?.plan === 'pro' && ENTITLED.includes(subscription.status ?? '')) {
+  // The app's own trial is not a subscription: subscribing is what it is for.
+  if (
+    !isAppTrial(trialRow) &&
+    subscription?.plan === 'pro' &&
+    ENTITLED.includes(subscription.status ?? '')
+  ) {
     return { error: 'You are already on Pro. Use Manage billing to change your plan.' }
   }
+
+  // Subscribing during the trial keeps the rest of it: the first charge is
+  // when the trial ends (or Checkout's 48-hour minimum, if that is later).
+  const now = new Date()
+  const firstCharge =
+    appTrialActive(trialRow, now) && trialRow?.trialEndsAt
+      ? firstChargeAt(trialRow.trialEndsAt, now)
+      : null
+  const firstChargeOn = firstCharge
+    ? formatDate(firstCharge.toISOString(), profile?.timezone ?? 'UTC')
+    : null
 
   let url: string | null = null
 
@@ -108,8 +223,20 @@ export async function startCheckout(
 
         // The webhook trusts this, not the redirect, to know whose plan changed.
         client_reference_id: user.id,
-        subscription_data: { metadata: { user_id: user.id } },
+        subscription_data: {
+          metadata: { user_id: user.id },
+          ...(firstCharge ? { trial_end: Math.floor(firstCharge.getTime() / 1000) } : {}),
+        },
         metadata: { user_id: user.id },
+
+        // The terms, on Stripe's page beside the button that agrees to them.
+        custom_text: {
+          submit: {
+            message: firstChargeOn
+              ? `Nothing is charged today. Your first charge of ${PRICE} is on ${firstChargeOn}, then ${PRICE} every month until you cancel.`
+              : `You will be charged ${PRICE} today, then ${PRICE} every month until you cancel.`,
+          },
+        },
 
         // No promotion is approved; Checkout shows no code field.
         allow_promotion_codes: false,
@@ -126,7 +253,7 @@ export async function startCheckout(
       // out of checkout until midnight UTC. The duplicate-subscription guard
       // above is what actually prevents a second subscription.
       {
-        idempotencyKey: `checkout:${user.id}:${customer ?? 'new'}:${priceId}:${Math.floor(Date.now() / 600_000)}`,
+        idempotencyKey: `checkout:${user.id}:${customer ?? 'new'}:${priceId}:${firstCharge ? firstCharge.getTime() : 'now'}:${Math.floor(Date.now() / 600_000)}`,
       },
     )
 
@@ -142,7 +269,7 @@ export async function startCheckout(
 
   if (!url) return { error: 'Checkout could not be opened. Nothing was charged.' }
 
-  await track('checkout_started', { interval: 'monthly' })
+  await track('checkout_started', { interval: 'monthly', duringTrial: Boolean(firstCharge) })
   // Outside the try: redirect() signals by throwing, and catching it here would
   // report a successful redirect as a checkout failure.
   redirect(url)

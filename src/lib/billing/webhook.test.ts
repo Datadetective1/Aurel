@@ -61,6 +61,7 @@ class MemoryStore implements BillingStore {
       stripeCustomerId: input.stripeCustomerId,
       stripeSubscriptionId: input.stripeSubscriptionId,
       stripePriceId: input.stripePriceId,
+      trialEndsAt: input.trialEndsAt,
       stateAt: input.stateAt,
     })
     this.customers.set(input.stripeCustomerId, input.userId)
@@ -416,6 +417,181 @@ describe('one row, several subscriptions', () => {
       event('evt_off', 'customer.subscription.deleted', { id: 'sub_1', customer: 'cus_1' }),
       deps,
     )
+    expect(store.rows.get(USER)?.plan).toBe('free')
+  })
+})
+
+/**
+ * THE 14-DAY TRIAL, THROUGH THE WEBHOOK
+ * =============================================================================
+ * The trial is the app's own row (pro / trialing / trial_ends_at, no Stripe
+ * subscription). Stripe only appears when the customer chooses Subscribe to
+ * Pro: a Checkout whose subscription carries `trial_end`, so the rest of the
+ * trial is kept and the first charge is at its end.
+ *
+ * The existing handler needed three changes, each pinned here by a test that
+ * fails on the old code: the subscription confirmation was never sent (the
+ * trial row already read as Pro), an abandoned checkout erased a running
+ * trial, and the cancellation notice said "charged again" when nothing had
+ * ever been charged.
+ * =============================================================================
+ */
+describe('the Pro trial', () => {
+  const DAY = 86_400
+  // The harness clock starts at 1_760_000_000 s.
+  const T0 = 1_760_000_000
+  const iso = (s: number) => new Date(s * 1000).toISOString()
+
+  function trialSetup(trialEndS: number, remote: { current: Stripe.Subscription }) {
+    const ctx = setup(remote)
+    const transitions: SubscriptionTransition[] = []
+    ctx.deps.notify = async (_u, t) => {
+      transitions.push(t)
+    }
+    ctx.store.rows.set(USER, {
+      userId: USER,
+      plan: 'pro',
+      status: 'trialing',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: iso(trialEndS),
+      isFounding: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      trialEndsAt: iso(trialEndS),
+      stateAt: null,
+    })
+    return { ...ctx, transitions }
+  }
+
+  const trialing = (trialEnd: number, over: Partial<Stripe.Subscription> = {}) =>
+    subscription({
+      status: 'trialing',
+      trial_end: trialEnd,
+      items: {
+        object: 'list',
+        data: [{ price: { id: PRO_PRICE }, current_period_end: trialEnd } as never],
+        has_more: false,
+        url: '',
+      },
+      ...over,
+    })
+
+  it('subscribing during the trial confirms the first charge date, once', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { store, transitions, deps } = trialSetup(end, remote)
+
+    await processStripeEvent(checkout(), deps)
+    // Stripe sends several events for one checkout, and retries them.
+    await processStripeEvent(checkout(), deps)
+    await processStripeEvent(
+      event('evt_created', 'customer.subscription.created', { id: 'sub_1', customer: 'cus_1' }),
+      deps,
+    )
+
+    expect(transitions).toEqual([{ kind: 'activated', firstChargeAt: iso(end) }])
+    expect(store.rows.get(USER)).toMatchObject({
+      plan: 'pro',
+      status: 'trialing',
+      stripeSubscriptionId: 'sub_1',
+      trialEndsAt: iso(end),
+    })
+  })
+
+  it('the first charge at the end of the trial is a renewal: no second email', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { transitions, deps } = trialSetup(end, remote)
+    await processStripeEvent(checkout(), deps)
+    remote.current = subscription({ status: 'active' })
+    await processStripeEvent(
+      event('evt_paid', 'invoice.paid', {
+        parent: { subscription_details: { subscription: 'sub_1' } },
+      }),
+      deps,
+    )
+    expect(transitions.map((t) => t.kind)).toEqual(['activated'])
+  })
+
+  it('canceling before the first charge says nothing will be charged, then ends at the trial’s end', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { store, transitions, deps } = trialSetup(end, remote)
+    await processStripeEvent(checkout(), deps)
+
+    remote.current = trialing(end, { cancel_at_period_end: true })
+    await processStripeEvent(updated('evt_cancel'), deps)
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', cancelAtPeriodEnd: true })
+
+    remote.current = trialing(end, { status: 'canceled', cancel_at_period_end: true })
+    await processStripeEvent(
+      event('evt_end', 'customer.subscription.deleted', { id: 'sub_1' }),
+      deps,
+    )
+    expect(transitions).toEqual([
+      { kind: 'activated', firstChargeAt: iso(end) },
+      { kind: 'cancellation_scheduled', endsAt: iso(end), inTrial: true },
+      { kind: 'ended', reason: 'canceled' },
+    ])
+    expect(store.rows.get(USER)?.plan).toBe('free')
+  })
+
+  it('a delayed event, delivered after later ones, re-reads the current state and sends nothing', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { transitions, deps } = trialSetup(end, remote)
+    remote.current = trialing(end, { cancel_at_period_end: true })
+    // The cancellation's event lands first; the checkout's arrives late.
+    await processStripeEvent(updated('evt_cancel'), deps)
+    await processStripeEvent(checkout('evt_checkout_late'), deps)
+    await processStripeEvent(
+      event('evt_created_late', 'customer.subscription.created', {
+        id: 'sub_1',
+        customer: 'cus_1',
+      }),
+      deps,
+    )
+    expect(transitions).toEqual([{ kind: 'activated', firstChargeAt: iso(end) }])
+  })
+
+  it('an abandoned or failed checkout cannot erase a trial that is still running', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: subscription({ status: 'incomplete' }) }
+    const { store, transitions, deps } = trialSetup(end, remote)
+    const before = { ...store.rows.get(USER) }
+
+    const created = await processStripeEvent(
+      event('evt_incomplete', 'customer.subscription.created', { id: 'sub_1', customer: 'cus_1' }),
+      deps,
+    )
+    remote.current = subscription({ status: 'incomplete_expired' })
+    await processStripeEvent(updated('evt_expired'), deps)
+
+    expect(created.body).toMatchObject({ handled: false })
+    expect(store.rows.get(USER)).toEqual(before)
+    expect(transitions).toEqual([])
+  })
+
+  it('subscribing after the trial ended starts a subscription, and says so', async () => {
+    const remote = { current: subscription({ status: 'active' }) }
+    const { store, transitions, deps } = trialSetup(T0 - DAY, remote)
+    await processStripeEvent(checkout(), deps)
+    expect(transitions).toEqual([{ kind: 'activated', firstChargeAt: null }])
+    expect(store.rows.get(USER)).toMatchObject({ plan: 'pro', status: 'active' })
+  })
+
+  it('a failed first charge keeps Pro while Stripe retries, then ends it for payment', async () => {
+    const end = T0 + 10 * DAY
+    const remote = { current: trialing(end) }
+    const { store, transitions, deps } = trialSetup(end, remote)
+    await processStripeEvent(checkout(), deps)
+    remote.current = subscription({ status: 'past_due' })
+    await processStripeEvent(updated('evt_failed'), deps)
+    expect(store.rows.get(USER)?.plan).toBe('pro')
+    remote.current = subscription({ status: 'unpaid' })
+    await processStripeEvent(updated('evt_unpaid'), deps)
+    expect(transitions.map((t) => t.kind)).toEqual(['activated', 'payment_problem', 'ended'])
     expect(store.rows.get(USER)?.plan).toBe('free')
   })
 })

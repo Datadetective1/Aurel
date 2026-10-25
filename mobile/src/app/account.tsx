@@ -57,7 +57,9 @@ export default function Account() {
         ? 'Billed by Apple. Change or cancel it in Settings › Apple ID › Subscriptions.'
         : data.billing === 'included'
           ? 'Included with your access. Nothing is billed.'
-          : 'Nothing is billed.'
+          : data.billing === 'trial'
+            ? 'Trial: no card, nothing billed. When it ends the account returns to Free, and nothing is deleted.'
+            : 'Nothing is billed.'
 
   return (
     <Screen topInset={false} refreshing={refreshing} onRefresh={refresh}>
@@ -91,7 +93,7 @@ export default function Account() {
         <LinkRow icon="file-text" label="Terms" onPress={() => void Linking.openURL(data.legal.termsUrl)} />
       </Section>
 
-      {data.planLabel === 'Free' ? <PilotCode onRedeemed={refresh} /> : null}
+      {data.planLabel === 'Free' || data.billing === 'trial' ? <PilotCode onRedeemed={refresh} /> : null}
 
       {data.sampleData ? <SampleData loaded={data.sampleData.loaded} onChanged={refresh} /> : null}
 

@@ -121,10 +121,20 @@ export type OnboardingResponse =
 export interface AccountResponse {
   email: string | null
   name: string
-  /** "Free", "Pro", "Full access". */
+  /** "Free", "Pro", "Full access", "Pro trial · ends 8 Nov 2026". */
   planLabel: string
-  /** Where the plan is managed, so the app never shows a web-only control as its own. */
-  billing: 'none' | 'web' | 'apple' | 'included'
+  /**
+   * Where the plan is managed, so the app never shows a web-only control as its
+   * own. `trial` is the 14-day trial: no card, nothing billed. Older apps show
+   * an unknown value as "Nothing is billed", which is true of the trial.
+   */
+  billing: 'none' | 'web' | 'apple' | 'included' | 'trial'
+  /**
+   * The 14-day trial: running, subscribed during it (`endsAt` is then the
+   * first charge), or ended without a subscription. Null without one; absent
+   * on older servers.
+   */
+  trial?: { state: 'active' | 'ended' | 'subscribed'; endsAt: string } | null
   legal: { privacyUrl: string; termsUrl: string; supportEmail: string }
   capture: CaptureLimits
   /** Whether the fictional sample record is in this account. Absent on older servers. */

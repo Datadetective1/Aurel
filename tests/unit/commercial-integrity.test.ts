@@ -124,6 +124,36 @@ describe('checkout charges exactly what the page shows', () => {
   })
 })
 
+describe('the 14-day trial', () => {
+  const claim = code(read('lib', 'billing', 'trial-claim.ts'))
+  const actions = code(read('app', '(app)', 'settings', 'billing', 'actions.ts'))
+
+  it('is the only entitlement written outside the webhook, and only onto an unused Free row', () => {
+    expect(claim).toMatch(/plan:\s*'pro'/)
+    for (const guard of [
+      ".eq('plan', 'free')",
+      ".is('trial_ends_at', null)",
+      ".is('stripe_subscription_id', null)",
+    ]) {
+      expect(claim).toContain(guard)
+    }
+  })
+
+  it('never touches Stripe: no card, and nothing there that a card update could start', () => {
+    expect(claim).not.toMatch(/stripe\(\)/)
+    const start = actions.slice(
+      actions.indexOf('export async function startProTrial'),
+      actions.indexOf('export async function startCheckout'),
+    )
+    expect(start).not.toMatch(/stripe\(\)|checkout\.sessions|customers\.create/)
+  })
+
+  it('subscribing during it keeps the rest of it and states the terms on Stripe’s page', () => {
+    expect(actions).toContain('trial_end:')
+    expect(actions).toContain('custom_text:')
+  })
+})
+
 describe('the webhook', () => {
   const route = code(read('app', 'api', 'stripe', 'webhook', 'route.ts'))
 

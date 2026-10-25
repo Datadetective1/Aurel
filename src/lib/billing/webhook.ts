@@ -7,6 +7,7 @@ import {
   type SubscriptionState,
   type SubscriptionTransition,
 } from './subscription-state'
+import { appTrialActive, isAppTrial } from './trial'
 
 /**
  * STRIPE WEBHOOK, THE PART THAT DECIDES
@@ -65,6 +66,8 @@ export interface CanonicalRow extends SubscriptionState {
   isFounding: boolean
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
+  /** The app's own trial, or Stripe's, as last written. */
+  trialEndsAt: string | null
   stateAt: string | null
 }
 
@@ -226,6 +229,9 @@ async function handle(
   }
 
   const before = await deps.store.getRow(userId)
+  const now = (deps.now ?? (() => new Date()))()
+  // The app's own trial is in this row but is not a Stripe subscription.
+  const appTrial = isAppTrial(before)
 
   const item = subscription.items.data[0]
   const priceId = item?.price?.id ?? null
@@ -257,8 +263,15 @@ async function handle(
     return { status: 'ignored', userId }
   }
 
+  // A subscription that confers nothing -- an abandoned or failed checkout --
+  // must not erase a trial that is still running. Only a subscription that
+  // entitles replaces it (finding: trial PR).
+  if (appTrial && appTrialActive(before, now) && plan === 'free') {
+    deps.log?.('billing.webhook_kept_trial', { type: event.type })
+    return { status: 'ignored', userId }
+  }
+
   const founding = await resolveFounding(before, plan, deps)
-  const now = (deps.now ?? (() => new Date()))()
 
   const applied = await deps.store.apply({
     userId,
@@ -275,7 +288,10 @@ async function handle(
   })
   if (applied === 'stale') return { status: 'processed', userId }
 
-  for (const transition of transitionsBetween(before, state)) {
+  // Subscribing during the trial is the start of a subscription, and a trial
+  // that ended unsubscribed is Free: either way the trial row is not "before
+  // as a subscriber", or the activation email would never be sent.
+  for (const transition of transitionsBetween(appTrial ? null : before, state)) {
     try {
       await deps.notify(userId, transition)
     } catch {

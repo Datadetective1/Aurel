@@ -43,6 +43,18 @@ export function proPriceId(): string | null {
 }
 
 /**
+ * Whether the Pro trial may be offered: only where subscribing works end to
+ * end -- Checkout, the price, the webhook that records the subscription, and
+ * the service role that grants the trial -- so a trial can always end in a
+ * real choice.
+ */
+export function trialAvailable(): boolean {
+  return Boolean(
+    features.billing && features.billingWebhooks && features.serviceRole && proPriceId(),
+  )
+}
+
+/**
  * Whether a Stripe price is the one this product sells at the advertised
  * amount: monthly, recurring, in the offer's currency, at the offer's price.
  *

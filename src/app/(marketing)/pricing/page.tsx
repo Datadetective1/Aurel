@@ -5,7 +5,11 @@ import { ApertureRule } from '@/components/brand/aperture'
 import { Button } from '@/components/ui/button'
 import { Badge, Container, Eyebrow, Panel } from '@/components/ui/primitives'
 import { FOUNDING_OFFER, PLANS, foundingProtectionBlurb, formatPrice } from '@/lib/billing/plans'
+import { allowanceRows } from '@/lib/billing/allowances'
+import { TRIAL_DAYS } from '@/lib/billing/trial'
 import { brand, title } from '@/lib/brand'
+
+const PRICE = formatPrice(PLANS.pro.monthlyPriceCents)
 
 export const metadata: Metadata = {
   title: 'Pricing',
@@ -16,6 +20,18 @@ export const metadata: Metadata = {
 
 const FAQ = [
   {
+    q: 'How does the Pro trial work?',
+    a: `${TRIAL_DAYS} days of Pro, once per account, with no card. Start it from Settings › Plan after you sign up. Nothing is charged automatically: when it ends, your account returns to Free unless you choose Subscribe to Pro. We email you two to three days before it ends.`,
+  },
+  {
+    q: 'What happens when the trial ends?',
+    a: 'Nothing is deleted or archived. You can still read, edit and export everyone and everything. Adding a sixth active person, the Relationship Atlas and the larger monthly allowances need Pro.',
+  },
+  {
+    q: 'If I subscribe during the trial, do I lose the rest of it?',
+    a: `No. You see the first charge date before you confirm: the day the trial would have ended (at least two days after you subscribe). Then ${PRICE} every month until you cancel. We remind you two to three days before the first charge, and if you cancel before it you pay nothing.`,
+  },
+  {
     q: 'Do I pay per person I add?',
     a: `No, and that is deliberate. ${brand.name} only gets useful when you add the people you actually work with, so charging per person would work against the whole point. Pro has no limit on people. What is metered is the expensive work: researching a public footprint, generating briefs, analyzing transcripts.`,
   },
@@ -25,7 +41,7 @@ const FAQ = [
   },
   {
     q: 'Is my relationship record private?',
-    a: `It is scoped to your account at the database level. It is not shared with anyone, and it is not used to train a shared model. If team plans are introduced, your private notes will stay private — sharing will always be an explicit act.`,
+    a: `It is scoped to your account at the database level. It is not shared with anyone, and it is not used to train a shared model. That is the same on every plan, as are the evidence behind each fact, your corrections, and export.`,
   },
   {
     q: 'What does "research" actually do?',
@@ -33,15 +49,15 @@ const FAQ = [
   },
   {
     q: 'Can I cancel?',
-    a: 'At any time, from Settings. You keep access until the end of the period you have paid for.',
+    a: 'At any time, from Settings › Plan. You keep Pro until the end of the period you have paid for, or of your trial if you subscribed during it.',
   },
 ]
 
 export default function PricingPage() {
   const free = PLANS.free
   const pro = PLANS.pro
-  const team = PLANS.team
   const protection = foundingProtectionBlurb()
+  const allowances = allowanceRows()
 
   return (
     <>
@@ -53,12 +69,12 @@ export default function PricingPage() {
               Priced for the conversations that matter.
             </h1>
             <p className="text-ink-secondary mt-6 leading-relaxed">
-              Start free. Upgrade when {brand.name} has enough of your relationship record to be
-              genuinely useful — which is usually after the first few meetings you prepare for.
+              Start free with five people. Try Pro free for {TRIAL_DAYS} days, no card: it returns
+              to Free unless you subscribe, and nothing is deleted.
             </p>
           </div>
 
-          <div className="mt-14 grid gap-6 lg:grid-cols-3">
+          <div className="mt-14 grid max-w-4xl gap-6 md:grid-cols-2">
             {/* --- free ------------------------------------------------------- */}
             <Panel className="flex flex-col p-7">
               <h2 className="font-display text-ink text-2xl">{free.name}</h2>
@@ -110,6 +126,10 @@ export default function PricingPage() {
               ) : null}
               {protection ? <p className="text-ink-muted mt-1 text-xs">{protection}</p> : null}
               <p className="text-ink-muted mt-1 text-xs">Billed monthly. Cancel any time.</p>
+              <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
+                Try it free for {TRIAL_DAYS} days, no card. Start the trial from Settings › Plan
+                after you sign up.
+              </p>
 
               <ul className="mt-7 grid flex-1 gap-3">
                 {pro.highlights.map((item) => (
@@ -119,42 +139,58 @@ export default function PricingPage() {
 
               <Button asChild size="lg" className="mt-8 w-full">
                 <Link href="/sign-up">
-                  Start free, upgrade later
+                  Start your {TRIAL_DAYS}-day trial
                   <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </Button>
             </Panel>
-
-            {/* --- teams ------------------------------------------------------ */}
-            <Panel className="flex flex-col p-7">
-              <h2 className="font-display text-ink text-2xl">{team.name}</h2>
-              <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{team.tagline}</p>
-
-              <p className="font-display text-ink mt-6 text-4xl">Talk to us</p>
-              <p className="text-ink-muted mt-1 text-xs">
-                Not available yet — tell us if your team would use it.
-              </p>
-
-              <ul className="mt-7 grid flex-1 gap-3">
-                {team.highlights.map((item) => (
-                  <Feature key={item}>{item}</Feature>
-                ))}
-              </ul>
-
-              <Button asChild variant="secondary" size="lg" className="mt-8 w-full">
-                <a
-                  href={`mailto:${brand.email.support}?subject=${encodeURIComponent(`${brand.name} for teams`)}`}
-                >
-                  Get in touch
-                </a>
-              </Button>
-            </Panel>
           </div>
 
-          <p className="text-ink-muted mt-8 max-w-2xl text-xs leading-relaxed">
-            Fair-use limits apply to the expensive operations — researching a person, generating
-            briefs, analyzing transcripts. They are set well above normal use; if you hit one, tell
-            us and we will look at it.
+          <p className="text-ink-secondary mt-8 max-w-2xl text-sm leading-relaxed">
+            On every plan: your record is private to your account, each fact shows the evidence
+            behind it, you can correct anything, and you can export or delete everything.
+          </p>
+        </Container>
+      </section>
+
+      {/* --- the allowances, as enforced ----------------------------------------- */}
+      <section className="border-line border-b py-20 sm:py-24">
+        <Container size="narrow">
+          <Eyebrow>Allowances</Eyebrow>
+          <h2 className="font-display text-ink mt-4 text-3xl leading-tight">
+            What each plan includes
+          </h2>
+          <div className="mt-8 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-line border-b">
+                  <th scope="col" className="text-ink-muted py-2.5 pr-4 text-xs font-normal">
+                    <span className="sr-only">Allowance</span>
+                  </th>
+                  <th scope="col" className="text-ink py-2.5 pr-4 font-medium">
+                    {free.name}
+                  </th>
+                  <th scope="col" className="text-ink py-2.5 font-medium">
+                    {pro.name}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {allowances.map((row) => (
+                  <tr key={row.label} className="border-line border-b">
+                    <th scope="row" className="text-ink-secondary py-2.5 pr-4 font-normal">
+                      {row.label}
+                    </th>
+                    <td className="text-ink py-2.5 pr-4 tabular-nums">{row.free}</td>
+                    <td className="text-ink py-2.5 tabular-nums">{row.pro}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-ink-muted mt-4 text-xs leading-relaxed">
+            Monthly allowances reset on the 1st. Unlimited means fair use: if you ever reach a
+            limit, tell us and we will look at it.
           </p>
         </Container>
       </section>
@@ -174,8 +210,8 @@ export default function PricingPage() {
           </p>
           <p className="text-ink-secondary mt-4 leading-relaxed">
             What is metered is the work that genuinely costs something to run: reading the public
-            web, generating a brief, analyzing a transcript, transcribing voice, and extended coach
-            use.
+            web, generating a brief, analyzing a transcript, transcribing voice, and answering
+            questions.
           </p>
 
           <ApertureRule className="my-12" />

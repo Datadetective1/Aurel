@@ -9,6 +9,7 @@ import { PLANS, type Capability, type MeterKind, type PlanId } from './plans'
 import { applyAccessTier, parseAccessTier, type AccessTier } from './access'
 import { resolveEntitlement, type EntitlementProvider } from './sources'
 import { transcriptionAllowance, type AllowanceDecision } from './transcription'
+import { isAppTrial, trialState, type TrialRow, type TrialState } from './trial'
 import { brand } from '@/lib/brand'
 
 /**
@@ -37,6 +38,12 @@ export interface Entitlements {
   isFounding: boolean
   /** Start of the current billing period, used as the quota bucket key. */
   periodStart: string
+  /**
+   * The 14-day trial, when the account has one running, subscribed during
+   * one, or had one end unsubscribed. `endsAt` is the trial's end; once
+   * subscribed, the first charge.
+   */
+  trial: { state: TrialState; endsAt: string } | null
   capabilities: Record<Capability, boolean>
   quotas: Partial<Record<MeterKind, number | null>>
   limits: { people: number | null }
@@ -60,7 +67,9 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const [{ data: subscription }, { data: overrides }, { data: grant }] = await Promise.all([
     supabase
       .from('subscriptions')
-      .select('plan, status, is_founding, current_period_end')
+      .select(
+        'plan, status, is_founding, current_period_end, trial_ends_at, stripe_subscription_id',
+      )
       .eq('user_id', user.id)
       .maybeSingle(),
     supabase
@@ -79,15 +88,28 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   ])
 
   // One canonical answer from every provider. A subscription that lapsed
-  // confers Free rather than staying entitled; see lib/billing/sources.
+  // confers Free rather than staying entitled; see lib/billing/sources. The
+  // app's own trial is not a Stripe subscription, so it is read as a trial,
+  // which ends by itself.
   const tier = parseAccessTier(grant?.tier)
+  const trialRow: TrialRow | null = subscription
+    ? {
+        status: subscription.status ?? null,
+        trialEndsAt: subscription.trial_ends_at ?? null,
+        stripeSubscriptionId: subscription.stripe_subscription_id ?? null,
+      }
+    : null
+  const appTrial = isAppTrial(trialRow)
   const resolved = resolveEntitlement({
-    stripe: subscription
-      ? { plan: (subscription.plan ?? 'free') as PlanId, status: subscription.status ?? null }
-      : null,
+    stripe:
+      subscription && !appTrial
+        ? { plan: (subscription.plan ?? 'free') as PlanId, status: subscription.status ?? null }
+        : null,
     apple: null,
+    trial: appTrial && trialRow?.trialEndsAt ? { endsAt: trialRow.trialEndsAt } : null,
     tier,
   })
+  const trial = trialState(trialRow)
   const plan = resolved.plan
 
   const definition = PLANS[plan] ?? PLANS.free
@@ -116,6 +138,7 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
     provider: resolved.provider,
     isFounding: subscription?.is_founding ?? false,
     periodStart: currentPeriodStart(),
+    trial: trial && trialRow?.trialEndsAt ? { state: trial, endsAt: trialRow.trialEndsAt } : null,
     capabilities,
     quotas,
     limits: applied.limits,
