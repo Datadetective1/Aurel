@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { brand } from '@/lib/brand'
 
 const h = vi.hoisted(() => ({ storage: false, google: false }))
 vi.mock('server-only', () => ({}))
@@ -18,7 +19,7 @@ const { default: PrivacyPage } = await import('./page')
 /**
  * THE PRIVACY PAGE SAYS WHAT PRODUCTION DOES
  * =============================================================================
- * Recordings are described in three places -- on the device, on Atturel's
+ * Recordings are described in three places -- on the device, on our
  * servers, at the provider -- and two sentences follow configuration instead
  * of describing a setup that may not be live: whether parts of a long
  * recording are stored, and the Google Limited Use statement, shown only when
@@ -41,7 +42,7 @@ describe('the privacy page', () => {
     )
     expect(text).toContain('it can be part of your phone’s own backup')
     expect(text).toContain('held in your browser tab until it is sent')
-    expect(text).toContain('On Atturel’s servers.')
+    expect(text).toContain(`On ${brand.name}’s servers.`)
     expect(text).toContain('never written to your record or our database')
     expect(text).toContain('At our service provider.')
     expect(text).toContain('not retained once transcribed')
