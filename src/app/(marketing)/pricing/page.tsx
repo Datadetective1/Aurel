@@ -46,7 +46,7 @@ const FAQ = [
   },
   {
     q: 'Is my relationship record private?',
-    a: `It is scoped to your account at the database level. It is not shared with anyone, and it is not used to train a shared model. That is the same on every plan, as are the evidence behind each fact, your corrections, and export.`,
+    a: `It is scoped to your account at the database level. It is not shared with other users. ${brand.name} does not use your content to train models. Our Privacy policy explains how our service providers process data. That is the same on every plan, as are the evidence behind each fact, your corrections, and export.`,
   },
   {
     q: 'What does "research" actually do?',

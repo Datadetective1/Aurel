@@ -183,7 +183,7 @@ const TRUST = [
   {
     icon: Lock,
     title: 'Private by design',
-    body: 'Scoped to your account. Never used to train a shared model.',
+    body: `Scoped to your account. ${brand.name} does not use your content to train models. Our Privacy policy explains how our service providers process data.`,
   },
 ]
 
