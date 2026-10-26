@@ -1,9 +1,11 @@
 name: Android build
 
 # Builds the Android app on EAS as a signed APK for installing on test phones
-# (the "preview" profile: internal distribution, production backend). Manual
-# only: Actions > Android build > Run workflow. It never uploads anything to
-# Google Play.
+# or an emulator. Manual only: Actions > Android build > Run workflow. It never
+# uploads anything to Google Play.
+#   Production backend: signs in to the real service ("preview" profile).
+#   Preview data: the app's invented record, no sign-in, no network
+#                 ("simulator-preview" profile), for checking screens.
 #
 # Secret (Settings > Secrets and variables > Actions):
 #   EXPO_TOKEN   The same Expo access token the iOS workflow uses.
@@ -11,10 +13,19 @@ name: Android build
 # Signing: the app's Android keystore is kept in Expo's credential storage for
 # @datadetective1/atturel. The first build creates it there (eas-cli has Expo
 # generate it when run non-interactively); every later build reuses it. It is
-# never written to the repository or to this run's logs.
+# never written to the repository or to this run's logs. Details in
+# docs/ANDROID.md.
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: What the app talks to
+        type: choice
+        options:
+          - Production backend
+          - Preview data
+        default: Production backend
 
 permissions:
   contents: read
@@ -79,7 +90,12 @@ jobs:
           fi
 
       - name: Build on EAS
-        run: eas build --platform android --profile preview --non-interactive --json > "$RUNNER_TEMP/build.json"
+        env:
+          VARIANT: ${{ inputs.variant }}
+        run: |
+          profile=preview
+          if [ "$VARIANT" = "Preview data" ]; then profile=simulator-preview; fi
+          eas build --platform android --profile "$profile" --non-interactive --json > "$RUNNER_TEMP/build.json"
 
       - name: Summary
         if: always()

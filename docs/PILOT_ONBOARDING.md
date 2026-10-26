@@ -6,6 +6,7 @@ About 20 minutes, around one real conversation you have coming up.
 
 - **The website, [www.atturel.com](https://www.atturel.com).** Everything in this guide works there, on a laptop or in a phone's browser.
 - **The iPhone app is in private testing (TestFlight). It is not in the App Store.** Use the website unless we have invited you to TestFlight.
+- **On an Android phone, use the website in your phone's browser.** An Android app is being tested on the team's own phones; it is not available to pilots yet and is not on Google Play.
 - **Plans.** Free, or Pro at $29 a month.
   - Pro comes with a **14-day trial and no card**.
   - When the trial ends, your account goes back to Free unless you choose to subscribe. Nothing is deleted.
@@ -72,12 +73,8 @@ Two questions, by reply or to support@atturel.com:
   - Build 0.1.0 (5) is in internal testing.
   - Internal testers must be users of the App Store Connect team, up to 100. They need no Apple review.
   - The internal group (Team (Expo)) has one tester.
-- **iPhone access for pilots outside the team: external TestFlight.** Being prepared, not submitted. It needs:
-  - an external group with test information;
-  - the reviewer demo account (`appreview@atturel.com`, created 25 Oct 2026);
-  - Apple's beta review (usually about a day).
-
-  Testers are then invited by email or a public link. Steps: `docs/IOS_TESTFLIGHT.md` §6.
+- **iPhone access for pilots outside the team: external TestFlight.** Build 5 was submitted for Apple's beta review on 26 Oct 2026 (group "Atturel Pilot"). Once Apple approves it, a public link for up to 10 testers is turned on and given to the owner to share. Steps: `docs/IOS_TESTFLIGHT.md` §6.
+- **Android: team phones only.** A signed test APK (Actions › Android build) is for checking the app on the team's own Android phones. Pilots on Android use the website until the physical-phone checks in `docs/ANDROID.md` pass. Nothing is on Google Play.
 
 - **Public App Store availability:** not submitted. How subscriptions are offered in the App Store build is still unresolved (audit §4, decisions 3 and 7).
 - **Payments.** Live checkout and the no-card trial are verified on production.
