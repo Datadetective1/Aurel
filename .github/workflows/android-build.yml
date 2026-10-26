@@ -11,8 +11,7 @@ name: Android build
 # Signing: the app's Android keystore is kept in Expo's credential storage for
 # @datadetective1/atturel. The first build creates it there (eas-cli has Expo
 # generate it when run non-interactively); every later build reuses it. It is
-# never written to the repository or to this run's logs. Details in
-# docs/ANDROID.md.
+# never written to the repository or to this run's logs.
 
 on:
   workflow_dispatch:
