@@ -14,6 +14,7 @@ import type { AccountResponse, CaptureRequest, CaptureResponse } from '@atturel/
 import { api, ApiError, directTranscriber, segmentedDeps, useApi } from '~/lib/api'
 import { discardRemote, storageTranscriber } from '~/lib/segmented'
 import { config } from '~/lib/config'
+import { deviceName, microphoneSettings, microphoneTakenBy } from '~/lib/device'
 import {
   canStart,
   composeCaptureText,
@@ -74,8 +75,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 type Phase = 'ready' | 'recording' | 'paused' | 'stopped' | 'sending'
 
-const INTERRUPTED =
-  'Paused — iPhone needed the microphone (a call, Siri or another app). What was recorded is kept. Resume when you are ready.'
+const INTERRUPTED = `Paused — the ${deviceName} needed the microphone (${microphoneTakenBy}). What was recorded is kept. Resume when you are ready.`
 
 function captureId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -391,7 +391,7 @@ export default function Capture() {
     if (!config.previewData) {
       const permission = await requestRecordingPermissionsAsync()
       if (!permission.granted) {
-        setError('Microphone access is off. Turn it on in Settings › Atturel › Microphone, or type notes instead.')
+        setError(`Microphone access is off. Turn it on in ${microphoneSettings}, or type notes instead.`)
         setMicDenied(true)
         return
       }
@@ -642,7 +642,7 @@ export default function Capture() {
             {transport === 'storage'
               ? 'To turn it into words, the audio is sent through Atturel to a speech-to-text service, held briefly in private storage while that happens, then deleted. '
               : 'To turn it into words, the audio is sent through Atturel to a speech-to-text service; Atturel does not keep it. '}
-            The copy on this iPhone is deleted once the conversation is kept. Recording pauses if you leave the app.
+            The copy on this {deviceName} is deleted once the conversation is kept. Recording pauses if you leave the app.
           </T>
         </>
       ) : null}
@@ -687,6 +687,7 @@ export default function Capture() {
               placeholderTextColor={c.inkMuted}
               value={typed}
               onChangeText={setTyped}
+              textAlignVertical="top"
               style={{ marginTop: 12, minHeight: 72, borderWidth: 1, borderColor: c.line, borderRadius: 10, padding: 12, color: c.ink, fontFamily: fonts.sans, fontSize: 15 }}
             />
           </Card>

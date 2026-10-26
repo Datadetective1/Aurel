@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { brand } from '@atturel/web/lib/brand'
 import { useAuth } from '~/lib/auth'
 import { config } from '~/lib/config'
+import { browserName } from '~/lib/device'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
 import { fonts, TOUCH, useTheme } from '~/theme'
@@ -94,7 +95,7 @@ export default function SignIn() {
           <View style={{ marginTop: 6 }}>
             <Button label="Sign in" onPress={submit} busy={busy} disabled={!email || !password} size="lg" />
           </View>
-          <Button label="Forgot your password?" variant="ghost" onPress={() => void Linking.openURL(`${config.apiUrl}/forgot-password`)} accessibilityHint="Opens atturel.com in Safari" />
+          <Button label="Forgot your password?" variant="ghost" onPress={() => void Linking.openURL(`${config.apiUrl}/forgot-password`)} accessibilityHint={`Opens atturel.com in ${browserName}`} />
           <View style={{ height: 1, backgroundColor: c.line, marginVertical: 8 }} />
           <Button label="New here? Create an account" variant="secondary" icon="user-plus" onPress={() => router.push('/sign-up')} />
         </View>

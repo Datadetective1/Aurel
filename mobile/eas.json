@@ -36,6 +36,9 @@
       "env": {
         "EXPO_PUBLIC_PREVIEW_DATA": "1"
       },
+      "android": {
+        "buildType": "apk"
+      },
       "ios": {
         "simulator": true,
         "buildConfiguration": "Release",

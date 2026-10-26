@@ -7,6 +7,7 @@ import Feather from '@expo/vector-icons/Feather'
 import type { CreateMeetingResponse, MeResponse, PrepareResponse, VisualPerson } from '@atturel/web/lib/mobile/contracts'
 import { api, ApiError, useApi } from '~/lib/api'
 import { atWallTime, formatTime, relativeDay, wallTime } from '~/lib/format'
+import { pickOnAndroid } from '~/lib/pick-time'
 import { Avatar } from '~/components/avatar'
 import { Button } from '~/components/button'
 import { Field } from '~/components/field'
@@ -154,9 +155,13 @@ export default function NewMeeting() {
                 icon="calendar"
                 selected={when.kind === 'at' && when.label === 'picked'}
                 onPress={() => {
+                  const from = when.kind === 'at' ? when.at : presets(now, tz)[1]!.at
+                  if (Platform.OS === 'android') {
+                    pickOnAndroid(from, tz, (at) => setWhen({ kind: 'at', at, label: 'picked' }))
+                    return
+                  }
                   setPicking(true)
-                  if (when.kind !== 'at') setWhen({ kind: 'at', at: presets(now, tz)[1]!.at, label: 'picked' })
-                  else setWhen({ ...when, label: 'picked' })
+                  setWhen({ kind: 'at', at: from, label: 'picked' })
                 }}
               />
             ) : null}
@@ -165,11 +170,11 @@ export default function NewMeeting() {
           {when.kind === 'at' ? (
             <T variant="small" tone="secondary" style={{ marginTop: 10 }}>{describe(when.at)}</T>
           ) : null}
-          {picking && when.kind === 'at' && Platform.OS !== 'web' ? (
+          {picking && when.kind === 'at' && Platform.OS === 'ios' ? (
             <DateTimePicker
               value={when.at}
               mode="datetime"
-              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              display="inline"
               minuteInterval={5}
               timeZoneName={tz}
               themeVariant={name === 'obsidian' ? 'dark' : 'light'}

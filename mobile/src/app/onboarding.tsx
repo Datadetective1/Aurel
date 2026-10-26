@@ -6,6 +6,7 @@ import type { OnboardingResponse } from '@atturel/web/lib/mobile/contracts'
 import { brand } from '@atturel/web/lib/brand'
 import { api, ApiError } from '~/lib/api'
 import { useAuth } from '~/lib/auth'
+import { deviceName } from '~/lib/device'
 import { Button } from '~/components/button'
 import { Field } from '~/components/field'
 import { T } from '~/components/text'
@@ -119,7 +120,7 @@ export default function Onboarding() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Feather name="globe" size={14} color={c.inkMuted} />
             <T variant="meta" tone="muted" style={{ flex: 1 }}>
-              Times are shown in {timezone.replace(/_/g, ' ')}, this iPhone’s time zone. Change it later in Settings on the web.
+              Times are shown in {timezone.replace(/_/g, ' ')}, this {deviceName}’s time zone. Change it later in Settings on the web.
             </T>
           </View>
           {error ? <T variant="small" tone="critical" accessibilityRole="alert">{error}</T> : null}

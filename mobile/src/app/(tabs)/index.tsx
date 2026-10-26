@@ -9,6 +9,7 @@ import { pendingStore } from '~/lib/pending-store'
 import { recordedSeconds } from '~/lib/pending-capture'
 import { useRecordingState } from '~/lib/recording-state'
 import { elapsed } from '~/lib/capture'
+import { deviceName } from '~/lib/device'
 import { countdown, formatDayLabel } from '~/lib/format'
 import { Failure, Loading, Screen, Section, Empty, Card, StaleNote } from '~/components/screen'
 import { LoopRow, MeetingCard } from '~/components/relationship'
@@ -237,12 +238,12 @@ function greeting(now: Date, timeZone: string) {
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
 }
 
-/** A recording kept on this iPhone that has not reached Atturel yet. */
+/** A recording kept on this phone that has not reached Atturel yet. */
 function UnsentCard({ seconds }: { seconds: number }) {
   return (
     <View style={{ marginTop: 16 }}>
       <Card tone="caution">
-        <T variant="small">A {elapsed(seconds)} recording has not been sent yet. It is safe on this iPhone.</T>
+        <T variant="small">A {elapsed(seconds)} recording has not been sent yet. It is safe on this {deviceName}.</T>
         <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
           <Button label="Open it in Capture" icon="mic" variant="secondary" onPress={() => router.push('/capture')} />
         </View>

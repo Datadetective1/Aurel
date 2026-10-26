@@ -6,6 +6,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { brand } from '@atturel/web/lib/brand'
 import { api, ApiError } from '~/lib/api'
 import { config } from '~/lib/config'
+import { deviceName } from '~/lib/device'
 import { Button } from '~/components/button'
 import { Card } from '~/components/screen'
 import { Field } from '~/components/field'
@@ -71,7 +72,7 @@ export default function SignUp() {
         </T>
         <View style={{ marginTop: 20 }}>
           <Card tone="sunken">
-            <Step n={1} text="Open the email on this iPhone and tap the link. It opens atturel.com." />
+            <Step n={1} text={`Open the email on this ${deviceName} and tap the link. It opens atturel.com.`} />
             <Step n={2} text="Come back here and sign in with the same email and password." />
           </Card>
         </View>
