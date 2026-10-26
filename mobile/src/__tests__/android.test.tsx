@@ -118,3 +118,25 @@ describe('the words for the device', () => {
     expect(w.browserName).toBe('Safari')
   })
 })
+
+describe('what the Android app asks for', () => {
+  // The merged manifest of build 0.1.0 (1) carried CAMERA from expo-image-picker's own
+  // manifest, though photos come through the system photo picker and the camera is
+  // never used. These stay blocked; the microphone stays allowed.
+  const android = require('../../app.json').expo.android as { blockedPermissions: string[] }
+
+  it('blocks the camera, storage and overlay permissions it never uses', () => {
+    expect(android.blockedPermissions).toEqual(
+      expect.arrayContaining([
+        'android.permission.CAMERA',
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+      ]),
+    )
+  })
+
+  it('never blocks the microphone', () => {
+    expect(android.blockedPermissions).not.toContain('android.permission.RECORD_AUDIO')
+  })
+})

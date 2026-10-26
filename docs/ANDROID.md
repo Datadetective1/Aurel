@@ -15,7 +15,7 @@ It is not on Google Play, and pilots on Android use the website.
 | Sign-in links | Sign-up, confirmation and password reset open atturel.com in the browser; no deep link is needed. The `atturel` scheme is registered. | None. |
 | Secure storage | `expo-secure-store` (Android Keystore), chunked under 2 KB, already used on both platforms. Its config plugin excludes it from Android backups. | None. |
 | Recording | `expo-audio` records AAC/M4A on Android with the same settings, in the app's private files folder (`directory: 'document'`), and pauses when the app leaves the foreground. Background recording stays off (no foreground service). | None. |
-| Permissions | The manifest asked for `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` (added by `expo-file-system`; unused), and `SYSTEM_ALERT_WINDOW`. Photos come through Android's system photo picker, which needs no permission. | Blocked. Left: `INTERNET`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `VIBRATE`. |
+| Permissions | The manifest asked for `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` (added by `expo-file-system` and `expo-image-picker`; unused) and `SYSTEM_ALERT_WINDOW`. The first APK's merged manifest also carried `CAMERA`, from `expo-image-picker`'s own manifest, although photos come through Android's system photo picker, which needs no permission, and the app never uses the camera. | All blocked. Runtime permission asked: microphone only. Normal permissions from libraries remain: internet, network state, vibrate, wake lock, install referrer, and biometric (from secure storage; no prompt, not used). |
 | File handling | Unsent recordings and `pending.json` sit in the app's own files folder, which is stable across updates on Android. Export writes to the cache folder and opens the system share sheet. | None. |
 | Navigation | Expo Router stack and tabs; the system Back button closes modals and steps back. Keyboard: `adjustResize`. Every screen applies the safe-area insets that Android's edge-to-edge layout needs. | None. |
 | Text input | The "Anything to add" box on Capture centred its text vertically on Android. | Aligned to the top. |
@@ -25,7 +25,7 @@ It is not on Google Play, and pilots on Android use the website.
 - **New meeting › Pick a time.** Android shows the system's day dialog, then its time dialog (`lib/pick-time.ts`); backing out of either changes nothing. iOS keeps the inline picker.
 - **Closing a loop.** Android's dialog shows Done (primary), Later and No longer needed; Back or a tap outside keeps the loop open. iOS keeps the action sheet with Keep open.
 - **Wording.** "this phone", Settings › Apps › Atturel › Permissions › Microphone, "a call or another app", "your browser".
-- **Manifest.** The three unused permissions are blocked (`android.blockedPermissions`).
+- **Manifest.** Camera, storage and overlay permissions are blocked (`android.blockedPermissions`); a test keeps them blocked and the microphone allowed.
 
 Tests: `mobile/src/__tests__/android.test.tsx` (the two-dialog time picker, the three-button loop dialog, the words on each platform, iOS unchanged).
 
