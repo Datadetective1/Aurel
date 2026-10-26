@@ -53,8 +53,9 @@ export default async function DataSettingsPage() {
       </Panel>
 
       <p className="mt-5 max-w-lg text-xs leading-relaxed text-ink-muted">
-        Everything above is scoped to your account at the database level. It is not shared with
-        anyone, it is not used to train a shared model, and {brand.name} never records or infers
+        Everything above is scoped to your account at the database level and is not shared with
+        other users. {brand.name} does not use your content to train models. Our Privacy policy
+        explains how our service providers process data. {brand.name} never records or infers
         anyone&rsquo;s protected characteristics.
       </p>
 

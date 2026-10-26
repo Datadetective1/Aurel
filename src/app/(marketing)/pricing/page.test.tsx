@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { brand } from '@/lib/brand'
 
 const h = vi.hoisted(() => ({ trial: true }))
 vi.mock('server-only', () => ({}))
@@ -81,6 +82,14 @@ describe('the pricing page', () => {
   it('says privacy, evidence, corrections and export are on every plan', () => {
     render(<PricingPage />)
     expect(screen.getByText(/On every plan: your record is private to your account/)).toBeTruthy()
+  })
+
+  it('makes the training statement the Privacy policy supports, in the FAQ and its structured data', () => {
+    const { container } = render(<PricingPage />)
+    const statement = `${brand.name} does not use your content to train models. Our Privacy policy explains how our service providers process data.`
+    expect(container.textContent).toContain(statement)
+    expect(container.innerHTML).toContain(statement)
+    expect(container.textContent).not.toMatch(/train a shared model|not shared with anyone/)
   })
 })
 
