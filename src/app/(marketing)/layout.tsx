@@ -173,9 +173,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="border-line flex flex-col gap-2 border-t py-4 sm:flex-row sm:items-center sm:justify-between sm:py-6">
-            <p className="text-ink-faint text-xs">
-              &copy; {new Date().getFullYear()} {brand.legalEntity}. All rights reserved.
-            </p>
+            <p className="text-ink-faint text-xs">&copy; 2026 {brand.name}. All rights reserved.</p>
             <p className="text-ink-faint hidden items-center gap-2 text-xs sm:flex">
               <ApertureMark className="size-3.5" />
               {brand.tagline}
