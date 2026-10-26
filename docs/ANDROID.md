@@ -90,6 +90,75 @@ Sources: [Payments policy](https://support.google.com/googleplay/android-develop
 - The Privacy page describes recording "in the iPhone app". It needs Android wording before Android pilots use the app. That is a policy change for the owner to approve.
 - Android **developer verification**: since 30 Sep 2026, certified Android phones in Brazil, Indonesia, Singapore and Thailand block installing apps, Play or sideloaded, from developers who have not verified their identity with Google. Wider rollout is expected through 2027. Registering the Play developer account (step 1) covers it.
 
-## Verification
+## Verification (26 Oct 2026)
 
-To be filled in from the build and emulator runs.
+### Builds
+
+| Build | Profile | Commit | Result |
+| --- | --- | --- | --- |
+| [0.1.0 (1)](https://expo.dev/accounts/datadetective1/projects/atturel/builds/8288b0a1-49ff-4f1b-9556-a75a222027a9) | preview (production backend) | `754c592` | **The test build to install.** Signed APK; no camera or storage permission. |
+| [0.1.0 (1)](https://expo.dev/accounts/datadetective1/projects/atturel/builds/a322cab9-b45b-44fa-a00a-8b0b9df32b83) | simulator-preview (preview data) | `f5662cb` | For checking screens with invented data. Still carries CAMERA (built before the fix); not for phones. |
+| [0.1.0 (1)](https://expo.dev/accounts/datadetective1/projects/atturel/builds/ca923e96-0c74-44af-b414-935094777ac1) | preview | `040e222` | Superseded: its manifest carried CAMERA. |
+
+All three expire on Expo's free plan 14 days after they were built (9 Nov 2026).
+
+### Automated (done)
+
+- `mobile`: 117 jest tests, typecheck. `android.test.tsx` covers:
+  - the two-dialog time picker;
+  - the three-button loop dialog, with iOS unchanged;
+  - device wording, with iOS unchanged;
+  - the blocked permissions.
+- Bundles: `npx expo export --platform android` and `--platform ios` both succeed.
+- Manifest: `expo config --type introspect`.
+- The test APK itself, inspected:
+  - package `com.atturel.app`, version 0.1.0 (code 1);
+  - minimum SDK 24, target SDK 36;
+  - APK Signature Scheme v2+;
+  - API `https://www.atturel.com`, preview data off;
+  - native code for arm64-v8a, armeabi-v7a, x86 and x86_64.
+- Permissions in the test APK:
+  - Runtime (prompted): `RECORD_AUDIO` only.
+  - Normal (no prompt): `INTERNET`, `ACCESS_NETWORK_STATE`, `MODIFY_AUDIO_SETTINGS`, `VIBRATE`, `WAKE_LOCK`, `USE_BIOMETRIC`/`USE_FINGERPRINT` (from secure storage, unused), and the Play install referrer.
+- Shared logic is covered by existing tests on both platforms: offline retry and resume of unsent recordings (`pending-capture`), the upload transports, and photo resizing.
+
+### Emulator (EAS Simulator, Android)
+
+Waiting for the owner to approve a usage budget for simulator minutes. The approval prompt went unanswered on 26 Oct. Planned:
+
+- **Preview-data APK:**
+  - each tab;
+  - a person;
+  - New meeting with the day and time dialogs;
+  - the loop dialog and Back;
+  - Capture with the simulated recorder (start, pause, resume, stop, Understand, Review, Keep);
+  - Ask;
+  - Account;
+  - the system photo picker opening without a permission prompt;
+  - Back from every modal.
+- **Production APK:** launch, the sign-in screen, and a failed sign-in, which proves the app reaches Supabase auth.
+
+The emulator has no real microphone, and no test account's credentials are available to this session, so signed-in flows are on the physical-phone list.
+
+### Physical Android phone (owner)
+
+Install the test APK from its build page, sign in with your own account, then check, in order:
+
+1. **Sign-in**, and staying signed in after closing and reopening the app.
+2. **People:** list, search, open someone, edit, add a photo through the system picker (no permission prompt), archive and restore.
+3. **Recording:**
+   - Capture, Record (the microphone prompt appears once), pause, resume, stop.
+   - **Understand it**, then **Review**, then **Keep**.
+   - The conversation and its commitments appear on Today and on the person.
+4. **Commitments:** tap a loop. The dialog shows Done / Later / No longer needed, and Back keeps it open.
+5. **New meeting:** Pick a time shows the day dialog, then the time dialog. Create and prepare.
+6. **Offline retry:** record, switch on aeroplane mode, tap Understand it. The recording is kept. Switch aeroplane mode off and tap Try again.
+7. **Microphone recovery:**
+   - Deny the microphone. Capture says where to turn it on, and **Open Settings** opens Atturel's app settings.
+   - Allow it there, come back, and record.
+   - Leaving the app while recording pauses it.
+8. **Export:** Account, Export my data, then the share sheet.
+9. **Ask:** ask a question about your record; the answer shows what it rests on.
+10. **Keyboard:** on Ask, Sign in and New meeting, the field being typed in stays visible.
+
+Report what fails with the phone model and Android version.
