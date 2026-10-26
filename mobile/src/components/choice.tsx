@@ -9,6 +9,7 @@ import {
   timezoneConfirmation,
   timezoneLabel,
 } from '@atturel/web/lib/timezones'
+import { deviceName } from '~/lib/device'
 import { fonts, TOUCH, useTheme } from '~/theme'
 import { T } from './text'
 
@@ -246,7 +247,7 @@ export function TimeZoneField({
           </View>
           {!q && device && device !== value ? (
             <Option
-              label={`Use this iPhone’s: ${timezoneLabel(device)}`}
+              label={`Use this ${deviceName}’s: ${timezoneLabel(device)}`}
               selected={false}
               onPress={() => choose(device)}
             />

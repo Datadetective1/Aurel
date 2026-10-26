@@ -1,0 +1,94 @@
+name: Android build
+
+# Builds the Android app on EAS as a signed APK for installing on test phones
+# (the "preview" profile: internal distribution, production backend). Manual
+# only: Actions > Android build > Run workflow. It never uploads anything to
+# Google Play.
+#
+# Secret (Settings > Secrets and variables > Actions):
+#   EXPO_TOKEN   The same Expo access token the iOS workflow uses.
+#
+# Signing: the app's Android keystore is kept in Expo's credential storage for
+# @datadetective1/atturel. The first build creates it there (eas-cli has Expo
+# generate it when run non-interactively); every later build reuses it. It is
+# never written to the repository or to this run's logs. Details in
+# docs/ANDROID.md.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the test APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_ACCOUNT: datadetective1
+      EAS_CLI_VERSION: 25.3.0
+    steps:
+      - name: Check the Expo token
+        working-directory: .
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::The EXPO_TOKEN secret is not set. Create a token at expo.dev (account settings > Access tokens) and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+
+      # As in the iOS workflow: the shared files under ../src resolve their
+      # imports from the root packages, so the checks need those too.
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --prefix ..
+          npm ci
+
+      - name: Check the app
+        run: |
+          npm run typecheck
+          npm test -- --ci
+
+      - name: Install EAS CLI
+        run: npm install --global "eas-cli@$EAS_CLI_VERSION"
+
+      - name: Confirm the Expo account
+        run: |
+          eas whoami | sed 's/\x1b\[[0-9;]*m//g' | tee "$RUNNER_TEMP/whoami.txt"
+          if ! grep -Eq "^(• )?$EXPO_ACCOUNT( \(|$)" "$RUNNER_TEMP/whoami.txt"; then
+            echo "::error::EXPO_TOKEN does not act for the $EXPO_ACCOUNT account."
+            exit 1
+          fi
+
+      - name: Build on EAS
+        run: eas build --platform android --profile preview --non-interactive --json > "$RUNNER_TEMP/build.json"
+
+      - name: Summary
+        if: always()
+        working-directory: .
+        run: |
+          {
+            echo "### Android build"
+            if [ -s "$RUNNER_TEMP/build.json" ]; then
+              jq -r '.[] | "- \(.appVersion) (\(.appBuildVersion)): \(.status) — https://expo.dev/accounts/'"$EXPO_ACCOUNT"'/projects/atturel/builds/\(.id)"' "$RUNNER_TEMP/build.json" || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

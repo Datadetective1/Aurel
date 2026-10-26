@@ -142,10 +142,15 @@ export function chooseLoopAction(loop: VisualLoop, onChanged: (message: string) 
     )
     return
   }
-  Alert.alert(loop.description, undefined, [
-    ...LOOP_ACTIONS.map((a, i) => ({ text: a.label, onPress: () => void run(i) })),
-    { text: 'Keep open', style: 'cancel' as const },
-  ])
+  // An Android dialog holds at most three buttons, read as neutral, negative,
+  // positive: No longer needed on its own at the left, Done in the primary
+  // place. Keeping the loop open is Back or a tap outside.
+  Alert.alert(
+    loop.description,
+    undefined,
+    [2, 1, 0].map((i) => ({ text: LOOP_ACTIONS[i]!.label, onPress: () => void run(i) })),
+    { cancelable: true },
+  )
 }
 
 /** One open loop: which way it runs, what it is, whose, when. Tap to close it. */
