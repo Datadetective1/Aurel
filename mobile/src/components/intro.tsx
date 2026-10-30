@@ -164,13 +164,13 @@ function Wordmark() {
 // --- the drawings -------------------------------------------------------------
 // Built from the app's own surfaces and type, so they read as the product.
 
-const MAYA = '/demo/faces/maya.svg'
+const MAYA = '/demo/faces/maya.webp'
 const SAMPLE = [
   { id: 'maya', name: 'Maya Chen', src: MAYA },
-  { id: 'daniel', name: 'Daniel Brooks', src: '/demo/faces/daniel.svg' },
-  { id: 'priya', name: 'Priya Shah', src: '/demo/faces/priya.svg' },
-  { id: 'lucas', name: 'Lucas Martin', src: '/demo/faces/lucas.svg' },
-  { id: 'elena', name: 'Elena Torres', src: '/demo/faces/elena.svg' },
+  { id: 'daniel', name: 'Daniel Brooks', src: '/demo/faces/daniel.webp' },
+  { id: 'priya', name: 'Priya Shah', src: '/demo/faces/priya.webp' },
+  { id: 'lucas', name: 'Lucas Martin', src: '/demo/faces/lucas.webp' },
+  { id: 'elena', name: 'Elena Torres', src: '/demo/faces/elena.webp' },
 ]
 
 function Sheet({ children, tilt = 0 }: { children: React.ReactNode; tilt?: number }) {
