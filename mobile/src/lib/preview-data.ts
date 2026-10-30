@@ -62,6 +62,7 @@ function previewReview(personId: string): ResearchResponse {
       host: 'example.com',
       publisher: person.company ?? 'Northwind',
       publishedAt: null,
+      updatedAt: null,
       state: 'waiting',
       match: 'strong',
       why: `Matched because their name is in the page title and it is published by ${person.company ?? 'Northwind'}.`,
@@ -72,6 +73,8 @@ function previewReview(personId: string): ResearchResponse {
         { id: 'src-team:1', kind: 'prior_role', label: 'Previously', value: 'Partnerships at Halcyon', detail: null, evidence: 'inferred', excerpt: 'having joined from Halcyon', current: false },
       ],
       proposals: 0,
+      image: false,
+      offerPhoto: false,
     },
     {
       id: 'src-talk',
@@ -80,6 +83,7 @@ function previewReview(personId: string): ResearchResponse {
       host: 'example.org',
       publisher: null,
       publishedAt: '2026-03-12T00:00:00.000Z',
+      updatedAt: null,
       state: 'waiting',
       match: 'possible',
       why: `This might be ${person.fullName}, but there is not enough to be sure. Matched because their name appears in the page.`,
@@ -87,6 +91,8 @@ function previewReview(personId: string): ResearchResponse {
       reviewed: false,
       facts: [{ id: 'src-talk:0', kind: 'appearance', label: 'Public appearance', value: 'Panel on partner programmes, March 2026', detail: null, evidence: 'observed', excerpt: null, current: true }],
       proposals: 1,
+      image: false,
+      offerPhoto: false,
     },
   ]
   const sources = previewResearch.searched
@@ -103,6 +109,23 @@ function previewReview(personId: string): ResearchResponse {
     hint: null,
     lastResearchedAt: previewResearch.searched ? NOW.toISOString() : null,
     sources,
+    // The two pages merged, as the server would: what is said, by how many pages.
+    profile: sources.some((s) => s.state !== 'rejected')
+      ? sources
+          .filter((s) => s.state !== 'rejected')
+          .flatMap((s) => s.facts.map((f) => ({ f, s })))
+          .map(({ f, s }) => ({
+            kind: f.kind === 'prior_role' || f.kind === 'current_role' ? 'role' : f.kind,
+            label: f.label,
+            value: f.value,
+            pages: 1,
+            asOf: s.updatedAt ?? s.publishedAt,
+            past: !f.current && f.kind.endsWith('role'),
+            dated: false,
+            onRecord: s.state === 'kept',
+            worthChecking: f.evidence === 'inferred',
+          }))
+      : [],
     notUsed: previewResearch.searched ? 4 : 0,
   }
 }

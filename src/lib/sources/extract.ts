@@ -1,5 +1,6 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
+import { isRestrictedPhotoHost, pageImageCandidates } from '@/lib/photos/candidates'
 
 /**
  * CONTENT EXTRACTION
@@ -25,6 +26,12 @@ export interface ExtractedContent {
   publisher: string | null
   publishedAt: string | null
   description: string | null
+  /**
+   * The page's own lead image (og:image, twitter:image), the picture a link
+   * preview shows. Raster only, never from a platform whose images are off
+   * limits. Kept as an address; nothing is fetched here.
+   */
+  image: string | null
   /** sha256 of the normalised text, for dedupe and change detection. */
   contentHash: string
   wordCount: number
@@ -140,6 +147,11 @@ export function extractFromHtml(html: string, url?: string): ExtractedContent {
     publisher,
     publishedAt: normaliseDate(publishedAt),
     description,
+    image: url
+      ? (pageImageCandidates(html.slice(0, 300_000), url).find(
+          (image) => !isRestrictedPhotoHost(image),
+        ) ?? null)
+      : null,
     contentHash: hashContent(text),
     wordCount: text ? text.split(/\s+/).length : 0,
   }
@@ -155,6 +167,7 @@ export function extractFromText(raw: string, title?: string | null): ExtractedCo
     publisher: null,
     publishedAt: null,
     description: null,
+    image: null,
     contentHash: hashContent(text),
     wordCount: text ? text.split(/\s+/).length : 0,
   }

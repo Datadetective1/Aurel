@@ -338,3 +338,24 @@ describe('bounded capture', () => {
     expect(matchExpertise('Jordan holds a degree in Computer Science.')).toBeNull()
   })
 })
+
+describe('extractFromHtml lead image', () => {
+  it('keeps the page’s own share image, resolved against the page', () => {
+    const html =
+      '<html><head><meta property="og:image" content="/img/dana.jpg"><title>Dana</title></head><body><p>Dana leads sales.</p></body></html>'
+    expect(extractFromHtml(html, 'https://northwind.example/team/dana').image).toBe(
+      'https://northwind.example/img/dana.jpg',
+    )
+  })
+
+  it('takes none from a restricted platform, a vector file, or a page with no address', () => {
+    const linkedIn =
+      '<meta property="og:image" content="https://media.licdn.com/dana.jpg"><p>Dana</p>'
+    expect(extractFromHtml(linkedIn, 'https://northwind.example/').image).toBeNull()
+    const svg = '<meta property="og:image" content="https://cdn.example/logo.svg"><p>Dana</p>'
+    expect(extractFromHtml(svg, 'https://northwind.example/').image).toBeNull()
+    expect(
+      extractFromHtml('<meta property="og:image" content="https://cdn.example/a.jpg">').image,
+    ).toBeNull()
+  })
+})

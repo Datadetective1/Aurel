@@ -483,6 +483,8 @@ export interface ResearchSource {
   host: string | null
   publisher: string | null
   publishedAt: string | null
+  /** When the page says it was last updated, if later than publishedAt. Shown in its place. */
+  updatedAt: string | null
   /** waiting: nothing from it is in the record yet. kept: in the record. rejected: marked as someone else. */
   state: 'waiting' | 'kept' | 'rejected'
   /** For a page still waiting: how strong the identity check found the match. */
@@ -497,6 +499,31 @@ export interface ResearchSource {
   facts: ResearchFact[]
   /** Communication readings it would propose, or proposed; each is reviewed on its own. */
   proposals: number
+  /** The page has a lead image, served small at .../sources/:sourceId/image. */
+  image: boolean
+  /** Offer that picture as their photo: a bio or speaker page you said is them, and they have none. */
+  offerPhoto: boolean
+}
+
+/** One thing the pages say about them, merged across every page not set aside. */
+export interface ResearchProfileFact {
+  /** "role" for current and earlier roles alike; otherwise the fact's own kind. */
+  kind: string
+  /** "Role", "Previously", "Education"... */
+  label: string
+  value: string
+  /** How many pages say it. */
+  pages: number
+  /** The newest date among those pages. */
+  asOf: string | null
+  /** A role the newest page mentioning it says has ended. */
+  past: boolean
+  /** A role seen only on pages much older than the newest: true as of asOf, not known since. */
+  dated: boolean
+  /** At least one of those pages is in the record; otherwise it waits on a page being confirmed. */
+  onRecord: boolean
+  /** Every page that says it only implies it. */
+  worthChecking: boolean
 }
 
 export interface ResearchResponse {
@@ -512,7 +539,10 @@ export interface ResearchResponse {
   canDiscover: boolean
   hint: string | null
   lastResearchedAt: string | null
+  /** Newest first within each state. */
   sources: ResearchSource[]
+  /** What the pages not set aside say, merged. */
+  profile: ResearchProfileFact[]
   /** Pages checked and not used: about someone else, or unreadable. */
   notUsed: number
 }
@@ -530,6 +560,10 @@ export interface RunResearchResponse extends ResearchResponse {
 export interface SourceDecisionRequest {
   decision: 'confirm' | 'reject'
 }
+// --- POST|DELETE /api/mobile/people/:id/sources/:sourceId/photo -------------------
+/** POST uses the page's picture as their photo; DELETE skips it for good. */
+export type SourcePhotoResponse =
+  { ok: true; photo: string | null; research: ResearchResponse } | { ok: false; error: string }
 export type SourceDecisionResponse =
   { ok: true; factsAdded: number; research: ResearchResponse } | { ok: false; error: string }
 

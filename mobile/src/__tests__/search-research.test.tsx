@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Alert } from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import type { PersonResponse, ResearchResponse, ResearchSource, RunResearchResponse } from '@atturel/web/lib/mobile/contracts'
 import { ThemeProvider } from '../theme'
@@ -100,6 +101,7 @@ const REVIEW: ResearchResponse = {
   hint: null,
   lastResearchedAt: null,
   sources: [],
+  profile: [],
   notUsed: 0,
 }
 const WAITING: ResearchSource = {
@@ -109,6 +111,7 @@ const WAITING: ResearchSource = {
   host: 'northwind.example',
   publisher: 'Northwind',
   publishedAt: null,
+  updatedAt: null,
   state: 'waiting',
   match: 'strong',
   why: 'Matched because their name is in the page title and it is published by Northwind.',
@@ -116,6 +119,8 @@ const WAITING: ResearchSource = {
   reviewed: false,
   facts: [{ id: 'src-1:0', kind: 'current_role', label: 'Role', value: 'VP Sales', detail: null, evidence: 'observed', excerpt: 'led by Dana Whitfield', current: true }],
   proposals: 0,
+  image: false,
+  offerPhoto: false,
 }
 const ran = (over: Partial<RunResearchResponse> = {}): RunResearchResponse => ({
   ...REVIEW,
@@ -149,7 +154,8 @@ describe('Public footprint', () => {
     expect(screen.getByText(WAITING.why)).toBeTruthy()
     expect(screen.getByText('“Our sales team is led by Dana Whitfield.”')).toBeTruthy()
     expect(screen.getByText('If it is Dana, this adds:')).toBeTruthy()
-    expect(screen.getByText(/Observed ·/)).toBeTruthy()
+    // The evidence words are not repeated under every fact.
+    expect(screen.queryByText(/Observed ·/)).toBeNull()
     // Found is not kept: nothing is shown as in the record yet.
     expect(screen.queryByText("In Dana's record")).toBeNull()
     expect(screen.queryByText(/Confirmed/)).toBeNull()
@@ -182,6 +188,94 @@ describe('Public footprint', () => {
 
     expect(await screen.findByText('Marked as someone else')).toBeTruthy()
     expect(bodyOf('POST', '/api/mobile/people/p-1/sources/src-1')).toEqual({ decision: 'reject' })
+  })
+
+  it('shows two facts a page, the rest behind "Show more", and the update date over the published one', async () => {
+    const facts = ['VP Sales', 'Board member', 'Advisor'].map((value, i) => ({ ...WAITING.facts[0]!, id: `src-1:${i}`, value }))
+    on(
+      '/api/mobile/people/p-1/research',
+      () => ok(ran({ sources: [{ ...WAITING, facts, publishedAt: '2025-06-02T12:00:00Z', updatedAt: '2026-09-03T12:00:00Z' }] })),
+      'POST',
+    )
+    await render(wrap(<Research />))
+    await fireEvent.press(await screen.findByText('Research public footprint'))
+
+    expect(await screen.findByText(/Updated .*2026/)).toBeTruthy()
+    expect(screen.getByText('Role: Board member')).toBeTruthy()
+    expect(screen.queryByText('Role: Advisor')).toBeNull()
+    await fireEvent.press(screen.getByText('Show 1 more'))
+    expect(screen.getByText('Role: Advisor')).toBeTruthy()
+  })
+
+  it('says what the pages agree on once, with how many say it', async () => {
+    on(
+      '/api/mobile/people/p-1/research',
+      () =>
+        ok(
+          ran({
+            profile: [
+              { kind: 'role', label: 'Role', value: 'VP Sales', pages: 3, asOf: '2026-09-03T12:00:00Z', past: false, dated: false, onRecord: false, worthChecking: false },
+              { kind: 'role', label: 'Role', value: 'Sales lead at Halcyon', pages: 1, asOf: '2020-03-01T12:00:00Z', past: false, dated: true, onRecord: false, worthChecking: false },
+            ],
+          }),
+        ),
+      'POST',
+    )
+    await render(wrap(<Research />))
+    await fireEvent.press(await screen.findByText('Research public footprint'))
+
+    expect(await screen.findByText('What the pages say')).toBeTruthy()
+    expect(screen.getByText(/3 pages · newest/)).toBeTruthy()
+    expect(screen.getByText(/1 page · as of .*2020/)).toBeTruthy()
+    expect(screen.getByText(/None of it is in Dana's record until you confirm a page/)).toBeTruthy()
+  })
+
+  it('"These are all them" confirms each waiting page, only after you say so', async () => {
+    const second = { ...WAITING, id: 'src-2', title: 'Panel | Summit' }
+    on('/api/mobile/people/p-1/research', () => ok(ran({ sources: [WAITING, second] })), 'POST')
+    for (const id of ['src-1', 'src-2'])
+      on(`/api/mobile/people/p-1/sources/${id}`, () => ok({ ok: true, factsAdded: 1, research: REVIEW }), 'POST')
+    const alert = jest.spyOn(Alert, 'alert')
+    await render(wrap(<Research />))
+    await fireEvent.press(await screen.findByText('Research public footprint'))
+    await fireEvent.press(await screen.findByText('These are all them'))
+
+    // Nothing is sent until the question is answered.
+    expect(asked('POST', '/api/mobile/people/p-1/sources/src-1')).toHaveLength(0)
+    const buttons = alert.mock.calls[0]![2]!
+    await buttons.find((b) => b.text === 'Add all')!.onPress!()
+
+    await waitFor(() => expect(asked('POST', '/api/mobile/people/p-1/sources/src-2')).toHaveLength(1))
+    expect(bodyOf('POST', '/api/mobile/people/p-1/sources/src-1')).toEqual({ decision: 'confirm' })
+    expect(await screen.findByText("Kept 2 pages and added 2 facts to Dana's record.")).toBeTruthy()
+    alert.mockRestore()
+  })
+
+  it('offers a confirmed bio page’s picture as their photo, set only by your tap', async () => {
+    const kept: ResearchSource = { ...WAITING, state: 'kept', match: null, why: 'You confirmed this is them.', reviewed: true, offerPhoto: true }
+    routes.splice(0) // this page opens on a confirmed page, not the empty review
+    on('/api/mobile/people/p-1/research', () => ok({ ...REVIEW, sources: [kept] }))
+    on('/api/mobile/people/p-1/sources/src-1/photo', () => ok({ ok: true, photo: 'https://signed.example/p.jpg', research: { ...REVIEW, sources: [{ ...kept, offerPhoto: false }] } }), 'POST')
+    await render(wrap(<Research />))
+
+    expect(await screen.findByText("Use this page's picture as Dana's photo?")).toBeTruthy()
+    expect(asked('POST', '/api/mobile/people/p-1/sources/src-1/photo')).toHaveLength(0)
+    await fireEvent.press(screen.getByText('Use as photo'))
+
+    expect(await screen.findByText(/Saved as Dana's photo/)).toBeTruthy()
+    expect(screen.queryByText("Use this page's picture as Dana's photo?")).toBeNull()
+  })
+
+  it('"Skip" turns the photo down for good', async () => {
+    const kept: ResearchSource = { ...WAITING, state: 'kept', match: null, why: 'You confirmed this is them.', reviewed: true, offerPhoto: true }
+    routes.splice(0) // this page opens on a confirmed page, not the empty review
+    on('/api/mobile/people/p-1/research', () => ok({ ...REVIEW, sources: [kept] }))
+    on('/api/mobile/people/p-1/sources/src-1/photo', () => ok({ ok: true, photo: null, research: { ...REVIEW, sources: [{ ...kept, offerPhoto: false }] } }), 'DELETE')
+    await render(wrap(<Research />))
+    await fireEvent.press(await screen.findByText('Skip'))
+
+    await waitFor(() => expect(asked('DELETE', '/api/mobile/people/p-1/sources/src-1/photo')).toHaveLength(1))
+    expect(screen.queryByText("Use this page's picture as Dana's photo?")).toBeNull()
   })
 
   it('when it cannot tell who they are, it says what would help, and editing does not search', async () => {

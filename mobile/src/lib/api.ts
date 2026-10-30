@@ -81,6 +81,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
+/**
+ * An image served by Atturel's own API, with the sign-in it needs, for
+ * expo-image. Null in preview, where there is no server, and when signed out.
+ */
+export async function apiImage(path: string): Promise<{ uri: string; headers: Record<string, string> } | null> {
+  if (config.previewData) return null
+  const access = await token()
+  return access ? { uri: `${config.apiUrl}${path}`, headers: { Authorization: `Bearer ${access}` } } : null
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
 
