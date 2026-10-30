@@ -102,7 +102,7 @@ export function ResearchPanel({
     try {
       settle(await researchPerson(personId))
     } catch {
-      settle({ error: 'Research did not complete. Nothing was saved — try again.' })
+      settle({ error: 'Research did not complete. Nothing was saved. Try again.' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId])
@@ -117,7 +117,7 @@ export function ResearchPanel({
     try {
       settle(await refineIdentityAndResearch({ personId, ...details }))
     } catch {
-      settle({ error: 'Research did not complete. Nothing was saved — try again.' })
+      settle({ error: 'Research did not complete. Nothing was saved. Try again.' })
     }
   }
 

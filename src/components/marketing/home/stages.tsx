@@ -71,7 +71,7 @@ function After() {
   return (
     <ProductFrame
       bodyClassName="p-4"
-      description={`After: ${brand.name} proposes the decision — expand to three more teams in January — and the commitment it produced: you send ${ELENA.name} the revised plan. Nothing is kept until you confirm it.`}
+      description={`After: ${brand.name} proposes the decision (expand to three more teams in January) and the commitment it produced: you send ${ELENA.name} the revised plan. Nothing is kept until you confirm it.`}
     >
       <p className="text-ink flex items-start gap-2 text-[0.875rem] leading-snug">
         <Scale className="text-accent mt-0.5 size-3.5 shrink-0" />
@@ -113,7 +113,7 @@ export function Stages() {
           </p>
           <h3 className="font-display text-ink mt-1 text-xl leading-tight">
             {title}
-            <span className="text-ink-secondary font-sans text-sm"> — {line}</span>
+            <span className="text-ink-secondary font-sans text-sm">. {line}</span>
           </h3>
           <div className="mt-3">
             <Visual />

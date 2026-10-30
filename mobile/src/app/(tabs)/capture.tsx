@@ -75,7 +75,7 @@ export { RouteError as ErrorBoundary } from '~/components/route-error'
 type Phase = 'ready' | 'recording' | 'paused' | 'stopped' | 'sending'
 
 const INTERRUPTED =
-  'Paused — iPhone needed the microphone (a call, Siri or another app). What was recorded is kept. Resume when you are ready.'
+  'Paused. iPhone needed the microphone (a call, Siri or another app). What was recorded is kept. Resume when you are ready.'
 
 function captureId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
@@ -184,7 +184,7 @@ export default function Capture() {
       setPhase('stopped')
       setNotice(
         `This recording from ${formatTime(found.pending.createdAt, Intl.DateTimeFormat().resolvedOptions().timeZone)} has not been sent yet. Send it, or discard it.` +
-          (found.lostCurrentPart ? ' The app closed while it was recording, so the last part — since the most recent pause — could not be saved.' : '') +
+          (found.lostCurrentPart ? ' The app closed while it was recording, so the last part, since the most recent pause, could not be saved.' : '') +
           missing,
       )
       bump()
@@ -309,7 +309,7 @@ export default function Capture() {
         await endPart()
         await beginPart()
       } catch {
-        setError('The recording could not continue. What was recorded so far is kept — stop and send it.')
+        setError('The recording could not continue. What was recorded so far is kept. Stop and send it.')
         setPhase('paused')
       } finally {
         busyRef.current = false
@@ -429,7 +429,7 @@ export default function Capture() {
       await beginPart()
       setPhase('recording')
     } catch {
-      setError('The microphone could not restart. What was recorded is kept — stop and send it.')
+      setError('The microphone could not restart. What was recorded is kept. Stop and send it.')
     }
   }
 
@@ -489,8 +489,8 @@ export default function Capture() {
           // here, once -- unless the audio is what is missing.
           setError(
             words.missing
-              ? `${words.error} It cannot be sent as it is — discard it, or type what happened instead.`
-              : `${words.error} The recording is safe on this phone — try again, or discard it.`,
+              ? `${words.error} It cannot be sent as it is. Discard it, or type what happened instead.`
+              : `${words.error} The recording is safe on this phone. Try again, or discard it.`,
           )
           setErrorDetail(words.detail ?? null)
           setSendFailed(true)

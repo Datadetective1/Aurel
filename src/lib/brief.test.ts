@@ -137,8 +137,8 @@ describe('listeningCues', () => {
       ],
     })
     expect(cues.map((c) => c.note)).toEqual([
-      'Still open — you owe this',
-      'Still open — they owe this',
+      'Still open: you owe this',
+      'Still open: they owe this',
       'Still open between you',
     ])
     expect(cues[0]!.text).toBe('Send the utilisation model')
@@ -154,7 +154,7 @@ describe('listeningCues', () => {
     })
     const cues = listeningCues(brief, { openCommitments: [] })
     expect(cues).toHaveLength(1)
-    expect(cues[0]!.text).toBe('How Priya Shah and Lucas Martin work — nothing is recorded yet.')
+    expect(cues[0]!.text).toBe('How Priya Shah and Lucas Martin work: nothing is recorded yet.')
     expect(cues[0]!.note).toBe('Nothing to check this against')
   })
 

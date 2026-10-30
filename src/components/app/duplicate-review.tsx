@@ -43,7 +43,7 @@ export function DuplicateReview({ pairs }: { pairs: DuplicatePair[] }) {
       <p className="label">Possible duplicates</p>
       <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
         These look like the same person recorded twice. Merging keeps every observation, interaction
-        and source — the other record is archived, not deleted.
+        and source. The other record is archived, not deleted.
       </p>
 
       {error ? (

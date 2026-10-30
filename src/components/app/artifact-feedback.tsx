@@ -46,7 +46,7 @@ export function ArtifactFeedback({ artifactId }: { artifactId: string }) {
     return (
       <p className="flex items-center gap-2 text-sm text-ink-muted">
         <CircleCheck className="size-4 text-positive" aria-hidden="true" />
-        Thanks — that helps tune what you get next time.
+        Thanks, that helps tune what you get next time.
       </p>
     )
   }

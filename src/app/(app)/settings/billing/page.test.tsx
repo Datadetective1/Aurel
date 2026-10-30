@@ -102,7 +102,7 @@ describe('a Free account that never had a trial', () => {
   it('offers the trial first, and a separate, priced subscribe action with its terms', async () => {
     await show()
     expect(screen.getByRole('button', { name: 'Start your 14-day Pro trial' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Subscribe to Pro — $29/month' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Subscribe to Pro for $29/month' })).toBeTruthy()
     expect(
       screen.getByText(/14 days of Pro, no card\. It returns to Free unless you subscribe/),
     ).toBeTruthy()
@@ -147,7 +147,7 @@ describe('during the trial', () => {
 
   it('subscribing shows the first charge date and keeps the rest of the trial', async () => {
     await show()
-    expect(screen.getByRole('button', { name: 'Subscribe to Pro — $29/month' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Subscribe to Pro for $29/month' })).toBeTruthy()
     expect(
       screen.getByText(
         'The rest of your trial is kept. Your first charge of $29 is on 8 Nov 2026, then $29 every month until you cancel.',
@@ -182,7 +182,7 @@ describe('the trial ended without a subscription', () => {
       screen.getByText(/Your Pro trial ended on 20 Oct 2026\. Nothing was charged\./),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Start your 14-day/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Subscribe to Pro — $29/month' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Subscribe to Pro for $29/month' })).toBeTruthy()
     expect(screen.getByText(/charged \$29 today/)).toBeTruthy()
   })
 })
@@ -252,7 +252,7 @@ describe('with the trial offer closed (PRO_TRIAL_OFFER not "on": the default, an
     h.row = row()
     await show()
     expect(screen.queryByRole('button', { name: /Start your 14-day/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Subscribe to Pro — $29/month' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Subscribe to Pro for $29/month' })).toBeTruthy()
   })
 
   it('a trial already running keeps its end date and its remaining days', async () => {

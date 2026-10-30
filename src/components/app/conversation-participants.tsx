@@ -291,8 +291,8 @@ function RemoveDialog({
         Remove <span className="font-medium">{name}</span> from this conversation?
       </p>
       <p className="text-ink-muted mt-1 text-xs leading-relaxed">
-        Anything this conversation filed under {name.split(' ')[0]} — promises, decisions, suggested
-        memory — can move to the person who was actually there.
+        Anything this conversation filed under {name.split(' ')[0]} (promises, decisions, suggested
+        memory) can move to the person who was actually there.
       </p>
       <div className="text-ink-secondary mt-3 flex flex-wrap items-center gap-2 text-xs">
         <span>Move it to</span>

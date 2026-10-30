@@ -33,7 +33,7 @@ export function ProfileDetail({
       <section>
         <Eyebrow>Your communication fingerprint</Eyebrow>
         <p className="text-ink-secondary mt-3 max-w-xl text-sm leading-relaxed">
-          Each tendency sits on a continuum. Neither end is better — the point is knowing your
+          Each tendency sits on a continuum. Neither end is better. The point is knowing your
           default so you can tell when a situation calls for something else.
         </p>
         <Fingerprint dimensions={dimensions} contextDependent={contextDependent} className="mt-8" />

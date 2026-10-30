@@ -319,7 +319,7 @@ function DecisionProposal({ decision }: { decision: DecisionRecord }) {
           </div>
           {decision.context ? (
             <p className="text-ink-secondary mt-2 text-xs leading-relaxed">
-              <span className="text-ink-muted">Because — </span>
+              <span className="text-ink-muted">Because: </span>
               {decision.context}
             </p>
           ) : null}

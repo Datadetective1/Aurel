@@ -122,8 +122,8 @@ export function meetingReminderEmail(input: MeetingReminderInput): BuiltEmail {
 
   return {
     subject: input.unprepared
-      ? `${input.title} — nothing recorded yet`
-      : `${input.title} — ${input.whenLabel}`,
+      ? `${input.title}: nothing recorded yet`
+      : `${input.title}, ${input.whenLabel}`,
     html: renderEmail({
       // Names of attendees, no notes: this line shows on a lock screen.
       preheader: `${input.whenLabel} with ${who}.`,
@@ -149,7 +149,7 @@ export function meetingReminderEmail(input: MeetingReminderInput): BuiltEmail {
         button('Open the brief', absoluteUrl(`/meetings/${input.meetingId}/brief`)),
         input.unprepared
           ? paragraph(
-              `Nothing is recorded about ${escapeHtml(who)} yet, so there is no brief worth reading — only what you supply. Two minutes of context now is the difference.`,
+              `Nothing is recorded about ${escapeHtml(who)} yet, so there is no brief worth reading, only what you supply. Two minutes of context now is the difference.`,
             )
           : '',
       ].join(''),
@@ -200,7 +200,7 @@ export function weeklySummaryEmail(input: WeeklySummaryInput): BuiltEmail {
               `${eyebrow('Past due')}${overdue
                 .map((item) =>
                   evidenceLine(
-                    `${escapeHtml(item.description)} — <span style="color:${palette.ink};">${escapeHtml(item.person)}</span>, due ${escapeHtml(item.dueLabel)}`,
+                    `${escapeHtml(item.description)}: <span style="color:${palette.ink};">${escapeHtml(item.person)}</span>, due ${escapeHtml(item.dueLabel)}`,
                     'from your records',
                   ),
                 )
@@ -213,7 +213,7 @@ export function weeklySummaryEmail(input: WeeklySummaryInput): BuiltEmail {
               `${eyebrow('Gone quiet')}${input.quietRelationships
                 .map((person) =>
                   evidenceLine(
-                    `<span style="color:${palette.ink};">${escapeHtml(person.name)}</span> — last spoke ${escapeHtml(person.lastContactLabel)}`,
+                    `<span style="color:${palette.ink};">${escapeHtml(person.name)}</span>, last spoke ${escapeHtml(person.lastContactLabel)}`,
                     'from your records',
                   ),
                 )

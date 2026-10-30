@@ -73,8 +73,8 @@ export default function PrivacyPage() {
               Documents you upload to read (such as a PDF), and the text extracted from them.
             </li>
             <li className="list-disc">
-              If you connect a calendar: a read-only copy of your upcoming events — title, time,
-              location, description, organizer, attendees and meeting link — for the next two weeks.{' '}
+              If you connect a calendar: a read-only copy of your upcoming events for the next two
+              weeks: title, time, location, description, organizer, attendees and meeting link.{' '}
               {brand.name} never creates, changes or answers calendar events.
             </li>
             <li className="list-disc">
@@ -86,7 +86,7 @@ export default function PrivacyPage() {
             </li>
             <li className="list-disc">
               Basic product events, such as &ldquo;a brief was generated&rdquo;, recorded by{' '}
-              {brand.name} itself as counts — never the content of your notes or conversations.
+              {brand.name} itself as counts, never the content of your notes or conversations.
             </li>
           </ul>
         </Section>
@@ -108,7 +108,7 @@ export default function PrivacyPage() {
           <p>
             {brand.name} does not show your record to the people it describes, and it is not shared
             with other users. If team workspaces are introduced, sharing will always be an explicit
-            act — your private notes stay private by default.
+            act. Your private notes stay private by default.
           </p>
         </Section>
 
@@ -120,7 +120,7 @@ export default function PrivacyPage() {
           </p>
           <p>
             When a language model is used, only the specific, bounded context needed for that task
-            is sent — not your whole record. Neither we nor OpenAI use your content to train models;
+            is sent, not your whole record. Neither we nor OpenAI use your content to train models;
             the search terms sent to Exa for public research are handled under Exa&rsquo;s terms,
             described under How long it is kept. Product analytics deliberately record only counts
             and enum values, never names, notes or message bodies.
@@ -130,8 +130,8 @@ export default function PrivacyPage() {
         <Section title="Public research">
           <p>
             When you research someone&rsquo;s public professional footprint, {brand.name} reads
-            legitimate publicly accessible material — company biographies, conference pages,
-            articles, interviews — and records what it found along with a link to the source.
+            legitimate publicly accessible material (company biographies, conference pages,
+            articles, interviews) and records what it found along with a link to the source.
           </p>
           <p>
             It does not bypass logins, paywalls or access controls, and it does not scrape platforms
@@ -150,7 +150,7 @@ export default function PrivacyPage() {
           <p>
             {brand.name} does not infer or record race, ethnicity, religion, sexual orientation,
             gender identity, medical conditions, disability, mental health, pregnancy, age,
-            political affiliation, union membership, immigration status or criminal history — about
+            political affiliation, union membership, immigration status or criminal history about
             anyone.
           </p>
           <p>
@@ -227,22 +227,22 @@ export default function PrivacyPage() {
             {brand.name} runs on a small number of providers, each used only for the job named here:
           </p>
           <ul className="grid gap-2 pl-5">
-            <li className="list-disc">Supabase — database, sign-in and file storage</li>
-            <li className="list-disc">Vercel — hosting the application</li>
+            <li className="list-disc">Supabase: database, sign-in and file storage</li>
+            <li className="list-disc">Vercel: hosting the application</li>
             <li className="list-disc">
-              OpenAI — the language model behind briefs, reading conversations and answering
+              OpenAI: the language model behind briefs, reading conversations and answering
               questions, and speech-to-text. Only the bounded context a task needs is sent. OpenAI
               does not use it to train its models; see Voice recordings for how long OpenAI may keep
               what is sent.
             </li>
             <li className="list-disc">
-              Exa — finding public professional material when you research someone. It receives the
+              Exa: finding public professional material when you research someone. It receives the
               person&rsquo;s name and, where known, their organization and job title.
             </li>
-            <li className="list-disc">Resend — sending account and product email</li>
-            <li className="list-disc">Stripe — payments</li>
+            <li className="list-disc">Resend: sending account and product email</li>
+            <li className="list-disc">Stripe: payments</li>
             <li className="list-disc">
-              Google and Microsoft — reading your calendar, only if you connect one
+              Google and Microsoft: reading your calendar, only if you connect one
               {providerConfigured('google')
                 ? `. ${brand.name}’s use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.`
                 : ''}
@@ -263,8 +263,9 @@ export default function PrivacyPage() {
               Mark a source as the wrong person, which removes what it supported
             </li>
             <li className="list-disc">
-              Export your whole record — people, meetings, conversations, commitments, sources and
-              what was generated from them — as one JSON file. Photos are not included in the file.
+              Export your whole record as one JSON file: people, meetings, conversations,
+              commitments, sources and what was generated from them. Photos are not included in the
+              file.
             </li>
             <li className="list-disc">
               Delete your account and destroy the entire record, from the web or inside the iPhone

@@ -78,8 +78,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               Important conversations shouldn&rsquo;t start cold.
             </p>
             <p className="text-ink-secondary mt-5 text-sm leading-relaxed">
-              {brand.name} keeps a record of the people you work with — what they have asked for,
-              what they objected to, and what is still open between you — and turns it into
+              {brand.name} keeps a record of the people you work with: what they have asked for,
+              what they objected to, and what is still open between you. It turns that into
               preparation for the next conversation that matters.
             </p>
           </blockquote>

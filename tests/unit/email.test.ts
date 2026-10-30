@@ -59,7 +59,7 @@ describe('transactional templates', () => {
       unprepared: true,
     })
 
-    expect(unprepared.subject).toBe('Budget review — nothing recorded yet')
+    expect(unprepared.subject).toBe('Budget review: nothing recorded yet')
     expect(unprepared.html).toContain('Budget review')
     expect(unprepared.html).toContain('Maya Chen')
   })

@@ -107,7 +107,7 @@ export default async function LoopsPage({
             <>
               When you keep a conversation, {brand.name} pulls out what you promised, what they
               promised, and what nobody answered. Confirm them and they live here until you close
-              them — with one tap.
+              them with one tap.
             </>
           }
           action={

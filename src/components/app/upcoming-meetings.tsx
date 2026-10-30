@@ -140,7 +140,7 @@ export function UpcomingMeetings({
           From your calendar
         </Eyebrow>
         <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">
-          Nothing on your calendar in the next few days. Meetings appear here as they are added — or{' '}
+          Nothing on your calendar in the next few days. Meetings appear here as they are added, or{' '}
           <Link href="/meetings/new" className="text-accent underline underline-offset-2">
             create one by hand
           </Link>
@@ -276,7 +276,7 @@ function EventCard({
           <UserPlus className="mt-px size-3 shrink-0" aria-hidden="true" />
           <span>
             {unknown.length === 1 ? 'One attendee is' : `${unknown.length} attendees are`} unknown
-            to {brand.name}. Add them from the brief to research their public footprint —{' '}
+            to {brand.name}. Add them from the brief to research their public footprint.{' '}
             {brand.name} will not research anyone without you asking.
           </span>
         </p>

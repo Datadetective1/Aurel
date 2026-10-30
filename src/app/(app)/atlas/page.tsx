@@ -169,7 +169,7 @@ export default async function AtlasPage() {
           // What it is for is the part worth saying: this is the view that
           // gets more useful the longer the account runs, because it is built
           // out of contact you have actually recorded.
-          description={`This is the long view. Once you are tracking a few people, ${brand.name} groups them by where they work and flags the relationships going quiet — the ones you would not notice slipping until you needed them.`}
+          description={`This is the long view. Once you are tracking a few people, ${brand.name} groups them by where they work and flags the relationships going quiet, the ones you would not notice slipping until you needed them.`}
           action={
             <Button asChild>
               <Link href="/people/new">

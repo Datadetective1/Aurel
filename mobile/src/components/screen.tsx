@@ -65,7 +65,7 @@ function PreviewBanner() {
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.bgSunken, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 12, alignSelf: 'flex-start' }}
     >
       <Feather name="eye" size={12} color={c.inkMuted} />
-      <T variant="meta" tone="muted">Preview data — invented people, nothing real</T>
+      <T variant="meta" tone="muted">Preview data: invented people, nothing real</T>
     </View>
   )
 }

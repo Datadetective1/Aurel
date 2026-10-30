@@ -57,7 +57,7 @@ export function calendarOutcome(
       return {
         tone: 'caution',
         title: 'Your organization needs to approve this',
-        body: `Your administrator has to allow ${brandName} to read calendars before you can connect. Until then, create meetings by hand — preparation works the same way.`,
+        body: `Your administrator has to allow ${brandName} to read calendars before you can connect. Until then, create meetings by hand. Preparation works the same way.`,
       }
     case 'no_offline_access':
       return {

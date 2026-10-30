@@ -132,7 +132,7 @@ function meeting(id: string): MeetingResponse {
           })),
           cues: [
             { text: 'Whether recordings can stay in-region', note: 'Unresolved in your record' },
-            { text: LOOPS[0]!.description, note: 'Still open — you owe this' },
+            { text: LOOPS[0]!.description, note: 'Still open: you owe this' },
           ],
           likelyObjections: BRIEF.likelyObjections,
           uncertainties: BRIEF.uncertainties,

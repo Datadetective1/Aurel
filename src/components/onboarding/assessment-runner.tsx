@@ -160,7 +160,7 @@ export function AssessmentRunner({
         leastItemId: next.least,
         latencyMs: Date.now() - shownAt.current,
       })
-      if (!result.ok) setError('That answer did not save. Your progress is still here — try again.')
+      if (!result.ok) setError('That answer did not save. Your progress is still here. Try again.')
       else setError(null)
     },
     [assessmentId],

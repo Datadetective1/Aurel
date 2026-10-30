@@ -14,7 +14,7 @@ import { brand } from '@/lib/brand'
  * this) supports the box model far more predictably than it supports paths.
  * The arches are the same motif as the app icon: nested thresholds.
  */
-export const alt = `${brand.name} — ${brand.descriptor}`
+export const alt = `${brand.name} · ${brand.descriptor}`
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 

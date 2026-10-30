@@ -72,7 +72,7 @@ export function GenerateBriefPanel({
       if (result?.error) setError(result.error)
       else router.refresh()
     } catch {
-      setError('That did not save — check your connection and try again. Your text is still here.')
+      setError('That did not save. Check your connection and try again. Your text is still here.')
     } finally {
       setSavingObjective(false)
     }
@@ -108,7 +108,7 @@ export function GenerateBriefPanel({
     } catch {
       // A dropped connection or a timed-out function arrives here, not as a
       // result. It must land on the same honest, retryable state.
-      setError('The brief did not finish building. Nothing was lost — try again.')
+      setError('The brief did not finish building. Nothing was lost. Try again.')
     }
     setRunning(false)
   }, [meetingId, router])

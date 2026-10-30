@@ -245,5 +245,5 @@ export async function rejectPhotoSuggestion(
 
   await track('profile_photo_rejected', { provider: suggestion.provider })
   revalidatePath(`/people/${suggestion.person_id}`)
-  return { message: 'Thanks — that photo will not be suggested again.' }
+  return { message: 'Thanks, that photo will not be suggested again.' }
 }

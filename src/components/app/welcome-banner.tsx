@@ -44,7 +44,7 @@ export function WelcomeBanner({ name, className }: { name: string; className?: s
           told once, in the same words as the welcome email. */}
       <p className="text-ink-secondary mt-2 max-w-lg text-sm leading-relaxed">
         It is empty right now, and that is expected. Find one meeting, choose who it is with, and
-        prepare it — the steps are just below.
+        prepare it. The steps are just below.
       </p>
     </div>
   )

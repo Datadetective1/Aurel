@@ -156,7 +156,7 @@ export async function createInvitation(
   return {
     ok: true,
     code,
-    message: 'Copy this now — it is stored only as a hash and cannot be shown again.',
+    message: 'Copy this now. It is stored only as a hash and cannot be shown again.',
   }
 }
 

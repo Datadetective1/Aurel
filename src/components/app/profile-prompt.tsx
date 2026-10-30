@@ -95,7 +95,7 @@ export function ProfilePrompt({ block }: { block: PromptBlock }) {
           <button
             type="button"
             onClick={dismiss}
-            aria-label="Not now — hide this for a week"
+            aria-label="Not now. Hide this for a week"
             className="text-ink-faint hover:text-ink-secondary focus-visible:outline-[var(--focus-ring)] -m-2 flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <X className="size-4" aria-hidden="true" />

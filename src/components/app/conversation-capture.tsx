@@ -311,7 +311,7 @@ export function ConversationCapture({
             onChange={(e) => setSourceText(e.currentTarget.value)}
             placeholder={
               mode === 'paste'
-                ? 'Ravi: I can get you the revised numbers by Thursday.\nYou: Great — and we agreed the launch moves to March?\nRavi: Yes, March.'
+                ? 'Ravi: I can get you the revised numbers by Thursday.\nYou: Great, and we agreed the launch moves to March?\nRavi: Yes, March.'
                 : 'Ravi asked for the cost impact before the recommendation. I said I would send the revised forecast by Thursday. We agreed the launch moves to March. Still unclear who owns the migration budget.'
             }
             className="leading-relaxed"

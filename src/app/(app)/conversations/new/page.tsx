@@ -108,7 +108,7 @@ export default async function NewConversationPage({
         as="h1"
         eyebrow={linkedMeeting ? 'After the meeting' : 'Remember'}
         title={linkedMeeting ? linkedMeeting.title : 'Keep a conversation'}
-        description={`Speak it, record it, paste it or type it. ${brand.name} reads it for what you promised, what they promised, what was decided and what was left open — then asks you before any of it becomes memory.`}
+        description={`Speak it, record it, paste it or type it. ${brand.name} reads it for what you promised, what they promised, what was decided and what was left open, then asks you before any of it becomes memory.`}
         className="mt-4"
       />
 

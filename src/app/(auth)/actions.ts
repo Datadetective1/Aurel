@@ -145,7 +145,7 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
     }
     if (error.code === 'email_not_confirmed') {
       return {
-        error: 'Confirm your email address first — check your inbox for the link we sent.',
+        error: 'Confirm your email address first. Check your inbox for the link we sent.',
       }
     }
     return { error: GENERIC_SIGN_IN_ERROR }

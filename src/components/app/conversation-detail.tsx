@@ -310,7 +310,7 @@ export function ConversationDetailView({
             <p className="text-ink text-sm leading-relaxed">{conversation.summary}</p>
             {conversation.outcome ? (
               <p className="text-ink-secondary mt-2 text-sm leading-relaxed">
-                <span className="text-ink-muted">Upshot — </span>
+                <span className="text-ink-muted">Upshot: </span>
                 {conversation.outcome}
               </p>
             ) : null}

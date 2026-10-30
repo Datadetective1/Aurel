@@ -176,7 +176,7 @@ export async function addDocument(
     if (result.message) return { error: result.message }
 
     const truncationNote = extraction.truncated
-      ? ' Only the first part was read — it is a long document.'
+      ? ' Only the first part was read. It is a long document.'
       : ''
 
     return {

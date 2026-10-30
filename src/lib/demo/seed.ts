@@ -196,11 +196,11 @@ const PEOPLE: SeedPerson[] = [
  */
 const DEMO_TRANSCRIPT = [
   'Alex: Thanks for making time. I wanted to walk through the revised ROI model before the capacity review.',
-  'Daniel: Before we get into the model — what does this actually cost us this quarter? Last time I had to dig for it.',
+  'Daniel: Before we get into the model, what does this actually cost us this quarter? Last time I had to dig for it.',
   "Alex: Fair. It's two engineers for eleven weeks, so roughly the number we discussed, plus the licence uplift.",
   "Daniel: Lead with that. I'm not going to sign off on a benefits slide that hides the bill.",
   "Alex: Understood. I'll resubmit the case with the cost impact stated first, by Thursday.",
-  "Daniel: Fine — lead with what it costs and I'll read the rest.",
+  "Daniel: Fine, lead with what it costs and I'll read the rest.",
   'Daniel: And who actually owns the migration budget once the headcount moves? Nobody had an answer.',
   "Alex: I don't know yet. I'll find out.",
   'Daniel: Okay. Send it Thursday and we can go into the review with something I can defend.',
@@ -430,7 +430,7 @@ export async function seedDemoData(
           decided_on: new Date(now - 22 * DAY).toISOString().slice(0, 10),
           interaction_id: budgetCheckIn,
           review_status: 'confirmed',
-          excerpt: "Daniel: Fine — lead with what it costs and I'll read the rest.",
+          excerpt: "Daniel: Fine, lead with what it costs and I'll read the rest.",
         })
         .select('id')
         .single()

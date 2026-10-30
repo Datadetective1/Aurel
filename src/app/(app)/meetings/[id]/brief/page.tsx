@@ -254,7 +254,7 @@ export default async function BriefPage({
               never sees again. One sentence under the button that starts the
               next turn of it. */}
           <p className="text-ink-muted mt-3 text-xs leading-relaxed">
-            Afterwards, debriefing is what sharpens the next one — what you confirm becomes part of
+            Afterwards, debriefing is what sharpens the next one. What you confirm becomes part of
             the record this brief was built from.
           </p>
 

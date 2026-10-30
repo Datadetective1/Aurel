@@ -46,7 +46,7 @@ export interface PlanSummary {
 }
 
 const PRICE = formatPrice(PLANS.pro.monthlyPriceCents)
-export const SUBSCRIBE_LABEL = `Subscribe to Pro — ${PRICE}/month`
+export const SUBSCRIBE_LABEL = `Subscribe to Pro for ${PRICE}/month`
 export const KEPT_ON_FREE =
   'Nothing is deleted: on Free you can still read, edit and export everyone and everything. Adding a sixth person, the Relationship Atlas and the larger monthly allowances need Pro.'
 

@@ -196,7 +196,7 @@ export function accessStatusFor(failure: { reason: string; status?: number }): {
  * what the user can do instead.
  */
 const RESTRICTED_MESSAGE =
-  'We couldn’t read this page. Some sites limit automated access to their content — you can paste the relevant public information here, or attach a document instead.'
+  'We couldn’t read this page. Some sites limit automated access to their content. You can paste the relevant public information here, or attach a document instead.'
 
 /** A page whose content really is sparse, as opposed to withheld. */
 const THIN_MESSAGE = 'There wasn’t enough readable information on this page to use.'

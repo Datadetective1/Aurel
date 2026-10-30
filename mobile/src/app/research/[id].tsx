@@ -160,7 +160,7 @@ export default function Research() {
       <Card tone="sunken" style={{ marginTop: 16 }}>
         <T variant="small">
           {review.canDiscover
-            ? `Atturel searches public professional sources — company pages, talks, interviews, articles — for ${person.fullName}, using the name, company, role and email domain on record.`
+            ? `Atturel searches public professional sources (company pages, talks, interviews, articles) for ${person.fullName}, using the name, company, role and email domain on record.`
             : (review.hint ?? `Atturel reads the profile link on record for ${first}.`)}
         </T>
         <T variant="small" tone="secondary" style={{ marginTop: 8 }}>

@@ -30,7 +30,7 @@ export default async function CheckEmailPage({
         . Open it and {brand.name} will pick up right where you left off.
       </p>
       <p className="mt-6 text-xs leading-relaxed text-ink-muted">
-        Nothing yet? Check your spam folder. Confirmation links expire after 24 hours — you can
+        Nothing yet? Check your spam folder. Confirmation links expire after 24 hours. You can
         request a new one by signing up again with the same address.
       </p>
       <p className="mt-8 text-sm text-ink-muted">

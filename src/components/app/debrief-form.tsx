@@ -78,7 +78,7 @@ ${text}` : text
       <FormField
         id="notes"
         label="What happened?"
-        description="Rough notes are fine. Names help — they are how each observation gets attached to the right person."
+        description="Rough notes are fine. Names help: they are how each observation gets attached to the right person."
         required
         error={state.fieldErrors?.notes?.[0]}
       >

@@ -102,7 +102,7 @@ function Hero() {
               Walk into every room prepared.
             </h1>
             <p className="text-ink-secondary mt-4 max-w-lg text-base leading-relaxed sm:text-lg">
-              Who you&rsquo;re meeting, what matters to them, and what you owe &mdash; in one
+              Who you&rsquo;re meeting, what matters to them, and what you owe. All in one
               glance, before you walk in.
             </p>
 
@@ -156,7 +156,7 @@ function Relationships() {
           id="memory-title"
           eyebrow="Relationship intelligence"
           title={`${brand.name} remembers the relationship, not just the meeting.`}
-          line="Who's connected, what happened last time, and what's owed — each with its source."
+          line="Who's connected, what happened last time, and what's owed, each with its source."
         />
         <RelationshipVisual className="mt-7 sm:mt-10" />
       </Container>
@@ -168,7 +168,7 @@ const TRUST = [
   {
     icon: Eye,
     title: 'Evidence on every line',
-    body: 'Confirmed, observed or inferred — always labelled.',
+    body: 'Confirmed, observed or inferred, and always labelled.',
   },
   {
     icon: CircleCheck,

@@ -126,7 +126,7 @@ export default async function BillingSettingsPage({
           <CircleCheck className="mt-px size-3.5 shrink-0" aria-hidden="true" />
           {subscribed
             ? 'Thank you. You are subscribed to Pro.'
-            : 'Thank you. Your subscription starts as soon as Stripe confirms it — usually within seconds. This page checks for you.'}
+            : 'Thank you. Your subscription starts as soon as Stripe confirms it, usually within seconds. This page checks for you.'}
         </p>
       ) : null}
       {/* Refreshes the page a few times while the webhook lands, so the
@@ -186,7 +186,7 @@ export default async function BillingSettingsPage({
         <section className="mt-10">
           <Eyebrow>This month</Eyebrow>
           <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
-            Storing notes and observations is never metered — only the operations that cost real
+            Storing notes and observations is never metered, only the operations that cost real
             money to run.
           </p>
           <ul className="mt-5 grid gap-4">
