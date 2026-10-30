@@ -3,14 +3,18 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 import type { ResearchFact, ResearchResponse, ResearchSource } from '@/lib/mobile/contracts'
 import { readHeld } from './ingest'
+import { buildProfile } from './profile'
 import { researchCapability } from './providers'
+import { offersPhoto, sourceImageUrl } from './source-images'
 import {
+  dropDuplicatePages,
   factLabel,
   hostOf,
   matchStrength,
   nameExcerpt,
   reviewReason,
   reviewState,
+  updatedDate,
   type ReviewState,
 } from './review'
 
@@ -36,7 +40,7 @@ export async function loadResearchReview(
   const { data: person } = await supabase
     .from('people')
     .select(
-      'id, full_name, preferred_name, job_title, profile_url, last_researched_at, organizations(name)',
+      'id, full_name, preferred_name, job_title, profile_url, last_researched_at, avatar_path, avatar_url, organizations(name)',
     )
     .eq('user_id', userId)
     .eq('id', personId)
@@ -47,7 +51,7 @@ export async function loadResearchReview(
   const { data: links } = await supabase
     .from('source_person_links')
     .select(
-      'identity_match_status, identity_match_confidence, match_signals, reviewed_by_user, sources(id, source_title, source_url, publisher, published_at, retrieved_at, access_status)',
+      'identity_match_status, identity_match_confidence, match_signals, reviewed_by_user, sources(id, source_title, source_url, source_type, publisher, published_at, retrieved_at, access_status, metadata)',
     )
     .eq('user_id', userId)
     .eq('person_id', personId)
@@ -64,7 +68,7 @@ export async function loadResearchReview(
   })
   const shown = rows.flatMap((r) => (r.state ? [{ ...r, state: r.state }] : []))
   const keptIds = shown.filter((r) => r.state === 'kept').map((r) => r.src.id)
-  const waitingIds = shown.filter((r) => r.state === 'waiting').map((r) => r.src.id)
+  const readIds = shown.filter((r) => r.state !== 'rejected').map((r) => r.src.id)
 
   const [{ data: factLinks }, { data: observationLinks }, { data: texts }] = await Promise.all([
     keptIds.length
@@ -85,12 +89,12 @@ export async function loadResearchReview(
       : Promise.resolve({
           data: [] as { source_id: string | null; observations: { person_id: string } | null }[],
         }),
-    waitingIds.length
+    readIds.length
       ? supabase
           .from('sources')
           .select('id, extracted_text')
           .eq('user_id', userId)
-          .in('id', waitingIds)
+          .in('id', readIds)
       : Promise.resolve({ data: [] as { id: string; extracted_text: string | null }[] }),
   ])
 
@@ -113,78 +117,106 @@ export async function loadResearchReview(
     jobTitle: person.job_title,
   }
 
-  const sources: ResearchSource[] = shown
-    .map(({ link, src, state }) => {
-      const held = state === 'waiting' ? readHeld(link.match_signals) : null
-      const onRecord: ResearchFact[] =
-        state === 'kept'
-          ? (factLinks ?? []).flatMap((fl) => {
-              const fact = fl.source_id === src.id ? factById.get(fl.fact_id) : undefined
-              return fact
-                ? [
-                    {
-                      id: fact.id,
-                      kind: fact.kind,
-                      label: factLabel(fact.kind),
-                      value: fact.value,
-                      detail: fact.detail,
-                      evidence: fact.evidence_level,
-                      excerpt: fl.excerpt,
-                      current: fact.is_current,
-                    },
-                  ]
-                : []
-            })
-          : []
-      const wouldAdd: ResearchFact[] = (held?.facts ?? []).map((fact, i) => ({
-        id: `${src.id}:${i}`,
-        kind: fact.kind,
-        label: factLabel(fact.kind),
-        value: fact.value,
-        detail: fact.detail,
-        evidence: fact.evidenceLevel,
-        excerpt: fact.excerpt,
-        current: fact.isCurrent,
-      }))
-      const proposals =
-        state === 'waiting'
-          ? (held?.observations.length ?? 0)
-          : state === 'kept'
-            ? (observationLinks ?? []).filter(
-                (o) => o.source_id === src.id && o.observations?.person_id === personId,
-              ).length
-            : 0
-      return {
-        id: src.id,
-        title: src.source_title || hostOf(src.source_url) || 'A page',
-        url: src.source_url,
-        host: hostOf(src.source_url),
-        publisher: src.publisher,
-        publishedAt: src.published_at,
+  const now = new Date()
+  const pages = shown.map(({ link, src, state }) => {
+    const held = state === 'waiting' ? readHeld(link.match_signals) : null
+    const onRecord: ResearchFact[] =
+      state === 'kept'
+        ? (factLinks ?? []).flatMap((fl) => {
+            const fact = fl.source_id === src.id ? factById.get(fl.fact_id) : undefined
+            return fact
+              ? [
+                  {
+                    id: fact.id,
+                    kind: fact.kind,
+                    label: factLabel(fact.kind),
+                    value: fact.value,
+                    detail: fact.detail,
+                    evidence: fact.evidence_level,
+                    excerpt: fl.excerpt,
+                    current: fact.is_current,
+                  },
+                ]
+              : []
+          })
+        : []
+    const wouldAdd: ResearchFact[] = (held?.facts ?? []).map((fact, i) => ({
+      id: `${src.id}:${i}`,
+      kind: fact.kind,
+      label: factLabel(fact.kind),
+      value: fact.value,
+      detail: fact.detail,
+      evidence: fact.evidenceLevel,
+      excerpt: fact.excerpt,
+      current: fact.isCurrent,
+    }))
+    const proposals =
+      state === 'waiting'
+        ? (held?.observations.length ?? 0)
+        : state === 'kept'
+          ? (observationLinks ?? []).filter(
+              (o) => o.source_id === src.id && o.observations?.person_id === personId,
+            ).length
+          : 0
+    const text = textById.get(src.id) ?? null
+    return {
+      id: src.id,
+      title: src.source_title || hostOf(src.source_url) || 'A page',
+      url: src.source_url,
+      host: hostOf(src.source_url),
+      publisher: src.publisher,
+      publishedAt: src.published_at,
+      updatedAt: updatedDate(text, src.published_at, now),
+      state,
+      match:
+        state === 'waiting' ? matchStrength(Number(link.identity_match_confidence ?? 0)) : null,
+      why: reviewReason(subject, {
         state,
-        match:
-          state === 'waiting' ? matchStrength(Number(link.identity_match_confidence ?? 0)) : null,
-        why: reviewReason(subject, {
-          state,
-          reviewed: link.reviewed_by_user,
-          signals: link.match_signals,
-        }),
-        nameExcerpt:
-          state === 'waiting' ? nameExcerpt(textById.get(src.id) ?? null, person.full_name) : null,
         reviewed: link.reviewed_by_user,
-        facts: state === 'waiting' ? wouldAdd : onRecord,
-        proposals,
-        confidence: Number(link.identity_match_confidence ?? 0),
-        retrievedAt: src.retrieved_at ?? '',
-      }
-    })
-    .sort(
-      (a, b) =>
-        ORDER[a.state] - ORDER[b.state] ||
-        b.confidence - a.confidence ||
-        b.retrievedAt.localeCompare(a.retrievedAt),
-    )
-    .map(({ confidence: _c, retrievedAt: _r, ...source }) => source)
+        signals: link.match_signals,
+      }),
+      nameExcerpt:
+        state === 'waiting'
+          ? nameExcerpt(text, person.full_name, { title: src.source_title })
+          : null,
+      reviewed: link.reviewed_by_user,
+      facts: state === 'waiting' ? wouldAdd : onRecord,
+      proposals,
+      image: sourceImageUrl(src.metadata) !== null,
+      offerPhoto: offersPhoto({
+        state,
+        reviewed: link.reviewed_by_user,
+        sourceType: src.source_type,
+        metadata: src.metadata,
+        personId,
+        personHasPhoto: Boolean(person.avatar_path || person.avatar_url),
+      }),
+      confidence: Number(link.identity_match_confidence ?? 0),
+      retrievedAt: src.retrieved_at ?? '',
+    }
+  })
+
+  // Newest first: a 2020 article is context, today's page is news.
+  const dateOf = (page: { updatedAt: string | null; publishedAt: string | null }) =>
+    page.updatedAt ?? page.publishedAt ?? ''
+  const unique = dropDuplicatePages(pages).sort(
+    (a, b) =>
+      ORDER[a.state] - ORDER[b.state] ||
+      dateOf(b).localeCompare(dateOf(a)) ||
+      b.confidence - a.confidence ||
+      b.retrievedAt.localeCompare(a.retrievedAt),
+  )
+  const sources: ResearchSource[] = unique.map(
+    ({ confidence: _c, retrievedAt: _r, ...source }) => source,
+  )
+  const profile = buildProfile(
+    unique.map((page) => ({
+      id: page.id,
+      state: page.state,
+      date: dateOf(page) || null,
+      facts: page.facts,
+    })),
+  )
 
   const capability = researchCapability()
   return {
@@ -200,6 +232,7 @@ export async function loadResearchReview(
     hint: capability.discoveryHint,
     lastResearchedAt: person.last_researched_at,
     sources,
+    profile,
     notUsed: rows.length - shown.length,
   }
 }

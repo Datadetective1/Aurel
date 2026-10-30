@@ -91,7 +91,7 @@ describe('the research review', () => {
       state: 'waiting',
       match: 'strong',
       why: 'Matched because their name is in the page title and it is published by Northwind.',
-      nameExcerpt: 'The team. Dana Whitfield leads sales at Northwind.',
+      nameExcerpt: 'Dana Whitfield leads sales at Northwind.',
       proposals: 1,
     })
     expect(held!.facts).toEqual([
@@ -161,6 +161,72 @@ describe('the research review', () => {
     })
     expect(review!.sources.map((s) => [s.id, s.state])).toEqual([['mine', 'rejected']])
     expect(review!.notUsed).toBe(2)
+  })
+
+  it('newest first, one card per document, and what the pages say merged', async () => {
+    const held = (value: string) => ({
+      exactNameInTitle: true,
+      held: { ...HELD, facts: [{ ...HELD.facts[0], value }] },
+    })
+    const waiting = { identity_match_status: 'unreviewed', identity_match_confidence: 0.6 }
+    const review = await load({
+      source_person_links: [
+        link(page('old', { published_at: '2020-03-01T00:00:00Z' }), {
+          ...waiting,
+          identity_match_confidence: 0.9,
+          match_signals: held('VP Sales'),
+        }),
+        link(page('new', { published_at: '2026-09-01T00:00:00Z' }), {
+          ...waiting,
+          match_signals: held('VP Sales'),
+        }),
+        // The same page again, by a tracking link.
+        link(page('copy', { source_url: 'https://www.example.com/new/?utm_source=feed' }), {
+          ...waiting,
+          match_signals: held('VP Sales'),
+        }),
+      ],
+      sources: [
+        {
+          id: 'new',
+          user_id: 'u-1',
+          extracted_text: 'Northwind news\nUPDATED | Oct 2, 2026\nDana Whitfield leads sales.',
+        },
+      ],
+    })
+    expect(review!.sources.map((s) => s.id)).toEqual(['new', 'old'])
+    expect(review!.sources[0]!.updatedAt).toBe('2026-10-02T00:00:00.000Z')
+    expect(review!.profile).toEqual([
+      expect.objectContaining({ value: 'VP Sales', pages: 2, asOf: '2026-10-02T00:00:00.000Z' }),
+    ])
+  })
+
+  it('offers a confirmed bio page’s picture as their photo, and shows a thumbnail', async () => {
+    const bio = page('bio', {
+      source_type: 'company_bio',
+      metadata: { image: 'https://example.com/dana.jpg' },
+    })
+    const review = await load({
+      source_person_links: [
+        link(bio, { identity_match_status: 'confirmed', reviewed_by_user: true }),
+      ],
+      fact_sources: [],
+      professional_facts: [],
+      observation_sources: [],
+    })
+    expect(review!.sources[0]).toMatchObject({ image: true, offerPhoto: true })
+
+    const withPhoto = await loadResearchReview(
+      fakeClient({
+        people: [{ ...PERSON, avatar_path: 'u-1/people/p-1.jpg' }],
+        source_person_links: [
+          link(bio, { identity_match_status: 'confirmed', reviewed_by_user: true }),
+        ],
+      }).client,
+      'u-1',
+      'p-1',
+    )
+    expect(withPhoto!.sources[0]).toMatchObject({ image: true, offerPhoto: false })
   })
 
   it('another account’s pages for the same person never appear', async () => {

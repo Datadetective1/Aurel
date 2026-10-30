@@ -420,6 +420,9 @@ export async function ingestUrl(url: string, options: IngestOptions): Promise<In
     metadata: {
       wordCount: extracted.wordCount,
       contentType: fetched.contentType,
+      // The lead image, for the research card and, once the page is
+      // confirmed, as a photo the user may choose. Only an address.
+      image: extracted.image,
       truncated: fetched.truncated,
       httpStatus: fetched.status,
     },
