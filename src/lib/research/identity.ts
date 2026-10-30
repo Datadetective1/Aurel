@@ -14,6 +14,16 @@
  * =============================================================================
  */
 
+import {
+  foldText,
+  isGenericEmailDomain,
+  hostMatchesOrganization,
+  matchName,
+  matchOrganization,
+  namedEmployersNear,
+  sameOrganization,
+} from './matching'
+
 export type IdentityMatchStatus =
   'confirmed' | 'probable' | 'ambiguous' | 'no_match' | 'conflicting' | 'unreviewed'
 
@@ -59,6 +69,8 @@ const WEIGHTS = {
   exactNameInTitle: 0.18,
   exactNameInText: 0.1,
   organizationMatch: 0.28,
+  /** Only the distinctive word of the employer's name, e.g. "Meridian". */
+  organizationPartialMatch: 0.14,
   organizationDomainMatch: 0.22,
   jobTitleMatch: 0.14,
   emailDomainMatch: 0.2,
@@ -77,54 +89,57 @@ export function assessIdentity(
   const signals: Record<string, boolean> = {}
   let score = 0
 
-  const haystack = `${evidence.title ?? ''}\n${evidence.text ?? ''}`.toLowerCase()
-  const name = subject.fullName.trim().toLowerCase()
+  const haystack = `${evidence.title ?? ''}\n${evidence.text ?? ''}`
+  const host = safeHost(evidence.url)
 
   if (options.userSuppliedUrl) {
     signals.userSuppliedUrl = true
     score += WEIGHTS.userSuppliedUrl
   }
 
-  if (name) {
-    const nameInTitle = (evidence.title ?? '').toLowerCase().includes(name)
-    if (nameInTitle) {
-      signals.exactNameInTitle = true
-      score += WEIGHTS.exactNameInTitle
-    }
-    if (haystack.includes(name)) {
-      signals.exactNameInText = true
-      score += WEIGHTS.exactNameInText
-    }
+  // Whole words, accents folded, middle names and "Last, First" allowed. A
+  // substring check linked "Jordan Averyson" as Jordan Avery and missed
+  // "Jordan P. Avery" entirely; see matching.ts.
+  const inTitle = matchName(subject.fullName, evidence.title)
+  const inText = inTitle ?? matchName(subject.fullName, haystack)
+  if (inTitle) {
+    signals.exactNameInTitle = true
+    score += WEIGHTS.exactNameInTitle
   }
+  if (inText) {
+    signals.exactNameInText = true
+    score += WEIGHTS.exactNameInText
+  }
+  if (inText === 'variant') signals.nameVariant = true
 
-  const org = subject.organization?.trim().toLowerCase()
+  const org = subject.organization?.trim()
   if (org && org.length > 2) {
-    if (haystack.includes(org)) {
+    const mentioned = matchOrganization(org, haystack)
+    if (mentioned === 'full') {
       signals.organizationMatch = true
       score += WEIGHTS.organizationMatch
+    } else if (mentioned === 'partial') {
+      signals.organizationPartialMatch = true
+      score += WEIGHTS.organizationPartialMatch
     }
     // The source living on the employer's own domain is strong corroboration.
-    const host = safeHost(evidence.url)
-    const publisher = (evidence.publisher ?? '').toLowerCase()
-    const orgToken = org.replace(/[^a-z0-9]/g, '')
     if (
-      orgToken.length > 2 &&
-      ((host && host.replace(/[^a-z0-9]/g, '').includes(orgToken)) || publisher.includes(org))
+      hostMatchesOrganization(host, org) ||
+      matchOrganization(org, evidence.publisher) === 'full'
     ) {
       signals.organizationDomainMatch = true
       score += WEIGHTS.organizationDomainMatch
     }
   }
 
-  const title = subject.jobTitle?.trim().toLowerCase()
-  if (title && title.length > 2 && haystack.includes(title)) {
+  const title = subject.jobTitle?.trim()
+  if (title && title.length > 2 && foldText(haystack).includes(foldText(title))) {
     signals.jobTitleMatch = true
     score += WEIGHTS.jobTitleMatch
   }
 
   const emailDomain = subject.email?.split('@')[1]?.toLowerCase()
   if (emailDomain && !isGenericEmailDomain(emailDomain)) {
-    const host = safeHost(evidence.url)
     if (host && (host === emailDomain || host.endsWith(`.${emailDomain}`))) {
       signals.emailDomainMatch = true
       score += WEIGHTS.emailDomainMatch
@@ -139,7 +154,9 @@ export function assessIdentity(
     Boolean(org) &&
     signals.exactNameInText === true &&
     !signals.organizationMatch &&
-    hasCompetingEmployer(haystack, org!)
+    !signals.organizationPartialMatch &&
+    !signals.organizationDomainMatch &&
+    hasCompetingEmployer(subject.fullName, haystack, org!)
 
   if (contradictsOrganization && !options.userSuppliedUrl) {
     return {
@@ -190,11 +207,19 @@ export function explainMatch(subject: IdentitySubject, signals: Record<string, b
   const reasons: string[] = []
   if (signals.userSuppliedUrl) reasons.push('you provided this link')
   if (signals.exactNameInTitle) reasons.push('their name is in the page title')
-  else if (signals.exactNameInText) reasons.push('their name appears in the page')
+  else if (signals.exactNameInText) {
+    reasons.push(
+      signals.nameVariant
+        ? 'their name appears in the page with a middle name or surname first'
+        : 'their name appears in the page',
+    )
+  }
   if (signals.organizationDomainMatch && subject.organization) {
     reasons.push(`it is published by ${subject.organization}`)
   } else if (signals.organizationMatch && subject.organization) {
     reasons.push(`it mentions ${subject.organization}`)
+  } else if (signals.organizationPartialMatch && subject.organization) {
+    reasons.push(`it mentions part of the name ${subject.organization}`)
   }
   if (signals.jobTitleMatch && subject.jobTitle) reasons.push(`it mentions ${subject.jobTitle}`)
   if (signals.emailDomainMatch) reasons.push('it is on their email domain')
@@ -205,24 +230,18 @@ export function explainMatch(subject: IdentitySubject, signals: Record<string, b
 }
 
 /**
- * Heuristic: does the text name a DIFFERENT employer prominently?
- * Only used to downgrade, never to upgrade, so a false positive costs a missed
- * source rather than a wrong attribution.
+ * Does the text name a DIFFERENT employer for them?
+ *
+ * Only a role followed by "at <Company>" near their name counts, and only when
+ * no employer named there is theirs. The earlier test -- any "at" followed by a
+ * letter anywhere on the page -- called "spoke at the summit" a different
+ * employer. Only used to downgrade, never to upgrade, so a false positive costs
+ * a missed source rather than a wrong attribution.
  */
-function hasCompetingEmployer(haystack: string, organization: string): boolean {
-  const patterns = [
-    /\b(?:vp|vice president|director|head|chief|senior|lead|manager|engineer)\s+(?:of\s+)?[a-z ]{2,30}\s+at\s+([a-z0-9&.\- ]{3,40})/gi,
-    /\bat\s+([A-Z][A-Za-z0-9&.\-]{2,30}(?:\s+[A-Z][A-Za-z0-9&.\-]{2,30}){0,2})\b/g,
-  ]
-  for (const pattern of patterns) {
-    for (const match of haystack.matchAll(pattern)) {
-      const employer = match[1]?.trim().toLowerCase()
-      if (!employer) continue
-      if (employer.includes(organization) || organization.includes(employer)) return false
-    }
-  }
-  // Only claim a conflict when some employer was named and none matched.
-  return /\bat\s+[a-z]/i.test(haystack)
+function hasCompetingEmployer(fullName: string, haystack: string, organization: string): boolean {
+  const named = namedEmployersNear(fullName, haystack)
+  if (named.length === 0) return false
+  return !named.some((employer) => sameOrganization(employer, organization))
 }
 
 function safeHost(url: string | null | undefined): string | null {
@@ -232,25 +251,6 @@ function safeHost(url: string | null | undefined): string | null {
   } catch {
     return null
   }
-}
-
-/** Free-mail domains carry no organisational signal. */
-function isGenericEmailDomain(domain: string): boolean {
-  return [
-    'gmail.com',
-    'googlemail.com',
-    'outlook.com',
-    'hotmail.com',
-    'live.com',
-    'yahoo.com',
-    'icloud.com',
-    'me.com',
-    'proton.me',
-    'protonmail.com',
-    'aol.com',
-    'gmx.com',
-    'mail.com',
-  ].includes(domain)
 }
 
 /** Should this assessment create a link automatically? */

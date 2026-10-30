@@ -140,3 +140,88 @@ describe('assessIdentity', () => {
     expect(assessIdentity(maya, {}).status).toBe('no_match')
   })
 })
+
+/**
+ * Cases a substring check got wrong, in both directions. Each one was measured
+ * against the previous implementation before it was fixed.
+ */
+describe('assessIdentity: names and employers written differently', () => {
+  const jordan = {
+    fullName: 'Jordan Avery',
+    organization: 'Meridian Systems',
+    jobTitle: 'VP Engineering',
+  }
+
+  it('does not link a person whose surname merely starts with theirs', () => {
+    const result = assessIdentity(jordan, {
+      title: 'Jordan Averyson profile',
+      text: 'Jordan Averyson works at Meridian Systems.',
+      url: 'https://example.com/a',
+    })
+    expect(shouldAutoLink(result)).toBe(false)
+    expect(result.status).toBe('no_match')
+  })
+
+  it('recognises them with a middle initial', () => {
+    const result = assessIdentity(jordan, {
+      title: 'Jordan P. Avery',
+      text: 'Jordan P. Avery, VP Engineering, Meridian Systems',
+      url: 'https://conf.example.org/speakers',
+    })
+    expect(result.status).toBe('probable')
+    expect(result.signals.nameVariant).toBe(true)
+  })
+
+  it('recognises "Last, First" and asks rather than dropping it', () => {
+    const result = assessIdentity(jordan, {
+      title: 'Speakers',
+      text: 'Avery, Jordan — Meridian Systems, VP Engineering',
+      url: 'https://conf.example.org/speakers',
+    })
+    expect(result.signals.exactNameInText).toBe(true)
+    expect(result.status).not.toBe('no_match')
+  })
+
+  it('recognises a name saved without its accents', () => {
+    const result = assessIdentity(
+      { fullName: 'Jose Alvarez', organization: 'Meridian Systems' },
+      {
+        title: 'José Álvarez',
+        text: 'José Álvarez at Meridian Systems',
+        url: 'https://a.example.org',
+      },
+    )
+    expect(result.status).toBe('probable')
+  })
+
+  it('accepts the short form of their employer on its own site', () => {
+    // Was "conflicting": "at Meridian" did not contain "meridian systems".
+    const result = assessIdentity(jordan, {
+      title: 'Jordan Avery',
+      text: 'Jordan Avery is VP Engineering at Meridian.',
+      url: 'https://meridian.com/team',
+    })
+    expect(result.status).toBe('probable')
+    expect(result.signals.organizationPartialMatch).toBe(true)
+    expect(result.signals.organizationDomainMatch).toBe(true)
+  })
+
+  it('does not call a talk "a different organisation"', () => {
+    // Any "at" followed by a letter used to count as a competing employer.
+    const result = assessIdentity(jordan, {
+      title: 'Jordan Avery on platform teams',
+      text: 'Jordan Avery spoke at the summit about platform engineering.',
+      url: 'https://events.example.org/x',
+    })
+    expect(result.status).toBe('ambiguous')
+  })
+
+  it('still flags a named role at another company', () => {
+    const result = assessIdentity(jordan, {
+      title: 'Jordan Avery',
+      text: 'Jordan Avery is CTO at Northwind Labs.',
+      url: 'https://northwind.io/team',
+    })
+    expect(result.status).toBe('conflicting')
+  })
+})
