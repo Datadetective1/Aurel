@@ -267,7 +267,7 @@ function Unprepared({ data, onChanged }: { data: MeetingResponse; onChanged: (me
   }
   return (
     <View>
-      <Empty icon="edit-3" title="Not prepared yet" body="Atturel reads what you know about these people — past conversations, open loops, what they care about — and writes a brief at every depth." />
+      <Empty icon="edit-3" title="Not prepared yet" body="Atturel reads what you know about these people (past conversations, open loops, what they care about) and writes a brief at every depth." />
       <PrepareButton meetingId={data.meeting.id} onDone={onChanged} />
     </View>
   )
@@ -282,7 +282,7 @@ function PrepareButton({ meetingId, again, onDone }: { meetingId: string; again?
     try {
       const result = await api.post<PrepareResponse>(`/api/mobile/meetings/${meetingId}/prepare`, {})
       if (result.ok) {
-        onDone(result.grounded ? 'Prepared from your records alone — no language model was involved.' : 'Prepared.')
+        onDone(result.grounded ? 'Prepared from your records alone. No language model was involved.' : 'Prepared.')
       } else {
         setError(result.upgrade ? 'This account has used the briefs its plan includes.' : result.error)
       }
@@ -314,7 +314,7 @@ function PrepareButton({ meetingId, again, onDone }: { meetingId: string; again?
       />
       {busy ? (
         <T variant="small" tone="secondary" style={{ textAlign: 'center' }} accessibilityLiveRegion="polite">
-          Reading what you know about them — usually 10 to 30 seconds.
+          Reading what you know about them. This usually takes 10 to 30 seconds.
         </T>
       ) : null}
       {error ? <T variant="small" tone="critical" accessibilityRole="alert">{error}</T> : null}
@@ -367,7 +367,7 @@ function Quick({ data, onChanged }: { data: MeetingResponse; onChanged: (message
                     <T variant="small" style={{ fontFamily: fonts.sansMedium }}>{p.name}</T>
                     {p.guidance[0] ? <T variant="small" tone="secondary">{p.guidance[0]}</T> : null}
                     {p.knownConcerns[0] ? <Chip icon="shield">{`Has raised: ${p.knownConcerns[0]}`}</Chip> : null}
-                    {p.publicOnly ? <T variant="meta" tone="muted">Public sources only — preliminary until you have met.</T> : null}
+                    {p.publicOnly ? <T variant="meta" tone="muted">Public sources only. Preliminary until you have met.</T> : null}
                   </View>
                 </View>
               )
@@ -390,7 +390,7 @@ function Quick({ data, onChanged }: { data: MeetingResponse; onChanged: (message
 
       {q.cues.length > 0 ? (
         <Section label="Listen for" icon="headphones">
-          <T variant="meta" tone="muted" style={{ marginBottom: 8 }}>Open in your record — not a prediction of what anyone will say.</T>
+          <T variant="meta" tone="muted" style={{ marginBottom: 8 }}>Open in your record. Not a prediction of what anyone will say.</T>
           {q.cues.map((cue, i) => (
             <View key={i} style={{ marginBottom: 10 }}>
               <T variant="small">{cue.text}</T>
@@ -472,7 +472,7 @@ function Deep({ data }: { data: MeetingResponse }) {
         ) : null}
       </Section>
       <T variant="meta" tone="muted" style={{ marginTop: 16 }}>
-        {data.grounded ? 'Composed directly from your records — no language model was involved.' : 'Generated from your records.'}
+        {data.grounded ? 'Composed directly from your records. No language model was involved.' : 'Generated from your records.'}
         {data.preparedAt ? ` Prepared ${formatDate(data.preparedAt, data.timeZone)}.` : ''}
       </T>
     </View>

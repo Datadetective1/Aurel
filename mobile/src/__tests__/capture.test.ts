@@ -18,7 +18,7 @@ describe('capture rules', () => {
   it('labels marks and notes as the user’s, after the transcript', () => {
     const text = composeCaptureText('Me: hello', [{ atSeconds: 192, note: 'pricing came up' }, { atSeconds: 300, note: '' }], 'Follow up Friday')
     expect(text).toBe(
-      'Me: hello\n\nMy notes during the conversation:\n- 3:12 — pricing came up\n- 5:00 — marked as important\n\nMy note afterwards:\nFollow up Friday',
+      'Me: hello\n\nMy notes during the conversation:\n- 3:12: pricing came up\n- 5:00: marked as important\n\nMy note afterwards:\nFollow up Friday',
     )
   })
 

@@ -219,7 +219,7 @@ export default function NewMeeting() {
           />
           {busy === 'preparing' ? (
             <T variant="small" tone="secondary" style={{ textAlign: 'center' }} accessibilityLiveRegion="polite">
-              Preparing the brief from what you know about them — usually 10 to 30 seconds.
+              Preparing the brief from what you know about them. This usually takes 10 to 30 seconds.
             </T>
           ) : null}
         </View>

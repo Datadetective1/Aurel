@@ -58,7 +58,7 @@ export default function Atlas() {
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <StaleNote failure={stale} />
       <T variant="display" accessibilityRole="header">Atlas</T>
-      <T variant="small" tone="secondary" style={{ marginTop: 6 }}>Who you know, where, and what connects them — only what your record holds.</T>
+      <T variant="small" tone="secondary" style={{ marginTop: 6 }}>Who you know, where, and what connects them, only from what your record holds.</T>
 
       {data.connections.length > 0 ? (
         <Section label="Connections on record" icon="link">

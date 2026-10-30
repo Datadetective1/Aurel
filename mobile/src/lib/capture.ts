@@ -63,7 +63,7 @@ export interface Bookmark {
 export function composeCaptureText(transcript: string, bookmarks: Bookmark[], typedNote: string): string {
   const parts = [transcript.trim()]
   const marks = bookmarks
-    .map((b) => `- ${elapsed(b.atSeconds)}${b.note.trim() ? ` — ${b.note.trim()}` : ' — marked as important'}`)
+    .map((b) => `- ${elapsed(b.atSeconds)}${b.note.trim() ? `: ${b.note.trim()}` : ': marked as important'}`)
     .join('\n')
   if (marks) parts.push(`My notes during the conversation:\n${marks}`)
   if (typedNote.trim()) parts.push(`My note afterwards:\n${typedNote.trim()}`)

@@ -118,7 +118,7 @@ export function ScenarioRunner({
           <p
             className={cn('text-ink-secondary text-xs leading-relaxed', isOpeningSitting && 'mt-1')}
           >
-            There is no right answer — every option is something good people do. &ldquo;It
+            There is no right answer. Every option is something good people do. &ldquo;It
             depends&rdquo; is a real answer, recorded as such. Skip leaves a question blank, and
             nothing is inferred from it.
           </p>

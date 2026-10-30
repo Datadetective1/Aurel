@@ -29,10 +29,10 @@ describe('a Free account that never had a trial', () => {
     expect(s.label).toBe('Free')
     expect(s.offerTrial).toBe(true)
     expect(s.subscribe).toEqual({
-      label: 'Subscribe to Pro — $29/month',
+      label: 'Subscribe to Pro for $29/month',
       terms: 'You will be charged $29 today, then $29 every month until you cancel.',
     })
-    expect(SUBSCRIBE_LABEL).toBe('Subscribe to Pro — $29/month')
+    expect(SUBSCRIBE_LABEL).toBe('Subscribe to Pro for $29/month')
   })
 
   it('is not offered the trial where subscribing does not work', () => {
@@ -59,7 +59,7 @@ describe('during the trial', () => {
 
   it('subscribing keeps the rest of the trial and shows the first charge date', () => {
     const s = planSummary({ ...base, plan: 'pro', trial })
-    expect(s.subscribe?.label).toBe('Subscribe to Pro — $29/month')
+    expect(s.subscribe?.label).toBe('Subscribe to Pro for $29/month')
     expect(s.subscribe?.terms).toBe(
       'The rest of your trial is kept. Your first charge of $29 is on 8 Nov 2026, then $29 every month until you cancel.',
     )

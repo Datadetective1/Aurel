@@ -600,7 +600,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
                             <p className="text-ink text-sm leading-relaxed">
                               {fact.value}
                               {fact.detail ? (
-                                <span className="text-ink-muted"> — {fact.detail}</span>
+                                <span className="text-ink-muted">, {fact.detail}</span>
                               ) : null}
                             </p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -639,8 +639,8 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
             <section className="mt-8">
               <Eyebrow>Sources</Eyebrow>
               <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
-                Everything above that came from public material rests on these. Correct any of them
-                — what they alone supported is withdrawn with them.
+                Everything above that came from public material rests on these. Correct any of them,
+                and what they alone supported is withdrawn with them.
               </p>
               <ul className="mt-3 grid gap-2">
                 {sources.map((source) => (

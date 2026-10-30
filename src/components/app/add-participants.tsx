@@ -107,7 +107,7 @@ export function AddParticipants({
           <option value="">Add someone to this meeting…</option>
           {people.map((person) => (
             <option key={person.id} value={person.id}>
-              {person.subtitle ? `${person.name} — ${person.subtitle}` : person.name}
+              {person.subtitle ? `${person.name}, ${person.subtitle}` : person.name}
             </option>
           ))}
         </select>

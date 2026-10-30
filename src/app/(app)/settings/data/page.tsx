@@ -63,8 +63,8 @@ export default async function DataSettingsPage() {
         <div className="mt-8">
           <Eyebrow>Demo data</Eyebrow>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-ink-secondary">
-            Load a fictional relationship record — five invented colleagues with real evidence, an
-            overdue commitment and a meeting worth preparing for — to see what {brand.name} looks
+            Load a fictional relationship record (five invented colleagues with real evidence, an
+            overdue commitment and a meeting worth preparing for) to see what {brand.name} looks
             like after a few months of use. Removable in one click.
           </p>
           <div className="mt-4">

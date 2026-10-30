@@ -165,7 +165,7 @@ export default async function CapabilitiesSettingsPage() {
       status: ai.generative ? 'configured' : 'setup',
       detail: ai.generative
         ? `${ai.provider} · ${ai.model}. Briefs combine your records, retrieved evidence and relationship memory.`
-        : 'No language model is configured, so briefs are composed deterministically from your records. Everything is still evidence-backed — it simply reasons less.',
+        : 'No language model is configured, so briefs are composed deterministically from your records. Everything is still evidence-backed. It simply reasons less.',
       deploymentAction: ai.generative
         ? undefined
         : {
@@ -214,7 +214,7 @@ export default async function CapabilitiesSettingsPage() {
             : calendarCard,
       detail:
         calendarCard === 'connected'
-          ? 'Your upcoming meetings are read so preparation follows your real day. Read-only — nothing is created, edited or answered on your behalf.'
+          ? 'Your upcoming meetings are read so preparation follows your real day. Read-only: nothing is created, edited or answered on your behalf.'
           : calendarCard === 'attention'
             ? 'Your calendar connection needs attention. Below, it says what it needs, and it can be disconnected.'
             : anyCalendarConfigured
@@ -263,7 +263,7 @@ export default async function CapabilitiesSettingsPage() {
       icon: FileText,
       status: 'available',
       detail:
-        'Attach a PDF, a Word document or plain text, or paste a transcript — either way it is analyzed the same as a fetched page, with the same citations. A scanned PDF with no text layer is refused rather than saved empty.',
+        'Attach a PDF, a Word document or plain text, or paste a transcript. Either way it is analyzed the same as a fetched page, with the same citations. A scanned PDF with no text layer is refused rather than saved empty.',
       userAction: { label: 'Add context to someone', href: '/people' },
     },
     {
@@ -273,7 +273,7 @@ export default async function CapabilitiesSettingsPage() {
       status: research.enrichmentProvider === 'none' ? 'unavailable' : 'configured',
       detail:
         research.enrichmentProvider === 'none'
-          ? `Optional vendor data. None is configured, and ${brand.name} does not require any — every claim comes from a source you can open.`
+          ? `Optional vendor data. None is configured, and ${brand.name} does not require any. Every claim comes from a source you can open.`
           : `Vendor data from ${research.enrichmentProvider}, cited like any other source.`,
     },
     {
@@ -383,7 +383,7 @@ export default async function CapabilitiesSettingsPage() {
           <h2 className="label">Not set up</h2>
           <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
             None of these stop you working. Each one names exactly what is missing. Where a setting
-            is shown as code, it is a server credential — it needs whoever runs this install rather
+            is shown as code, it is a server credential: it needs whoever runs this install rather
             than your account.
           </p>
           <ul className="mt-3 grid gap-2.5">

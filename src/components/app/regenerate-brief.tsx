@@ -72,7 +72,7 @@ export function RegenerateBrief({
         <p className="text-ink text-sm">The record has changed since this was prepared.</p>
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           {reason ?? 'New evidence has been added.'} {brand.name} has not rebuilt the brief on its
-          own — what you read below is what it knew at the time.
+          own. What you read below is what it knew at the time.
         </p>
         {error ? (
           <p role="alert" className="text-critical mt-2 text-xs">

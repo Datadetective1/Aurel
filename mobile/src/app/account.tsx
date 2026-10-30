@@ -459,7 +459,7 @@ function DeleteAccount({ onCancel }: { onCancel: () => void }) {
       <View style={{ marginTop: 14, gap: 8 }}>
         {needsAppleAck ? (
           <Button
-            label="I have cancelled it — delete my account"
+            label="I have cancelled it, delete my account"
             variant="danger"
             icon="trash-2"
             busy={busy}

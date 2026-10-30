@@ -93,7 +93,7 @@ export default async function InteractionProfileSettingsPage() {
             {isLegacy
               ? 'Built with an earlier version of the questions.'
               : refined
-                ? `Fully refined — all ${TOTAL_COUNT} answered.`
+                ? `Fully refined: all ${TOTAL_COUNT} answered.`
                 : `Profile refinement: ${answeredCount} of ${TOTAL_COUNT}`}
             {assessment.completed_at
               ? ` · last scored ${formatDate(assessment.completed_at, timeZone)}`
@@ -108,7 +108,7 @@ export default async function InteractionProfileSettingsPage() {
             </p>
           ) : !refined ? (
             <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">
-              Built from your answers and refined as you use {brand.name}. It is usable now — each
+              Built from your answers and refined as you use {brand.name}. It is usable now. Each
               further question narrows where you actually sit, and {brand.name} says how sure it is
               rather than presenting a partial read as a finished one.
             </p>
@@ -181,7 +181,7 @@ export default async function InteractionProfileSettingsPage() {
       <div className="border-line mt-10 border-t pt-8">
         <Eyebrow>More about you</Eyebrow>
         <p className="text-ink-secondary mt-3 max-w-lg text-sm leading-relaxed">
-          Your goals, any assessments you have taken before, and your coaching context. Optional —
+          Your goals, any assessments you have taken before, and your coaching context. Optional:
           each one makes suggestions a little more specific.
         </p>
         <Button asChild variant="secondary" size="sm" className="mt-4 h-11">

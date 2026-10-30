@@ -122,7 +122,7 @@ export const emailFrom = `${brand.email.fromName} <${brand.email.fromAddress}>`
 
 /** Canonical page-title builder. `title()` → bare brand name. */
 export function title(page?: string): string {
-  return page ? `${page} · ${brand.name}` : `${brand.name} — ${brand.tagline}`
+  return page ? `${page} · ${brand.name}` : `${brand.name} · ${brand.tagline}`
 }
 
 /**
@@ -134,7 +134,7 @@ export function title(page?: string): string {
  * characters so Google shows it whole.
  */
 export function seoTitle(): string {
-  return `${brand.name} — ${brand.descriptor}`
+  return `${brand.name} · ${brand.descriptor}`
 }
 
 export type Brand = typeof brand

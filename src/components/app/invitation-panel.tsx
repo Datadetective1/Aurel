@@ -93,7 +93,7 @@ export function InvitationPanel({ tier }: { tier: AccessTier }) {
           <Eyebrow>Issue an invitation</Eyebrow>
           <p className="text-ink-muted mt-2 max-w-lg text-xs leading-relaxed">
             Creates a code granting full pilot access. Only its hash is stored, so it is shown once
-            and cannot be recovered — issue a new one if it is lost.
+            and cannot be recovered. Issue a new one if it is lost.
           </p>
 
           <form action={createAction} className="mt-3 grid max-w-lg gap-2 sm:grid-cols-[1fr_auto_auto]">

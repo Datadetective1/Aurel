@@ -434,6 +434,6 @@ export function researchCapability() {
      */
     discoveryHint: search.configured
       ? null
-      : `Add a link — a company bio, a talk, an article — and ${brand.name} reads it for professional context.`,
+      : `Add a link (a company bio, a talk, an article) and ${brand.name} reads it for professional context.`,
   } as const
 }

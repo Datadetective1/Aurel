@@ -106,7 +106,7 @@ export async function extractDocument(file: {
       ok: false,
       reason: 'unsupported_type',
       message:
-        'That file type is not supported. PDF, Word (.docx) and plain text work — for anything else, paste the text.',
+        'That file type is not supported. PDF, Word (.docx) and plain text work. For anything else, paste the text.',
     }
   }
 
@@ -131,7 +131,7 @@ export async function extractDocument(file: {
           ok: false,
           reason: 'empty',
           message:
-            'That PDF has no readable text — it is probably a scan or images. Paste the text instead.',
+            'That PDF has no readable text. It is probably a scan or images. Paste the text instead.',
         }
       }
 

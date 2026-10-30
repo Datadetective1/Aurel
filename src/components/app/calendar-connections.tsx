@@ -95,7 +95,7 @@ function ConnectionRow({ connection }: { connection: CalendarConnection }) {
     } catch {
       // A dropped connection, not a refusal: say so, and leave the button usable.
       setMessage({
-        text: 'That did not reach the server. Nothing was changed — try again.',
+        text: 'That did not reach the server. Nothing was changed. Try again.',
         ok: false,
       })
     } finally {

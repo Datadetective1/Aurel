@@ -193,9 +193,9 @@ export function listeningCues(brief: NormalizedBrief, input: ListeningInput): Li
       text: commitment.description,
       note:
         commitment.owner === 'user'
-          ? 'Still open — you owe this'
+          ? 'Still open: you owe this'
           : commitment.owner === 'person'
-            ? 'Still open — they owe this'
+            ? 'Still open: they owe this'
             : 'Still open between you',
     })
   }
@@ -206,7 +206,7 @@ export function listeningCues(brief: NormalizedBrief, input: ListeningInput): Li
   const unknownPeople = brief.participants.filter((p) => p.publicOnly).map((p) => p.name)
   if (unknownPeople.length > 0) {
     cues.push({
-      text: `How ${formatNames(unknownPeople)} ${unknownPeople.length === 1 ? 'works' : 'work'} — nothing is recorded yet.`,
+      text: `How ${formatNames(unknownPeople)} ${unknownPeople.length === 1 ? 'works' : 'work'}: nothing is recorded yet.`,
       note: 'Nothing to check this against',
     })
   }

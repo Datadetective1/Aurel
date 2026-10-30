@@ -261,7 +261,7 @@ export function RelationshipVisual({ className }: { className?: string }) {
     <ProductFrame
       className={className}
       bodyClassName="grid md:grid-cols-[1.1fr_1fr]"
-      description={`${brand.name}'s view of your relationships. A map shows you at the centre: four meetings with ${ELENA.name} of ${ELENA.org}, two conversations with ${THEO.name}, also of ${THEO.org}, and ${NADIA.name} of ${NADIA.org}, who introduced you to Elena. Last time, at the pilot review on September 18, Elena asked to see adoption by team before expanding — from your notes. Nadia introduced you to Elena — from your records. You owe Elena the adoption breakdown, due today. You are waiting on Theo for the budget code.`}
+      description={`${brand.name}'s view of your relationships. A map shows you at the centre: four meetings with ${ELENA.name} of ${ELENA.org}, two conversations with ${THEO.name}, also of ${THEO.org}, and ${NADIA.name} of ${NADIA.org}, who introduced you to Elena. Last time, at the pilot review on September 18, Elena asked to see adoption by team before expanding, from your notes. Nadia introduced you to Elena, from your records. You owe Elena the adoption breakdown, due today. You are waiting on Theo for the budget code.`}
     >
       <div className="bg-bg-sunken border-line border-b px-3 py-4 sm:px-6 md:border-r md:border-b-0">
         <div className="mb-1 flex items-center gap-2.5 px-2">

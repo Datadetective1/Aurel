@@ -209,7 +209,7 @@ export function QuickBrief({
                     ) : null}
                     {p.publicOnly ? (
                       <p className="text-ink-muted mt-1 text-xs">
-                        From public sources only — preliminary until you have met.
+                        From public sources only. Preliminary until you have met.
                       </p>
                     ) : null}
                   </div>

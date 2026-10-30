@@ -126,7 +126,7 @@ export const CORE_SCENARIOS: readonly Scenario[] = [
     prompt: 'A meeting is booked with no agenda.',
     options: [
       { id: 'str-core-a', label: 'Send one, or ask for one', direction: 1 },
-      { id: 'str-core-b', label: 'Fine — talk it through and see where it goes', direction: -1 },
+      { id: 'str-core-b', label: 'Fine, talk it through and see where it goes', direction: -1 },
       depends('str-core-c'),
     ],
   },
@@ -236,7 +236,7 @@ export const REFINEMENT_SCENARIOS: readonly Scenario[] = [
     prompt: 'A conversation ends with everyone broadly agreeing.',
     options: [
       { id: 'str-2-a', label: 'Write down who is doing what by when', direction: 1 },
-      { id: 'str-2-b', label: 'Leave it — people know what to do', direction: -1 },
+      { id: 'str-2-b', label: 'Leave it, people know what to do', direction: -1 },
       depends('str-2-c'),
     ],
   },

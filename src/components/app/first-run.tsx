@@ -100,12 +100,12 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
                   state.calendarConnected
                     ? state.upcomingCount > 0
                       ? `Calendar connected. ${state.upcomingCount} upcoming ${state.upcomingCount === 1 ? 'meeting' : 'meetings'} in the next two weeks.`
-                      : 'Calendar connected. Nothing scheduled in the next two weeks — create the meeting by hand.'
+                      : 'Calendar connected. Nothing scheduled in the next two weeks. Create the meeting by hand.'
                     : state.meetingCount > 0
                       ? 'You have a meeting to prepare.'
                       : state.calendarAvailable
-                        ? `Connect your calendar and ${brand.name} finds the meetings and the people for you. Read-only — it never creates, edits or answers anything. Or create one meeting by hand.`
-                        : 'Create the meeting by hand — preparation works the same way.'
+                        ? `Connect your calendar and ${brand.name} finds the meetings and the people for you. Read-only: it never creates, edits or answers anything. Or create one meeting by hand.`
+                        : 'Create the meeting by hand. Preparation works the same way.'
                 }
                 actions={meetingActions}
               />
@@ -121,7 +121,7 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
                       ? `${state.peopleCount} ${state.peopleCount === 1 ? 'person' : 'people'} added, ${state.researchedCount} researched.`
                       : `${state.peopleCount} ${state.peopleCount === 1 ? 'person' : 'people'} added. Research from their page to confirm who they are.`
                     : state.unknownAttendees > 0
-                      ? `${state.unknownAttendees} ${state.unknownAttendees === 1 ? 'person' : 'people'} on your calendar ${state.unknownAttendees === 1 ? 'is' : 'are'} not in ${brand.name} yet. A name, a company and a role is enough — it then checks legitimate public professional sources to confirm who they are.`
+                      ? `${state.unknownAttendees} ${state.unknownAttendees === 1 ? 'person' : 'people'} on your calendar ${state.unknownAttendees === 1 ? 'is' : 'are'} not in ${brand.name} yet. A name, a company and a role is enough. It then checks legitimate public professional sources to confirm who they are.`
                       : `A name, a company and a role is enough. ${brand.name} then checks legitimate public professional sources to confirm who they are, and accepts nothing it cannot match.`
                 }
                 actions={personDone ? [] : [{ label: 'Add the person', href: '/people/new' }]}
@@ -134,7 +134,7 @@ export function FirstRun({ state, className }: { state: FirstRunState; className
                 title="Prepare the meeting"
                 body={
                   prepareDone
-                    ? `${state.preparedCount} ${state.preparedCount === 1 ? 'brief' : 'briefs'} built. After the meeting, debrief it — that is what makes the next one sharper.`
+                    ? `${state.preparedCount} ${state.preparedCount === 1 ? 'brief' : 'briefs'} built. After the meeting, debrief it. That is what makes the next one sharper.`
                     : `Say what you need from the conversation, and ${brand.name} turns everything it knows into how to open, what to emphasize and what to leave with.`
                 }
                 actions={

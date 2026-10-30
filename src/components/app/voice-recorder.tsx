@@ -134,7 +134,7 @@ export function VoiceRecorder({
         setPhase('error')
         setFailed({ blob, seconds, origin, fileName })
         setError(
-          `${payload?.error ?? "We couldn't transcribe that."} Your recording is still here — try again, or download it to keep a copy.`,
+          `${payload?.error ?? "We couldn't transcribe that."} Your recording is still here. Try again, or download it to keep a copy.`,
         )
         return
       }
@@ -149,7 +149,7 @@ export function VoiceRecorder({
       setPhase('error')
       setFailed({ blob, seconds, origin, fileName })
       setError(
-        "We couldn't reach the transcription service. Your recording is still here — try again when you're back online, or download it to keep a copy.",
+        "We couldn't reach the transcription service. Your recording is still here. Try again when you're back online, or download it to keep a copy.",
       )
     }
   }

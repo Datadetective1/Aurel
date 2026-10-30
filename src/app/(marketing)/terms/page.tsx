@@ -54,8 +54,8 @@ export default function TermsPage() {
             and it must not be used to assess anyone&rsquo;s suitability for a role.
           </p>
           <p>
-            {brand.name} must not be used to make or support employment decisions — hiring, firing,
-            promotion, compensation or discipline — or to build profiles of people for any purpose
+            {brand.name} must not be used to make or support employment decisions (hiring, firing,
+            promotion, compensation or discipline) or to build profiles of people for any purpose
             other than preparing for your own professional interactions with them.
           </p>
         </Section>
@@ -91,7 +91,7 @@ export default function TermsPage() {
         <Section title="Your content">
           <p>
             Your records remain yours. You grant {brand.legalEntity} only the permission needed to
-            operate the service for you — storing, processing and displaying your content back to
+            operate the service for you: storing, processing and displaying your content back to
             you. We do not use it to train models, it is never sold, and it is shared only with the
             service providers that run {brand.name}, each named in the Privacy policy with what it
             keeps.

@@ -252,7 +252,7 @@ export async function getProfessionalFacts(supabase: Client, userId: string, per
   return {
     data: data ?? [],
     citations: (data ?? []).map((f) => ({
-      label: `${f.value}${f.detail ? ` — ${f.detail}` : ''}`,
+      label: `${f.value}${f.detail ? `, ${f.detail}` : ''}`,
       evidenceLevel: f.evidence_level,
       personId,
     })),

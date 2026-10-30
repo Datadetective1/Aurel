@@ -172,8 +172,8 @@ export function formatOffset(zone: string, at: Date = new Date()): string {
 
 /** What goes in a dropdown option: "Lisbon — GMT+01:00". */
 export function timezoneLabel(zone: string, at: Date = new Date()): string {
-  if (zone === 'UTC') return 'UTC — Coordinated Universal Time'
-  return `${cityOf(zone)} — ${formatOffset(zone, at)}`
+  if (zone === 'UTC') return 'UTC, Coordinated Universal Time'
+  return `${cityOf(zone)} (${formatOffset(zone, at)})`
 }
 
 /** The wall-clock time in that zone right now: "4:12 PM". */

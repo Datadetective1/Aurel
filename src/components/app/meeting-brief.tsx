@@ -427,7 +427,7 @@ export function QuickBriefView({
                   ) : null}
                   {participant.knownConcerns[0] ? (
                     <p className="text-ink-secondary mt-1 text-[0.8125rem] leading-relaxed">
-                      <span className="text-ink-muted">Has raised — </span>
+                      <span className="text-ink-muted">Has raised: </span>
                       {participant.knownConcerns[0]}
                     </p>
                   ) : null}
@@ -720,7 +720,7 @@ export function MeetingBriefView({
         <BriefSection level="supporting" title="Room dynamics">
           {brief.roomDynamics.decisionOwner ? (
             <p className="text-ink mt-3 text-sm">
-              <span className="text-ink-muted">Decision sits with — </span>
+              <span className="text-ink-muted">Decision sits with: </span>
               {brief.roomDynamics.decisionOwner}
             </p>
           ) : (
@@ -912,8 +912,8 @@ export function MeetingBriefView({
           className="text-accent decoration-accent/40 hover:decoration-accent underline underline-offset-2"
         >
           After the meeting, debrief it
-        </Link>{' '}
-        — that is what makes the next brief better.
+        </Link>
+        . That is what makes the next brief better.
       </p>
     </div>
   )
