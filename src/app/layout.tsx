@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Instrument_Sans, Instrument_Serif } from 'next/font/google'
+import { Gloock, Schibsted_Grotesk } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { brand, seoTitle, siteUrl } from '@/lib/brand'
@@ -7,21 +7,23 @@ import './globals.css'
 
 /**
  * Typography.
- * Instrument Sans for interface, Instrument Serif for editorial display. They
- * are a designed pair, both OFL-licensed and therefore safe to self-host, which
- * next/font does automatically — no third-party font request at runtime.
+ * Schibsted Grotesk for interface, Gloock for editorial display. Schibsted is a
+ * sturdy newsroom grotesque with more character than the usual interface sans;
+ * Gloock is a high-contrast serif with inked terminals, used only at headline
+ * sizes. Both are OFL-licensed and therefore safe to self-host, which next/font
+ * does automatically, so there is no third-party font request at runtime. The
+ * iPhone app loads the same pair (mobile/src/theme/tokens.ts).
  */
-const sans = Instrument_Sans({
+const sans = Schibsted_Grotesk({
   subsets: ['latin'],
-  variable: '--font-instrument-sans',
+  variable: '--font-brand-sans',
   display: 'swap',
 })
 
-const serif = Instrument_Serif({
+const serif = Gloock({
   subsets: ['latin'],
   weight: '400',
-  style: ['normal', 'italic'],
-  variable: '--font-instrument-serif',
+  variable: '--font-brand-serif',
   display: 'swap',
 })
 
@@ -71,12 +73,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${serif.variable}`}>
-      <body className="min-h-dvh bg-bg text-ink antialiased">
+      <body className="bg-bg text-ink min-h-dvh antialiased">
         <ThemeProvider>
           {/* Skip link: first tab stop on every page. */}
           <a
             href="#main"
-            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-md)] focus:bg-surface-inverse focus:px-4 focus:py-2 focus:text-sm focus:text-ink-inverse"
+            className="focus:bg-surface-inverse focus:text-ink-inverse sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-[var(--radius-md)] focus:px-4 focus:py-2 focus:text-sm"
           >
             Skip to content
           </a>

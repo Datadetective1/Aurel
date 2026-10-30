@@ -605,7 +605,7 @@ export async function researchPerson(
     if (accepted === 0) {
       return {
         ok: false,
-        error: `I couldn't confidently identify ${person.full_name}. I reviewed ${considered} source${considered === 1 ? '' : 's'} and could not confirm any of them were about this person, so none were used.`,
+        error: `I couldn't confidently identify ${person.full_name}. I reviewed ${considered} source${considered === 1 ? '' : 's'} and could not confirm any of them were about this person, so none were used. If they have little online, add what you know about them yourself.`,
         sourcesConsidered: considered,
         identity: { missing: missingIdentity(person) },
       }

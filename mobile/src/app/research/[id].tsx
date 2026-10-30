@@ -216,6 +216,21 @@ export default function Research() {
               </View>
             </>
           ) : null}
+          {!outcome.ok && !outcome.missing?.length ? (
+            <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+              <Button
+                label="Add what you know"
+                icon="edit-3"
+                variant="secondary"
+                onPress={() => router.push({ pathname: '/edit-person/[id]', params: { id: person.id } })}
+              />
+            </View>
+          ) : null}
+          {!outcome.ok ? (
+            <T variant="meta" tone="muted" style={{ marginTop: 8 }}>
+              {`Plenty of people have little online. Notes you add about ${first} are used in every brief.`}
+            </T>
+          ) : null}
         </Card>
       ) : null}
 

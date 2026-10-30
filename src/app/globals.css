@@ -149,8 +149,8 @@
   --color-critical-wash: var(--critical-wash);
   --color-info-wash: var(--info-wash);
 
-  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-sans: var(--font-brand-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-brand-serif), ui-serif, Georgia, serif;
 
   --radius-sm: 4px;
   --radius-md: 8px;

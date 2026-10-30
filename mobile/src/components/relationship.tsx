@@ -8,7 +8,7 @@ import { TIMELINE_KIND_LABEL } from '@atturel/web/lib/visual/timeline'
 import { monogram } from '@atturel/web/lib/visual/logo'
 import { api, ApiError } from '~/lib/api'
 import { formatDate, formatTime, relativeDay, firstName } from '~/lib/format'
-import { TOUCH, useTheme } from '~/theme'
+import { TOUCH, useTheme, fonts } from '~/theme'
 import { Avatar, FaceStack } from './avatar'
 import { Chip, ChipRow, DIRECTION_ICON, PrepChip } from './chip'
 import { T } from './text'
@@ -23,7 +23,7 @@ export function CompanyLine({ name }: { name: string }) {
         importantForAccessibility="no-hide-descendants"
         style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: c.line, backgroundColor: c.bgSunken, alignItems: 'center', justifyContent: 'center' }}
       >
-        <T style={{ fontSize: 9, lineHeight: 11, color: c.inkSecondary, fontFamily: 'InstrumentSans_500Medium' }} maxFontSizeMultiplier={1}>
+        <T style={{ fontSize: 9, lineHeight: 11, color: c.inkSecondary, fontFamily: fonts.sansMedium }} maxFontSizeMultiplier={1}>
           {monogram(name)}
         </T>
       </View>
@@ -75,7 +75,7 @@ export function MeetingCard({ meeting, timeZone, now }: { meeting: VisualMeeting
           </View>
         )}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <T variant="meta" tone="secondary" style={{ fontFamily: 'InstrumentSans_500Medium' }}>{when}</T>
+          <T variant="meta" tone="secondary" style={{ fontFamily: fonts.sansMedium }}>{when}</T>
           <T variant="title" style={{ marginTop: 2, fontSize: 20, lineHeight: 25 }} numberOfLines={2}>
             {meeting.title}
           </T>
@@ -283,7 +283,7 @@ export function PersonRow({ person, timeZone, now }: { person: VisualPerson; tim
       >
         <Avatar name={person.fullName} src={person.src} size={48} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <T variant="body" style={{ fontFamily: 'InstrumentSans_500Medium' }} numberOfLines={1}>{person.name}</T>
+          <T variant="body" style={{ fontFamily: fonts.sansMedium }} numberOfLines={1}>{person.name}</T>
           {place ? <T variant="meta" tone="muted" numberOfLines={1}>{place}</T> : null}
           <T variant="meta" tone={person.owe > 0 ? 'accent' : 'secondary'} style={{ marginTop: 2 }}>{fact}</T>
           {person.isDemo ? <View style={{ marginTop: 6 }}><SampleChip /></View> : null}

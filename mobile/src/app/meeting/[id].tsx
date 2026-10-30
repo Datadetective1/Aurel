@@ -15,7 +15,7 @@ import { PeoplePicker } from '~/components/people-picker'
 import { Notice } from '~/components/notice'
 import { Card, Empty, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
-import { TOUCH, useTheme } from '~/theme'
+import { TOUCH, useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
@@ -137,7 +137,7 @@ export default function Prepare() {
             onPress={() => setDepth(key)}
             style={{ flex: 1, minHeight: TOUCH - 4, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: depth === key ? c.surface : 'transparent' }}
           >
-            <T variant="small" tone={depth === key ? 'ink' : 'muted'} style={{ fontFamily: 'InstrumentSans_500Medium' }}>{label}</T>
+            <T variant="small" tone={depth === key ? 'ink' : 'muted'} style={{ fontFamily: fonts.sansMedium }}>{label}</T>
           </Pressable>
         ))}
       </View>
@@ -364,7 +364,7 @@ function Quick({ data, onChanged }: { data: MeetingResponse; onChanged: (message
                 <View key={p.personId ?? i} style={{ flexDirection: 'row', gap: 12 }}>
                   <Avatar name={face?.fullName ?? p.name} src={face?.src} size={40} />
                   <View style={{ flex: 1, gap: 4 }}>
-                    <T variant="small" style={{ fontFamily: 'InstrumentSans_500Medium' }}>{p.name}</T>
+                    <T variant="small" style={{ fontFamily: fonts.sansMedium }}>{p.name}</T>
                     {p.guidance[0] ? <T variant="small" tone="secondary">{p.guidance[0]}</T> : null}
                     {p.knownConcerns[0] ? <Chip icon="shield">{`Has raised: ${p.knownConcerns[0]}`}</Chip> : null}
                     {p.publicOnly ? <T variant="meta" tone="muted">Public sources only — preliminary until you have met.</T> : null}
@@ -464,7 +464,7 @@ function Deep({ data }: { data: MeetingResponse }) {
           <Disclosure title="Questions you may get" subtitle={`${b.questionsYouMayGet.length}`}>
             {b.questionsYouMayGet.map((x, i) => (
               <View key={i} style={{ marginBottom: 10 }}>
-                <T variant="small" style={{ fontFamily: 'InstrumentSans_500Medium' }}>{x.question}</T>
+                <T variant="small" style={{ fontFamily: fonts.sansMedium }}>{x.question}</T>
                 <T variant="small" tone="secondary">{x.response}</T>
               </View>
             ))}
@@ -507,7 +507,7 @@ function Disclosure({ title, subtitle, children }: { title: string; subtitle?: s
         style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 10 }}
       >
         <View style={{ flex: 1 }}>
-          <T variant="small" style={{ fontFamily: 'InstrumentSans_500Medium' }}>{title}</T>
+          <T variant="small" style={{ fontFamily: fonts.sansMedium }}>{title}</T>
           {subtitle ? <T variant="meta" tone="muted">{subtitle}</T> : null}
         </View>
         <Feather name={open ? 'chevron-up' : 'chevron-down'} size={18} color={c.inkMuted} />

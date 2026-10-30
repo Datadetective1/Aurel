@@ -2,7 +2,7 @@ import * as React from 'react'
 import { View } from 'react-native'
 import { Tabs } from 'expo-router/js-tabs'
 import Feather from '@expo/vector-icons/Feather'
-import { useTheme } from '~/theme'
+import { useTheme, fonts } from '~/theme'
 import { useRecordingState } from '~/lib/recording-state'
 
 /**
@@ -20,7 +20,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: c.ink,
         tabBarInactiveTintColor: c.inkMuted,
         tabBarStyle: { backgroundColor: c.bg, borderTopColor: c.line },
-        tabBarLabelStyle: { fontFamily: 'InstrumentSans_500Medium', fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: fonts.sansMedium, fontSize: 11 },
       }}
     >
       <Tabs.Screen

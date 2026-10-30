@@ -12,8 +12,8 @@ import { fonts, useTheme } from '~/theme'
 type Variant = 'display' | 'title' | 'body' | 'small' | 'label' | 'meta'
 
 const STYLE: Record<Variant, { fontFamily: string; fontSize: number; lineHeight: number; letterSpacing?: number; textTransform?: 'uppercase' }> = {
-  display: { fontFamily: fonts.display, fontSize: 30, lineHeight: 34 },
-  title: { fontFamily: fonts.display, fontSize: 22, lineHeight: 27 },
+  display: { fontFamily: fonts.display, fontSize: 28, lineHeight: 33 },
+  title: { fontFamily: fonts.display, fontSize: 21, lineHeight: 26 },
   body: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 22 },
   small: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 19 },
   label: { fontFamily: fonts.sansMedium, fontSize: 12, lineHeight: 14, letterSpacing: 1.4, textTransform: 'uppercase' },

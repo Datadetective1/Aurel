@@ -4,7 +4,7 @@ import Feather from '@expo/vector-icons/Feather'
 import { DIRECTION_META, type ActionDirection } from '@atturel/web/lib/visual/relationship-actions'
 import type { PrepState } from '@atturel/web/lib/visual/glance'
 import { PREP_META } from '@atturel/web/lib/visual/glance'
-import { useTheme } from '~/theme'
+import { useTheme, fonts } from '~/theme'
 import { T } from './text'
 
 /**
@@ -50,7 +50,7 @@ export function Chip({
       }}
     >
       {icon ? <Feather name={icon} size={13} color={p.fg} accessibilityElementsHidden /> : null}
-      <T variant="meta" style={{ color: p.fg, fontFamily: 'InstrumentSans_500Medium' }} maxFontSizeMultiplier={1.5}>
+      <T variant="meta" style={{ color: p.fg, fontFamily: fonts.sansMedium }} maxFontSizeMultiplier={1.5}>
         {children}
       </T>
     </View>

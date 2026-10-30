@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo-google-fonts/instrument-sans": "^0.4.2",
-    "@expo-google-fonts/instrument-serif": "^0.4.1",
+    "@expo-google-fonts/gloock": "^0.4.2",
+    "@expo-google-fonts/schibsted-grotesk": "^0.4.2",
     "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-community/datetimepicker": "9.1.0",
@@ -53,7 +53,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "export:web": "expo export --platform web",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "lint": "expo lint"
   },
   "private": true,
   "jest": {

@@ -8,6 +8,7 @@ import type {
   PossibleDuplicate,
   VisualPerson,
 } from '@atturel/web/lib/mobile/contracts'
+import { brand } from '@atturel/web/lib/brand'
 import { api, ApiError, useApi } from '~/lib/api'
 import { fonts, TOUCH, useTheme } from '~/theme'
 import { Avatar } from './avatar'
@@ -159,6 +160,10 @@ export function NewPerson({
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [duplicate, setDuplicate] = React.useState<PossibleDuplicate | null>(null)
+  // A first name alone finds nobody. Said on the first Add, not while they
+  // type; a second Add goes ahead, because some people are known by one name.
+  const [nudged, setNudged] = React.useState(false)
+  const oneWord = fullName.trim().length > 0 && !/\s/.test(fullName.trim())
 
   const say = (e: unknown, fallback: string) =>
     setError(
@@ -173,6 +178,10 @@ export function NewPerson({
     )
 
   const add = async (confirmDuplicate: boolean) => {
+    if (oneWord && !nudged) {
+      setNudged(true)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -219,8 +228,12 @@ export function NewPerson({
   return (
     <View style={{ marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: c.line, backgroundColor: c.bgSunken, gap: 12 }}>
       <T variant="label" tone="muted">Someone new</T>
+      <T variant="small" tone="secondary">
+        {`Their full name and company are what ${brand.name} uses to find them in public sources and prepare you.`}
+      </T>
       <Field
-        label="Name"
+        label="Full name"
+        placeholder="First and last name"
         value={fullName}
         onChangeText={(v) => {
           setFullName(v)
@@ -229,7 +242,12 @@ export function NewPerson({
         autoCapitalize="words"
         textContentType="name"
       />
-      <Field label="Company (optional)" value={company} onChangeText={setCompany} textContentType="organizationName" />
+      {oneWord && nudged ? (
+        <T variant="small" tone="caution" accessibilityRole="alert">
+          Add their last name too. A first name alone is not enough to look anyone up.
+        </T>
+      ) : null}
+      <Field label="Company" placeholder="Where they work" value={company} onChangeText={setCompany} textContentType="organizationName" />
       <Field label="Role (optional)" value={title} onChangeText={setTitle} textContentType="jobTitle" />
       {duplicate ? (
         <View
@@ -257,7 +275,13 @@ export function NewPerson({
       {duplicate ? null : (
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Button label="Add" icon="check" busy={busy} disabled={!fullName.trim()} onPress={() => void add(false)} />
+            <Button
+              label={oneWord && nudged ? 'Add anyway' : 'Add'}
+              icon="check"
+              busy={busy}
+              disabled={!fullName.trim()}
+              onPress={() => void add(false)}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Button label="Cancel" variant="secondary" onPress={onCancel} />

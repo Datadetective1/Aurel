@@ -98,11 +98,17 @@ export const obsidian: Palette = {
   infoWash: 'rgba(143,188,220,0.12)',
 }
 
+/**
+ * Gloock for display: a high-contrast serif with sharp, inked terminals, used
+ * only at headline sizes. Schibsted Grotesk for everything else: a sturdy
+ * newsroom grotesque with more character than the usual interface sans.
+ * Keep in step with src/app/layout.tsx on the web.
+ */
 export const fonts = {
-  display: 'InstrumentSerif_400Regular',
-  sans: 'InstrumentSans_400Regular',
-  sansMedium: 'InstrumentSans_500Medium',
-  sansSemi: 'InstrumentSans_600SemiBold',
+  display: 'Gloock_400Regular',
+  sans: 'SchibstedGrotesk_400Regular',
+  sansMedium: 'SchibstedGrotesk_500Medium',
+  sansSemi: 'SchibstedGrotesk_600SemiBold',
 }
 
 export const radius = { sm: 4, md: 8, lg: 12, xl: 18, full: 999 }

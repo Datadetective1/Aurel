@@ -15,7 +15,7 @@ import { LoopRow, MeetingCard } from '~/components/relationship'
 import { Notice } from '~/components/notice'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
-import { useTheme } from '~/theme'
+import { useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
@@ -142,7 +142,7 @@ export default function Today() {
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, opacity: pressed ? 0.8 : 1, minHeight: 56 })}
             >
               <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.accentWash, alignItems: 'center', justifyContent: 'center' }}>
-                <T variant="small" tone="accent" style={{ fontFamily: 'InstrumentSans_600SemiBold' }}>{r.pending}</T>
+                <T variant="small" tone="accent" style={{ fontFamily: fonts.sansSemi }}>{r.pending}</T>
               </View>
               <View style={{ flex: 1 }}>
                 <T variant="small" numberOfLines={1}>{r.title}</T>

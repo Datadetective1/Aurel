@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router'
 import Feather from '@expo/vector-icons/Feather'
 import type { PersonLifecycleResponse, PersonResponse, PhotoResponse } from '@atturel/web/lib/mobile/contracts'
 import { DIRECTION_ORDER } from '@atturel/web/lib/visual/relationship-actions'
+import { brand } from '@atturel/web/lib/brand'
 import { api, ApiError, useApi } from '~/lib/api'
 import { photoForm, pickPhoto } from '~/lib/photo'
 import { useFresh } from '~/lib/use-fresh'
@@ -76,6 +77,16 @@ export default function Person() {
           />
         </View>
       </View>
+
+      {/* Someone just added, with nothing behind the name: say what would help,
+          rather than leave Ask and Prepare to find out there is nothing to use. */}
+      {!person.isDemo && timeline.length === 0 && loops.length === 0 && themes.length === 0 && !data.edit?.notes ? (
+        <GetReady
+          id={person.id}
+          first={firstName(person.name)}
+          thin={!person.company || !/\s/.test((data.edit?.fullName ?? person.fullName).trim())}
+        />
+      ) : null}
 
       {/* --- where things stand ------------------------------------------------ */}
       <View style={{ marginTop: 20 }}>
@@ -159,6 +170,37 @@ export default function Person() {
         )}
       </Section>
     </Screen>
+  )
+}
+
+function GetReady({ id, first, thin }: { id: string; first: string; thin: boolean }) {
+  return (
+    <Card tone="accent" style={{ marginTop: 16 }}>
+      <T variant="label" tone="accent">{`Get ready to meet ${first}`}</T>
+      <T variant="small" style={{ marginTop: 8 }}>
+        {`${brand.name} only knows what you typed so far. Give it something to go on and your brief gets specific.`}
+      </T>
+      {thin ? (
+        <T variant="small" tone="caution" style={{ marginTop: 8 }}>
+          {`Add ${first}'s full name and company first, so the search finds the right person.`}
+        </T>
+      ) : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+        <Button
+          label={`Look ${first} up`}
+          icon="search"
+          variant="secondary"
+          accessibilityHint="Opens public research. Nothing is searched until you ask."
+          onPress={() => router.push({ pathname: '/research/[id]', params: { id } })}
+        />
+        <Button
+          label="Add what you know"
+          icon="edit-3"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/edit-person/[id]', params: { id } })}
+        />
+      </View>
+    </Card>
   )
 }
 
