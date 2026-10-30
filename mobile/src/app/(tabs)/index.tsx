@@ -12,6 +12,7 @@ import { elapsed } from '~/lib/capture'
 import { countdown, formatDayLabel } from '~/lib/format'
 import { Failure, Loading, Screen, Section, Empty, Card, StaleNote } from '~/components/screen'
 import { LoopRow, MeetingCard } from '~/components/relationship'
+import { GoingCold, OwedLink } from '~/components/relationship-tools'
 import { Notice } from '~/components/notice'
 import { Button } from '~/components/button'
 import { T } from '~/components/text'
@@ -160,7 +161,10 @@ export default function Today() {
         ) : (
           data.loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} onChanged={changed} />)
         )}
+        <OwedLink />
       </Section>
+
+      <GoingCold />
     </Screen>
   )
 }

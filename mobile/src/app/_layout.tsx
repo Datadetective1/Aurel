@@ -59,6 +59,9 @@ function Navigator() {
           <Stack.Screen name="archived/[id]" options={{ title: '' }} />
           <Stack.Screen name="research/[id]" options={{ title: 'Public footprint' }} />
           <Stack.Screen name="how-it-works" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="owed" options={{ title: 'Everything owed' }} />
+          <Stack.Screen name="handoff/[id]" options={{ title: 'Handoff pack', presentation: 'modal' }} />
+          <Stack.Screen name="scan" options={{ title: 'Scan a card', presentation: 'modal' }} />
         </Stack.Protected>
         <Stack.Protected guard={!introduced}>
           <Stack.Screen name="intro" options={{ headerShown: false }} />

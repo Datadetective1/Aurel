@@ -13,6 +13,7 @@ import { Avatar } from '~/components/avatar'
 import { Button } from '~/components/button'
 import { Chip, ChipRow, DirectionChip } from '~/components/chip'
 import { CompanyLine, LoopRow, SampleChip, Timeline } from '~/components/relationship'
+import { WarmPath } from '~/components/relationship-tools'
 import { Notice } from '~/components/notice'
 import { Card, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
@@ -134,6 +135,8 @@ export default function Person() {
           {loops.map((l) => <LoopRow key={l.id} loop={l} timeZone={tz} now={now} showPerson={false} onChanged={changed} />)}
         </Section>
       ) : null}
+
+      <WarmPath personId={person.id} name={person.name} />
 
       {/* Public research is its own step, never started by what was typed in. */}
       <Section label="Public footprint" icon="globe">
@@ -297,6 +300,13 @@ function Manage({
   return (
     <Section label="Manage" icon="sliders">
       <View style={{ gap: 8, alignItems: 'flex-start' }}>
+        <Button
+          label="Make a handoff pack"
+          icon="send"
+          variant="secondary"
+          accessibilityHint={`A brief on ${first} for a colleague, or for you after time away. You see it before sharing.`}
+          onPress={() => router.push({ pathname: '/handoff/[id]', params: { id: person.id } })}
+        />
         {person.editable ? (
           <Button label="Edit details" icon="edit-2" variant="secondary" onPress={() => router.push({ pathname: '/edit-person/[id]', params: { id: person.id } })} />
         ) : null}

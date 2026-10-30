@@ -155,11 +155,14 @@ export function LoopRow({
   now,
   showPerson = true,
   onChanged,
+  freshness,
 }: {
   loop: VisualLoop
   timeZone: string
   now: Date
   showPerson?: boolean
+  /** How close it is to going stale, said in place of the due date. */
+  freshness?: { note: string; tone: 'critical' | 'caution' | 'muted' }
   /** When given, the row opens Done / Later / Cancel and calls this after a change. */
   onChanged?: (message: string) => void
 }) {
@@ -171,7 +174,7 @@ export function LoopRow({
       onPress={() => onChanged && chooseLoopAction(loop, onChanged)}
       accessibilityRole={onChanged ? 'button' : 'text'}
       accessibilityHint={onChanged ? 'Mark done, later, or no longer needed' : undefined}
-      accessibilityLabel={`${meta.label}${loop.personName && showPerson ? `, ${loop.personName}` : ''}: ${loop.description}${loop.overdue ? ', overdue' : ''}`}
+      accessibilityLabel={`${meta.label}${loop.personName && showPerson ? `, ${loop.personName}` : ''}: ${loop.description}${freshness ? `, ${freshness.note}` : loop.overdue ? ', overdue' : ''}`}
       style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, minHeight: TOUCH, opacity: pressed ? 0.75 : 1 })}
     >
       <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: loop.overdue ? c.criticalWash : loop.direction === 'owe' ? c.accentWash : c.bgSunken, alignItems: 'center', justifyContent: 'center' }}>
@@ -179,8 +182,12 @@ export function LoopRow({
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <T variant="small">{loop.description}</T>
-        <T variant="meta" tone={loop.overdue ? 'critical' : 'muted'} style={{ marginTop: 2 }}>
-          {[meta.label, showPerson ? loop.personName : null, loop.dueOn ? `${loop.overdue ? 'was due' : 'due'} ${relativeDay(loop.dueOn, timeZone, now).toLowerCase()}` : null]
+        <T variant="meta" tone={freshness ? freshness.tone : loop.overdue ? 'critical' : 'muted'} style={{ marginTop: 2 }}>
+          {[
+            meta.label,
+            showPerson ? loop.personName : null,
+            freshness ? freshness.note : loop.dueOn ? `${loop.overdue ? 'was due' : 'due'} ${relativeDay(loop.dueOn, timeZone, now).toLowerCase()}` : null,
+          ]
             .filter(Boolean)
             .join(' · ')}
         </T>

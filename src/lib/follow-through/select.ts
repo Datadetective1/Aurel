@@ -1,4 +1,5 @@
 import { daysBetween } from '@/lib/tz'
+import { NUDGE_DAYS, STALE_AFTER_DAYS } from '@/lib/visual/owed'
 
 /**
  * FOLLOW-THROUGH SELECTION
@@ -89,8 +90,11 @@ function bucketFor(loop: DigestLoop, today: string, weekday: number): Bucket | n
   // Undated loops would otherwise appear every single morning, which is how a
   // reminder becomes noise. Once a week, and only once they have had a few
   // days to resolve on their own.
-  if (weekday !== UNDATED_WEEKDAY) return null
   const age = daysBetween(loop.createdAt.slice(0, 10), today)
+  // The one exception to once a week: the morning an undated loop comes
+  // within NUDGE_DAYS of going stale, so it is raised while it can be kept.
+  if (age === STALE_AFTER_DAYS - NUDGE_DAYS) return 'undated'
+  if (weekday !== UNDATED_WEEKDAY) return null
   if (age < UNDATED_MIN_AGE_DAYS) return null
   return 'undated'
 }
