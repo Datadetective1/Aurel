@@ -145,8 +145,14 @@ export function NewPerson({
   onAdded,
   onExisting,
   existingLabel = 'Open',
+  initial,
 }: {
   initialName: string
+  /**
+   * Everything else already known, as from a scanned card. When given, the
+   * contact fields show too, so the user checks each one before it is saved.
+   */
+  initial?: { company?: string; title?: string; email?: string; profileUrl?: string; notes?: string }
   onCancel: () => void
   onAdded: (person: NewPersonResult) => void
   /** The person already on record was chosen instead. */
@@ -155,8 +161,11 @@ export function NewPerson({
 }) {
   const { c } = useTheme()
   const [fullName, setFullName] = React.useState(initialName.trim())
-  const [company, setCompany] = React.useState('')
-  const [title, setTitle] = React.useState('')
+  const [company, setCompany] = React.useState(initial?.company ?? '')
+  const [title, setTitle] = React.useState(initial?.title ?? '')
+  const [email, setEmail] = React.useState(initial?.email ?? '')
+  const [profileUrl, setProfileUrl] = React.useState(initial?.profileUrl ?? '')
+  const [notes, setNotes] = React.useState(initial?.notes ?? '')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [duplicate, setDuplicate] = React.useState<PossibleDuplicate | null>(null)
@@ -189,6 +198,9 @@ export function NewPerson({
         fullName: fullName.trim(),
         organizationName: company.trim() || undefined,
         jobTitle: title.trim() || undefined,
+        email: email.trim() || undefined,
+        profileUrl: profileUrl.trim() || undefined,
+        notes: notes.trim() || undefined,
         checkDuplicate: true,
         confirmDuplicate: confirmDuplicate || undefined,
       })
@@ -249,6 +261,23 @@ export function NewPerson({
       ) : null}
       <Field label="Company" placeholder="Where they work" value={company} onChangeText={setCompany} textContentType="organizationName" />
       <Field label="Role (optional)" value={title} onChangeText={setTitle} textContentType="jobTitle" />
+      {initial ? (
+        <>
+          <Field
+            label="Email (optional)"
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v)
+              setDuplicate(null)
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            textContentType="emailAddress"
+          />
+          <Field label="LinkedIn or profile link (optional)" value={profileUrl} onChangeText={setProfileUrl} autoCapitalize="none" keyboardType="url" textContentType="URL" />
+          <Field label="Notes (optional)" value={notes} onChangeText={setNotes} multiline />
+        </>
+      ) : null}
       {duplicate ? (
         <View
           accessibilityRole="alert"

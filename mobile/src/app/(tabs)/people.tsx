@@ -59,14 +59,24 @@ export default function People() {
       <StaleNote failure={stale} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T variant="display" accessibilityRole="header">People</T>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add someone"
-          onPress={() => setAdding((a) => !a)}
-          style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
-        >
-          <Feather name={adding ? 'x' : 'user-plus'} size={20} color={c.inkSecondary} />
-        </Pressable>
+        <View style={{ flexDirection: 'row' }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Scan a business card or badge"
+            onPress={() => router.push('/scan')}
+            style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+          >
+            <Feather name="credit-card" size={20} color={c.inkSecondary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add someone"
+            onPress={() => setAdding((a) => !a)}
+            style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+          >
+            <Feather name={adding ? 'x' : 'user-plus'} size={20} color={c.inkSecondary} />
+          </Pressable>
+        </View>
       </View>
       {adding ? (
         <NewPerson

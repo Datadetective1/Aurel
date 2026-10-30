@@ -23,6 +23,10 @@ import type {
   VisualPerson,
   VisualPersonDetail,
 } from '@/lib/visual/types'
+import type { Freshness } from '@/lib/visual/owed'
+import type { ColdRelationship, ReachOutReason } from '@/lib/visual/going-cold'
+import type { WarmPath } from '@/lib/visual/warm-path'
+import type { HandoffPack } from '@/lib/people/handoff'
 
 export type {
   VisualConnection,
@@ -34,6 +38,11 @@ export type {
   PrepState,
   NormalizedBrief,
   ListeningCue,
+  Freshness,
+  ColdRelationship,
+  ReachOutReason,
+  WarmPath,
+  HandoffPack,
 }
 export type { TimelineEntry, TimelineKind } from '@/lib/visual/timeline'
 export type { ActionDirection } from '@/lib/visual/relationship-actions'
@@ -616,3 +625,43 @@ export interface AtlasResponse {
   /** People the user marked important with no contact in 30 days. */
   goingQuiet: VisualPerson[]
 }
+
+// --- GET /api/mobile/owed -----------------------------------------------------
+/** An open loop, read for how close it is to going stale. */
+export interface OwedLoop extends VisualLoop {
+  createdAt: string
+  /** The conversation it came out of, when there was one. */
+  from: string | null
+  freshness: Freshness
+  /** "Overdue by 2 days", "Due tomorrow", "Open 12 days, no date". */
+  note: string
+}
+export interface OwedResponse {
+  timeZone: string
+  now: string
+  /** What the user promised, and their own follow-ups. */
+  mine: OwedLoop[]
+  /** What other people promised the user. */
+  theirs: OwedLoop[]
+  /** Questions and loops with no single owner. */
+  shared: OwedLoop[]
+  /** How many are overdue, stale or about to be. */
+  nudges: number
+}
+
+// --- GET /api/mobile/going-cold ---------------------------------------------------
+export interface GoingColdResponse {
+  timeZone: string
+  /** Important people with no contact in weeks, most important first. */
+  people: (ColdRelationship & { person: VisualPerson })[]
+}
+
+// --- GET /api/mobile/people/:id/warm-path -----------------------------------------
+export interface WarmPathResponse {
+  target: { id: string; name: string }
+  /** People the user knows who share something on record with the target. */
+  paths: (WarmPath & { person: VisualPerson })[]
+}
+
+// --- GET /api/mobile/people/:id/handoff?notes=1 -----------------------------------
+export type HandoffResponse = HandoffPack

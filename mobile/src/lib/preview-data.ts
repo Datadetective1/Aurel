@@ -7,6 +7,11 @@ import type {
   CalendarSyncResponse,
   CaptureResponse,
   DeletionPreviewResponse,
+  GoingColdResponse,
+  HandoffResponse,
+  OwedLoop,
+  OwedResponse,
+  WarmPathResponse,
   MeResponse,
   MeetingResponse,
   PeopleResponse,
@@ -394,6 +399,74 @@ export async function previewResponse<T>(path: string, init: RequestInit): Promi
       ],
       decisions: [{ id: 'r-4', description: 'Pilot starts with his account team only', excerpt: null, likely: true }],
       memoryProposals: 1,
+    }
+    return body as T
+  }
+
+  if (p === '/owed') {
+    const loop = (l: (typeof LOOPS)[number], extra: Pick<OwedLoop, 'freshness' | 'note' | 'createdAt'>): OwedLoop => ({
+      ...l,
+      from: 'Prototype walkthrough',
+      ...extra,
+    })
+    const body: OwedResponse = {
+      timeZone: TZ,
+      now: NOW.toISOString(),
+      mine: [loop(LOOPS[0]!, { freshness: 'overdue', note: 'Overdue by 1 day', createdAt: new Date(NOW.getTime() - 12 * 86_400_000).toISOString() })],
+      theirs: [loop(LOOPS[1]!, { freshness: 'nudge', note: 'Open 12 days, no date', createdAt: new Date(NOW.getTime() - 12 * 86_400_000).toISOString() })],
+      shared: [loop(LOOPS[2]!, { freshness: 'fresh', note: 'Open 4 days, no date', createdAt: new Date(NOW.getTime() - 4 * 86_400_000).toISOString() })],
+      nudges: 2,
+    }
+    return body as T
+  }
+
+  if (p === '/going-cold') {
+    const body: GoingColdResponse = {
+      timeZone: TZ,
+      people: [
+        {
+          personId: PEOPLE[1]!.id,
+          person: PEOPLE[1]!,
+          daysQuiet: 30,
+          neverSpoke: false,
+          reason: {
+            text: 'Maureen appeared at the Regional Operators Forum. Asking how it went is an easy way back in.',
+            evidence: 'inferred',
+            sourceTitle: 'Regional Operators Forum speakers',
+            sourceUrl: 'https://example.com/forum',
+            datedOn: NOW.toISOString().slice(0, 10),
+          },
+        },
+      ],
+    }
+    return body as T
+  }
+
+  const warmMatch = p.match(/^\/people\/([^/]+)\/warm-path$/)
+  if (warmMatch) {
+    const target = PEOPLE.find((q) => q.id === warmMatch[1]) ?? PEOPLE[2]!
+    const ties = CONNECTIONS.filter((c) => c.a === target.id || c.b === target.id)
+    const paths = ties.flatMap((c) => {
+      const other = PEOPLE.find((q) => q.id === (c.a === target.id ? c.b : c.a))
+      return other?.lastInteractionAt ? [{ introducerId: other.id, ties: [c.description], evidence: c.evidence, person: other }] : []
+    })
+    const body: WarmPathResponse = { target: { id: target.id, name: target.name }, paths: paths.slice(0, 3) }
+    return body as T
+  }
+
+  const handoffMatch = p.match(/^\/people\/([^/?]+)\/handoff(\?.*)?$/)
+  if (handoffMatch) {
+    const x = PEOPLE.find((q) => q.id === handoffMatch[1]) ?? PEOPLE[0]!
+    const notes = handoffMatch[2]?.includes('notes=1')
+    const body: HandoffResponse = {
+      title: `Handoff: ${x.fullName}`,
+      text: [
+        `HANDOFF: ${x.fullName.toUpperCase()}`,
+        `${x.fullName}, ${x.title} at ${x.company}. Relationship: ${x.context}. Invented sample person.`,
+        'STILL OPEN\n- Promised to Columbus: Send the prototype link and the two-page overview (overdue)\n- Columbus promised: Share the in-region storage requirements',
+        ...(notes ? ['NOTES\nPrefers a short agenda sent the day before.'] : []),
+        'Prepared with Atturel. Confirmed means they said it or it was confirmed; Observed means it is on record; Inferred is a reading worth checking.',
+      ].join('\n\n'),
     }
     return body as T
   }
