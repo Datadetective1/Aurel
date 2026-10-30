@@ -23,8 +23,10 @@ import {
   MAX_SEARCH_REQUESTS,
   hasEnough,
   planQueries,
+  rankCandidates,
 } from '@/lib/research/queries'
 import { canonicalUrl, detectInputKind } from '@/lib/sources/url'
+import { isGenericEmailDomain } from '@/lib/research/matching'
 import { resolveOrganization } from '@/lib/organizations'
 import { track } from '@/lib/analytics'
 import { logger } from '@/lib/logger'
@@ -406,17 +408,29 @@ export async function researchPerson(
       await updateJob(supabase, jobId, { stage: 'searching_sources' })
       const provider = resolveSearchProvider()
 
-      const plan = planQueries({
+      // The email domain, when there is one and it is an employer's. Nothing
+      // else narrows a search this hard: a page on the employer's own domain
+      // naming the person is about as close to a primary source as public
+      // research gets. A gmail.com address is not an employer, and searching
+      // gmail.com for them spent one of the three requests on nothing.
+      const emailDomain = person.email?.includes('@')
+        ? (person.email.split('@')[1]?.toLowerCase() ?? null)
+        : null
+      const subject = {
         name: person.full_name,
         organization: person.organizations?.name ?? null,
         jobTitle: person.job_title,
-        // The email domain, when there is one. Nothing else narrows a search
-        // this hard: a page on the employer's own domain naming the person is
-        // about as close to a primary source as public research gets.
-        domain: person.email?.includes('@') ? person.email.split('@')[1] : null,
-      })
+        domain: emailDomain && !isGenericEmailDomain(emailDomain) ? emailDomain : null,
+      }
+      const plan = planQueries(subject)
+
+      // Pages already settled for this person are not read again: a re-run
+      // spends its reads on pages it has not seen, which is the only way a
+      // second search can find anything new.
+      const { known, setAside } = await knownPagesFor(supabase, personId)
 
       const strong: string[] = []
+      let likely = 0
 
       for (const planned of plan) {
         if (searchRequests >= MAX_SEARCH_REQUESTS) break
@@ -440,11 +454,18 @@ export async function researchPerson(
 
         // Ranking runs per rung so `sufficient` counts sources worth reading,
         // not raw hits. Ten aggregator pages do not settle anything.
-        const ranked = rankCandidates(search.results.map((r) => r.url))
-        const fresh = ranked.filter((url) => !strong.includes(url))
-        strong.push(...fresh)
+        const ranked = rankCandidates(search.results, subject, {
+          known,
+          setAside,
+          canonical: (url) => canonicalUrl(url) ?? url,
+        })
+        const fresh = ranked.filter((candidate) => !strong.includes(candidate.url))
+        strong.push(...fresh.map((candidate) => candidate.url))
+        // Only results that look like them count toward stopping the ladder.
+        const freshLikely = fresh.filter((candidate) => candidate.likelyThem).length
+        likely += freshLikely
 
-        if (hasEnough(planned, fresh.length, strong.length, MAX_CANDIDATES)) break
+        if (hasEnough(planned, freshLikely, likely, MAX_CANDIDATES)) break
       }
 
       candidateUrls.push(...strong.slice(0, MAX_CANDIDATES))
@@ -644,58 +665,36 @@ async function updateJob(
 }
 
 /**
- * Rank candidate URLs by likely usefulness.
- * Official company pages and conference listings beat SEO aggregators, which
- * are the main source of confidently-wrong biographical data.
+ * Pages this person's research has already settled, as canonical URLs.
+ *
+ * `known`: the user decided, it is in their record, or it is waiting for their
+ * check -- reading any of these again adds nothing. `setAside`: the identity
+ * check turned it down on its own; read again only when nothing better turns
+ * up, since a sharper check may now accept it.
  */
-function rankCandidates(urls: string[]): string[] {
-  const DENY = [
-    'facebook.com',
-    'instagram.com',
-    'tiktok.com',
-    'pinterest.com',
-    'quora.com',
-    'zoominfo.com',
-    'rocketreach.co',
-    'signalhire.com',
-    'apollo.io',
-    'lusha.com',
-    'spokeo.com',
-    'whitepages.com',
-    'peoplefinder',
-    'beenverified',
-    // LinkedIn is excluded on purpose: fetching it programmatically is against
-    // their terms. Users may still add a LinkedIn URL as identity metadata.
-    'linkedin.com',
-  ]
-
-  const scored = urls
-    .map((url) => {
-      let host = ''
-      let path = ''
-      try {
-        const parsedUrl = new URL(url)
-        host = parsedUrl.hostname.toLowerCase().replace(/^www\./, '')
-        path = parsedUrl.pathname.toLowerCase()
-      } catch {
-        return null
-      }
-      if (DENY.some((d) => host.includes(d))) return null
-
-      let score = 0
-      if (/\/(leadership|team|about|our-people|management|bio)\b/.test(path)) score += 5
-      if (/\/(speakers?|sessions?|agenda|conference)\b/.test(path)) score += 4
-      if (/\/(blog|news|press|insights|article)\b/.test(path)) score += 3
-      if (host.endsWith('.edu') || host.endsWith('.gov') || host.endsWith('.org')) score += 2
-      if (host === 'github.com' || host === 'youtube.com') score += 2
-      // Deep aggregator-style paths are usually low quality.
-      if (path.split('/').length > 6) score -= 2
-
-      return { url, score }
-    })
-    .filter((x): x is { url: string; score: number } => x !== null)
-
-  return scored.sort((a, b) => b.score - a.score).map((s) => s.url)
+async function knownPagesFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  personId: string,
+): Promise<{ known: Set<string>; setAside: Set<string> }> {
+  const known = new Set<string>()
+  const setAside = new Set<string>()
+  const { data } = await supabase
+    .from('source_person_links')
+    .select('identity_match_status, reviewed_by_user, match_signals, sources(source_url)')
+    .eq('person_id', personId)
+  for (const link of data ?? []) {
+    const url = link.sources?.source_url
+    if (!url) continue
+    const key = canonicalUrl(url) ?? url
+    const decided =
+      link.reviewed_by_user ||
+      link.identity_match_status === 'confirmed' ||
+      link.identity_match_status === 'probable' ||
+      readHeld(link.match_signals) !== null
+    if (decided) known.add(key)
+    else if (link.identity_match_status === 'no_match') setAside.add(key)
+  }
+  return { known, setAside }
 }
 
 /**
