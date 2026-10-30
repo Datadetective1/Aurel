@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { brand } from '@atturel/web/lib/brand'
 import { Alert, Linking, Switch, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import * as Application from 'expo-application'
@@ -20,7 +21,7 @@ import { Failure, Loading, Screen, Section, Card, StaleNote } from '~/components
 import { Button } from '~/components/button'
 import { CalendarConnections } from '~/components/calendar-connections'
 import { T } from '~/components/text'
-import { TOUCH, useTheme } from '~/theme'
+import { TOUCH, useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
@@ -84,6 +85,7 @@ export default function Account() {
       <PrivacyAndData />
 
       <Section label="Help" icon="help-circle">
+        <LinkRow icon="compass" label={`How ${brand.name} works`} onPress={() => router.push('/how-it-works')} />
         <LinkRow
           icon="mail"
           label={`Contact ${data.legal.supportEmail}`}
@@ -315,7 +317,7 @@ function PilotCode({ onRedeemed }: { onRedeemed: () => void }) {
         accessibilityLabel="Invitation code"
         placeholder="ATT-XXXX-XXXX-XXXX"
         placeholderTextColor={c.inkFaint}
-        style={{ marginTop: 10, minHeight: TOUCH, borderWidth: 1, borderColor: c.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: c.ink, backgroundColor: c.surface, fontFamily: 'InstrumentSans_400Regular', fontSize: 16 }}
+        style={{ marginTop: 10, minHeight: TOUCH, borderWidth: 1, borderColor: c.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: c.ink, backgroundColor: c.surface, fontFamily: fonts.sans, fontSize: 16 }}
       />
       <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
         <Button label="Redeem" variant="secondary" busy={busy} disabled={code.trim().length < 6} onPress={() => void redeem()} />
@@ -445,7 +447,7 @@ function DeleteAccount({ onCancel }: { onCancel: () => void }) {
           paddingHorizontal: 12,
           color: c.ink,
           backgroundColor: c.surface,
-          fontFamily: 'InstrumentSans_400Regular',
+          fontFamily: fonts.sans,
           fontSize: 16,
         }}
       />

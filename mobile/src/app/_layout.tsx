@@ -4,29 +4,34 @@ import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
-import { InstrumentSerif_400Regular } from '@expo-google-fonts/instrument-serif'
+import { Gloock_400Regular } from '@expo-google-fonts/gloock'
 import {
-  InstrumentSans_400Regular,
-  InstrumentSans_500Medium,
-  InstrumentSans_600SemiBold,
-} from '@expo-google-fonts/instrument-sans'
+  SchibstedGrotesk_400Regular,
+  SchibstedGrotesk_500Medium,
+  SchibstedGrotesk_600SemiBold,
+} from '@expo-google-fonts/schibsted-grotesk'
 import { AuthProvider, useAuth } from '~/lib/auth'
-import { ThemeProvider, useTheme } from '~/theme'
+import { IntroGateProvider, useIntroGate } from '~/lib/intro-gate'
+import { fonts, ThemeProvider, useTheme } from '~/theme'
 
 void SplashScreen.preventAutoHideAsync().catch(() => {})
 
 function Navigator() {
   const { state } = useAuth()
+  const intro = useIntroGate()
   const { c, name } = useTheme()
+  const loading = state.status === 'loading' || intro.seen === null
 
   React.useEffect(() => {
-    if (state.status !== 'loading') void SplashScreen.hideAsync().catch(() => {})
-  }, [state.status])
+    if (!loading) void SplashScreen.hideAsync().catch(() => {})
+  }, [loading])
 
-  if (state.status === 'loading') return null
+  if (loading) return null
+  // A new install sees how Atturel works first, signed in or not.
+  const introduced = intro.seen === true
   const signedIn = state.status === 'signed_in'
-  const ready = signedIn && state.onboarded
-  const settingUp = signedIn && !state.onboarded
+  const ready = introduced && signedIn && state.onboarded
+  const settingUp = introduced && signedIn && !state.onboarded
 
   return (
     <>
@@ -36,7 +41,7 @@ function Navigator() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor: c.bg },
           headerTintColor: c.ink,
-          headerTitleStyle: { fontFamily: 'InstrumentSans_500Medium', color: c.ink },
+          headerTitleStyle: { fontFamily: fonts.sansMedium, color: c.ink },
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: c.bg },
         }}
@@ -53,11 +58,15 @@ function Navigator() {
           <Stack.Screen name="archived/index" options={{ title: 'Archived' }} />
           <Stack.Screen name="archived/[id]" options={{ title: '' }} />
           <Stack.Screen name="research/[id]" options={{ title: 'Public footprint' }} />
+          <Stack.Screen name="how-it-works" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        </Stack.Protected>
+        <Stack.Protected guard={!introduced}>
+          <Stack.Screen name="intro" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={settingUp}>
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={!signedIn}>
+        <Stack.Protected guard={introduced && !signedIn}>
           <Stack.Screen name="sign-in" options={{ headerShown: false }} />
           <Stack.Screen name="sign-up" options={{ title: '', headerTransparent: true }} />
         </Stack.Protected>
@@ -68,10 +77,10 @@ function Navigator() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    InstrumentSerif_400Regular,
-    InstrumentSans_400Regular,
-    InstrumentSans_500Medium,
-    InstrumentSans_600SemiBold,
+    Gloock_400Regular,
+    SchibstedGrotesk_400Regular,
+    SchibstedGrotesk_500Medium,
+    SchibstedGrotesk_600SemiBold,
   })
   if (!fontsLoaded) return null
 
@@ -79,7 +88,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <Navigator />
+          <IntroGateProvider>
+            <Navigator />
+          </IntroGateProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

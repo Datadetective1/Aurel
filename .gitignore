@@ -33,3 +33,6 @@ supabase/.temp/
 
 # The native app's icon, splash and favicon are build inputs, same reason.
 !mobile/assets/*.png
+# The sample people's portraits ship inside the iPhone app (made by
+# scripts/brand/sample-faces.py), so they are deliverables too.
+!mobile/assets/people/*.png

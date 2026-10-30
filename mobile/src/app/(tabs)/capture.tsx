@@ -744,7 +744,7 @@ function Choice({ icon, title, body, selected, onPress }: { icon: React.Componen
     >
       <Feather name={icon} size={20} color={selected ? c.ink : c.inkMuted} />
       <View style={{ flex: 1 }}>
-        <T variant="body" style={{ fontFamily: 'InstrumentSans_500Medium' }}>{title}</T>
+        <T variant="body" style={{ fontFamily: fonts.sansMedium }}>{title}</T>
         <T variant="meta" tone="muted">{body}</T>
       </View>
       <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? c.ink : c.lineStrong} />

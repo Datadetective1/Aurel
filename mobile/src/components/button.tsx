@@ -2,7 +2,7 @@ import * as React from 'react'
 import { ActivityIndicator, Pressable, View } from 'react-native'
 import Feather from '@expo/vector-icons/Feather'
 import * as Haptics from 'expo-haptics'
-import { TOUCH, useTheme } from '~/theme'
+import { TOUCH, useTheme, fonts } from '~/theme'
 import { T } from './text'
 
 /**
@@ -57,7 +57,7 @@ export function Button({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {busy ? <ActivityIndicator color={fg} /> : icon ? <Feather name={icon} size={17} color={fg} /> : null}
-        <T variant="body" style={{ color: fg, fontFamily: 'InstrumentSans_500Medium' }}>
+        <T variant="body" style={{ color: fg, fontFamily: fonts.sansMedium }}>
           {label}
         </T>
       </View>

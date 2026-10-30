@@ -10,7 +10,7 @@ import { Button } from '~/components/button'
 import { DIRECTION_ICON } from '~/components/chip'
 import { Card, Empty, Failure, Loading, Screen, Section, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
-import { useTheme } from '~/theme'
+import { useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
@@ -112,7 +112,7 @@ export default function Review() {
 
       <View style={{ marginTop: 16 }}>
         <Card tone="sunken">
-          <T variant="body" style={{ fontFamily: 'InstrumentSans_500Medium' }}>
+          <T variant="body" style={{ fontFamily: fonts.sansMedium }}>
             {summary.length ? summary.join(' · ') : 'Nothing to confirm'}
           </T>
           <T variant="meta" tone="muted" style={{ marginTop: 4 }}>

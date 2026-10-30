@@ -2,7 +2,7 @@ import * as React from 'react'
 import { View } from 'react-native'
 import { Image } from 'expo-image'
 import { config } from '~/lib/config'
-import { useTheme } from '~/theme'
+import { useTheme, fonts } from '~/theme'
 import { T } from './text'
 
 /**
@@ -15,9 +15,24 @@ import { T } from './text'
  * passes `label`.
  */
 
-/** Photos are signed URLs; the sample people's illustrations are paths on the website. */
-function resolve(src: string | null | undefined): string | null {
+/**
+ * The sample people's portraits ship inside the app, so they show offline and
+ * match this build whatever the website serves. Same drawings as
+ * public/demo/faces on the web, made by scripts/brand/sample-faces.py.
+ */
+const SAMPLE_FACES: Record<string, number> = {
+  maya: require('../../assets/people/maya.png'),
+  daniel: require('../../assets/people/daniel.png'),
+  priya: require('../../assets/people/priya.png'),
+  lucas: require('../../assets/people/lucas.png'),
+  elena: require('../../assets/people/elena.png'),
+}
+
+/** Photos are signed URLs; the sample people's illustrations are bundled, or paths on the website. */
+export function resolve(src: string | null | undefined): string | number | null {
   if (!src) return null
+  const sample = /^\/demo\/faces\/([a-z]+)\.svg$/.exec(src)
+  if (sample && SAMPLE_FACES[sample[1]!] !== undefined) return SAMPLE_FACES[sample[1]!]!
   if (/^https?:\/\//i.test(src)) return src
   return src.startsWith('/') ? `${config.apiUrl}${src}` : null
 }
@@ -61,7 +76,7 @@ export function Avatar({
   ]
   const tint = tints[bucket(name, tints.length)]!
   const uri = resolve(src)
-  const [failed, setFailed] = React.useState<string | null>(null)
+  const [failed, setFailed] = React.useState<string | number | null>(null)
   const a11y = label
     ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label }
     : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const }
@@ -81,12 +96,12 @@ export function Avatar({
         overflow: 'hidden',
       }}
     >
-      <T style={{ color: tint.fg, fontSize: size * 0.34, lineHeight: size * 0.4, fontFamily: 'InstrumentSans_500Medium' }} maxFontSizeMultiplier={1}>
+      <T style={{ color: tint.fg, fontSize: size * 0.34, lineHeight: size * 0.4, fontFamily: fonts.sansMedium }} maxFontSizeMultiplier={1}>
         {initials(name)}
       </T>
       {uri && failed !== uri ? (
         <Image
-          source={{ uri }}
+          source={typeof uri === 'string' ? { uri } : uri}
           style={{ position: 'absolute', top: 0, left: 0, width: size, height: size }}
           contentFit="cover"
           contentPosition={{ top: '35%' }}

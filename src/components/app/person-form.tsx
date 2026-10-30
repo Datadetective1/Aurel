@@ -86,6 +86,7 @@ export function PersonForm({
         <FormField
           id="fullName"
           label="Full name"
+          description="First and last name. A first name alone is not enough to look anyone up."
           required
           error={state.fieldErrors?.fullName?.[0]}
           className="sm:col-span-2"

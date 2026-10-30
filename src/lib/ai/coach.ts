@@ -933,7 +933,7 @@ async function describePerson(
 
   const header =
     sections.length === 0
-      ? `I don't know enough about ${person.displayName} yet. There are no recorded observations or interactions — research their public footprint or log a conversation and this fills in.`
+      ? `I don't have anything on ${person.displayName} yet, so there is nothing to prepare you with. Open their page and look them up in public sources (their full name and company make that work), or add a few notes about them yourself. Once there is something to go on, ask again.`
       : `${person.displayName}${person.jobTitle ? `, ${person.jobTitle}` : ''}${person.organization ? ` at ${person.organization}` : ''}. ${person.interactionCount} recorded interaction${person.interactionCount === 1 ? '' : 's'}.`
 
   const unknowns: string[] = []

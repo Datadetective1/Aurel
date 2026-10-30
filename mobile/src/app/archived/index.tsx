@@ -14,7 +14,7 @@ import { Notice } from '~/components/notice'
 import { SampleChip } from '~/components/relationship'
 import { Empty, Failure, Loading, Screen, StaleNote } from '~/components/screen'
 import { T } from '~/components/text'
-import { TOUCH, useTheme } from '~/theme'
+import { TOUCH, useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
 
 /**
@@ -119,7 +119,7 @@ export default function Archived() {
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
-                  <T variant="small" style={{ fontFamily: 'InstrumentSans_500Medium' }}>
+                  <T variant="small" style={{ fontFamily: fonts.sansMedium }}>
                     {p.name}
                   </T>
                   <T variant="meta" tone="muted">

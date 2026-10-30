@@ -24,7 +24,10 @@ brass-filled primary button spends the one colour the brand has on a rectangle.
 
 ## Type
 
-Instrument Serif for display, Instrument Sans for everything else. Serif appears
+Gloock for display, Schibsted Grotesk for everything else. (Until October 2026
+the pair was Instrument Serif and Instrument Sans; testers said it read like
+many other apps, so the pair changed. The logo wordmark is still outlined
+Instrument Serif and is a separate decision.) Serif appears
 at headline sizes and for single significant numbers — `01 / 24` in the
 assessment, a plan name, a count. It is a voice, not a decoration, and it stops
 carrying meaning the moment it appears at body size.
