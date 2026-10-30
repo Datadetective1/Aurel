@@ -4,8 +4,9 @@ Text-to-image with FLUX.1 [schnell] (Black Forest Labs, Apache 2.0 licence,
 outputs free for commercial use), run on a public Hugging Face Space through
 gradio_client. No reference images: each prompt describes an invented person.
 
-Usage: python scripts/brand/sample-photos.py OUT_DIR [seeds per person]
-Writes OUT_DIR/<key>-<seed>.webp, square, for picking by eye.
+Usage: python scripts/brand/sample-photos.py OUT_DIR KEY [seeds]
+Writes OUT_DIR/<key>-<seed>.webp, square, for picking by eye. One person per
+run, because a Space's free GPU quota is small and counted per machine.
 """
 import pathlib
 import shutil
@@ -14,7 +15,8 @@ import sys
 from gradio_client import Client
 
 OUT = pathlib.Path(sys.argv[1])
-PER = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+KEY = sys.argv[2]
+PER = int(sys.argv[3]) if len(sys.argv) > 3 else 2
 OUT.mkdir(parents=True, exist_ok=True)
 
 STYLE = (
@@ -39,30 +41,31 @@ PEOPLE = {
 SPACES = ['black-forest-labs/FLUX.1-schnell', 'evalstate/flux1_schnell']
 
 
-def connect():
-    last = None
+def generate(prompt, seed):
+    """Try each Space in turn; a Space out of free quota or asleep is skipped."""
     for name in SPACES:
         try:
-            return name, Client(name)
-        except Exception as e:  # space asleep or gone, try the next
-            last = e
+            result = Client(name, verbose=False).predict(
+                prompt=prompt, seed=seed, randomize_seed=False, width=1024, height=1024,
+                num_inference_steps=4, api_name='/infer',
+            )
+        except Exception as e:
             print(f'{name}: {e}')
-    raise SystemExit(f'no FLUX.1 schnell space reachable: {last}')
-
-
-name, client = connect()
-print('space', name)
-for key, who in PEOPLE.items():
-    for i in range(PER):
-        seed = 1000 + i * 37
-        prompt = f'{STYLE}, {who}'
-        result = client.predict(
-            prompt=prompt, seed=seed, randomize_seed=False, width=1024, height=1024,
-            num_inference_steps=4, api_name='/infer',
-        )
+            continue
         path = result[0] if isinstance(result, (list, tuple)) else result
-        if isinstance(path, dict):
-            path = path.get('path') or path.get('url')
-        dest = OUT / f'{key}-{seed}{pathlib.Path(str(path)).suffix or ".webp"}'
-        shutil.copy(path, dest)
-        print('wrote', dest)
+        return path.get('path') if isinstance(path, dict) else path
+    return None
+
+
+made = 0
+for i in range(PER):
+    seed = 1000 + i * 37
+    path = generate(f'{STYLE}, {PEOPLE[KEY]}', seed)
+    if not path:
+        continue
+    dest = OUT / f'{KEY}-{seed}{pathlib.Path(str(path)).suffix or ".webp"}'
+    shutil.copy(path, dest)
+    made += 1
+    print('wrote', dest)
+if not made:
+    raise SystemExit(f'no image made for {KEY}')
