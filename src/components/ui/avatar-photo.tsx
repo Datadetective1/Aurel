@@ -1,5 +1,6 @@
 'use client'
 
+import { sampleFace } from '@/lib/demo/faces'
 import { cn } from '@/lib/utils'
 
 /**
@@ -33,6 +34,7 @@ export function AvatarPhoto({
   priority?: boolean
   className?: string
 }) {
+  src = sampleFace(src)
   // Avatars are arbitrary remote or data URLs supplied per user, so
   // next/image would need a per-user remote allowlist to be configured.
   return (

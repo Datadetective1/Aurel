@@ -17,21 +17,22 @@ import { T } from './text'
 
 /**
  * The sample people's portraits ship inside the app, so they show offline and
- * match this build whatever the website serves. Same drawings as
- * public/demo/faces on the web, made by scripts/brand/sample-faces.py.
+ * match this build whatever the website serves. Same photos of invented
+ * people as public/demo/faces on the web (provenance in its README). Older
+ * accounts store the drawings' `.svg` paths, which map to the same photos.
  */
 const SAMPLE_FACES: Record<string, number> = {
-  maya: require('../../assets/people/maya.png'),
-  daniel: require('../../assets/people/daniel.png'),
-  priya: require('../../assets/people/priya.png'),
-  lucas: require('../../assets/people/lucas.png'),
-  elena: require('../../assets/people/elena.png'),
+  maya: require('../../assets/people/maya.jpg'),
+  daniel: require('../../assets/people/daniel.jpg'),
+  priya: require('../../assets/people/priya.jpg'),
+  lucas: require('../../assets/people/lucas.jpg'),
+  elena: require('../../assets/people/elena.jpg'),
 }
 
-/** Photos are signed URLs; the sample people's illustrations are bundled, or paths on the website. */
+/** Photos are signed URLs; the sample people's photos are bundled, or paths on the website. */
 export function resolve(src: string | null | undefined): string | number | null {
   if (!src) return null
-  const sample = /^\/demo\/faces\/([a-z]+)\.svg$/.exec(src)
+  const sample = /^\/demo\/faces\/([a-z]+)\.(?:svg|webp)$/.exec(src)
   if (sample && SAMPLE_FACES[sample[1]!] !== undefined) return SAMPLE_FACES[sample[1]!]!
   if (/^https?:\/\//i.test(src)) return src
   return src.startsWith('/') ? `${config.apiUrl}${src}` : null

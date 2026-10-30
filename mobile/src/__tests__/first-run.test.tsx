@@ -103,9 +103,11 @@ describe('adding someone new', () => {
 describe('sample portraits', () => {
   it('ship inside the app, so they match this build', () => {
     // A bundled asset, not a link to the website.
-    const face = resolve('/demo/faces/maya.svg')
+    const face = resolve('/demo/faces/maya.webp')
     expect(face).not.toBeNull()
     expect(typeof face).not.toBe('string')
+    // Accounts seeded with the old drawings get the same bundled photo.
+    expect(resolve('/demo/faces/maya.svg')).toBe(face)
     expect(resolve('/people/someone.webp')).toBe('https://www.atturel.com/people/someone.webp')
     expect(resolve('https://example.com/a.jpg')).toBe('https://example.com/a.jpg')
   })

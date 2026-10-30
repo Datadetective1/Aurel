@@ -5,9 +5,6 @@ name: Sample photos
 # the branch it ran on for picking by eye.
 
 on:
-  push:
-    branches: [feat/sample-photos]
-    paths: [scripts/brand/sample-photos.py, .github/workflows/sample-photos.yml]
   workflow_dispatch:
 
 permissions:
