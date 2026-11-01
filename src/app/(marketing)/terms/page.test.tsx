@@ -38,17 +38,21 @@ describe('the terms', () => {
     expect(text).not.toContain('not yet a binding legal document')
   })
 
-  it('name the operator, and present no company or registration as complete', () => {
+  it('name Harborlune LLC as the operator, and claim no assumed name', () => {
     const text = render(<TermsPage />).container.textContent ?? ''
+    expect(brand.legalEntity).toBe('Harborlune LLC')
     expect(text).toContain(`between you and ${brand.legalEntity}, who operates ${brand.name}`)
     expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}`)
-    expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
+    expect(text).not.toMatch(/\b(DBA|doing business as)\b/i)
+    expect(text).not.toMatch(/\b(Labs|Inc\.?)\b/)
   })
 
   it('give contact by email, and publish no postal address', () => {
     const text = render(<TermsPage />).container.textContent ?? ''
     expect(text).toContain(brand.email.support)
     expect(text).toContain(brand.email.privacy)
-    expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}. Effective`)
+    expect(text).toContain(
+      `${brand.name} is operated by ${brand.legalEntity}. Governing law: ${brand.legal.jurisdiction}. Effective`,
+    )
   })
 })
