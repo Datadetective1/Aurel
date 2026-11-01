@@ -73,10 +73,11 @@ describe('the privacy page', () => {
     )
   })
 
-  it('names the operator, and presents no company or registration as complete', () => {
+  it('names Harborlune LLC as the operator, and claims no assumed name', () => {
     const text = render(<PrivacyPage />).container.textContent ?? ''
     expect(text).toContain(`${brand.name} is operated by ${brand.legalEntity}`)
-    expect(text).not.toMatch(/\b(Labs|LLC|Inc\.?|DBA)\b/)
+    expect(text).not.toMatch(/\b(DBA|doing business as)\b/i)
+    expect(text).not.toMatch(/\b(Labs|Inc\.?)\b/)
   })
 
   it('states what Apple 5.1.1(i) and CalOPPA ask for: retention, provider terms, changes', () => {

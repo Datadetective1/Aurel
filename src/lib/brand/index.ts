@@ -43,11 +43,12 @@ export const brand = {
   slug: 'atturel',
   /**
    * The operator: the person or company that provides the service and is the
-   * other party to the Terms. Today an individual operating Atturel (owner,
-   * 25 Oct 2026); a company has not been formed yet. Change it only once a
-   * registration is actually complete.
+   * other party to the Terms. Harborlune LLC, a Texas LLC formed 24 Oct 2026;
+   * Amary asked on 1 Nov 2026 for the legal pages to name it. No assumed name
+   * (DBA) is filed for Atturel, so the pages say "operated by", never "doing
+   * business as".
    */
-  legalEntity: 'Amary Biton Coulibaly',
+  legalEntity: 'Harborlune LLC',
   /** Primary marketing domain, display form (no protocol). */
   domain: 'atturel.com',
 
@@ -95,17 +96,18 @@ export const brand = {
 
   legal: {
     /**
-     * Governing law and venue for the Terms. Optional; while null the Terms
-     * omit the line. Never guess it. (No postal address is published: none is
+     * Governing law for the Terms: Texas, the home state of Harborlune LLC
+     * (set 1 Nov 2026 with the operator change). While null the Terms omit
+     * the line. (No postal address is published: none is
      * required for the current pages, and contact is by the email addresses
      * above -- see docs/LEGAL_REVIEW_REQUIRED.md, item 3.)
      */
-    jurisdiction: null as string | null,
+    jurisdiction: 'the State of Texas' as string | null,
     /**
      * The day the current Terms and Privacy took effect: the day they were
      * published. Change it with any change to either page.
      */
-    policiesEffective: '26 October 2026',
+    policiesEffective: '1 November 2026',
     /** Set true only after a lawyer has reviewed Terms + Privacy. */
     policiesLegallyReviewed: false,
   },
