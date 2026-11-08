@@ -220,6 +220,13 @@ export default function PrivacyPage() {
             contains none of your relationship record. Stripe keeps its own records of past
             payments, as payment processors are required to.
           </p>
+          <p>
+            If you subscribe in the iPhone app, Apple handles the payment instead, and we never see
+            your card or your Apple ID. Apple sends us a signed record of the subscription: its
+            identifier, the plan, the dates it covers, whether it will renew, and whether it was
+            refunded. We keep that record with your account and delete it when you delete your
+            account.
+          </p>
         </Section>
 
         <Section title="Service providers">
@@ -241,6 +248,9 @@ export default function PrivacyPage() {
             </li>
             <li className="list-disc">Resend: sending account and product email</li>
             <li className="list-disc">Stripe: payments</li>
+            <li className="list-disc">
+              Apple: payments for subscriptions bought in the iPhone app
+            </li>
             <li className="list-disc">
               Google and Microsoft: reading your calendar, only if you connect one
               {providerConfigured('google')
@@ -305,9 +315,11 @@ export default function PrivacyPage() {
             </strong>{' '}
             The minimal billing record described under Payments; the log of billing notifications
             Stripe sent us about your plan, if you subscribed (their type, time and processing
-            status, with your former account&rsquo;s ID); and, if you ever changed your password,
-            when you did, with a one-way hash of the network address it came from, no longer linked
-            to you. None of these contains your relationship record, and they have no set end date.
+            status, with your former account&rsquo;s ID); the same kind of log for notifications
+            Apple sent us, if you subscribed in the iPhone app; and, if you ever changed your
+            password, when you did, with a one-way hash of the network address it came from, no
+            longer linked to you. None of these contains your relationship record, and they have no
+            set end date.
           </p>
           <p>
             <strong className="text-ink font-medium">At our service providers.</strong> Each keeps

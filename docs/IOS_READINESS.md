@@ -142,12 +142,16 @@ manifest; if you change an answer, change `mobile/app.json` too.
    describes a SaaS app with no prices or upgrade buttons being rejected under
    3.1.1 repeatedly because the review account had a web-paid plan. Options:
    add StoreKit for Pro (plan in [STOREKIT.md](STOREKIT.md)), or submit with a
-   reviewer account on Free and accept the rejection risk. Nothing was built or
-   changed in billing.
+   reviewer account on Free and accept the rejection risk. **Decided (owner,
+   8 Nov 2026): add an Apple in-app purchase for Pro beside web billing**,
+   accepting Apple's commission (15% under the Small Business Program). Built
+   on branch `storekit-pro-iap`; what is left at Apple is in
+   [STOREKIT.md](STOREKIT.md) §"Owner steps".
 2. **Free-plan limits for testers.** Free has 3 briefs a month, 60 transcription
    minutes, 5 people and no Atlas. **Decided (owner, 25 Oct 2026):** testers
    use the standard 14-day Pro trial, then $29 a month if they subscribe. No
-   pilot codes by default.
+   pilot codes by default. **Changed (owner, 29 Oct 2026):** invited testers
+   get free full access through owner-issued invitation codes.
 3. **Sample people and the Free people limit.** This branch stops the five
    invented sample people from counting toward Free's five people (a Free
    account that loaded the sample could not add anyone real). Revert the

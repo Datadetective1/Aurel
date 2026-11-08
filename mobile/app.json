@@ -160,7 +160,8 @@
           "microphonePermission": "Atturel records a conversation only while the app is open on your screen, so it can turn what was said into notes you review. Recording always shows in the app and pauses when you leave it."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true

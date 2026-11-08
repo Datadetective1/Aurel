@@ -199,3 +199,50 @@ describe('owner and pilot accounts', () => {
     expect(s.lines).toEqual(['Renews on 25 Nov 2026 at $29.'])
   })
 })
+
+describe('Pro billed by Apple', () => {
+  const apple: PlanSummaryInput = {
+    ...base,
+    plan: 'pro',
+    canSubscribe: false,
+    trialOffered: false,
+    billedBy: 'apple',
+    subscription: {
+      status: 'active',
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: '2026-11-25T15:00:00Z',
+    },
+  }
+
+  it('names no price and says where it is managed', () => {
+    const s = planSummary(apple)
+    expect(s.shortLabel).toBe('Pro')
+    expect(s.lines[0]).toBe('Billed by Apple. Renews on 25 Nov 2026.')
+    expect(s.lines[1]).toContain('Settings')
+    expect(s.lines.join(' ')).not.toContain('$')
+    expect(s.subscribe).toBeNull()
+  })
+
+  it('says when a canceled subscription ends', () => {
+    const s = planSummary({
+      ...apple,
+      subscription: { ...apple.subscription!, cancelAtPeriodEnd: true },
+    })
+    expect(s.shortLabel).toBe('Pro until 25 Nov 2026')
+    expect(s.lines[0]).toContain('Canceled. Pro stays on until 25 Nov 2026')
+  })
+
+  it('says Apple is retrying a failed renewal', () => {
+    const s = planSummary({
+      ...apple,
+      subscription: { ...apple.subscription!, status: 'past_due' },
+    })
+    expect(s.lines[0]).toContain('Apple could not renew')
+  })
+
+  it('never reads as a trial returning to Free while a trial still runs beside it', () => {
+    const s = planSummary({ ...apple, trial: { state: 'active', endsAt: '2026-11-01T15:00:00Z' } })
+    expect(s.label).toBe('Pro')
+    expect(s.lines.join(' ')).not.toContain('returns to Free')
+  })
+})

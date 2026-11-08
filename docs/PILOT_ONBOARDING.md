@@ -72,14 +72,14 @@ Two questions, by reply or to support@atturel.com:
   - Build 0.1.0 (5) is in internal testing.
   - Internal testers must be users of the App Store Connect team, up to 100. They need no Apple review.
   - The internal group (Team (Expo)) has one tester.
-- **iPhone access for pilots outside the team: external TestFlight.** Being prepared, not submitted. It needs:
+- **iPhone access for pilots outside the team: external TestFlight.** Approved by Apple's beta review on 29 Oct 2026 for build 0.1.0 (5), which can be tested until 23 Jan 2027. The public link is on, capped at 10 testers. Invited testers get full access with an owner-issued invitation code (changed 29 Oct 2026). What it needed:
   - an external group with test information;
   - the reviewer demo account (`appreview@atturel.com`, created 25 Oct 2026);
   - Apple's beta review (usually about a day).
 
   Testers are then invited by email or a public link. Steps: `docs/IOS_TESTFLIGHT.md` §6.
 
-- **Public App Store availability:** not submitted. How subscriptions are offered in the App Store build is still unresolved (audit §4, decisions 3 and 7).
+- **Public App Store availability:** not submitted. Decided 8 Nov 2026: Pro is sold in the app through Apple's in-app purchase as well as on the web (`docs/STOREKIT.md`).
 - **Payments.** Live checkout and the no-card trial are verified on production.
   - The live payment lifecycle is not yet verified by a real transaction: a completed subscription, the first charge, a failed charge, and cancellation.
   - The first genuine pilot purchase is that evidence. Watch the webhook delivery in Stripe (Developers › Webhooks › the live endpoint).

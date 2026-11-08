@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { track } from '@/lib/analytics'
@@ -11,6 +12,12 @@ import { resolveEntitlement, type EntitlementProvider } from './sources'
 import { transcriptionAllowance, type AllowanceDecision } from './transcription'
 import { isAppTrial, trialState, type TrialRow, type TrialState } from './trial'
 import { brand } from '@/lib/brand'
+import {
+  appleBillingLine,
+  appleProviderState,
+  type AppleSubscriptionRow,
+} from './apple/subscriptions'
+import { APPLE_SUBSCRIPTION_COLUMNS_USER, appleRowsFromDb } from './apple/read'
 
 /**
  * ENTITLEMENTS
@@ -35,6 +42,16 @@ export interface Entitlements {
   tier: AccessTier
   /** Which provider confers the plan, for "manage billing" and deletion. */
   provider: EntitlementProvider
+  /** Every provider billing this account now; each is stopped differently. */
+  billingProviders: Exclude<EntitlementProvider, 'manual' | 'none'>[]
+  /**
+   * The account's App Store subscription, when one is running; and whether
+   * App Store purchases can be recorded at all (migration 0025 applied).
+   */
+  apple: {
+    available: boolean
+    billing: { status: string; cancelAtPeriodEnd: boolean; currentPeriodEnd: string | null } | null
+  }
   isFounding: boolean
   /** Start of the current billing period, used as the quota bucket key. */
   periodStart: string
@@ -64,28 +81,40 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const user = await requireUser()
   const supabase = await createClient()
 
-  const [{ data: subscription }, { data: overrides }, { data: grant }] = await Promise.all([
-    supabase
-      .from('subscriptions')
-      .select(
-        'plan, status, is_founding, current_period_end, trial_ends_at, stripe_subscription_id',
-      )
-      .eq('user_id', user.id)
-      .maybeSingle(),
-    supabase
-      .from('entitlement_overrides')
-      .select('capability, limit_value, enabled, expires_at')
-      .eq('user_id', user.id),
-    // Read-only to the account it belongs to, and unwritable from any
-    // user-scoped connection -- see migration 0015. A revoked grant is a row
-    // with revoked_at set, so revocation takes effect on the next read.
-    supabase
-      .from('access_grants')
-      .select('tier, revoked_at')
-      .eq('user_id', user.id)
-      .is('revoked_at', null)
-      .maybeSingle(),
-  ])
+  const [{ data: subscription }, { data: overrides }, { data: grant }, appleRead] =
+    await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select(
+          'plan, status, is_founding, current_period_end, trial_ends_at, stripe_subscription_id',
+        )
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      supabase
+        .from('entitlement_overrides')
+        .select('capability, limit_value, enabled, expires_at')
+        .eq('user_id', user.id),
+      // Read-only to the account it belongs to, and unwritable from any
+      // user-scoped connection -- see migration 0015. A revoked grant is a row
+      // with revoked_at set, so revocation takes effect on the next read.
+      supabase
+        .from('access_grants')
+        .select('tier, revoked_at')
+        .eq('user_id', user.id)
+        .is('revoked_at', null)
+        .maybeSingle(),
+      // App Store subscriptions, read-own under RLS (migration 0025). Until the
+      // migration is applied the read fails: no Apple access, and the app is
+      // told not to offer a purchase it could not record.
+      (supabase as unknown as SupabaseClient)
+        .from('app_store_subscriptions')
+        .select(APPLE_SUBSCRIPTION_COLUMNS_USER)
+        .eq('user_id', user.id),
+    ])
+  const appleAvailable = !appleRead.error
+  const appleRows: AppleSubscriptionRow[] = appleAvailable
+    ? appleRowsFromDb((appleRead.data ?? []) as Record<string, unknown>[])
+    : []
 
   // One canonical answer from every provider. A subscription that lapsed
   // confers Free rather than staying entitled; see lib/billing/sources. The
@@ -105,7 +134,7 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
       subscription && !appTrial
         ? { plan: (subscription.plan ?? 'free') as PlanId, status: subscription.status ?? null }
         : null,
-    apple: null,
+    apple: appleProviderState(appleRows),
     trial: appTrial && trialRow?.trialEndsAt ? { endsAt: trialRow.trialEndsAt } : null,
     tier,
   })
@@ -136,6 +165,8 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
     plan,
     tier,
     provider: resolved.provider,
+    billingProviders: resolved.billingProviders,
+    apple: { available: appleAvailable, billing: appleBillingLine(appleRows) },
     isFounding: subscription?.is_founding ?? false,
     periodStart: currentPeriodStart(),
     trial: trial && trialRow?.trialEndsAt ? { state: trial, endsAt: trialRow.trialEndsAt } : null,

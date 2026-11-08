@@ -29,6 +29,10 @@ export interface PlanSummaryInput {
   /** Billing is configured, so Subscribe can open Checkout. */
   canSubscribe: boolean
   timeZone: string
+  /** 'apple' when the paid plan is an App Store subscription: `subscription`
+   *  is then Apple's (lib/billing/apple), its price is Apple's, and it is
+   *  managed in the subscriber's Apple ID, not in Manage billing. */
+  billedBy?: 'stripe' | 'apple'
   now?: Date
 }
 
@@ -50,10 +54,38 @@ export const SUBSCRIBE_LABEL = `Subscribe to Pro for ${PRICE}/month`
 export const KEPT_ON_FREE =
   'Nothing is deleted: on Free you can still read, edit and export everyone and everything. Adding a sixth person, the Relationship Atlas and the larger monthly allowances need Pro.'
 
+export const APPLE_MANAGE =
+  'Manage or cancel it on your iPhone: Settings, then your name, then Subscriptions.'
+
 export function planSummary(input: PlanSummaryInput): PlanSummary {
   const now = input.now ?? new Date()
   const on = (iso: string) => formatDateIn(iso, input.timeZone)
   const trial = input.trial
+
+  // Billed by Apple: Apple sets the price and holds the card, so these lines
+  // name neither, and say where it is managed. Checked first, so a trial that
+  // is still running beside it never reads as "returns to Free".
+  if (input.billedBy === 'apple' && input.plan !== 'free') {
+    const end = input.subscription?.currentPeriodEnd ?? null
+    const canceled = input.subscription?.cancelAtPeriodEnd ?? false
+    const retrying = input.subscription?.status === 'past_due'
+    return {
+      label: PLANS[input.plan].name,
+      shortLabel: canceled && end ? `Pro until ${on(end)}` : PLANS[input.plan].name,
+      lines: [
+        retrying
+          ? 'Apple could not renew your subscription and is retrying. Pro stays on meanwhile; check the payment method in your Apple ID.'
+          : canceled && end
+            ? `Canceled. Pro stays on until ${on(end)}, then the account moves to Free. ${KEPT_ON_FREE}`
+            : end
+              ? `Billed by Apple. Renews on ${on(end)}.`
+              : 'Billed by Apple.',
+        APPLE_MANAGE,
+      ],
+      offerTrial: false,
+      subscribe: null,
+    }
+  }
 
   // Owner and pilot accounts have everything, unless they also pay: a paying
   // pilot still needs to see when the next charge is.

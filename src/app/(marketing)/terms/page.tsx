@@ -114,6 +114,14 @@ export default function TermsPage() {
             expensive operations; your plan&rsquo;s current monthly limits and usage are shown under
             Settings &rarr; Plan.
           </p>
+          <p>
+            If you subscribe in the iPhone app, Apple bills Pro to your Apple ID, at the price shown
+            in the App Store, under Apple&rsquo;s terms. It renews every month unless you turn it
+            off at least 24 hours before the period ends, on your iPhone in Settings, then your
+            name, then Subscriptions; Pro stays on until the end of the period you paid for. Apple
+            handles refunds for these subscriptions. Deleting your {brand.name} account does not
+            cancel an Apple subscription, so cancel it with Apple as well.
+          </p>
         </Section>
 
         <Section title="Ending the arrangement">

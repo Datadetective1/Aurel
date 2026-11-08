@@ -182,6 +182,15 @@ export async function startCheckout(
     return { error: 'You are already on Pro. Use Manage billing to change your plan.' }
   }
 
+  // Pro bought in the iPhone app is billed by Apple; a second, Stripe
+  // subscription would charge the same person twice for the same plan.
+  if ((await getEntitlements()).billingProviders.includes('apple')) {
+    return {
+      error:
+        'You already have Pro through the App Store. Manage it on your iPhone: Settings, then your name, then Subscriptions.',
+    }
+  }
+
   // Subscribing during the trial keeps the rest of it: the first charge is
   // when the trial ends (or Checkout's 48-hour minimum, if that is later).
   const now = new Date()
