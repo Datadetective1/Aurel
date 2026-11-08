@@ -153,7 +153,45 @@ export interface AccountResponse {
    * the web, at `manageUrl`; Sync now is in the app. Absent on older servers.
    */
   calendar?: { connections: CalendarConnection[]; manageUrl?: string }
+  /**
+   * Pro through Apple. `productId` is the App Store product to load with
+   * StoreKit; `accountToken` is passed as StoreKit's appAccountToken so the
+   * purchase is bound to this account. `offer` is false when the account is
+   * already Pro another way (web subscription, full access), so the app shows
+   * no purchase. `active` when an Apple subscription is running for this
+   * account. Absent on older servers.
+   */
+  appleIap?: {
+    offer: boolean
+    productId: string
+    accountToken: string
+    active: boolean
+    renews: boolean | null
+    endsAt: string | null
+  }
 }
+
+// --- POST /api/mobile/purchases/apple -------------------------------------------
+export interface ApplePurchaseRequest {
+  /** StoreKit 2 transaction JWS, exactly as Apple signed it. */
+  signedTransaction: string
+}
+export type ApplePurchaseResponse =
+  | { ok: true; status: 'active' | 'past_due' | 'expired' | 'revoked'; expiresAt: string | null }
+  | {
+      ok: false
+      code:
+        | 'invalid_signature'
+        | 'wrong_app'
+        | 'unknown_product'
+        | 'not_subscription'
+        | 'environment'
+        | 'malformed'
+        | 'account_mismatch'
+        | 'linked_to_another_account'
+        | 'busy'
+        | 'unavailable'
+    }
 
 export interface CalendarConnection {
   provider: 'google' | 'microsoft' | string

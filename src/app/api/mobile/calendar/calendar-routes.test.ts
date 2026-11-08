@@ -47,6 +47,8 @@ vi.mock('@/lib/billing/entitlements', () => ({
     periodStart: '2026-10-01T00:00:00Z',
     quotas: { transcription_seconds: null },
     capabilities: { calendarIntegration },
+    billingProviders: ['stripe'],
+    apple: { available: true, billing: null },
   }),
   usageInPeriod: async () => 0,
 }))

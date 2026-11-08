@@ -6,7 +6,10 @@ import { fakeClient } from '../../../../../tests/stubs/fake-supabase'
  * =============================================================================
  * The plan line uses the website's own words and dates (account zone), and
  * `billing` says where it is managed -- `trial` for the 14-day trial, which
- * bills nothing. No purchase or payment link is ever sent (owner decision 3).
+ * bills nothing. No web checkout or payment link is ever sent (owner decision
+ * 3). Since Nov 8 2026 the app may sell Pro through Apple's own in-app
+ * purchase (StoreKit), described by `appleIap`; that is Apple's sheet, not a
+ * link (docs/STOREKIT.md).
  * =============================================================================
  */
 
@@ -38,6 +41,8 @@ vi.mock('@/lib/billing/entitlements', () => ({
     periodStart: '2026-10-01',
     quotas: { transcription_seconds: 3600 },
     capabilities: { calendarIntegration: true },
+    billingProviders: [],
+    apple: { available: true, billing: null },
     ...h.entitlements,
   }),
   usageInPeriod: async () => 0,
@@ -130,5 +135,71 @@ describe('GET /api/mobile/account: the plan', () => {
     }
     const raw = JSON.stringify(await account())
     expect(raw).not.toMatch(/checkout|stripe|subscribe|\/settings\/billing|\$29/i)
+  })
+})
+
+describe('GET /api/mobile/account: Pro through Apple', () => {
+  it('offers the App Store purchase, bound to this account', async () => {
+    h.entitlements = { plan: 'free', tier: 'standard', provider: 'none', trial: null }
+    expect(await account()).toMatchObject({
+      appleIap: {
+        offer: true,
+        productId: 'com.atturel.app.pro.monthly',
+        accountToken: 'u-1',
+        active: false,
+      },
+    })
+  })
+
+  it('offers it during the trial, which it does not end', async () => {
+    h.entitlements = {
+      plan: 'pro',
+      tier: 'standard',
+      provider: 'trial',
+      trial: { state: 'active', endsAt: '2026-11-08T15:00:00Z' },
+    }
+    expect(await account()).toMatchObject({ appleIap: { offer: true } })
+  })
+
+  it('never offers it to a web subscriber, a full-access account, or before the tables exist', async () => {
+    h.entitlements = {
+      plan: 'pro',
+      tier: 'standard',
+      provider: 'stripe',
+      billingProviders: ['stripe'],
+    }
+    expect(await account()).toMatchObject({ appleIap: { offer: false } })
+    h.entitlements = { plan: 'free', tier: 'pilot', provider: 'manual' }
+    expect(await account()).toMatchObject({ appleIap: { offer: false } })
+    h.entitlements = {
+      plan: 'free',
+      tier: 'standard',
+      provider: 'none',
+      apple: { available: false, billing: null },
+    }
+    expect(await account()).toMatchObject({ appleIap: { offer: false } })
+  })
+
+  it('shows an Apple subscription as billed by Apple, with its own dates', async () => {
+    h.entitlements = {
+      plan: 'pro',
+      tier: 'standard',
+      provider: 'apple',
+      trial: null,
+      billingProviders: ['apple'],
+      apple: {
+        available: true,
+        billing: {
+          status: 'active',
+          cancelAtPeriodEnd: true,
+          currentPeriodEnd: '2026-11-20T15:00:00Z',
+        },
+      },
+    }
+    expect(await account()).toMatchObject({
+      planLabel: 'Pro until 20 Nov 2026',
+      billing: 'apple',
+      appleIap: { offer: false, active: true, renews: false, endsAt: '2026-11-20T15:00:00Z' },
+    })
   })
 })

@@ -76,17 +76,23 @@ export default async function BillingSettingsPage({
   // will be charged.
   const onTrial = entitlements.trial?.state === 'active'
   const subscribable = checkoutAvailable()
+  // Pro through the iPhone app: Apple bills it and the subscriber manages it
+  // in their Apple ID. There is nothing at Stripe to show or manage.
+  const billedByApple = entitlements.provider === 'apple'
   const summary = planSummary({
     plan: entitlements.plan,
     fullAccess,
     trial: entitlements.trial,
-    subscription: billing
-      ? {
-          status: billing.status,
-          cancelAtPeriodEnd: billing.cancel_at_period_end,
-          currentPeriodEnd: billing.current_period_end,
-        }
-      : null,
+    billedBy: billedByApple ? 'apple' : 'stripe',
+    subscription: billedByApple
+      ? entitlements.apple.billing
+      : billing
+        ? {
+            status: billing.status,
+            cancelAtPeriodEnd: billing.cancel_at_period_end,
+            currentPeriodEnd: billing.current_period_end,
+          }
+        : null,
     trialOffered:
       trialOfferOpen() &&
       entitlements.plan === 'free' &&
@@ -104,7 +110,7 @@ export default async function BillingSettingsPage({
     timeZone,
   })
   // Subscribed at Stripe, as opposed to on the trial Atturel grants itself.
-  const subscribed = entitlements.plan !== 'free' && !onTrial
+  const subscribed = entitlements.plan !== 'free' && !onTrial && !billedByApple
 
   const usage = await Promise.all(
     metered.map(async (kind) => ({
@@ -293,8 +299,9 @@ export default async function BillingSettingsPage({
       ) : null}
 
       <p className="text-ink-muted mt-8 max-w-lg text-xs leading-relaxed">
-        Cancel any time from Manage billing; Pro stays on until the end of the period you paid for,
-        or of your trial if you subscribed during it. Billing questions:{' '}
+        {billedByApple ? 'Web subscriptions: cancel' : 'Cancel'} any time from Manage billing; Pro
+        stays on until the end of the period you paid for, or of your trial if you subscribed during
+        it. Billing questions:{' '}
         <a
           href={`mailto:${brand.email.support}`}
           className="text-accent underline underline-offset-2"

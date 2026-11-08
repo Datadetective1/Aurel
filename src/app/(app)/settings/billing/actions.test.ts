@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
   timezone: 'America/Chicago',
   tier: 'standard' as string,
   configured: true,
+  appleActive: false,
 }))
 
 class RedirectSignal extends Error {
@@ -168,7 +169,7 @@ vi.mock('@/lib/billing/entitlements', async () => {
           row && !app
             ? { plan: row.plan as 'free' | 'pro', status: (row.status as string) ?? null }
             : null,
-        apple: null,
+        apple: h.appleActive ? { plan: 'pro', status: 'active' } : null,
         trial: app && trialRow?.trialEndsAt ? { endsAt: trialRow.trialEndsAt } : null,
         tier: h.tier as 'standard',
       })
@@ -177,6 +178,7 @@ vi.mock('@/lib/billing/entitlements', async () => {
         plan: resolved.plan,
         tier: h.tier,
         provider: resolved.provider,
+        billingProviders: resolved.billingProviders,
         trial: state && trialRow?.trialEndsAt ? { state, endsAt: trialRow.trialEndsAt } : null,
       }
     },
@@ -229,6 +231,7 @@ beforeEach(() => {
   h.subscriptions = [freeRow()]
   h.tier = 'standard'
   h.configured = true
+  h.appleActive = false
   vi.clearAllMocks()
 })
 afterEach(() => vi.useRealTimers())
@@ -468,5 +471,18 @@ describe('subscribing without a trial running', () => {
     const { state } = await subscribe()
     expect(state?.error).toMatch(/already on Pro/)
     expect(stripeCalls()).toBe(0)
+  })
+})
+
+describe('subscribing while Apple already bills Pro', () => {
+  it('refuses, and starts nothing at Stripe', async () => {
+    h.appleActive = true
+    const { state, url } = await subscribe()
+    expect(url).toBeNull()
+    expect(state).toEqual({
+      error:
+        'You already have Pro through the App Store. Manage it on your iPhone: Settings, then your name, then Subscriptions.',
+    })
+    expect(stripeFake.checkout.sessions.create).not.toHaveBeenCalled()
   })
 })

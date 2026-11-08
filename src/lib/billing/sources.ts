@@ -10,9 +10,9 @@ import { trialRunning } from './trial'
  *
  *   stripe   web subscriptions, written only by the signed webhook into
  *            `subscriptions`
- *   apple    App Store subscriptions -- NOT ACTIVE. The slot exists so the
- *            resolution rule is decided now; nothing writes it yet. See
- *            docs/STOREKIT.md for the table and server notifications it needs.
+ *   apple    App Store subscriptions bought in the iPhone app, written only
+ *            after Apple's signature verifies (lib/billing/apple) into
+ *            `app_store_subscriptions`. See docs/STOREKIT.md.
  *   manual   owner and pilot grants in `access_grants`, and support overrides
  *   trial    the 14-day Pro trial Atturel grants itself, with no card and no
  *            Stripe subscription (lib/billing/trial). Never a billing provider:
@@ -33,7 +33,7 @@ export interface ProviderState {
 
 export interface EntitlementSources {
   stripe: ProviderState | null
-  /** Always null until App Store subscriptions are activated. */
+  /** The account's App Store subscription (lib/billing/apple), or null. */
   apple: ProviderState | null
   /** The app's own trial and when it ends, when the account has one. */
   trial?: { endsAt: string } | null

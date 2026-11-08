@@ -8,6 +8,7 @@ import { deleteCurrentAccount } from '@/lib/account/deletion.server'
 import { mobileCaptureLimits } from '@/lib/capture/limits'
 import { absoluteUrl, brand } from '@/lib/brand'
 import { features } from '@/lib/env'
+import { APPLE_PRO_MONTHLY } from '@/lib/billing/apple/subscriptions'
 import { CALENDAR_COLUMNS, mobileCalendarConnection } from '@/lib/mobile/calendar'
 import type {
   AccountResponse,
@@ -63,13 +64,17 @@ export async function GET() {
       plan: entitlements.plan,
       fullAccess: hasFullAccess(entitlements.tier),
       trial: entitlements.trial ?? null,
-      subscription: billing
-        ? {
-            status: billing.status ?? null,
-            cancelAtPeriodEnd: Boolean(billing.cancel_at_period_end),
-            currentPeriodEnd: billing.current_period_end ?? null,
-          }
-        : null,
+      billedBy: entitlements.provider === 'apple' ? 'apple' : 'stripe',
+      subscription:
+        entitlements.provider === 'apple'
+          ? entitlements.apple.billing
+          : billing
+            ? {
+                status: billing.status ?? null,
+                cancelAtPeriodEnd: Boolean(billing.cancel_at_period_end),
+                currentPeriodEnd: billing.current_period_end ?? null,
+              }
+            : null,
       trialOffered: false,
       canSubscribe: false,
       timeZone: profile?.timezone ?? 'UTC',
@@ -100,6 +105,21 @@ export async function GET() {
         }),
       ),
       manageUrl: absoluteUrl('/settings/capabilities'),
+    },
+    appleIap: {
+      // Offered only where it can be recorded, and never to an account that
+      // is already Pro another way: a web subscriber or a full-access grant
+      // must not be billed twice. Someone on the 14-day trial may subscribe.
+      offer:
+        entitlements.apple.available &&
+        !hasFullAccess(entitlements.tier) &&
+        !entitlements.billingProviders.includes('stripe') &&
+        !entitlements.billingProviders.includes('apple'),
+      productId: APPLE_PRO_MONTHLY,
+      accountToken: user.id,
+      active: entitlements.billingProviders.includes('apple'),
+      renews: entitlements.apple.billing ? !entitlements.apple.billing.cancelAtPeriodEnd : null,
+      endsAt: entitlements.apple.billing?.currentPeriodEnd ?? null,
     },
   }
   return json(body)

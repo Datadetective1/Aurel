@@ -40,7 +40,7 @@ export async function deleteCurrentAccount(input: {
           plan: entitlements.plan,
           tier: entitlements.tier,
           stripeCustomerId: data?.stripe_customer_id ?? null,
-          appleActive: entitlements.provider === 'apple',
+          appleActive: entitlements.billingProviders.includes('apple'),
         }
       },
 

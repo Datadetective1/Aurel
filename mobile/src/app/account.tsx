@@ -20,6 +20,7 @@ import { config } from '~/lib/config'
 import { Failure, Loading, Screen, Section, Card, StaleNote } from '~/components/screen'
 import { Button } from '~/components/button'
 import { CalendarConnections } from '~/components/calendar-connections'
+import { ApplePro } from '~/components/apple-pro'
 import { T } from '~/components/text'
 import { TOUCH, useTheme, fonts } from '~/theme'
 export { RouteError as ErrorBoundary } from '~/components/route-error'
@@ -55,7 +56,7 @@ export default function Account() {
     data.billing === 'web'
       ? 'Billed on the web. Change or cancel it from Settings › Plan at atturel.com.'
       : data.billing === 'apple'
-        ? 'Billed by Apple. Change or cancel it in Settings › Apple ID › Subscriptions.'
+        ? 'Billed by Apple. Change or cancel it on your iPhone in Settings, then your name, then Subscriptions.'
         : data.billing === 'included'
           ? 'Included with your access. Nothing is billed.'
           : data.billing === 'trial'
@@ -77,6 +78,8 @@ export default function Account() {
           <Button label="Edit profile" icon="user" variant="secondary" onPress={() => router.push('/profile')} />
         </View>
       </Card>
+
+      {data.appleIap ? <ApplePro iap={data.appleIap} legal={data.legal} onChanged={refresh} /> : null}
 
       <Notifications />
 
